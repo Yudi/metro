@@ -8,6 +8,8 @@ import express from 'express';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import xmlbuilder from 'xmlbuilder';
+
 const serverDistFolder = dirname(fileURLToPath(import.meta.url));
 const browserDistFolder = resolve(serverDistFolder, '../browser');
 
@@ -47,6 +49,25 @@ app.use('/**', (req, res, next) => {
       response ? writeResponseToNodeResponse(response, res) : next(),
     )
     .catch(next);
+});
+
+const routes = ['/'];
+
+app.get('/sitemap.xml', (req, res) => {
+  const root = xmlbuilder.create('urlset', {
+    version: '1.0',
+    encoding: 'UTF-8',
+  });
+  root.att('xmlns', 'http://www.sitemaps.org/schemas/sitemap/0.9');
+
+  routes.forEach((route) => {
+    const url = root.ele('url');
+    url.ele('loc', `https://metro.yudi.com.br${route}`);
+    // You can add more elements like <changefreq> and <priority> here if needed
+  });
+
+  res.header('Content-Type', 'application/xml');
+  res.send(root.end({ pretty: true }));
 });
 
 /**

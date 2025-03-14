@@ -38,8 +38,10 @@
 </section>
 <section>
   <h1>Estado das linhas</h1>
-  @for (line of lineStatus()?.Data; track line) {
-    <h2>{{ line.Line }}</h2>
-    <p>{{ line.StatusCode }}</p>
+  @defer {
+    @for (line of lineStatus()?.Data; track line) {
+      <h2>{{ line.Line }}</h2>
+      <p>{{ line.StatusCode }}</p>
+    }
   }
 </section>

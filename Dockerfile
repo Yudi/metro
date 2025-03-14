@@ -27,10 +27,10 @@ RUN if [[ $(uname -m) == "aarch64" ]] ; \
 
 RUN yarn global add bun
 
-FROM base AS prod-deps
+FROM install-bun AS prod-deps
 RUN bun install --omit=dev --frozen-lockfile
 
-FROM base AS build-deps
+FROM install-bun AS build-deps
 RUN bun install --frozen-lockfile
 
 FROM build-deps AS build

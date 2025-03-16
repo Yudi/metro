@@ -1,0 +1,35 @@
+<div class="container">
+  <div class="station-list">
+    @for (station of stopsL9; track station; let i = $index) {
+      <div class="station">
+        <div class="left-time">
+          <span>{{ station.nextTrain }}</span>
+        </div>
+        <div class="icon">
+          @if (i === 0) {
+            <img src="svg/station_first.svg" alt="Lane Icon" />
+          } @else if (i > 0 && i < stopsL9.length - 1) {
+            <img src="svg/station.svg" alt="Lane Icon" />
+          } @else if (i === stopsL9.length - 1) {
+            <img src="svg/station_last.svg" alt="Lane Icon" />
+          } @else {
+            <img src="svg/plain.svg" alt="Lane Icon" />
+          }
+        </div>
+        <div class="right-time">
+          <span>{{ station.nextTrain }}</span>
+        </div>
+        <div class="station-name">{{ station.name }}</div>
+      </div>
+      @if (i !== stopsL9.length - 1) {
+        <div class="station">
+          <div class="left-time"></div>
+          <div class="icon">
+            <img src="svg/plain.svg" alt="Line Icon" />
+          </div>
+          <div class="right-time"></div>
+        </div>
+      }
+    }
+  </div>
+</div>

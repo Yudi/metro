@@ -1,11 +1,12 @@
 import { Component, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { LineStatusService } from './shared/services/line-status.service';
-import { JsonPipe } from '@angular/common';
+import { LineStatusComponent } from './shared/components/line-status/line-status.component';
+import { Line9Component } from './shared/components/train-tracking/line-9/line-9.component';
 
 @Component({
   selector: 'app-root',
-  imports: [JsonPipe],
+  imports: [LineStatusComponent, Line9Component],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',
 })

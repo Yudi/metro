@@ -1,0 +1,110 @@
+.container {
+  max-width: 500px;
+}
+.header {
+  font-size: 24px;
+  font-weight: bold;
+  color: #212e84;
+  margin-bottom: 10px;
+}
+.grid {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  border-top: 2px solid #212e84;
+  padding-top: 10px;
+}
+.line {
+  display: contents;
+  width: 100%;
+}
+.line:hover {
+  background-color: red;
+}
+.line .badge {
+  width: 30px;
+  height: 30px;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  border-radius: 5px;
+  text-align: center;
+  line-height: 30px;
+}
+.line-name {
+  margin-right: 0.5rem;
+}
+.gray-circle {
+  width: 16px;
+  height: 16px;
+  background-color: #848c8f;
+  border-radius: 50%;
+}
+.green-circle {
+  width: 16px;
+  height: 16px;
+  background-color: #00a78d;
+  border-radius: 50%;
+}
+.red-circle {
+  width: 16px;
+  height: 16px;
+  background-color: #ee4034;
+  border-radius: 50%;
+}
+.yellow-circle {
+  width: 16px;
+  height: 16px;
+  background-color: #ffd300;
+  border-radius: 50%;
+}
+.azul {
+  background-color: #00529f;
+}
+.verde {
+  background-color: #008061;
+}
+.vermelha {
+  background-color: #ee4034;
+}
+.amarela {
+  background-color: #ffd300;
+}
+.lilas {
+  background-color: #784e9e;
+}
+.rubi {
+  background-color: #9f1866;
+}
+.diamante {
+  background-color: #9d9e94;
+}
+.esmeralda {
+  background-color: #00a78d;
+}
+.turquesa {
+  background-color: #007c8e;
+}
+.coral {
+  background-color: #ef4e22;
+}
+.safira {
+  background-color: #033f87;
+}
+.jade {
+  background-color: #00ab5a;
+}
+.prata {
+  background-color: #848c8f;
+}
+.updated {
+  font-size: 12px;
+  color: gray;
+  margin-top: 10px;
+}
+.clickable {
+  cursor: pointer;
+}

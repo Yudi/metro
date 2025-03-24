@@ -1,7 +1,6 @@
 <section>
   <app-line-status></app-line-status>
 </section>
-<app-line-9></app-line-9>
 <section>
   <h1>Próximo trem</h1>
   <p>
@@ -9,34 +8,10 @@
     próximo trem, mas não possui uma página com a lista de estações.
   </p>
   <p>Selecione a sua estação de origem para saber o horário do próximo trem.</p>
-  <h2>Linha 8 - Diamante</h2>
 
-  <ul>
-    @for (stop of stopsL8; track stop) {
-      <li>
-        <a
-          [href]="
-            'https://proximotrem.viamobilidade.com.br/?linha=L8&estacao_origem=' +
-            stop.code
-          "
-          >{{ stop.name }}</a
-        >
-      </li>
-    }
-  </ul>
+  <div class="lines-grid">
+    <app-line-8 class="line"></app-line-8>
 
-  <h2>Linha 9 - Esmeralda</h2>
-  <ul>
-    @for (stop of stopsL9; track stop) {
-      <li>
-        <a
-          [href]="
-            'https://proximotrem.viamobilidade.com.br/?linha=L9&estacao_origem=' +
-            stop.code
-          "
-          >{{ stop.name }}</a
-        >
-      </li>
-    }
-  </ul>
+    <app-line-9 class="line"></app-line-9>
+  </div>
 </section>

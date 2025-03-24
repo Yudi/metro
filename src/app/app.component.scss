@@ -1,0 +1,13 @@
+.lines-grid {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  gap: 10px;
+  align-items: start;
+  padding-top: 10px;
+
+  @media (max-width: 850px) {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    gap: 15px;
+  }
+}

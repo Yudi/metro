@@ -106,10 +106,6 @@ export class Line9Component implements OnInit {
   getNextTrain(stationCode: string) {
     this.requestNextTrain('L9', stationCode).pipe(
       tap((data: NextTrain[]) => {
-        // this.trainDataSubject.next({
-        //   ...this.trainDataSubject.value,
-        //   [code]: data, // Updating the dictionary reactively
-
         this.stopsL9.map((stop) => {
           if (stop.code === stationCode) {
             stop['nextTrain'] = data;

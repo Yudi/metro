@@ -1,6 +1,6 @@
 <div class="container">
   <div class="station-list">
-    @for (station of stopsL9; track station; let i = $index) {
+    @for (station of stopsL8; track station; let i = $index) {
       <div class="station">
         <div class="left-time">
           <span>{{ station.nextTrain }}</span>
@@ -9,32 +9,32 @@
           @if (i === 0) {
             <a
               [href]="
-                'https://proximotrem.viamobilidade.com.br/?linha=L9&estacao_origem=' +
+                'https://proximotrem.viamobilidade.com.br/?linha=L8&estacao_origem=' +
                 station.code
               "
             >
-              <img src="svg/l9_station_first.svg" alt="Lane Icon" />
+              <img src="svg/l8_station_first.svg" alt="Lane Icon" />
             </a>
-          } @else if (i > 0 && i < stopsL9.length - 1) {
+          } @else if (i > 0 && i < stopsL8.length - 1) {
             <a
               [href]="
-                'https://proximotrem.viamobilidade.com.br/?linha=L9&estacao_origem=' +
+                'https://proximotrem.viamobilidade.com.br/?linha=L8&estacao_origem=' +
                 station.code
               "
             >
-              <img src="svg/l9_station.svg" alt="Lane Icon" />
+              <img src="svg/l8_station.svg" alt="Lane Icon" />
             </a>
-          } @else if (i === stopsL9.length - 1) {
+          } @else if (i === stopsL8.length - 1) {
             <a
               [href]="
-                'https://proximotrem.viamobilidade.com.br/?linha=L9&estacao_origem=' +
+                'https://proximotrem.viamobilidade.com.br/?linha=L8&estacao_origem=' +
                 station.code
               "
             >
-              <img src="svg/l9_station_last.svg" alt="Lane Icon" />
+              <img src="svg/l8_station_last.svg" alt="Lane Icon" />
             </a>
           } @else {
-            <img src="svg/l9_plain.svg" alt="Lane Icon" />
+            <img src="svg/l8_plain.svg" alt="Lane Icon" />
           }
         </div>
         <div class="right-time">
@@ -43,18 +43,18 @@
         <div class="station-name">
           <a
             [href]="
-              'https://proximotrem.viamobilidade.com.br/?linha=L9&estacao_origem=' +
+              'https://proximotrem.viamobilidade.com.br/?linha=L8&estacao_origem=' +
               station.code
             "
             >{{ station.name }}</a
           >
         </div>
       </div>
-      @if (i !== stopsL9.length - 1) {
+      @if (i !== stopsL8.length - 1) {
         <div class="station">
           <div class="left-time"></div>
           <div class="icon">
-            <img src="svg/l9_plain.svg" alt="Line Icon" />
+            <img src="svg/l8_plain.svg" alt="Line Icon" />
           </div>
           <div class="right-time"></div>
         </div>

@@ -5,7 +5,7 @@ import { Title, Meta } from '@angular/platform-browser';
   providedIn: 'root',
 })
 export class SeoService {
-  readonly siteTitle = 'Transporte metropolitano de São Paulo';
+  readonly siteTitle = 'Transporte Metropolitano de São Paulo';
   private title = inject(Title);
   private meta = inject(Meta);
   private renderer: Renderer2;

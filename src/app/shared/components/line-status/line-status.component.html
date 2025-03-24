@@ -1,0 +1,23 @@
+<div class="container">
+  <div class="header">Estado das linhas</div>
+  <div class="grid">
+    @defer {
+      @for (line of lineStatus()?.Data; track line) {
+        <div
+          class="line"
+          [ngClass]="{
+            clickable: isOperationNormal(line.StatusLabel),
+          }"
+        >
+          <div class="badge" [class]="normalizeColor(line.ColorName)">
+            {{ line.Code }}
+          </div>
+          <div class="line-name">{{ formatLineName(line.ColorName) }}</div>
+          <div class="status">{{ line.StatusLabel }}</div>
+          <div [class]="getStatusColor(line.StatusColor)"></div>
+        </div>
+      }
+    }
+    <!-- <div class="updated">Atualizado: 16/03/2025 04:31:26</div> -->
+  </div>
+</div>

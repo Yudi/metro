@@ -1,47 +1,17 @@
 <section>
+  <app-line-status></app-line-status>
+</section>
+<section>
   <h1>Próximo trem</h1>
   <p>
     A ViaMobilidade disponibiliza uma aplicação para consulta do horário do
     próximo trem, mas não possui uma página com a lista de estações.
   </p>
   <p>Selecione a sua estação de origem para saber o horário do próximo trem.</p>
-  <h2>Linha 8 - Diamante</h2>
 
-  <ul>
-    @for (stop of stopsL8; track stop) {
-      <li>
-        <a
-          [href]="
-            'https://proximotrem.viamobilidade.com.br/?linha=L8&estacao_origem=' +
-            stop.code
-          "
-          >{{ stop.name }}</a
-        >
-      </li>
-    }
-  </ul>
+  <div class="lines-grid">
+    <app-line-8 class="line"></app-line-8>
 
-  <h2>Linha 9 - Esmeralda</h2>
-  <ul>
-    @for (stop of stopsL9; track stop) {
-      <li>
-        <a
-          [href]="
-            'https://proximotrem.viamobilidade.com.br/?linha=L9&estacao_origem=' +
-            stop.code
-          "
-          >{{ stop.name }}</a
-        >
-      </li>
-    }
-  </ul>
-</section>
-<section>
-  <h1>Estado das linhas</h1>
-  @defer {
-    @for (line of lineStatus()?.Data; track line) {
-      <h2>{{ line.Line }}</h2>
-      <p>{{ line.StatusCode }}</p>
-    }
-  }
+    <app-line-9 class="line"></app-line-9>
+  </div>
 </section>

@@ -1,0 +1,40 @@
+.container {
+  display: flex;
+  align-items: center;
+}
+.station-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.station {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.icon {
+  display: flex;
+  flex-direction: row;
+  gap: 5px;
+}
+.icon img {
+  width: 30px;
+  height: 30px;
+}
+.icon a {
+  width: 30px;
+  height: 30px;
+}
+.station-name {
+  font-size: 1.25rem;
+  font-weight: bold;
+}
+.station-name a {
+  text-decoration: none;
+  color: inherit;
+}
+.left-time,
+.right-time {
+  width: 50px; /* Adjust as needed */
+  text-align: center;
+}

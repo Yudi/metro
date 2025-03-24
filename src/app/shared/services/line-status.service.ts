@@ -34,8 +34,12 @@ interface LineData {
   ColorName: string;
   ColorHex: string;
   Line: string;
-  StatusCode: string;
+  StatusCode:
+    | 'AtividadeProgramada'
+    | 'OperacaoNormal'
+    | 'OperacaoEncerrada'
+    | 'VelocidadeReduzida';
   StatusLabel: string;
   StatusColor: string;
-  Description: string;
+  Description: string | null;
 }

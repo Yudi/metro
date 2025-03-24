@@ -13,7 +13,6 @@ export class ViamobilidadeL8L9Service {
     lineCode: 'L8' | 'L9',
     stationCode: string,
   ): Observable<NextTrain[]> {
-    console.log(lineCode, stationCode);
     if (lineCode !== 'L8' && lineCode !== 'L9') {
       throw new Error('Invalid line code');
     }

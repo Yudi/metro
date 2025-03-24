@@ -100,7 +100,7 @@ export class Line8Component {
   ];
 
   getNextTrain(stationCode: string) {
-    this.requestNextTrain('L9', stationCode).pipe(
+    this.requestNextTrain('L8', stationCode).pipe(
       tap((data: NextTrain[]) => {
         this.stopsL8.map((stop) => {
           if (stop.code === stationCode) {

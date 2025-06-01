@@ -26,7 +26,7 @@ export class Line8Component {
       name: 'Palmeiras–Barra Funda',
     },
     {
-      code: 'LAP',
+      code: 'LAB',
       name: 'Lapa',
     },
     {

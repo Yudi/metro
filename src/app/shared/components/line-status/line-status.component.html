@@ -2,22 +2,38 @@
   <div class="header">Estado das linhas</div>
   <div class="grid">
     @defer {
-      @for (line of lineStatus()?.Data; track line) {
-        <div
-          class="line"
-          [ngClass]="{
-            clickable: isOperationNormal(line.StatusLabel),
-          }"
-        >
-          <div class="badge" [class]="normalizeColor(line.ColorName)">
-            {{ line.Code }}
+      @if (lineStatusSignal(); as lineStatus) {
+        @for (line of lineStatus.Data; track line) {
+          <div
+            class="line"
+            [ngClass]="{
+              clickable: !isOperationNormal(line.StatusColor),
+            }"
+            (click)="lineClick(line)"
+            (keypress)="lineClick(line)"
+            tabindex="0"
+          >
+            <div class="badge" [class]="normalizeColor(line.ColorName)">
+              {{ line.Code }}
+            </div>
+            <div class="line-name">{{ formatLineName(line.ColorName) }}</div>
+            <div class="status">{{ statusLabelFormat(line.StatusLabel) }}</div>
+            <div [class]="getStatusColor(line.StatusColor)"></div>
           </div>
-          <div class="line-name">{{ formatLineName(line.ColorName) }}</div>
-          <div class="status">{{ line.StatusLabel }}</div>
-          <div [class]="getStatusColor(line.StatusColor)"></div>
+          @if (expandedLine() === line.Code.toString()) {
+            <div class="description">
+              <div class="description-title">
+                {{ line.Code }} - {{ line.ColorName }}
+              </div>
+              {{ line.Description }}
+            </div>
+          }
+        }
+        <div class="updated">
+          Atualizado às
+          {{ lineStatus.timestamp | date: "HH:mm:ss" }}
         </div>
       }
     }
-    <!-- <div class="updated">Atualizado: 16/03/2025 04:31:26</div> -->
   </div>
 </div>

@@ -1,6 +1,14 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { interval, Observable, shareReplay, startWith, switchMap } from 'rxjs';
+import {
+  interval,
+  map,
+  Observable,
+  of,
+  shareReplay,
+  startWith,
+  switchMap,
+} from 'rxjs';
 
 @Injectable({
   providedIn: 'root',
@@ -17,19 +25,21 @@ export class LineStatusService {
           'https://apim-proximotrem-prd-brazilsouth-001.azure-api.net/api/v1/lines',
         ),
       ),
+      map((data) => ({ ...data, timestamp: new Date() })),
       shareReplay(1),
     );
   }
 }
 
-interface LineStatus {
-  Status: string;
+export interface LineStatus {
+  Status: boolean;
   Message: string;
   MessageDebug: string;
   Data: LineData[];
+  timestamp: Date | null;
 }
 
-interface LineData {
+export interface LineData {
   Code: number;
   ColorName: string;
   ColorHex: string;
@@ -38,7 +48,8 @@ interface LineData {
     | 'AtividadeProgramada'
     | 'OperacaoNormal'
     | 'OperacaoEncerrada'
-    | 'VelocidadeReduzida';
+    | 'VelocidadeReduzida'
+    | 'Paralisada';
   StatusLabel: string;
   StatusColor: string;
   Description: string | null;

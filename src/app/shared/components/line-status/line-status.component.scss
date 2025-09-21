@@ -1,5 +1,5 @@
 .container {
-  max-width: 500px;
+  max-width: 450px;
 }
 .header {
   font-size: 24px;
@@ -10,17 +10,22 @@
 .grid {
   display: grid;
   grid-template-columns: auto auto 1fr auto;
-  gap: 10px;
+  gap: 0.25rem;
   align-items: center;
   border-top: 2px solid #212e84;
   padding-top: 10px;
+  font-size: 1.1rem;
 }
 .line {
-  display: contents;
+  display: grid;
+  grid-template-columns: auto 0.5fr 1fr auto;
+  align-items: center;
   width: 100%;
+  grid-column: span 4;
+  padding: 0.25rem 1rem;
 }
 .line:hover {
-  background-color: red;
+  background-color: #e0e0e0;
 }
 .line .badge {
   width: 30px;
@@ -33,6 +38,7 @@
   border-radius: 5px;
   text-align: center;
   line-height: 30px;
+  margin-right: 1rem;
 }
 .line-name {
   margin-right: 0.5rem;
@@ -107,4 +113,20 @@
 }
 .clickable {
   cursor: pointer;
+}
+.description {
+  grid-column: span 4;
+  font-size: 1rem;
+  color: #333;
+  background-color: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  padding: 10px;
+  margin-top: 5px;
+  width: 100%;
+}
+
+.description-title {
+  font-weight: bold;
+  margin-bottom: 5px;
 }

@@ -1,5 +1,5 @@
-import { DOCUMENT } from '@angular/common';
-import { inject, Injectable, Renderer2, RendererFactory2 } from '@angular/core';
+
+import { inject, Injectable, Renderer2, RendererFactory2, DOCUMENT } from '@angular/core';
 import { Title, Meta } from '@angular/platform-browser';
 @Injectable({
   providedIn: 'root',

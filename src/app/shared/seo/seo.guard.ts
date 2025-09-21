@@ -1,5 +1,5 @@
 import { SeoService } from './seo.service';
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import {
   ActivatedRouteSnapshot,
   CanActivate,
@@ -9,7 +9,7 @@ import {
   providedIn: 'root',
 })
 export class SeoGuard implements CanActivate {
-  public constructor(private seo: SeoService) {}
+  private seo = inject(SeoService);
   public canActivate(
     route: ActivatedRouteSnapshot,
     state: RouterStateSnapshot,

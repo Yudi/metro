@@ -10,6 +10,8 @@
               clickable: !isOperationNormal(line.StatusColor),
             }"
             (click)="lineClick(line)"
+            (keypress)="lineClick(line)"
+            tabindex="0"
           >
             <div class="badge" [class]="normalizeColor(line.ColorName)">
               {{ line.Code }}

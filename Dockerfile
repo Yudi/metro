@@ -3,7 +3,7 @@ FROM node:alpine AS base
 
 WORKDIR /app
 
-COPY package.json bun.lockb .
+COPY package.json bun.lock .
 
 FROM base AS install-bun
 

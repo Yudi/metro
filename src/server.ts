@@ -7,6 +7,7 @@ import {
 import express from 'express';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { routes as appRoutes } from './app/app.routes';
 
 import xmlbuilder from 'xmlbuilder';
 
@@ -38,20 +39,6 @@ app.use(
     redirect: false,
   }),
 );
-
-/**
- * Handle all other requests by rendering the Angular application.
- */
-app.use('/**', (req, res, next) => {
-  angularApp
-    .handle(req)
-    .then((response) =>
-      response ? writeResponseToNodeResponse(response, res) : next(),
-    )
-    .catch(next);
-});
-
-import { routes as appRoutes } from './app/app.routes';
 
 function collectPaths(routes: unknown[]): string[] {
   const paths: string[] = [];
@@ -88,6 +75,18 @@ app.get('/sitemap.xml', (req, res) => {
 
   res.header('Content-Type', 'application/xml');
   res.send(root.end({ pretty: true }));
+});
+
+/**
+ * Handle all other requests by rendering the Angular application.
+ */
+app.use('/**', (req, res, next) => {
+  angularApp
+    .handle(req)
+    .then((response) =>
+      response ? writeResponseToNodeResponse(response, res) : next(),
+    )
+    .catch(next);
 });
 
 /**

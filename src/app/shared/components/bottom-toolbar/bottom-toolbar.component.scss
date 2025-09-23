@@ -112,11 +112,6 @@
   box-shadow: 0 0 0 2px rgba(103, 80, 164, 0.18);
 }
 
-// Padding so content isn't hidden behind toolbar
-:host-context(.has-bottom-toolbar) .app-content {
-  padding-bottom: 4.5rem;
-}
-
 @media (min-width: 768px) {
   .bottom-toolbar {
     display: none;

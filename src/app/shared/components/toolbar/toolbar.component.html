@@ -9,16 +9,25 @@
     <!-- Mobile -->
     <mat-nav-list>
       @for (item of footerLinks; track item.name) {
-        <a
-          class="list-item"
-          mat-list-item
-          [routerLink]="item.link"
-          (click)="closeSidenav()"
-        >
-          <p class="list-item-label">
-            {{ item.name }}
-          </p>
-        </a>
+        @if (item.external) {
+          <a
+            href="{{ item.link }}"
+            class="list-item"
+            rel="noopener"
+            mat-list-item
+            (click)="closeSidenav()"
+          >
+            <p class="list-item-label">
+              {{ item.name }}
+            </p>
+          </a>
+        } @else {
+          <a routerLink="{{ item.link }}" class="list-item" mat-list-item>
+            <p class="list-item-label">
+              {{ item.name }}
+            </p></a
+          >
+        }
       }
     </mat-nav-list>
   </mat-sidenav>

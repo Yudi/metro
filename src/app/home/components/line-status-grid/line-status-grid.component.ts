@@ -1,29 +1,28 @@
-import { Component, inject, WritableSignal, signal } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import {
-  LineData,
-  LineStatusService,
-} from '../../services/line-status.service';
 import { CommonModule } from '@angular/common';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { LineDescriptionDialogComponent } from './line-description-dialog.component';
+import { ApiService, LineData } from '../../../shared/services/api.service';
 
 @Component({
-  selector: 'app-line-status',
-  imports: [CommonModule],
-  templateUrl: './line-status.component.html',
-  styleUrl: './line-status.component.scss',
+  selector: 'app-line-status-grid',
+  imports: [CommonModule, MatDialogModule],
+  templateUrl: './line-status-grid.component.html',
+  styleUrl: './line-status-grid.component.scss',
 })
-export class LineStatusComponent {
-  lineStatusService = inject(LineStatusService);
-  lineStatusSignal = toSignal(this.lineStatusService.requestStatus(), {
+export class LineStatusGridComponent {
+  apiService = inject(ApiService);
+  lineStatusSignal = toSignal(this.apiService.getOverallStatus(), {
     initialValue: null,
   });
-  expandedLine: WritableSignal<string | null> = signal(null); // Track the currently expanded line using WritableSignal
+  private dialog = inject(MatDialog);
 
   normalizeColor(color: string): string {
     return color
-      .normalize('NFD') // Decomposes characters (e.g., "lilás" → "lila"+"s")
-      .replace(/[\u0300-\u036f]/g, '') // Removes diacritics
-      .toLowerCase(); // Converts to lowercase
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
   }
 
   getStatusColor(color: string): string {
@@ -64,11 +63,8 @@ export class LineStatusComponent {
     if (this.isOperationNormal(line.StatusColor)) {
       return;
     }
-    // Toggle the expanded state
-    this.expandedLine.set(
-      this.expandedLine() === line.Code.toString()
-        ? null
-        : line.Code.toString(),
-    );
+    this.dialog.open(LineDescriptionDialogComponent, {
+      data: line,
+    });
   }
 }

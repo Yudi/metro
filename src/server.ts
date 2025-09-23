@@ -51,7 +51,27 @@ app.use('/**', (req, res, next) => {
     .catch(next);
 });
 
-const routes = ['/'];
+import { routes as appRoutes } from './app/app.routes';
+
+function collectPaths(routes: unknown[]): string[] {
+  const paths: string[] = [];
+  for (const route of routes) {
+    if (typeof route === 'object' && route !== null) {
+      const r = route as { path?: string; children?: unknown[] };
+      if (r.path !== undefined && r.path !== '**') {
+        paths.push(
+          r.path === '' ? '/' : r.path.startsWith('/') ? r.path : `/${r.path}`,
+        );
+      }
+      if (Array.isArray(r.children)) {
+        paths.push(...collectPaths(r.children));
+      }
+    }
+  }
+  return paths;
+}
+
+const routes = Array.from(new Set(collectPaths(appRoutes)));
 
 app.get('/sitemap.xml', (req, res) => {
   const root = xmlbuilder.create('urlset', {

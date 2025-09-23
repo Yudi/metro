@@ -1,0 +1,9 @@
+@if (licenses(); as text) {
+  <div>{{ text }}</div>
+} @else {
+  @if (error()) {
+    <p>Não foi possível obter a lista de licenças</p>
+  } @else {
+    <p>Carregando...</p>
+  }
+}

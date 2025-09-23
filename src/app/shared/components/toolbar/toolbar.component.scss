@@ -1,0 +1,58 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+.desktop-nav {
+  display: none;
+  gap: 8px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  color: inherit;
+  .brand-icon {
+    margin-right: 0.5rem;
+    width: 2rem;
+    height: 2rem;
+  }
+  .brand-text {
+    font-weight: 500;
+  }
+}
+
+.menu-button {
+  display: inline-flex;
+  margin-right: 0.25rem;
+}
+
+@media (min-width: 768px) {
+  .menu-button {
+    display: none;
+  }
+
+  .desktop-nav {
+    display: flex;
+    align-items: center;
+  }
+}
+
+.mobile-sidenav {
+  width: 250px;
+}
+
+.toolbar-sidenav-container {
+  height: 100%;
+}
+
+.toolbar-content {
+  padding: 16px;
+  flex: 1;
+}

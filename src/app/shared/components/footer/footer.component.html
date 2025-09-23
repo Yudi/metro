@@ -1,0 +1,18 @@
+<mat-toolbar class="footer-toolbar">
+  <mat-toolbar-row class="footer-content">
+    <span class="footer-text">Transporte Metropolitano de São Paulo</span>
+    <span class="footer-links">
+      @for (item of footerLinks; track item.name) {
+        @if (item.external) {
+          <a href="{{ item.link }}" class="footer-link" rel="noopener">{{
+            item.name
+          }}</a>
+        } @else {
+          <a routerLink="{{ item.link }}" class="footer-link">{{
+            item.name
+          }}</a>
+        }
+      }
+    </span>
+  </mat-toolbar-row>
+</mat-toolbar>

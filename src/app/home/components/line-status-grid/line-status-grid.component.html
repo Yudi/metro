@@ -1,0 +1,51 @@
+<div class="container">
+  <div class="header">Estado das linhas</div>
+  <div class="grid">
+    @defer {
+      @if (lineStatusSignal(); as lineStatus) {
+        @for (line of lineStatus.Data; track line) {
+          <div
+            class="line-card"
+            [ngClass]="{
+              clickable: !isOperationNormal(line.StatusColor),
+            }"
+            (click)="lineClick(line)"
+            (keypress)="lineClick(line)"
+            tabindex="0"
+          >
+            <div class="badge" [class]="normalizeColor(line.ColorName)">
+              {{ line.Code }}
+            </div>
+            <div class="content">
+              <div class="line-name">{{ formatLineName(line.ColorName) }}</div>
+              <div class="status-badge" [attr.data-status]="line.StatusCode">
+                <span class="status-dot"></span>
+                <span class="status-text">{{
+                  statusLabelFormat(line.StatusLabel)
+                }}</span>
+              </div>
+            </div>
+          </div>
+        }
+        <div class="updated">
+          Atualizado às
+          {{ lineStatus.timestamp | date: "HH:mm:ss" }}
+          <br />
+          Dados fornecidos pela Motiva
+        </div>
+      } @else {
+        <div class="skeleton-rows" aria-hidden="true">
+          @for (i of [].constructor(13); track i) {
+            <div class="line-card skeleton">
+              <div class="badge placeholder"></div>
+              <div class="content">
+                <div class="line-name placeholder short"></div>
+                <div class="status placeholder"></div>
+              </div>
+            </div>
+          }
+        </div>
+      }
+    }
+  </div>
+</div>

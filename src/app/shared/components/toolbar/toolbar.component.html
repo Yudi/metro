@@ -1,0 +1,62 @@
+<mat-sidenav-container class="toolbar-sidenav-container">
+  <mat-sidenav
+    #sidenav
+    mode="over"
+    [opened]="opened()"
+    (closedStart)="closeSidenav()"
+    class="mobile-sidenav"
+  >
+    <!-- Mobile -->
+    <mat-nav-list>
+      @for (item of footerLinks; track item.name) {
+        <a
+          class="list-item"
+          mat-list-item
+          [routerLink]="item.link"
+          (click)="closeSidenav()"
+        >
+          <p class="list-item-label">
+            {{ item.name }}
+          </p>
+        </a>
+      }
+    </mat-nav-list>
+  </mat-sidenav>
+
+  <mat-toolbar class="app-toolbar" color="primary">
+    <button
+      mat-icon-button
+      aria-label="Open navigation"
+      class="menu-button"
+      (click)="toggleSidenav()"
+    >
+      <mat-icon>menu</mat-icon>
+    </button>
+
+    <a class="brand" href="#" aria-label="Página inicial">
+      <img
+        src="icons/logo.avif"
+        alt="Logotipo do site"
+        class="brand-icon"
+        aria-hidden="true"
+      />
+      <span class="brand-text">Transporte Metropolitano</span>
+    </a>
+
+    <span class="spacer"></span>
+
+    <!-- Desktop -->
+    <nav class="desktop-nav">
+      @for (item of items; track item.label) {
+        <a mat-button [routerLink]="item.route">
+          {{ item.label }}
+        </a>
+      }
+    </nav>
+  </mat-toolbar>
+
+  <div class="toolbar-content">
+    <ng-content />
+  </div>
+  <app-bottom-toolbar></app-bottom-toolbar>
+</mat-sidenav-container>

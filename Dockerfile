@@ -43,5 +43,6 @@ FROM base AS serve
 COPY --from=prod-deps /app/node_modules ./node_modules
 WORKDIR /usr/app
 COPY --from=build /app/dist/metro ./
+COPY --from=build /app/dist/metro/3rdpartylicenses.txt ./browser
 CMD node server/server.mjs
 EXPOSE 4000

@@ -1,0 +1,70 @@
+<div class="map-wrapper">
+  <!-- Header with Display Mode Toggle and Desktop Actions -->
+  <app-map-header
+    [displayMode]="displayMode()"
+    [hasSelections]="hasSelections()"
+    [hasFeatures]="features().length > 0"
+    [locationPermission]="locationPermission()"
+    [isRequestingLocation]="isRequestingLocation()"
+    [isLocationDisabled]="isLocationDisabled()"
+    (displayModeChange)="onDisplayModeChange($event)"
+    (searchClick)="openSearchModal()"
+    (exploreClick)="openExploreModal()"
+    (layersClick)="openLayerSettings()"
+    (centerClick)="centerOnSaoPaulo()"
+    (centerOnUserClick)="centerOnUserLocation()"
+    (clearClick)="clearAllSelections()"
+  />
+
+  <!-- Status Bar -->
+  @if (isDevMode) {
+    <app-map-status-bar
+      [isLoading]="isLoading()"
+      [displayMode]="displayMode()"
+      [routeCount]="selectedRoutes().size"
+      [stopCount]="selectedStops().size"
+      [visibleCount]="displayedRoutes().length + displayedStops().length"
+      [nearbyRadius]="nearbyRadius()"
+      [nearbyStopsCount]="displayedStops().length"
+    />
+  }
+
+  <!-- Map Container -->
+  <div id="ol-map-tab" class="map-container"></div>
+
+  <!-- Mobile FAB Menu -->
+  <app-map-fab-menu
+    [hasSelections]="hasSelections()"
+    [hasFeatures]="features().length > 0"
+    (searchClick)="openSearchModal()"
+    (exploreClick)="openExploreModal()"
+    (layersClick)="openLayerSettings()"
+    (centerClick)="centerOnSaoPaulo()"
+    (centerOnUserClick)="centerOnUserLocation()"
+    (clearClick)="clearAllSelections()"
+    [isRequestingLocation]="isRequestingLocation()"
+    [isLocationDisabled]="isLocationDisabled()"
+  />
+
+  <!-- Footer with Realtime Status -->
+  <app-map-footer
+    [hasSelectedFeature]="!!selectedFeature()"
+    (featureInfoClick)="onFeatureInfoClick()"
+  />
+
+  <!-- Selections Panel (when items selected) -->
+  @if (hasSelections()) {
+    <app-map-selections-panel
+      [selectedRoutes]="selectedRoutes()"
+      [selectedStops]="selectedStops()"
+      [selectedBikeStations]="selectedBikeStations()"
+      (removeRoute)="removeRouteFromSelection($event)"
+      (removeStop)="removeStopFromSelection($event)"
+      (removeBikeStation)="removeBikeStationFromSelection($event)"
+      (clearAll)="clearAllSelections()"
+    />
+  }
+
+  <!-- Popup Container -->
+  <ng-container #popupContainer></ng-container>
+</div>

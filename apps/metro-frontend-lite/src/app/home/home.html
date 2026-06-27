@@ -1,0 +1,11 @@
+@for (data of links; track data) {
+<h2>{{data.name}}</h2>
+<ul>
+  @for (link of data.routes; track link) {
+  <li>
+    <a [routerLink]="data.prefix + '/' + link.route">{{ link.label }}</a>
+  </li>
+  }
+</ul>
+
+}

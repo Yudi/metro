@@ -1,0 +1,71 @@
+.directions-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.direction-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.direction-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--mat-sys-on-surface-variant, #666);
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+
+  mat-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.line-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  color: #fff;
+}
+
+.headway-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  padding: 2px 8px;
+  background: var(--mat-sys-tertiary-container, rgba(108, 99, 255, 0.1));
+  color: var(--mat-sys-on-tertiary-container, #4a42b0);
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: default;
+  white-space: nowrap;
+
+  mat-icon {
+    font-size: 12px;
+    width: 12px;
+    height: 12px;
+    color: inherit;
+  }
+
+  &.headway-fallback {
+    opacity: 0.7;
+    font-style: italic;
+  }
+}

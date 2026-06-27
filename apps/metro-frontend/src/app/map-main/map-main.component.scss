@@ -1,0 +1,25 @@
+.bus-page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.bus-page h1 {
+  margin: 16px 24px 8px;
+  color: #333;
+  font-size: 24px;
+  font-weight: 500;
+}
+
+.bus-page p {
+  margin: 0 24px 16px;
+  color: #666;
+  font-size: 14px;
+}
+
+app-map {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}

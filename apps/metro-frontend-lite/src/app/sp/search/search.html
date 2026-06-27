@@ -1,0 +1,172 @@
+<div class="search-page">
+  <!-- Search View -->
+  @if (viewState() === 'search') {
+  <header class="search-header">
+    <h1>Próximo trem ou ônibus</h1>
+    <p>Pesquise uma estação de metrô/trem ou ponto de ônibus</p>
+  </header>
+
+  <div class="search-form">
+    <div class="search-input-row">
+      <lite-input
+        type="search"
+        [placeholder]="'Buscar estação ou ponto...'"
+        [(value)]="searchQuery"
+        [fullWidth]="true"
+        [loading]="isLoading()"
+        [clearable]="true"
+        (enterPressed)="onSearch()"
+      ></lite-input>
+      <lite-icon-button
+        variant="primary"
+        [disabled]="!canUseNearby()"
+        [ariaLabel]="getNearbyTooltip()"
+        (click)="onNearbySearch()"
+      >
+        @if (isRequestingLocation()) {
+        <lite-spinner size="sm"></lite-spinner>
+        } @else { 📍 }
+      </lite-icon-button>
+    </div>
+
+    <lite-button
+      variant="primary"
+      [fullWidth]="true"
+      [disabled]="searchQuery().length < 2"
+      [loading]="isLoading()"
+      (buttonClick)="onSearch()"
+    >
+      Buscar
+    </lite-button>
+  </div>
+  }
+
+  <!-- Results View -->
+  @if (viewState() === 'results') {
+  <header class="results-header">
+    <lite-icon-button variant="ghost" ariaLabel="Voltar" (click)="onBack()">
+      ←
+    </lite-icon-button>
+    <div class="results-title">
+      <h2>@if (isNearbyMode()) { Paradas próximas } @else { Resultados }</h2>
+      <span class="results-count">{{ results().length }} encontrado(s)</span>
+    </div>
+    <lite-button variant="ghost" size="sm" (buttonClick)="onNewSearch()">
+      Nova busca
+    </lite-button>
+  </header>
+
+  <div class="results-list">
+    @for (stop of results(); track stop.id) {
+    <lite-card
+      variant="outlined"
+      [clickable]="true"
+      (cardClick)="onStopSelect(stop)"
+    >
+      <div class="stop-card-content">
+        <div
+          class="stop-icon"
+          [class.subway]="stop.kind === 'railStation'"
+          [class.bike]="stop.kind === 'bikeStation'"
+        >
+          {{ getStopIcon(stop) }}
+        </div>
+        <div class="stop-info">
+          <h3 class="stop-name">{{ stop.name }}</h3>
+          <p class="stop-type">{{ getStopType(stop) }}</p>
+          @if (stop.kind === 'bikeStation') {
+          <p class="stop-type">{{ getBikeSummary(stop) }}</p>
+          }
+          @if (stop.lineCodes.length > 0) {
+          <div class="stop-lines">
+            @for (code of stop.lineCodes; track code) {
+            <lite-chip
+              size="sm"
+              [customBg]="getLineColor(code).bg"
+              [customColor]="getLineColor(code).text"
+            >
+              L{{ code }}
+            </lite-chip>
+            }
+          </div>
+          }
+        </div>
+        @if (stop.kind === 'busStop' && (stop.routes?.length ?? 0) > 0) {
+        <lite-chip variant="primary" size="sm">
+          {{ stop.routes?.length }} linhas
+        </lite-chip>
+        } @else if (hasNextTrainData(stop)) {
+        <lite-chip variant="primary" size="sm">Tempo real</lite-chip>
+        } @else if (stop.kind === 'bikeStation' && stop.bikeAvailability) {
+        <lite-chip variant="primary" size="sm">
+          {{ stop.bikeAvailability.numBikesAvailable }} bikes
+        </lite-chip>
+        }
+      </div>
+    </lite-card>
+    } @empty {
+    <div class="no-results">
+      <span class="no-results-icon">🔍</span>
+      <h3>Nenhum resultado encontrado</h3>
+      <p>Tente buscar com termos diferentes</p>
+    </div>
+    }
+  </div>
+  }
+
+  <!-- Detail View -->
+  @if (viewState() === 'detail') { @if (selectedStop(); as stop) {
+  <header class="detail-header">
+    <lite-icon-button variant="ghost" ariaLabel="Voltar" (click)="onBack()">
+      ←
+    </lite-icon-button>
+    <div class="detail-title">
+      <h2>{{ stop.name }}</h2>
+      <span class="detail-type">{{ getStopType(stop) }}</span>
+    </div>
+  </header>
+
+  <div class="detail-content">
+    <!-- Line badges -->
+    @if (stop.kind === 'railStation' && stop.lineCodes.length > 0) {
+    <section class="detail-section">
+      <h3>Linhas nesta estação</h3>
+      <div class="lines-grid">
+        @for (code of stop.lineCodes; track code) {
+        <div
+          class="line-badge"
+          [style.background-color]="getLineColor(code).bg"
+          [style.color]="getLineColor(code).text"
+        >
+          L{{ code }}
+        </div>
+        }
+      </div>
+    </section>
+    }
+
+    @if (stop.kind === 'railStation' && hasNextTrainData(stop)) {
+    <app-lite-rail-next-trains
+      [groups]="nextTrainGroups()"
+      [loading]="trainsLoading()"
+      [error]="trainsError()"
+    />
+    }
+
+    @if (stop.kind === 'busStop') {
+    <app-lite-bus-stop-detail
+      [stop]="stop"
+      [arrivals]="busArrivals()"
+      [connected]="realtimeService.connected()"
+      [railConnections]="railConnections()"
+      [railConnectionsLoading]="railConnectionsLoading()"
+      [railConnectionsError]="railConnectionsError()"
+    />
+    }
+
+    @if (stop.kind === 'bikeStation') {
+    <app-lite-bike-availability [station]="stop" />
+    }
+  </div>
+  } }
+</div>

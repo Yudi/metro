@@ -1,0 +1,350 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider        = "prisma-client"
+  output          = "../generated/prisma"
+  previewFeatures = ["postgresqlExtensions"]
+  binaryTargets   = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  // url        = env("DATABASE_URL")
+  extensions = [postgis]
+}
+
+model GTFSDataset {
+  id          String     @id @default(uuid(7))
+  lastUpdated DateTime   @default(now()) @updatedAt
+  fileHash    String     @unique
+  fileSize    Int
+  version     String?
+  gtfsFiles   GTFSFile[]
+
+  @@map("gtfs_datasets")
+}
+
+model GTFSFile {
+  id          String      @id @default(uuid(7))
+  datasetId   String
+  fileName    String
+  fileHash    String
+  fileSize    Int
+  recordCount Int?
+  lastUpdated DateTime    @default(now()) @updatedAt
+  dataset     GTFSDataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+
+  @@unique([datasetId, fileName])
+  @@map("gtfs_files")
+}
+
+// ============================================
+// Processed/Merged Subway Stations Table (Legacy - from SPTrans GTFS)
+// ============================================
+// This table stores merged subway stations with aggregated agency and route info.
+// Stations with similar names (e.g., "Pinheiros Metrô" and "Pinheiros CPTM") are
+// merged into a single entry, except for known exceptions (Lapa, Mooca, Morumbi).
+// This data is refreshed after each GTFS import.
+// NOTE: This is now deprecated in favor of Metro_Station and Trem_Station tables
+model MergedSubwayStation {
+  id              String   @id @default(uuid(7))
+  stopId          String   @unique // Primary stop_id (from closest station to city center)
+  mergedStopIds   String[] // All stop_ids that were merged into this station
+  name            String // Normalized station name (without Metro/CPTM suffix)
+  originalName    String // Original name of the primary station
+  latitude        Float
+  longitude       Float
+  agencies        String[] // e.g., ["METRO", "CPTM"]
+  lines           String[] // e.g., ["Turquesa", "Coral"]  
+  routeShortNames String[] // e.g., ["METRÔ L1", "CPTM L07"]
+  lastUpdated     DateTime @default(now()) @updatedAt
+
+  @@index([name])
+  @@map("merged_subway_stations")
+}
+
+model GPKGDataset {
+  id           String   @id @default(uuid(7))
+  source       String   @unique // 'metro_station', 'metro_line', 'trem_station', 'trem_line'
+  fileHash     String
+  fileSize     Int
+  downloadedAt DateTime @default(now())
+  lastUpdated  DateTime @default(now()) @updatedAt
+
+  @@index([fileHash])
+  @@map("gpkg_datasets")
+}
+
+model MergedRailStation {
+  id           String   @id @default(uuid(7))
+  primaryId    Int
+  mergedIds    Int[] // All stop_ids that were merged into this station
+  name         String // Normalized station name (without Metro/CPTM suffix)
+  originalName String // Original name of the primary station
+  latitude     Float
+  longitude    Float
+  agencies     String[] // e.g., ["METRO", "CPTM"]
+  lines        String[] // e.g., ["Turquesa", "Coral"]  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  @@index([name])
+  @@map("merged_rail_stations")
+}
+
+// ============================================
+// Train Passage Tracking (Headway Calculation)
+// ============================================
+// Records when trains pass stations, used to calculate average headway.
+// Passages are detected from real-time API predictions.
+// Old records are pruned periodically to keep the table small.
+
+model TrainPassage {
+  id          String   @id @default(uuid(7))
+  lineCode    String   @db.Text // L4, L8, L9, L10, L11, L12, L13
+  stationCode String   @db.Text // 3-letter code or integration source id
+  direction   String   @db.Text // Terminal/destination name for this direction
+  passedAt    DateTime @default(now()) // When the train passed the station
+  trainId     String?  @db.Text // Vehicle prefix or identifier (if available)
+
+  @@index([lineCode, stationCode, direction, passedAt(sort: Desc)])
+  @@map("train_passages")
+}
+
+// ============================================
+// Historical Operations Data
+// ============================================
+// Structured records for line incidents, backend lifecycle transparency,
+// and upstream retrieval failures. JSONB metadata keeps source diagnostics
+// without hiding the fields needed for future analysis and charts.
+
+model HistoricalIncidentEvent {
+  id               String                         @id @default(uuid(7)) @db.Uuid
+  eventType        historical_incident_event_type
+  observedAt       DateTime                       @default(now()) @db.Timestamptz
+  startedAt        DateTime?                      @db.Timestamptz
+  endedAt          DateTime?                      @db.Timestamptz
+  durationSeconds  Int?
+  source           String                         @db.Text
+  provider         String?                        @db.Text
+  lineCode         String?                        @db.Text
+  lineNumber       Int?                           @db.SmallInt
+  lineName         String?                        @db.Text
+  statusCode       String?                        @db.Text
+  statusLabel      String?                        @db.Text
+  statusColor      String?                        @db.Text
+  severity         String?                        @db.Text
+  title            String                         @db.Text
+  description      String?                        @db.Text
+  incidentCategory String?                        @db.Text
+  detail           String?                        @db.Text
+  metadata         Json?
+  createdAt        DateTime                       @default(now()) @db.Timestamptz
+
+  @@index([eventType, observedAt(sort: Desc)])
+  @@index([lineCode, observedAt(sort: Desc)])
+  @@index([source, observedAt(sort: Desc)])
+  @@index([statusCode, observedAt(sort: Desc)])
+  @@map("historical_incident_events")
+}
+
+model HistoricalHeadwaySnapshot {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  observedAt     DateTime @default(now()) @db.Timestamptz
+  lineCode       String   @db.Text
+  stationCode    String   @db.Text
+  stationName    String?  @db.Text
+  direction      String   @db.Text
+  averageSeconds Float?
+  sampleCount    Int?
+  bucket         String?  @db.Text
+  bucketLabel    String?  @db.Text
+  isFallback     Boolean  @default(false)
+  samples        Json?
+  source         String   @default("headway_tracking") @db.Text
+  errors         Json?
+  metadata       Json?
+  createdAt      DateTime @default(now()) @db.Timestamptz
+
+  @@index([lineCode, stationCode, observedAt(sort: Desc)])
+  @@index([lineCode, stationName, observedAt(sort: Desc)])
+  @@index([lineCode, direction, observedAt(sort: Desc)])
+  @@index([observedAt(sort: Desc)])
+  @@map("historical_headway_snapshots")
+}
+
+model User {
+  id         String   @id
+  created_at DateTime @default(now()) @db.Timestamptz
+  last_login DateTime @updatedAt
+
+  push_subscriptions  PushSubscription[]
+  alert_subscriptions AlertSubscription[]
+  data_requests       dataRequest[]
+  favorites           Favorite[]
+}
+
+model Favorite {
+  id        String   @id @default(uuid(7))
+  userId    String   @db.Text
+  type      String   @db.Text
+  code      String   @db.Text
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type, code])
+  @@index([userId])
+  @@map("favorites")
+}
+
+model PushSubscription {
+  id      String  @id @default(uuid(7)) @db.Uuid
+  user_id String?
+
+  endpoint   String  @unique
+  p256dh     String
+  auth       String
+  user_agent String?
+
+  created_at   DateTime  @default(now()) @db.Timestamptz
+  last_seen_at DateTime? @db.Timestamptz
+
+  user User? @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("push_subscriptions")
+}
+
+model AlertSubscription {
+  id      String @id @default(uuid(7)) @db.Uuid
+  user_id String
+
+  target_type alert_target_type
+  target_id   String
+
+  event_type alert_event_type @default(incident_only)
+
+  enabled Boolean @default(true)
+
+  created_at DateTime @default(now()) @db.Timestamptz
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  schedules          AlertSchedule[]
+  notification_state NotificationState?
+
+  @@map("alert_subscriptions")
+}
+
+model AlertSchedule {
+  id              String @id @default(uuid(7)) @db.Uuid
+  subscription_id String @db.Uuid
+
+  schedule_type String
+
+  start_time    DateTime? @db.Time
+  end_time      DateTime? @db.Time
+  specific_time DateTime? @db.Time
+
+  days_of_week Int[] @default([0, 1, 2, 3, 4, 5, 6])
+
+  timezone String @default("UTC")
+
+  interval_minutes Int?
+
+  enabled Boolean @default(true)
+
+  subscription AlertSubscription @relation(fields: [subscription_id], references: [id], onDelete: Cascade)
+
+  @@map("alert_schedules")
+}
+
+model NotificationState {
+  subscription_id String @id @db.Uuid
+
+  last_state       notification_state_type?
+  last_sent_at     DateTime?                @db.Timestamptz
+  last_incident_id String?                  @db.Uuid
+
+  subscription AlertSubscription @relation(fields: [subscription_id], references: [id], onDelete: Cascade)
+
+  @@map("notification_state")
+}
+
+model dataRequest {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  user_id String
+
+  request_type data_request_type
+  status       data_request_status @default(pending)
+
+  requested_at DateTime  @default(now()) @db.Timestamptz
+  completed_at DateTime? @db.Timestamptz
+
+  notes String?
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("data_requests")
+}
+
+enum alert_target_type {
+  rail_line
+  rail_station
+  bus_stop
+  bike_station
+}
+
+enum alert_event_type {
+  incident_only
+  all_status
+}
+
+enum notification_state_type {
+  normal
+  incident
+}
+
+enum data_request_type {
+  data_export
+  data_deletion
+}
+
+enum data_request_status {
+  pending
+  processing
+  completed
+}
+
+enum historical_incident_event_type {
+  RAIL_STATUS_INCIDENT @map("rail_status_incident")
+  RAIL_STATUS_RECOVERED @map("rail_status_recovered")
+  BACKEND_ONLINE @map("backend_online")
+  BACKEND_OFFLINE @map("backend_offline")
+  BACKEND_OFFLINE_DETECTED @map("backend_offline_detected")
+  RETRIEVAL_ISSUE @map("retrieval_issue")
+}
+
+// ============================================
+// Holidays (BrasilAPI + local additions)
+// ============================================
+// Stores holiday dates by year to avoid repeated external API calls.
+// Includes local São Paulo holiday (25/01) in addition to national holidays.
+model Feriado {
+  id          String   @id @default(uuid(7))
+  year        Int
+  date        String   @db.VarChar(10) // yyyy-MM-dd
+  name        String   @db.Text
+  type        String   @db.Text
+  lastUpdated DateTime @default(now()) @updatedAt
+
+  @@unique([year, date])
+  @@index([year])
+  @@map("feriados")
+}

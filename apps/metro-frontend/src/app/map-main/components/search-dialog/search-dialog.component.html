@@ -1,0 +1,126 @@
+<div class="search-dialog-container">
+  <!-- Dialog Header -->
+  <div class="search-dialog-header">
+    <button
+      mat-icon-button
+      mat-dialog-close
+      class="close-button"
+      aria-label="Fechar"
+    >
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <!-- Search Input -->
+  <div class="search-input-container">
+    <mat-form-field appearance="outline" class="search-field">
+      <mat-label>Buscar por paradas ou linhas</mat-label>
+      <input
+        matInput
+        type="text"
+        #searchInput
+        placeholder="Insira o termo para pesquisa..."
+        [value]="searchQuery()"
+        (input)="onSearchInput($event)"
+        autocomplete="off"
+      />
+      <mat-icon matPrefix>search</mat-icon>
+      @if (isSearching()) {
+        <mat-spinner matSuffix diameter="20"></mat-spinner>
+      }
+    </mat-form-field>
+    <button
+      mat-mini-fab
+      class="nearby-button"
+      [disabled]="
+        locationPermission() === 'denied' ||
+        !isLocationSupported() ||
+        isRequestingLocation()
+      "
+      [matTooltip]="nearbyButtonTooltip()"
+      (click)="toggleNearbySearch()"
+      aria-label="Buscar paradas próximas"
+    >
+      @if (isRequestingLocation()) {
+        <mat-spinner diameter="20"></mat-spinner>
+      } @else {
+        <mat-icon>{{ nearbySearch() ? 'near_me' : 'my_location' }}</mat-icon>
+      }
+    </button>
+  </div>
+
+  <!-- Nearby Search Button -->
+  <div class="search-options"></div>
+
+  <!-- Search Results -->
+  <mat-dialog-content class="search-results-container">
+    @if (isSearching()) {
+      <div class="loading-container">
+        <mat-spinner diameter="40"></mat-spinner>
+        <p class="loading-text">Buscando...</p>
+      </div>
+    } @else if (searchResults().length > 0) {
+      <div class="results-list">
+        <p class="results-header">
+          {{ searchResults().length }} resultado{{
+            searchResults().length === 1 ? '' : 's'
+          }}
+          encontrado{{ searchResults().length === 1 ? '' : 's' }}
+        </p>
+
+        @for (result of searchResults(); track result.id) {
+          <app-search-result-card
+            [result]="result"
+            (resultClick)="onResultClick($event)"
+          />
+        }
+      </div>
+    } @else if (searchQuery() && !isSearching() && !isReindexing()) {
+      <div class="no-results">
+        <mat-icon class="no-results-icon">search_off</mat-icon>
+        <h3>Nenhum resultado encontrado</h3>
+        <p>Tente buscar com termos diferentes ou verificar a ortografia.</p>
+
+        @if (isDevMode) {
+          <div class="no-results-actions">
+            <button
+              mat-raised-button
+              color="primary"
+              [disabled]="isReindexing()"
+              (click)="reindexData()"
+            >
+              @if (isReindexing()) {
+                <mat-spinner diameter="16"></mat-spinner>
+              } @else {
+                <mat-icon>refresh</mat-icon>
+              }
+              <span>DEBUG: Refresh Data</span>
+            </button>
+          </div>
+        }
+      </div>
+    } @else if (nearbySearch() && userLocation()) {
+      <div class="nearby-active">
+        <mat-icon class="nearby-icon">explore</mat-icon>
+        <h3>Buscando nas proximidades</h3>
+        <p>Mostrando paradas em um raio de 1 km</p>
+      </div>
+    } @else if (!searchQuery() && !nearbySearch()) {
+      <div class="search-help">
+        <mat-icon class="help-icon">search</mat-icon>
+        <h3>Busca</h3>
+
+        <div class="search-tips">
+          <h4>Dicas</h4>
+          <ul>
+            <li>Insira nomes de paradas, números de linhas ou locais</li>
+            <li>
+              Use o botão de localização para encontrar transporte próximo a
+              você
+            </li>
+          </ul>
+        </div>
+      </div>
+    }
+  </mat-dialog-content>
+</div>

@@ -1,0 +1,117 @@
+$surface-container: var(--mat-sys-surface-container, #f3f0f4);
+$surface-container-high: var(--mat-sys-surface-container-high, #ede9ee);
+$on-surface: var(--mat-sys-on-surface, #1d1b1e);
+$on-surface-variant: var(--mat-sys-on-surface-variant, #49454e);
+$outline-variant: var(--mat-sys-outline-variant, #cbc4cf);
+$primary: var(--mat-sys-primary, #6750a4);
+
+@mixin elevation-1 {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.selections-panel {
+  flex-shrink: 0;
+  background: $surface-container;
+  border-bottom: 1px solid $outline-variant;
+  max-height: 200px;
+  overflow: hidden;
+  @include elevation-1;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: $surface-container-high;
+  border-bottom: 1px solid $outline-variant;
+  font-weight: 500;
+  font-size: 0.875rem;
+  color: $on-surface;
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    color: $primary;
+  }
+
+  span {
+    flex: 1;
+  }
+
+  .clear-button {
+    margin: -8px;
+  }
+}
+
+.panel-content {
+  padding: 10px 12px;
+  max-height: 150px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: $outline-variant;
+    border-radius: 2px;
+  }
+}
+
+.chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.category-section {
+  &:not(:first-child) {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid $outline-variant;
+  }
+}
+
+.category-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: $on-surface-variant;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+// Responsive
+@media (max-width: 768px) {
+  .selections-panel {
+    max-height: 160px;
+  }
+
+  .panel-header {
+    padding: 6px 10px;
+  }
+
+  .panel-content {
+    padding: 8px 10px;
+    max-height: 110px;
+  }
+
+  .chip-list {
+    gap: 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  .selections-panel {
+    max-height: 140px;
+  }
+
+  .panel-content {
+    padding: 6px 8px;
+    max-height: 90px;
+  }
+}

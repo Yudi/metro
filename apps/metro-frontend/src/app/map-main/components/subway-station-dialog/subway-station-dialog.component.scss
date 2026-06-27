@@ -1,0 +1,244 @@
+@use '../../../shared/styles/rail-status' as rail;
+
+:host {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.station-content {
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.station-description {
+  margin-bottom: 16px;
+}
+
+// Subway lines section
+.subway-lines-section {
+  margin: 16px 0;
+
+  h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 16px 0;
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--mat-sys-on-surface, #333);
+
+    mat-icon {
+      color: var(--mat-sys-primary, rgb(11, 113, 208));
+    }
+  }
+}
+
+// Shared warning banner
+@include rail.status-warning-banner;
+
+.loading-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  color: #666;
+}
+
+.no-lines-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background-color: rgba(0, 0, 0, 0.04);
+  border-radius: 8px;
+  color: #3e3e3e;
+
+  mat-icon {
+    color: #999;
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.9rem;
+  }
+}
+
+.subway-lines-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.subway-line-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--mat-sys-surface-container-low, #f5f5f5);
+  border-radius: 12px;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+
+  /*&.has-issue {
+    border-color: rgba(255, 152, 0, 0.4);
+    background: rgba(255, 152, 0, 0.08);
+  }*/
+}
+
+.line-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  color: #fff;
+}
+
+.line-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 120px;
+}
+
+.line-name {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--mat-sys-on-surface, #333);
+}
+
+// Shared status badge styles (uses line-status-grid colors as source of truth)
+@include rail.status-badge;
+
+// Override dot size for horizontal layout
+.status-badge .status-dot {
+  width: 8px;
+  height: 8px;
+}
+
+// Shared skeleton loading
+@include rail.skeleton-loading;
+
+// Shared line description (issue details)
+@include rail.line-description;
+
+.last-updated {
+  margin: 12px 0 0;
+  font-size: 0.75rem;
+  color: #999;
+  text-align: right;
+}
+
+.error-message {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 0 0;
+  font-size: 0.8rem;
+  color: #d32f2f;
+
+  mat-icon {
+    font-size: 1rem;
+    width: 1rem;
+    height: 1rem;
+  }
+}
+
+mat-divider {
+  margin: 16px 0;
+}
+
+// Next train section
+.next-train-section {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.static-composition-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  margin-top: 16px;
+}
+
+.static-composition-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+}
+
+.static-composition-line__header,
+.static-composition-line__direction-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.static-composition-line__badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.static-composition-line__name {
+  color: var(--mat-sys-on-surface, #333);
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+
+.static-composition-line__directions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+}
+
+.static-composition-line__direction {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.static-composition-line__direction-header {
+  color: var(--mat-sys-on-surface-variant, #666);
+  font-size: 0.82rem;
+  font-weight: 650;
+
+  mat-icon {
+    width: 1rem;
+    height: 1rem;
+    font-size: 1rem;
+  }
+}
+
+.favorite-button {
+  color: rgba(0, 0, 0, 0.6);
+  transition: color 0.2s ease;
+}
+
+.favorite-button:hover {
+  color: rgba(0, 0, 0, 0.87);
+}
+
+.favorite-button.favorited {
+  color: #d32f2f;
+}
+
+.favorite-button.favorited:hover {
+  color: #b71c1c;
+}

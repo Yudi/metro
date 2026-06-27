@@ -1,0 +1,24 @@
+<h2><a routerLink="/">←</a> Telefones úteis - São Paulo</h2>
+
+@if (organizedAgencies.bus.length > 0) {
+<section>
+  <h2>Ônibus</h2>
+  @for (agency of organizedAgencies.bus; track agency) {
+  <app-agency-contacts [agency]="agency" />
+  }
+</section>
+} @if (organizedAgencies.rail.length > 0) {
+<section>
+  <h2>Trilhos</h2>
+  @for (agency of organizedAgencies.rail; track agency) {
+  <app-agency-contacts [agency]="agency" />
+  }
+</section>
+} @if (organizedAgencies.other.length > 0) {
+<section>
+  <h2>Outros</h2>
+  @for (agency of organizedAgencies.other; track agency) {
+  <app-agency-contacts [agency]="agency" />
+  }
+</section>
+}

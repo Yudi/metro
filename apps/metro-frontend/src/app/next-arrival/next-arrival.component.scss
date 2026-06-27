@@ -1,0 +1,154 @@
+h1 {
+  margin-bottom: 1rem !important;
+}
+
+.main-container {
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 600px;
+}
+
+p {
+  color: var(--mat-sys-on-surface-variant);
+  margin-bottom: 16px;
+}
+
+.search-container {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 24px;
+  width: 100%;
+  .search-field {
+    flex: 1;
+    max-width: 600px;
+  }
+
+  .nearby-button {
+    margin-top: 8px; // Align with form field input
+    flex-shrink: 0;
+  }
+}
+
+.results-container {
+  min-height: 200px;
+  max-width: 600px;
+
+  .loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 16px;
+    gap: 16px;
+
+    .loading-text {
+      color: var(--mat-sys-on-surface-variant);
+      font-size: 0.9rem;
+    }
+  }
+
+  .results-list {
+    .results-header {
+      font-size: 0.85rem;
+      color: var(--mat-sys-on-surface-variant);
+      margin-bottom: 12px;
+    }
+  }
+
+  .no-results {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 48px 16px;
+    gap: 8px;
+
+    .no-results-icon {
+      font-size: 48px;
+      width: 48px;
+      height: 48px;
+      color: var(--mat-sys-outline);
+      margin-bottom: 8px;
+    }
+
+    h3 {
+      margin: 0;
+      color: var(--mat-sys-on-surface);
+    }
+
+    p {
+      margin: 0;
+      color: var(--mat-sys-on-surface-variant);
+    }
+  }
+
+  .search-help {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding-top: 0;
+    padding: 32px 16px;
+    gap: 8px;
+
+    .help-icon {
+      font-size: 48px;
+      width: 48px;
+      height: 48px;
+      color: var(--mat-sys-primary);
+      margin-bottom: 8px;
+    }
+
+    h3 {
+      margin: 0;
+      color: var(--mat-sys-on-surface);
+    }
+
+    p {
+      margin: 0;
+      color: var(--mat-sys-on-surface-variant);
+    }
+
+    .search-tips {
+      margin-top: 24px;
+      text-align: left;
+      width: 100%;
+      max-width: 400px;
+
+      h4 {
+        font-size: 0.9rem;
+        font-weight: 500;
+        color: var(--mat-sys-on-surface);
+        margin: 16px 0 8px 0;
+
+        &:first-child {
+          margin-top: 0;
+        }
+      }
+
+      p {
+        font-size: 0.85rem;
+        margin: 0;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+
+        li {
+          font-size: 0.85rem;
+          color: var(--mat-sys-on-surface-variant);
+          margin-bottom: 4px;
+
+          .inline-icon {
+            font-size: 1rem;
+            vertical-align: middle;
+            margin: 0 2px;
+            width: auto;
+          }
+        }
+      }
+    }
+  }
+}

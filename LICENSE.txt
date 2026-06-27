@@ -1,6 +1,8 @@
-AGPL-3.0-only
+Metro Core - Copyright (c) 2025 Yudi
+All rights reserved.
 
 Metro - Copyright (c) 2025 Yudi
+Licensed under the AGPL-3.0-only License.
 
                     GNU AFFERO GENERAL PUBLIC LICENSE
                        Version 3, 19 November 2007

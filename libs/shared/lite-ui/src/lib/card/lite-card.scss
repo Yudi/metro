@@ -1,0 +1,66 @@
+// Lite Card Styles
+
+.lite-card {
+  display: block;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background-color: var(--lite-surface, #ffffff);
+  transition:
+    background-color 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.1s ease;
+
+  // Variants
+  &--default {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+
+  &--elevated {
+    box-shadow:
+      0 4px 6px -1px rgba(0, 0, 0, 0.1),
+      0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  }
+
+  &--outlined {
+    border: 1px solid var(--lite-border, #d1d5db);
+    box-shadow: none;
+  }
+
+  // Clickable state
+  &--clickable {
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+
+    &:hover:not(.lite-card--disabled) {
+      background-color: var(--lite-surface-hover, #f9fafb);
+    }
+
+    &:active:not(.lite-card--disabled) {
+      transform: scale(0.99);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--lite-focus-ring, #2563eb);
+      outline-offset: 2px;
+    }
+  }
+
+  // Selected state
+  &--selected {
+    border-color: var(--lite-primary, #2563eb);
+    background-color: var(--lite-primary-subtle, rgba(37, 99, 235, 0.05));
+
+    &.lite-card--outlined {
+      border-width: 2px;
+    }
+  }
+
+  // Disabled state
+  &--disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+}

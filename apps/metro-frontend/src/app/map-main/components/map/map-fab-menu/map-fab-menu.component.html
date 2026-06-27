@@ -1,0 +1,103 @@
+<div class="fab-container" [class.open]="isOpen()">
+  <!-- Overlay for closing when clicking outside -->
+  @if (isOpen()) {
+    <button
+      class="fab-overlay"
+      (click)="close()"
+      aria-label="Fechar menu"
+    ></button>
+  }
+
+  <!-- FAB Menu Items -->
+  @if (isMenuMounted()) {
+    <div
+      class="fab-menu"
+      [class.visible]="isOpen()"
+      (transitionend)="onMenuTransitionEnd($event)"
+    >
+      @if (hasSelections()) {
+        <button
+          mat-mini-fab
+          color="warn"
+          class="fab-item"
+          (click)="handleClear()"
+          matTooltip="Limpar seleções"
+          matTooltipPosition="left"
+        >
+          <mat-icon>clear_all</mat-icon>
+        </button>
+      }
+
+      <button
+        mat-mini-fab
+        class="fab-item"
+        (click)="handleExplore()"
+        matTooltip="Explorar outro local"
+        matTooltipPosition="left"
+      >
+        <mat-icon>explore</mat-icon>
+      </button>
+
+      <button
+        mat-mini-fab
+        class="fab-item"
+        (click)="handleCenterOnUser()"
+        matTooltip="Minha localização"
+        matTooltipPosition="left"
+        [disabled]="isRequestingLocation() || isLocationDisabled()"
+      >
+        <mat-icon>
+          {{
+            isRequestingLocation() || isLocationDisabled()
+              ? 'location_off'
+              : 'my_location'
+          }}
+        </mat-icon>
+      </button>
+
+      <button
+        mat-mini-fab
+        class="fab-item"
+        (click)="handleCenter()"
+        matTooltip="Centralizar em São Paulo"
+        matTooltipPosition="left"
+      >
+        <mat-icon>location_city</mat-icon>
+      </button>
+
+      <button
+        mat-mini-fab
+        class="fab-item"
+        (click)="handleLayers()"
+        matTooltip="Camadas"
+        matTooltipPosition="left"
+      >
+        <mat-icon>layers</mat-icon>
+      </button>
+    </div>
+  }
+
+  <!-- Main FAB - Search (always visible) -->
+  <button
+    mat-fab
+    color="primary"
+    class="main-fab search-fab"
+    (click)="searchClick.emit()"
+    matTooltip="Pesquisar"
+    matTooltipPosition="left"
+  >
+    <mat-icon>search</mat-icon>
+  </button>
+
+  <!-- Secondary FAB - Menu Toggle -->
+  <button
+    mat-mini-fab
+    class="menu-fab"
+    [class.active]="isOpen()"
+    (click)="toggle()"
+    matTooltip="Mais opções"
+    matTooltipPosition="left"
+  >
+    <mat-icon>{{ isOpen() ? 'close' : 'more_vert' }}</mat-icon>
+  </button>
+</div>

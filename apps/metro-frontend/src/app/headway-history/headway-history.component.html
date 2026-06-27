@@ -1,0 +1,293 @@
+<section class="headway-history-page">
+  <header class="page-header">
+    <div>
+      <h1>Histórico de intervalos</h1>
+    </div>
+    <button
+      mat-stroked-button
+      type="button"
+      (click)="fetchHeadwayHistory()"
+      [disabled]="loadState() === 'loading'"
+    >
+      <mat-icon>refresh</mat-icon>
+      Atualizar
+    </button>
+  </header>
+
+  <section class="disclaimer-panel" aria-label="Aviso sobre os dados">
+    <mat-icon>info</mat-icon>
+    <p>
+      Estes dados podem estar incorretos. O intervalo entre trens é estimado a
+      partir de passagens inferidas pelos dados de previsão disponíveis, então
+      falhas de coleta, atrasos da fonte, lacunas entre consultas e aproximações
+      do nosso método podem distorcer os valores exibidos.
+    </p>
+  </section>
+
+  <section class="filter-panel" aria-label="Filtros do histórico de intervalos">
+    <mat-form-field appearance="outline">
+      <mat-label>Início</mat-label>
+      <input
+        matInput
+        type="date"
+        [ngModel]="startDate()"
+        (ngModelChange)="onStartDateChange($event)"
+      />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Fim</mat-label>
+      <input
+        matInput
+        type="date"
+        [ngModel]="endDate()"
+        (ngModelChange)="onEndDateChange($event)"
+      />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Empresa</mat-label>
+      <mat-select
+        [ngModel]="selectedAgency()"
+        (ngModelChange)="onAgencyChange($event)"
+      >
+        <mat-option value="all">Todas</mat-option>
+        @for (agency of agencies(); track agency) {
+          <mat-option [value]="agency">{{ agency }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Linha</mat-label>
+      <mat-select
+        [ngModel]="selectedLine()"
+        (ngModelChange)="onLineChange($event)"
+      >
+        <mat-option value="all">Todas</mat-option>
+        @for (line of lines(); track line) {
+          <mat-option [value]="line">{{ line }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Estação</mat-label>
+      <mat-select
+        [ngModel]="selectedStation()"
+        (ngModelChange)="onStationChange($event)"
+      >
+        <mat-option value="all">Todas</mat-option>
+        @for (station of stations(); track station) {
+          <mat-option [value]="station">{{ station }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Sentido</mat-label>
+      <mat-select
+        [ngModel]="selectedDirection()"
+        (ngModelChange)="onDirectionChange($event)"
+      >
+        <mat-option value="all">Todos</mat-option>
+        @for (direction of directions(); track direction) {
+          <mat-option [value]="direction">{{ direction }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <div class="filter-actions">
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        (click)="fetchHeadwayHistory()"
+        [disabled]="loadState() === 'loading'"
+      >
+        <mat-icon>search</mat-icon>
+        Filtrar
+      </button>
+      <button mat-icon-button type="button" (click)="clearFilters()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+  </section>
+
+  @if (loadState() === 'loading') {
+    <section class="state-panel">
+      <mat-spinner diameter="32"></mat-spinner>
+      <span>Carregando histórico de intervalos...</span>
+    </section>
+  } @else if (loadState() === 'error') {
+    <section class="state-panel error-panel" role="alert">
+      <mat-icon>cloud_off</mat-icon>
+      <div>
+        <h2>Não foi possível carregar o histórico</h2>
+        <p>{{ errorMessage() }}</p>
+      </div>
+    </section>
+  } @else {
+    <section class="results-header">
+      <strong>{{ summaryText() }}</strong>
+    </section>
+
+    @if (filteredRows().length === 0) {
+      <section class="state-panel">
+        <mat-icon>search_off</mat-icon>
+        <span>Nenhum registro encontrado para os filtros selecionados.</span>
+      </section>
+    } @else {
+      <div class="table-shell">
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Linha</th>
+              <th>Empresa</th>
+              <th>Estação</th>
+              <th>Sentido</th>
+              <th>Intervalo médio</th>
+              <th>Amostras</th>
+              <th>Fonte</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of pagedRows(); track row.snapshot.id) {
+              <tr>
+                <td>{{ formatDateTime(row.snapshot.observedAt) }}</td>
+                <td>
+                  <strong>{{ row.lineName }}</strong>
+                  <span class="line-code">{{ row.snapshot.lineCode }}</span>
+                </td>
+                <td>{{ row.agencyName }}</td>
+                <td>{{ row.stationName }}</td>
+                <td>{{ row.snapshot.direction }}</td>
+                <td>
+                  <strong>
+                    {{ formatAverageSeconds(row.snapshot.averageSeconds) }}
+                  </strong>
+                  @let fallbackTooltip =
+                    'Fallback significa que não havia amostras suficientes no período atual, então usamos o período anterior mais próximo com dados para estimar o intervalo.';
+                  @if (row.snapshot.isFallback) {
+                    <span
+                      class="fallback-badge"
+                      tabindex="0"
+                      [matTooltip]="fallbackTooltip"
+                    >
+                      Fallback
+                    </span>
+                  }
+                </td>
+                <td>{{ formatNullable(row.snapshot.sampleCount) }}</td>
+                <td>{{ row.snapshot.source }}</td>
+              </tr>
+              <tr class="details-row">
+                <td colspan="8">
+                  <details>
+                    <summary>Dados coletados</summary>
+                    <dl class="raw-grid">
+                      <div>
+                        <dt>ID</dt>
+                        <dd>{{ row.snapshot.id }}</dd>
+                      </div>
+                      <div>
+                        <dt>Observado em</dt>
+                        <dd>{{ row.snapshot.observedAt }}</dd>
+                      </div>
+                      <div>
+                        <dt>Criado em</dt>
+                        <dd>{{ row.snapshot.createdAt }}</dd>
+                      </div>
+                      <div>
+                        <dt>Código da linha</dt>
+                        <dd>{{ row.snapshot.lineCode }}</dd>
+                      </div>
+                      <div>
+                        <dt>Estação</dt>
+                        <dd>{{ row.stationName }}</dd>
+                      </div>
+                      <div>
+                        <dt>Sentido bruto</dt>
+                        <dd>{{ row.snapshot.direction }}</dd>
+                      </div>
+                      <div>
+                        <dt>Média em segundos</dt>
+                        <dd>
+                          {{ formatNullable(row.snapshot.averageSeconds) }}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Total de amostras</dt>
+                        <dd>{{ formatNullable(row.snapshot.sampleCount) }}</dd>
+                      </div>
+                      <div>
+                        <dt>Bucket</dt>
+                        <dd>{{ formatNullable(row.snapshot.bucket) }}</dd>
+                      </div>
+                      <div>
+                        <dt>Rótulo do bucket</dt>
+                        <dd>{{ formatNullable(row.snapshot.bucketLabel) }}</dd>
+                      </div>
+                      <div>
+                        <dt>Usou fallback</dt>
+                        <dd>
+                          @if (row.snapshot.isFallback) {
+                            <span tabindex="0" [matTooltip]="fallbackTooltip">
+                              Sim
+                            </span>
+                          } @else {
+                            Não
+                          }
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>Fonte</dt>
+                        <dd>{{ row.snapshot.source }}</dd>
+                      </div>
+                    </dl>
+
+                    @if (hasJson(row.snapshot.samples)) {
+                      <h3>Amostras anonimizadas</h3>
+                      <pre>{{ formatJson(row.snapshot.samples) }}</pre>
+                    }
+                    @if (hasJson(row.snapshot.errors)) {
+                      <h3>Erros</h3>
+                      <pre>{{ formatJson(row.snapshot.errors) }}</pre>
+                    }
+                    @if (hasJson(row.snapshot.metadata)) {
+                      <h3>Metadados</h3>
+                      <pre>{{ formatJson(row.snapshot.metadata) }}</pre>
+                    }
+                  </details>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <nav class="pagination" aria-label="Paginação do histórico de intervalos">
+        <button
+          mat-stroked-button
+          type="button"
+          (click)="previousPage()"
+          [disabled]="currentPage() === 1"
+        >
+          <mat-icon>chevron_left</mat-icon>
+          Anterior
+        </button>
+        <span>Página {{ currentPage() }} de {{ totalPages() }}</span>
+        <button
+          mat-stroked-button
+          type="button"
+          (click)="nextPage()"
+          [disabled]="currentPage() === totalPages()"
+        >
+          Próxima
+          <mat-icon>chevron_right</mat-icon>
+        </button>
+      </nav>
+    }
+  }
+</section>

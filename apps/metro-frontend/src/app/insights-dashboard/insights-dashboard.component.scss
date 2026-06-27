@@ -1,0 +1,270 @@
+:host {
+  display: block;
+}
+
+.insights-page {
+  width: min(1120px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 24px 0 40px;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+h1 {
+  margin: 0;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.summary-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    'icon value'
+    'icon label';
+  align-items: center;
+  column-gap: 12px;
+  min-height: 82px;
+  padding: 14px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 8px;
+  background: var(--mat-sys-surface-container-low);
+}
+
+.summary-item mat-icon {
+  grid-area: icon;
+  color: var(--mat-sys-primary);
+}
+
+.summary-value {
+  grid-area: value;
+  color: var(--mat-sys-on-surface);
+  font-size: 1.55rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.summary-label {
+  grid-area: label;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: 16px;
+  align-items: start;
+}
+
+mat-card {
+  border-radius: 8px;
+}
+
+mat-card-header mat-icon {
+  border-radius: 0 !important;
+  width: 24px;
+  height: 24px;
+}
+
+mat-card-content {
+  display: grid;
+  gap: 18px;
+  padding-top: 12px;
+}
+
+.category-section {
+  display: grid;
+  gap: 10px;
+}
+
+.category-section h2 {
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.item-list {
+  display: grid;
+  gap: 10px;
+}
+
+.insight-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 58px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+
+.insight-row:last-child {
+  border-bottom: 0;
+}
+
+.row-icon {
+  color: var(--mat-sys-primary);
+}
+
+.row-content {
+  min-width: 0;
+}
+
+.row-content h3 {
+  margin: 0 0 5px;
+  overflow-wrap: anywhere;
+  color: var(--mat-sys-on-surface);
+  font-size: 0.96rem;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.soft-chip,
+.line-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.soft-chip {
+  background: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+}
+
+.route-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  min-height: 34px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.compact-badge {
+  min-width: 34px;
+  min-height: 24px;
+  padding: 0 7px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+}
+
+.muted-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.muted-state mat-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--mat-sys-outline);
+  font-size: 18px;
+}
+
+.muted,
+.empty-category,
+.loading-row {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.88rem;
+}
+
+.error-message {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--mat-sys-error);
+  border-radius: 8px;
+  color: var(--mat-sys-error);
+}
+
+.empty-state {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 48px 24px;
+  border: 1px dashed var(--mat-sys-outline-variant);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.empty-state mat-icon {
+  width: 48px;
+  height: 48px;
+  color: var(--mat-sys-primary);
+  font-size: 48px;
+}
+
+.empty-state h2,
+.empty-state p {
+  margin: 0;
+}
+
+.empty-state p {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.status-section {
+  margin-top: 24px;
+}
+
+@media (max-width: 900px) {
+  .summary-grid,
+  .dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-grid {
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 640px) {
+  .insights-page {
+    width: min(100% - 24px, 1120px);
+    padding-top: 16px;
+  }
+
+  .page-header {
+    align-items: flex-start;
+  }
+
+  .summary-grid,
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .route-badge {
+    min-width: 62px;
+  }
+}

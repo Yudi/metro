@@ -1,0 +1,212 @@
+<div class="search-container">
+  <!-- Search Card -->
+  <mat-card class="search-card" appearance="outlined">
+    <mat-card-content>
+      <!-- Main Search Input -->
+      <mat-form-field class="search-field" appearance="outline">
+        <mat-label>Search routes and stops</mat-label>
+        <input
+          matInput
+          [value]="searchQuery()"
+          (input)="onSearchInput($any($event.target).value)"
+          (focus)="onFocusSearch()"
+          (blur)="onBlurSearch()"
+          placeholder="Search with typo tolerance - try 'blu' for 'blue' line..."
+          autocomplete="off"
+        />
+        <mat-icon matPrefix>search</mat-icon>
+
+        <!-- Loading spinner -->
+        @if (isLoading()) {
+          <mat-spinner matSuffix diameter="20"></mat-spinner>
+        }
+
+        <!-- Clear button -->
+        @if (searchQuery()) {
+          <button
+            matSuffix
+            mat-icon-button
+            (click)="onClearSearch()"
+            aria-label="Clear search"
+          >
+            <mat-icon>clear</mat-icon>
+          </button>
+        }
+      </mat-form-field>
+
+      <!-- Search Actions -->
+      <div class="search-actions">
+        <button
+          mat-raised-button
+          color="primary"
+          (click)="onNearbySearch()"
+          [disabled]="isLocationDisabled() || isRequestingLocation()"
+          class="nearby-button"
+        >
+          @if (isRequestingLocation()) {
+            <mat-spinner diameter="16"></mat-spinner>
+          } @else {
+            <mat-icon>{{
+              isLocationDisabled() ? 'location_off' : 'my_location'
+            }}</mat-icon>
+          }
+          Buscar Paradas Próximas
+        </button>
+
+        <button
+          mat-stroked-button
+          color="accent"
+          (click)="reindexData()"
+          [disabled]="isReindexing()"
+        >
+          @if (isReindexing()) {
+            <mat-spinner diameter="16"></mat-spinner>
+            Reindexing Data...
+          } @else {
+            <ng-container>
+              <mat-icon>refresh</mat-icon>
+              Reindex Search Data
+            </ng-container>
+          }
+        </button>
+
+        @if (hasResults()) {
+          <mat-chip-set>
+            <mat-chip [matBadge]="resultCount()" matBadgeColor="accent">
+              <mat-icon>search</mat-icon>
+              {{ resultCount() }} results
+            </mat-chip>
+            <mat-chip color="primary">
+              <mat-icon>auto_fix_high</mat-icon>
+              Typo-tolerant
+            </mat-chip>
+          </mat-chip-set>
+        }
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Search Results -->
+  @if (showResults() && hasResults()) {
+    <mat-card class="results-card" appearance="outlined">
+      <mat-card-header>
+        <mat-card-title>
+          <mat-icon>list</mat-icon>
+          Search Results
+        </mat-card-title>
+      </mat-card-header>
+
+      <mat-card-content>
+        <div class="results-container">
+          @for (result of searchResults(); track result.id) {
+            <div
+              class="result-item"
+              [class.route-result]="result.type === 'route'"
+              [class.stop-result]="result.type === 'stop'"
+              (click)="onResultClick(result)"
+              (keyup.enter)="onResultClick(result)"
+              (keyup.space)="onResultClick(result)"
+              tabindex="0"
+              role="button"
+              [attr.aria-label]="'Select ' + result.type + ': ' + result.title"
+            >
+              <div class="result-icon">
+                @if (result.type === 'route') {
+                  <mat-icon color="primary">directions_bus</mat-icon>
+                } @else {
+                  <mat-icon color="accent">place</mat-icon>
+                }
+              </div>
+
+              <div class="result-content">
+                <div class="result-title">{{ result.title }}</div>
+                <div class="result-subtitle">{{ result.subtitle }}</div>
+
+                <!-- Search match info -->
+                @if (result.score) {
+                  <div class="match-score">
+                    <mat-icon class="score-icon">search</mat-icon>
+                    Match: {{ result.score! * 100 | number: '1.0-0' }}%
+                  </div>
+                }
+
+                <!-- Type badge and score -->
+                <div class="result-badges">
+                  <mat-chip
+                    class="type-chip"
+                    [color]="result.type === 'route' ? 'primary' : 'accent'"
+                  >
+                    {{ result.type === 'route' ? 'Route' : 'Stop' }}
+                  </mat-chip>
+
+                  @if (hasHighlights(result)) {
+                    <mat-chip class="highlight-chip" color="warn">
+                      <mat-icon>highlight</mat-icon>
+                      Typo-tolerant match
+                    </mat-chip>
+                  }
+                </div>
+              </div>
+
+              <div class="result-action">
+                <mat-icon>chevron_right</mat-icon>
+              </div>
+            </div>
+          }
+        </div>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  <!-- Empty State -->
+  @if (showEmptyState()) {
+    <mat-card class="empty-state-card" appearance="outlined">
+      <mat-card-content>
+        <div class="empty-state">
+          <mat-icon class="empty-icon">search_off</mat-icon>
+          <h3>Nenhum resultado encontrado</h3>
+          <p>Tente buscar por outro nome de linha, parada ou ID.</p>
+          <p class="empty-hint">
+            Se esta é sua primeira busca, os dados podem ainda não estar
+            indexados.
+          </p>
+
+          <div class="empty-actions">
+            <button
+              mat-raised-button
+              color="primary"
+              (click)="onNearbySearch()"
+              [disabled]="isLocationDisabled() || isRequestingLocation()"
+            >
+              @if (isRequestingLocation()) {
+                <mat-spinner diameter="16"></mat-spinner>
+              } @else {
+                <mat-icon>{{
+                  isLocationDisabled() ? 'location_off' : 'my_location'
+                }}</mat-icon>
+              }
+              Buscar Paradas Próximas
+            </button>
+
+            <button
+              mat-stroked-button
+              color="accent"
+              (click)="reindexData()"
+              [disabled]="isReindexing()"
+            >
+              @if (isReindexing()) {
+                <mat-spinner diameter="16"></mat-spinner>
+                Reindexing Data...
+              } @else {
+                <ng-container>
+                  <mat-icon>refresh</mat-icon>
+                  Reindex Search Data
+                </ng-container>
+              }
+            </button>
+          </div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  }
+</div>

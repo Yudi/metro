@@ -1,0 +1,349 @@
+@use '../../../shared/styles/rail-status' as rail;
+
+.container {
+  max-width: 1024px;
+  margin: auto;
+}
+
+.status-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+.regular-grid {
+  padding-top: 10px;
+}
+
+.special-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.special-section-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--mat-sys-on-surface);
+}
+
+.line-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 8px;
+  background-color: var(
+    --mat-sys-surface-container-lowest,
+    var(--mat-sys-surface-container-low)
+  );
+  transition:
+    box-shadow 0.2s,
+    transform 0.12s;
+  overflow: hidden;
+}
+
+// .line-card:hover {
+//   box-shadow: 0 8px 20px rgba(16, 24, 40, 0.08);
+// }
+
+.line-card .badge {
+  width: 60px;
+  height: 60px;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  border-radius: 50%;
+  text-align: center;
+  line-height: 60px;
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.line-card .badge .badge-icon {
+  font-size: 2.5rem;
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.line-card .content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.line-card.special-line .badge {
+  font-size: 1.15rem;
+}
+
+.special-grid {
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+.expresso-linha-10 .badge {
+  font-size: 1rem;
+}
+
+.special-info-card .badge mat-icon {
+  font-size: 1.35rem;
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.line-subtitle {
+  font-size: 0.84rem;
+  margin-bottom: 0.35rem;
+  color: var(--mat-sys-on-surface-variant, var(--mat-sys-on-surface));
+  text-align: center;
+}
+
+.schedule-block {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
+  color: var(--mat-sys-on-surface);
+}
+
+.schedule-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.schedule-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.84rem;
+}
+
+.line-name {
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+  text-align: center;
+  color: var(--mat-sys-on-surface);
+}
+
+.status {
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--mat-sys-on-surface);
+}
+
+.empty-message {
+  padding: 18px;
+  border: 1px dashed var(--mat-sys-outline-variant);
+  border-radius: 8px;
+  color: var(--mat-sys-on-surface-variant);
+  text-align: center;
+}
+
+// Shared status badge styles
+@include rail.status-badge;
+
+@media ((max-width: 513px) and (min-width: 478px)) or (max-width: 347px) {
+  .grid {
+    display: flex;
+    gap: 0.75rem;
+    padding: 8px 12px;
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+
+  .special-section-title {
+    padding-inline: 12px;
+  }
+
+  .status-badge {
+    padding: 0.25rem 0.5rem;
+  }
+
+  .line-card {
+    flex: 1 1 calc(50% - 0.75rem);
+    min-width: 195px;
+    max-width: calc(50% - 0.75rem);
+    padding: 0.75rem;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0;
+    box-sizing: border-box;
+    border-radius: 12px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent);
+    box-shadow: 0 6px 18px rgba(16, 24, 40, 0.06);
+    align-self: stretch;
+  }
+
+  @media (max-width: 477px) {
+    .line-card {
+      flex: 1 1 calc(50% - 0.75rem);
+      max-width: 100%;
+    }
+  }
+
+  // .line-card:hover {
+  //   box-shadow: 0 12px 30px rgba(16, 24, 40, 0.12);
+  // }
+
+  .line-card .badge {
+    width: 48px;
+    height: 48px;
+    line-height: 48px;
+    font-size: 1.1rem;
+    border-radius: 10px;
+    margin-bottom: 0;
+    flex-shrink: 0;
+  }
+
+  .line-card .content {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    // Text truncation
+    min-width: 0;
+  }
+
+  .line-name {
+    font-size: 1rem;
+    font-weight: 700;
+    text-wrap: wrap;
+    white-space: wrap;
+    text-align: left;
+    margin-bottom: 0.15rem;
+    overflow: hidden;
+    max-width: 100%;
+    color: var(--mat-sys-on-surface);
+  }
+
+  .line-subtitle {
+    font-size: 0.8rem;
+    text-align: left;
+    margin-bottom: 0.25rem;
+  }
+
+  .line-card .content {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    min-width: 0;
+    height: 100%;
+    justify-content: center;
+  }
+
+  .schedule-block {
+    margin-top: 0.25rem;
+  }
+
+  .schedule-title {
+    font-size: 0.74rem;
+  }
+
+  .schedule-row {
+    font-size: 0.82rem;
+    width: 100%;
+  }
+
+  .status {
+    text-align: left;
+    font-size: 0.9rem;
+    color: var(--mat-sys-on-surface);
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    max-width: 100%;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .line-card {
+    background-color: var(--mat-sys-surface-container-lowest);
+    border-color: rgba(255, 255, 255, 0.06);
+  }
+
+  // .line-card:hover {
+  //   box-shadow: 0 8px 24px rgba(2, 6, 23, 0.6);
+  // }
+
+  .header,
+  .line-name {
+    color: var(--mat-sys-primary);
+  }
+
+  .status {
+    color: var(--mat-sys-on-surface);
+  }
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.clickable:hover {
+  box-shadow: 0 8px 20px rgba(16, 24, 40, 0.08);
+}
+
+.updated {
+  font-size: 12px;
+  color: var(--mat-sys-on-surface);
+  margin-top: 2px;
+}
+
+// Skeleton
+
+@include rail.skeleton-shimmer-keyframes;
+
+.grid .line-card.skeleton {
+  border-color: transparent;
+  background-color: var(--skeleton-surface, #f4f6f8);
+  box-shadow: none;
+  pointer-events: none;
+}
+
+.line-card.skeleton .placeholder {
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-base, #e6eef6) 0%,
+    var(--skeleton-highlight, #f7fbff) 50%,
+    var(--skeleton-base, #e6eef6) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s linear infinite;
+  border-radius: 6px;
+}
+
+.line-card.skeleton .badge.placeholder {
+  border-radius: inherit;
+  margin-bottom: 0.5rem;
+}
+
+.line-card.skeleton .line-name.placeholder {
+  height: 14px;
+  width: 60%;
+  margin-bottom: 8px;
+  max-width: 220px;
+}
+
+.line-card.skeleton .status.placeholder {
+  height: 12px;
+  width: 85%;
+  max-width: 320px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .grid .line-card.skeleton {
+    background-color: var(--skeleton-surface-dark, #1e2933);
+  }
+  .line-card.skeleton .placeholder {
+    background: linear-gradient(90deg, #2a3942 0%, #34464f 50%, #2a3942 100%);
+  }
+}

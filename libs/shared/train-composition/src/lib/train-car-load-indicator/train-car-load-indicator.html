@@ -1,0 +1,41 @@
+<svg
+  [class]="'train-car-load ' + colorClass()"
+  viewBox="0 0 320 160"
+  role="img"
+  [attr.aria-label]="ariaLabel()"
+>
+  <defs>
+    <clipPath [attr.id]="clipPathId">
+      <path [attr.d]="shapePath()" />
+    </clipPath>
+  </defs>
+
+  <g [attr.clip-path]="'url(#' + clipPathId + ')'">
+    @for (band of bands; track band.value) {
+      <rect
+        class="train-car-load__band"
+        [class.train-car-load__band--active]="isActive(band)"
+        x="20"
+        [attr.y]="band.y"
+        width="280"
+        [attr.height]="bandHeight"
+      />
+    }
+
+    @for (door of doorMarkers(); track door.index) {
+      <line
+        class="train-car-load__door-marker"
+        [attr.x1]="door.x"
+        y1="34"
+        [attr.x2]="door.x"
+        y2="126"
+      />
+    }
+  </g>
+
+  <path
+    class="train-car-load__outline"
+    [attr.d]="shapePath()"
+    aria-hidden="true"
+  />
+</svg>

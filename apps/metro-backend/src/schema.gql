@@ -1,0 +1,792 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type BikeStationSummaryDto {
+  capacity: Int
+  effectiveCapacity: Int!
+  electricBikesAvailable: Int!
+  latitude: Float!
+  longitude: Float!
+  numBikesAvailable: Int!
+  stationId: String!
+}
+
+type BikeStationsSummaryPayloadDto {
+  """Unix timestamp in milliseconds when backend fetched this data"""
+  fetchedAt: Float!
+  lastUpdated: Int!
+  stations: [BikeStationSummaryDto!]!
+  ttl: Int!
+}
+
+type BoundingBox {
+  maxLat: Float!
+  maxLng: Float!
+  minLat: Float!
+  minLng: Float!
+}
+
+input BoundingBoxInput {
+  maxLat: Float!
+  maxLng: Float!
+  minLat: Float!
+  minLng: Float!
+}
+
+type BusRoute {
+  color: String!
+  geometry: GeometryData
+  id: ID!
+  longName: String!
+  routeId: String!
+  routeType: Int!
+  shortName: String!
+  textColor: String!
+}
+
+type BusShape {
+  geometry: GeometryData!
+  id: ID!
+  shapeId: String!
+}
+
+type BusStop {
+  """Normalized agency identifiers (metro, cptm) for icon display"""
+  agencies: [String!]
+  description: String
+  geometry: GeometryData
+  id: ID!
+  isSubwayStation: Boolean!
+  latitude: Float!
+  longitude: Float!
+  name: String!
+
+  """Raw route short names (METRÔ L1-AZUL) containing line codes"""
+  routeShortNames: [String!]
+  stopId: String!
+}
+
+type Calendar {
+  end_date: String!
+  friday: Int!
+  id: ID!
+  monday: Int!
+  saturday: Int!
+  service_id: String!
+  start_date: String!
+  sunday: Int!
+  thursday: Int!
+  tuesday: Int!
+  wednesday: Int!
+}
+
+"""CPTM station from the public station list"""
+type CptmStationInfo {
+  """Latitude"""
+  latitude: Float!
+
+  """Line code (L10, L11, L12, L13)"""
+  lineCode: String!
+
+  """Longitude"""
+  longitude: Float!
+
+  """Public station code"""
+  stationCode: String!
+
+  """Station name"""
+  stationName: String!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+scalar JSON
+
+"""Average headway for a direction"""
+type DirectionHeadwayEntity {
+  """Average headway in seconds"""
+  averageSeconds: Float!
+
+  """Time-of-day bucket id (e.g. am_peak, evening)"""
+  bucket: String
+
+  """Display label for the bucket (Portuguese)"""
+  bucketLabel: String
+
+  """Terminal/destination name"""
+  direction: String!
+
+  """
+  True when showing data from a previous bucket (insufficient current data)
+  """
+  isFallback: Boolean
+
+  """Number of interval samples used"""
+  sampleCount: Int!
+}
+
+type FavoriteList {
+  bikeStation: [String!]!
+  busRoute: [String!]!
+  busStop: [String!]!
+  railLine: [String!]!
+  railStation: [String!]!
+}
+
+input FavoriteListInput {
+  bikeStation: [String!]!
+  busRoute: [String!]!
+  busStop: [String!]!
+  railLine: [String!]!
+  railStation: [String!]!
+}
+
+"""Type of favorite item"""
+enum FavoriteType {
+  BikeStation
+  BusRoute
+  BusStop
+  RailLine
+  RailStation
+}
+
+type GeometryData {
+  coordinates: [[Float!]!]!
+  type: String!
+}
+
+"""Historical operations data grouped by data kind"""
+type HistoricalDataEntity {
+  """Historical headway snapshots"""
+  headwaySnapshots: [HistoricalHeadwaySnapshotEntity!]!
+
+  """Historical incident and transparency events"""
+  incidents: [HistoricalIncidentEventEntity!]!
+}
+
+input HistoricalDataFilterInput {
+  """Directions to include for headway snapshots"""
+  directions: [String!]
+
+  """Incident event types to include"""
+  eventTypes: [HistoricalIncidentEventType!]
+
+  """Include rows observed at or after this timestamp"""
+  from: DateTime
+
+  """Whether headway snapshots should be included"""
+  includeHeadway: Boolean
+
+  """Whether incident events should be included"""
+  includeIncidents: Boolean
+
+  """Rail line codes to include, such as L9"""
+  lineCodes: [String!]
+
+  """Numeric rail line codes to include"""
+  lineNumbers: [Int!]
+
+  """Logical sources to include, such as rail_status"""
+  sources: [String!]
+
+  """Station codes to include for headway snapshots"""
+  stationCodes: [String!]
+
+  """Station names to include for headway snapshots"""
+  stationNames: [String!]
+
+  """Rail status codes to include for incident events"""
+  statusCodes: [String!]
+
+  """Include rows observed at or before this timestamp"""
+  to: DateTime
+}
+
+"""Historical average headway snapshot for a station direction"""
+type HistoricalHeadwaySnapshotEntity {
+  """Average headway in seconds, null when unavailable"""
+  averageSeconds: Float
+
+  """Time-of-day bucket id used for the calculation"""
+  bucket: String
+
+  """Display label for the time-of-day bucket"""
+  bucketLabel: String
+
+  """When this history row was created"""
+  createdAt: DateTime!
+
+  """Terminal or direction name"""
+  direction: String!
+
+  """
+  Structured JSONB error details when the headway calculation is incomplete
+  """
+  errors: JSON
+
+  """Headway snapshot identifier"""
+  id: String!
+
+  """True when the snapshot used a fallback bucket"""
+  isFallback: Boolean!
+
+  """Rail line code, such as L9"""
+  lineCode: String!
+
+  """Structured metadata for diagnostics and future analysis"""
+  metadata: JSON
+
+  """When this snapshot was observed"""
+  observedAt: DateTime!
+
+  """Number of interval samples used or available"""
+  sampleCount: Int
+
+  """
+  Anonymized interval samples used for this average, without raw timestamps or train identifiers
+  """
+  samples: JSON
+
+  """Logical source of this headway row"""
+  source: String!
+
+  """Internal station key used by the headway calculation"""
+  @deprecated(reason: "Use stationName for user-facing historical data.")
+  stationCode: String!
+
+  """User-facing station name"""
+  stationName: String
+}
+
+"""Historical incident or transparency event for rail operations and backend availability"""
+type HistoricalIncidentEventEntity {
+  """When this history row was created"""
+  createdAt: DateTime!
+
+  """Detailed event description"""
+  description: String
+
+  """Incident category reported by the source, when available"""
+  incidentCategory: String
+
+  """Additional operational details"""
+  detail: String
+
+  """Event duration in seconds, if known"""
+  durationSeconds: Int
+
+  """When the event ended, if known"""
+  endedAt: DateTime
+
+  """Event type"""
+  eventType: HistoricalIncidentEventType!
+
+  """Historical event identifier"""
+  id: String!
+
+  """Rail line code, such as L9"""
+  lineCode: String
+
+  """Rail line display name"""
+  lineName: String
+
+  """Numeric rail line code"""
+  lineNumber: Int
+
+  """Structured metadata for diagnostics and future analysis"""
+  metadata: JSON
+
+  """When this event was observed"""
+  observedAt: DateTime!
+
+  """External provider or subsystem involved"""
+  provider: String
+
+  """Normalized severity for filtering and visualization"""
+  severity: String
+
+  """Logical source of the event"""
+  source: String!
+
+  """When the event started, if known"""
+  startedAt: DateTime
+
+  """Rail status code at observation time"""
+  statusCode: String
+
+  """Rail status color at observation time"""
+  statusColor: String
+
+  """Rail status label at observation time"""
+  statusLabel: String
+
+  """Short event title"""
+  title: String!
+}
+
+"""Kind of historical incident or transparency event"""
+enum HistoricalIncidentEventType {
+  BACKEND_OFFLINE
+  BACKEND_OFFLINE_DETECTED
+  BACKEND_ONLINE
+  RAIL_STATUS_INCIDENT
+  RAIL_STATUS_RECOVERED
+  RETRIEVAL_ISSUE
+}
+
+"""
+Merged rail station combining Metro and CPTM stations at the same location
+"""
+type MergedRailStation {
+  """Transit agencies serving this station (METRO, CPTM)"""
+  agencies: [String!]!
+  id: ID!
+  latitude: Float!
+
+  """Line names serving this station"""
+  lines: [String!]!
+  longitude: Float!
+
+  """All station IDs that were merged into this station"""
+  mergedIds: [Float!]!
+
+  """Normalized station name (without Metro/CPTM suffix)"""
+  name: String!
+
+  """Original name of the primary station"""
+  originalName: String!
+
+  """Primary station ID used for this merged station"""
+  primaryId: Float!
+}
+
+type MergedSubwayStation {
+  """Transit agencies serving this station (METRO, CPTM)"""
+  agencies: [String!]!
+  id: ID!
+  latitude: Float!
+  longitude: Float!
+
+  """All stop IDs that were merged into this station"""
+  mergedStopIds: [String!]!
+
+  """Normalized station name (without Metro/CPTM suffix)"""
+  name: String!
+
+  """Original name of the primary station"""
+  originalName: String!
+
+  """Route short names (e.g., METRÔ L1-AZUL, CPTM L07)"""
+  routeShortNames: [String!]!
+
+  """Primary stop ID used for this merged station"""
+  stopId: String!
+}
+
+type Mutation {
+  addFavorite(code: String!, type: FavoriteType!): MutationResponse!
+  reindexSearch: Boolean!
+  removeFavorite(code: String!, type: FavoriteType!): MutationResponse!
+  syncFavorites(favorites: FavoriteListInput!): MutationResponse!
+}
+
+type MutationResponse {
+  message: String
+  success: Boolean!
+}
+
+input NearbyStopsInput {
+  latitude: Float!
+  limit: Int = 20
+  longitude: Float!
+  radiusMeters: Int = 1000
+}
+
+"""Next train arrival information"""
+type NextTrainArrival {
+  """Predicted arrival time (HH:MM format)"""
+  arrivalTime: String!
+
+  """Destination station code"""
+  destinationCode: String!
+
+  """Destination station name"""
+  destinationName: String!
+
+  """Whether train is at the platform"""
+  isAtPlatform: Boolean!
+
+  """Line code (e.g., L8, L9)"""
+  lineCode: String!
+
+  """Station code where train is arriving"""
+  stationCode: String!
+
+  """Current station code where the train is"""
+  trainCurrentStationCode: String!
+
+  """Current station name where the train is"""
+  trainCurrentStationName: String!
+
+  """Last update timestamp from source"""
+  updatedAt: String!
+}
+
+type Query {
+  batchRoutesForStops(stopIds: [String!]!): [StopRoutes!]!
+
+  """
+  Lightweight summary of bike stations with availability details for map initialization.
+  """
+  bikeStationsSummary: BikeStationsSummaryPayloadDto!
+  busRoute(id: ID!): BusRoute
+  busRoutes: [BusRoute!]!
+  busShape(shapeId: String!): BusShape
+  busShapes: [BusShape!]!
+  busStop(id: ID!): BusStop
+  busStops: [BusStop!]!
+  busStopsInBounds(bounds: BoundingBoxInput!): [BusStop!]!
+
+  """Find a CPTM station by name and line code"""
+  findCptmStation(
+    """CPTM line code (10, 11, 12, or 13)"""
+    lineCode: Int!
+
+    """Station name to search for"""
+    stationName: String!
+  ): CptmStationInfo
+
+  """
+  Retrieve historical incidents, backend transparency events, retrieval issues, and headway snapshots
+  """
+  historicalData(
+    """Optional filters for historical data"""
+    filter: HistoricalDataFilterInput
+
+    """Maximum rows returned for each historical data kind"""
+    limit: Int
+
+    """Rows to skip for each historical data kind"""
+    offset: Int
+  ): HistoricalDataEntity!
+
+  """Get a merged rail station by any of its IDs"""
+  mergedRailStation(id: Float!): MergedRailStation
+
+  """Get all merged rail stations (pre-processed for deduplication)"""
+  mergedRailStations: [MergedRailStation!]!
+
+  """Get a merged subway station by any of its stop IDs"""
+  mergedSubwayStation(stopId: String!): MergedSubwayStation
+
+  """Get all merged subway stations (pre-processed for vector tiles)"""
+  mergedSubwayStations: [MergedSubwayStation!]!
+  multipleBusRoutes(ids: [ID!]!): [BusRoute!]!
+  multipleBusStops(ids: [ID!]!): [BusStop!]!
+  nearbyStops(input: NearbyStopsInput!): [Stop!]!
+
+  """
+  Get next train arrivals for a station (L4/L8/L9/L10/L11/L12/L13/EA/10X). Prefer WebSocket for real-time updates.
+  """
+  nextTrains(
+    """Line code: L4, L8, L9, L10, L11, L12, L13, EA, or 10X"""
+    lineCode: String!
+
+    """Public station code (e.g., HBR for L9, LUZ for CPTM)"""
+    stationCode: String!
+  ): StationNextTrains
+
+  """Get status of a specific rail line by code"""
+  railLineStatus(
+    """Line code (e.g., 1 for L1)"""
+    code: Int!
+  ): RailLine
+
+  """Get status of multiple rail lines by codes"""
+  railLineStatuses(
+    """Array of line codes to fetch"""
+    codes: [Int!]!
+  ): [RailLine!]!
+
+  """Get status of all rail lines (cached, refreshed every 5 minutes)"""
+  railLinesStatus: RailLinesStatus!
+
+  """Get a single rail station by ID from GeoSampa data"""
+  railStation(id: ID!): RailStation
+
+  """Get all rail stations from GeoSampa data (Metro and CPTM)"""
+  railStations: [RailStation!]!
+
+  """Get rail stations within bounding box from GeoSampa data"""
+  railStationsInBounds(bounds: BoundingBoxInput!): [RailStation!]!
+  routeDetails(routeId: String!): RouteDetails
+
+  """
+  Get complete route data (route info, trips, shapes, stops) in a single request
+  """
+  routeFullData(routeId: String!): RouteFullData
+  routeShape(routeId: String!): [RouteShape!]!
+  routesForStop(stopId: String!): [BusRoute!]!
+  search(input: SearchFiltersInput!): SearchResults!
+  searchBusStops(input: StopSearchInput): [BusStop!]!
+
+  """Search rail stations by name from GeoSampa data"""
+  searchRailStations(limit: Float = 20, searchTerm: String!): [RailStation!]!
+  stopDetails(stopId: String!): StopDetails
+
+  """
+  Get complete stop data with all routes passing through it in a single request
+  """
+  stopFullData(stopId: String!): StopFullData
+  stopsBounds: BoundingBox
+  stopsForRoute(routeId: String!): [BusStop!]!
+  subwayRoutes: [BusRoute!]!
+  subwayStations: [BusStop!]!
+  testDatabase: String!
+  tripsForRoute(routeId: String!): [Trip!]!
+
+  """Get user favorites (requires authentication)"""
+  userFavorites: FavoriteList!
+  validateToken: Boolean!
+}
+
+"""Individual rail line status"""
+type RailLine {
+  """Line code number (e.g., 1 for L1)"""
+  code: Int!
+
+  """Line color in hex format (e.g., #00529F)"""
+  colorHex: String!
+
+  """Line color name in Portuguese (e.g., Azul)"""
+  colorName: String!
+
+  """Description of any issues or alerts"""
+  description: String
+
+  """Incident category reported by the source, when available"""
+  incidentCategory: String
+
+  """Additional details for the status"""
+  detail: String
+
+  """Line identifier (e.g., L1-Azul)"""
+  line: String!
+
+  """
+  Current operation status code (AtividadeProgramada, OperacaoNormal, OperacaoEspecial, OperacaoEncerrada, VelocidadeReduzida, OperacaoParcial, OperacaoComImpactoPontual, Paralisada, DadosIndisponiveis)
+  """
+  statusCode: String!
+
+  """Status indicator color (verde, amarelo, vermelho, cinza)"""
+  statusColor: String!
+
+  """Human-readable status label"""
+  statusLabel: String!
+}
+
+"""Rail lines status response"""
+type RailLinesStatus {
+  """Error message if fetch failed"""
+  errorMessage: String
+
+  """Timestamp when the data was last fetched from source"""
+  lastUpdated: DateTime!
+
+  """List of rail line statuses"""
+  lines: [RailLine!]!
+
+  """Whether the data fetch was successful"""
+  success: Boolean!
+}
+
+"""Rail station from GeoSampa data (Metro or CPTM)"""
+type RailStation {
+  """Transit agency (METRO or CPTM)"""
+  agency: String!
+  geometry: GeometryData
+  id: ID!
+
+  """Latitude in WGS84"""
+  latitude: Float!
+
+  """Line name (e.g., AZUL, RUBI, L07)"""
+  lines: [String!]
+
+  """Longitude in WGS84"""
+  longitude: Float!
+
+  """Station name"""
+  name: String!
+
+  """Operation status (e.g., OPERANDO)"""
+  status: String
+}
+
+type Route {
+  agency_id: String!
+  id: ID!
+  route_color: String!
+  route_id: String!
+  route_long_name: String!
+  route_short_name: String!
+  route_text_color: String!
+  route_type: Int!
+}
+
+type RouteDetails {
+  calendars: [Calendar!]!
+  route: Route!
+  totalTrips: Int!
+  trips: [SearchTrip!]!
+}
+
+type RouteFullData {
+  """The route information"""
+  route: BusRoute!
+
+  """All shapes for this route"""
+  shapes: [BusShape!]!
+
+  """All stops along this route"""
+  stops: [BusStop!]!
+
+  """All trips for this route"""
+  trips: [Trip!]!
+}
+
+type RouteSearchResult {
+  highlights: [SearchHighlight!]
+  route: Route!
+  type: String!
+}
+
+type RouteShape {
+  geometry: String!
+  shape_id: String!
+}
+
+input SearchFiltersInput {
+  includeBikeStations: Boolean = false
+  includeBusRoutes: Boolean = false
+  includeBusStops: Boolean = false
+  includeRailLines: Boolean = false
+  includeRailStations: Boolean = false
+  limit: Int = 10
+  query: String!
+}
+
+type SearchHighlight {
+  field: String!
+  snippet: String!
+}
+
+type SearchResults {
+  routes: [RouteSearchResult!]!
+  stops: [StopSearchResult!]!
+  total: Int!
+}
+
+type SearchTrip {
+  direction_id: Int!
+  id: ID!
+  route_id: String!
+  service_id: String!
+  shape_id: String!
+  trip_headsign: String!
+  trip_id: String!
+}
+
+"""Next trains arriving at a station"""
+type StationNextTrains {
+  """When the data was last fetched"""
+  fetchedAt: DateTime
+
+  """Average headway per direction (if available)"""
+  headway: [DirectionHeadwayEntity!]
+
+  """Line code (L4, L8, or L9)"""
+  lineCode: String!
+
+  """Station code"""
+  stationCode: String!
+
+  """Station name"""
+  stationName: String!
+
+  """List of arriving trains"""
+  trains: [NextTrainArrival!]!
+}
+
+type Stop {
+  """For GeoSampa rail: METRO or CPTM"""
+  agency: String
+  id: ID!
+
+  """For GeoSampa rail: line name"""
+  line: String
+
+  """Source: gtfs or gpkg"""
+  source: String
+  stop_desc: String
+  stop_id: String!
+  stop_lat: Float!
+  stop_lon: Float!
+  stop_name: String!
+}
+
+type StopDetails {
+  calendars: [Calendar!]!
+  routes: [Route!]!
+  stop: Stop!
+  stopTimes: [StopTime!]!
+  trips: [SearchTrip!]!
+}
+
+type StopFullData {
+  """Full data for all routes passing through this stop"""
+  routes: [RouteFullData!]!
+
+  """The stop information"""
+  stop: BusStop!
+}
+
+type StopRoutes {
+  routeShortNames: [String!]!
+  stopId: String!
+}
+
+input StopSearchInput {
+  bounds: BoundingBoxInput
+  limit: Float
+  searchTerm: String
+}
+
+type StopSearchResult {
+  highlights: [SearchHighlight!]
+  stop: Stop!
+  type: String!
+}
+
+type StopTime {
+  arrival_time: String!
+  departure_time: String!
+  id: ID!
+  stop_id: String!
+  stop_sequence: Int!
+  trip_id: String!
+}
+
+type Trip {
+  directionId: Int!
+  id: ID!
+  routeId: String!
+  serviceId: String!
+  shapeId: String!
+  tripHeadsign: String!
+  tripId: String!
+}

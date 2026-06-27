@@ -1,0 +1,113 @@
+$surface-container: var(--mat-sys-surface-container, #f3f0f4);
+$surface-container-high: var(--mat-sys-surface-container-high, #ede9ee);
+$on-surface: var(--mat-sys-on-surface, #1d1b1e);
+$on-surface-variant: var(--mat-sys-on-surface-variant, #49454e);
+$outline: var(--mat-sys-outline, #7a757f);
+$outline-variant: var(--mat-sys-outline-variant, #cbc4cf);
+$primary: var(--mat-sys-primary, #6750a4);
+$primary-container: var(--mat-sys-primary-container, #e9ddff);
+
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: $surface-container-high;
+  border-bottom: 1px solid $outline-variant;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+
+  &::-webkit-scrollbar {
+    height: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: $outline;
+    border-radius: 2px;
+  }
+
+  &:empty {
+    display: none;
+  }
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: $surface-container;
+  border: 1px solid $outline-variant;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: $on-surface;
+  white-space: nowrap;
+  flex-shrink: 0;
+
+  mat-icon {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+    color: $on-surface-variant;
+  }
+
+  &.loading {
+    color: $primary;
+    border-color: $primary;
+    background: $primary-container;
+
+    mat-icon {
+      color: $primary;
+      animation: spin 1s linear infinite;
+    }
+  }
+
+  &.accent {
+    background: $primary-container;
+    border-color: $primary;
+    color: $primary;
+
+    mat-icon {
+      color: $primary;
+    }
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// Responsive
+@media (max-width: 768px) {
+  .status-bar {
+    padding: 4px 12px;
+    gap: 6px;
+  }
+
+  .status-chip {
+    padding: 3px 8px;
+    font-size: 0.6875rem;
+    border-radius: 10px;
+
+    mat-icon {
+      font-size: 12px;
+      width: 12px;
+      height: 12px;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .status-bar {
+    padding: 3px 8px;
+    gap: 4px;
+  }
+
+  .status-chip {
+    padding: 2px 6px;
+  }
+}

@@ -1,0 +1,122 @@
+// ============================================================================
+// VARIABLES - Material 3 Design Tokens
+// ============================================================================
+
+$surface-container-low: var(--mat-sys-surface-container-low, #f9f5fa);
+$outline: var(--mat-sys-outline, #7a757f);
+$primary: var(--mat-sys-primary, #6750a4);
+
+// Elevation levels (Material 3)
+@mixin elevation-2 {
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.06),
+    0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+// ============================================================================
+// MAIN CONTAINER
+// ============================================================================
+
+.map-wrapper {
+  display: flex;
+  flex-direction: column;
+  background: $surface-container-low;
+  position: relative;
+  // overflow: hidden;
+  margin-bottom: 5rem;
+}
+
+.map-container {
+  // flex: 1;
+  width: 100%;
+  position: relative;
+  background: #e8e8e8;
+  height: 60vh;
+}
+
+// ============================================================================
+// OPENLAYERS CUSTOMIZATION
+// ============================================================================
+
+:host ::ng-deep {
+  .ol-control {
+    border-radius: 8px;
+    overflow: hidden;
+    @include elevation-2;
+
+    button {
+      border-radius: 0;
+      transition: background-color 0.2s ease;
+
+      &:hover {
+        background-color: rgba(0, 0, 0, 0.05);
+      }
+
+      &:focus {
+        outline: 2px solid $primary;
+        outline-offset: 2px;
+      }
+    }
+  }
+
+  .ol-zoom {
+    top: 16px;
+    left: 16px;
+  }
+
+  .ol-attribution {
+    bottom: 8px;
+    right: 8px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 0.75rem;
+  }
+}
+
+// ============================================================================
+// RESPONSIVE DESIGN
+// ============================================================================
+
+@media (max-width: 768px) {
+  .map-wrapper {
+    min-height: 400px;
+  }
+
+  :host ::ng-deep {
+    .ol-zoom {
+      top: 12px;
+      left: 12px;
+    }
+
+    .ol-attribution {
+      font-size: 0.625rem;
+      padding: 2px 6px;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .map-wrapper {
+    min-height: 200px;
+  }
+}
+
+// ============================================================================
+// ACCESSIBILITY IMPROVEMENTS
+// ============================================================================
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+// High contrast mode support
+@media (prefers-contrast: high) {
+  :host ::ng-deep .ol-control {
+    border: 2px solid;
+  }
+}

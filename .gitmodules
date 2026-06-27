@@ -1,0 +1,3 @@
+[submodule "private/metro-core-private"]
+	path = private/metro-core-private
+	url = https://github.com/Yudi/metro-core-private

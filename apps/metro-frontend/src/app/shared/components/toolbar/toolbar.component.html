@@ -1,0 +1,48 @@
+<mat-toolbar class="app-toolbar" color="primary">
+  @if (backRoute()) {
+    <button
+      mat-icon-button
+      type="button"
+      class="back-button"
+      aria-label="Voltar"
+      (click)="navigateBack()"
+    >
+      <mat-icon aria-hidden="true">arrow_back</mat-icon>
+    </button>
+  }
+
+  <a class="brand" routerLink="/" aria-label="Ir para página inicial">
+    <img
+      src="/app/icons/logo.avif"
+      alt="Logotipo do site"
+      class="brand-icon"
+      aria-hidden="true"
+    />
+    <span class="brand-text">Transporte Metropolitano</span>
+  </a>
+
+  <span class="spacer"></span>
+
+  <!-- Desktop -->
+  <nav class="desktop-nav">
+    @for (item of items; track item.label) {
+      @if (item.route === '/mapa') {
+        <button mat-button type="button" (click)="navigateToItem($event, item)">
+          {{ item.label }}
+        </button>
+      } @else {
+        <a mat-button [routerLink]="item.route" [queryParams]="item.queryParams">
+          {{ item.label }}
+        </a>
+      }
+    }
+  </nav>
+</mat-toolbar>
+
+<main class="toolbar-content" [class.no-x-padding]="noXPadding()">
+  <ng-content />
+</main>
+<app-bottom-toolbar
+  [items]="items"
+  (navigateClick)="navigateToItem($event.event, $event.item)"
+></app-bottom-toolbar>

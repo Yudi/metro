@@ -1,0 +1,73 @@
+<div class="selections-panel">
+  <div class="panel-header">
+    <mat-icon>check_circle</mat-icon>
+    <span>Seleções ({{ totalSelections }})</span>
+    <button
+      mat-icon-button
+      class="clear-button"
+      (click)="clearAll.emit()"
+      aria-label="Limpar todas as seleções"
+    >
+      <mat-icon>clear_all</mat-icon>
+    </button>
+  </div>
+
+  <div class="panel-content">
+    <!-- Routes Category -->
+    @if (routes.length > 0) {
+    <div class="category-section">
+      <span class="category-label">Linhas</span>
+      <mat-chip-set class="chip-list" aria-label="Linhas selecionadas">
+        @for (route of routes; track route.id) {
+        <mat-chip removable (removed)="removeRoute.emit(route.id)">
+          <mat-icon matChipAvatar>directions_bus</mat-icon>
+          {{ getRouteDisplayName(route) }}
+          <button matChipRemove aria-label="Remover rota {{ route.shortName }}">
+            <mat-icon>cancel</mat-icon>
+          </button>
+        </mat-chip>
+        }
+      </mat-chip-set>
+    </div>
+    }
+
+    <!-- Stops Category -->
+    @if (stops.length > 0) {
+    <div class="category-section">
+      <span class="category-label">Paradas</span>
+      <mat-chip-set class="chip-list" aria-label="Paradas selecionadas">
+        @for (stop of stops; track stop.id) {
+        <mat-chip removable (removed)="removeStop.emit(stop.id)">
+          <mat-icon matChipAvatar>place</mat-icon>
+          {{ stop.name }}
+          <button matChipRemove aria-label="Remover parada {{ stop.name }}">
+            <mat-icon>cancel</mat-icon>
+          </button>
+        </mat-chip>
+        }
+      </mat-chip-set>
+    </div>
+    }
+
+    <!-- Bike Stations Category -->
+    @if (bikeStations.length > 0) {
+    <div class="category-section">
+      <span class="category-label">Estações de Bicicleta</span>
+      <mat-chip-set
+        class="chip-list"
+        aria-label="Estações de bicicleta selecionadas"
+      >
+        @for (station of bikeStations; track station.id) {
+        <mat-chip removable (removed)="removeBikeStation.emit(station.id)">
+          <mat-icon matChipAvatar>pedal_bike</mat-icon>
+          {{ station.name }}
+          <button matChipRemove aria-label="Remover estação {{ station.name }}">
+            <mat-icon>cancel</mat-icon>
+          </button>
+        </mat-chip>
+        }
+      </mat-chip-set>
+    </div>
+    }
+  </div>
+</div>

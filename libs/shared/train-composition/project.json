@@ -1,0 +1,95 @@
+{
+  "name": "train-composition",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/shared/train-composition/src",
+  "prefix": "lib",
+  "projectType": "library",
+  "tags": [
+    "type:ui",
+    "scope:shared"
+  ],
+  "targets": {
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": [
+        "{workspaceRoot}/coverage/{projectRoot}"
+      ],
+      "options": {
+        "jestConfig": "libs/shared/train-composition/jest.config.cts",
+        "tsConfig": "libs/shared/train-composition/tsconfig.spec.json"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint"
+    },
+    "storybook": {
+      "executor": "@storybook/angular:start-storybook",
+      "options": {
+        "port": 4400,
+        "configDir": "libs/shared/train-composition/.storybook",
+        "browserTarget": "train-composition:build-storybook",
+        "compodoc": false,
+        "compodocArgs": [
+          "-e",
+          "json",
+          "-d",
+          "./libs/shared/train-composition/.storybook/compodoc"
+        ],
+        "styles": [
+          "@fontsource/material-symbols-outlined",
+          "@fontsource-variable/inter"
+        ]
+      },
+      "configurations": {
+        "ci": {
+          "quiet": true
+        }
+      }
+    },
+    "build-storybook": {
+      "executor": "@storybook/angular:build-storybook",
+      "outputs": [
+        "{options.outputDir}"
+      ],
+      "options": {
+        "outputDir": "dist/storybook/train-composition",
+        "configDir": "libs/shared/train-composition/.storybook",
+        "browserTarget": "train-composition:build-storybook",
+        "compodoc": true,
+        "compodocArgs": [
+          "-e",
+          "json",
+          "-d",
+          "./libs/shared/train-composition/.storybook/compodoc"
+        ]
+      },
+      "configurations": {
+        "ci": {
+          "quiet": true
+        }
+      }
+    },
+    "test-storybook": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "test-storybook -c libs/shared/train-composition/.storybook --url=http://localhost:4400"
+      }
+    },
+    "static-storybook": {
+      "executor": "@nx/web:file-server",
+      "dependsOn": [
+        "build-storybook"
+      ],
+      "options": {
+        "buildTarget": "train-composition:build-storybook",
+        "staticFilePath": "dist/storybook/train-composition",
+        "spa": true
+      },
+      "configurations": {
+        "ci": {
+          "buildTarget": "train-composition:build-storybook:ci"
+        }
+      }
+    }
+  }
+}

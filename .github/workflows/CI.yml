@@ -1,26 +1,59 @@
-name: ci
+name: CI
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - monorepo-dev
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NX_DAEMON: false
+  NX_NO_CLOUD: true
 
 jobs:
-  build:
+  verify:
+    name: Nx affected checks
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout trusted source and private submodules
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: false
+          token: ${{ secrets.PRIVATE_SUBMODULE_TOKEN }}
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
+        uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build for production
-        run: bun run build --configuration=production --verbose
+      - name: Generate Prisma clients
+        run: |
+          bunx nx run metro-backend:prisma-generate
+          bunx nx run metro-core-private:prisma-generate
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+      - name: Set Nx SHAs
+        uses: nrwl/nx-set-shas@v5
         with:
-          name: Build-artifacts
-          path: dist/
+          main-branch-name: monorepo-dev
+
+      - name: Lint affected projects
+        run: bunx nx affected -t lint --parallel=3
+
+      - name: Test affected projects
+        run: bunx nx affected -t test --configuration=ci --parallel=3
+
+      - name: Build affected projects
+        run: bunx nx affected -t build --parallel=3

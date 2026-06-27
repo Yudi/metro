@@ -1,0 +1,38 @@
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    "rootDir": ".",
+    "sourceMap": true,
+    "declaration": false,
+    "moduleResolution": "node",
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "importHelpers": true,
+    "target": "es2015",
+    "module": "esnext",
+    "lib": ["es2020", "dom"],
+    "skipLibCheck": true,
+    "skipDefaultLibCheck": true,
+    "baseUrl": ".",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "paths": {
+      "@metro/*": ["libs/*/src/index.ts"],
+      "@metro/rail-integration-contracts": [
+        "libs/shared/rail-integration-contracts/src/index.ts"
+      ],
+      "@nx/api": ["libs/shared/api/src/index.ts"],
+      "@nx/environment": ["libs/shared/environment/src/index.ts"],
+      "@nx/seo": ["libs/shared/seo/src/index.ts"],
+      "@metro/shared/geolocation": ["libs/shared/geolocation/src/index.ts"],
+      "@metro/shared/lite-ui": ["libs/shared/lite-ui/src/index.ts"],
+      "@nx/firebase": ["libs/shared/firebase/src/index.ts"],
+      "@metro/shared/train-composition": [
+        "./libs/shared/train-composition/src/index.ts"
+      ],
+      "@metro/storybook-mocks": ["libs/shared/storybook-mocks/src/index.ts"]
+    },
+    "strict": true
+  },
+  "exclude": ["node_modules", "tmp"]
+}

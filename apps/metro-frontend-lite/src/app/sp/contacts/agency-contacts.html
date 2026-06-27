@@ -1,0 +1,45 @@
+<div class="agency-container">
+  <h3 class="agency-header">
+    <img
+      [src]="'/public/shared/agencies/' + agency().agencyKey + '.svg'"
+      [alt]="agency().shortName"
+      class="agency-logo"
+      loading="lazy"
+    />
+    {{ agency().shortName }}
+  </h3>
+
+  @if (agency().contact.additionalInformation) {
+  <p class="additional-information">
+    {{ agency().contact.additionalInformation }}
+  </p>
+
+  } @for (phone of agency().contact.phones; track phone) {
+  <div class="data-container">
+    <b>{{ phone.title }}</b>
+    @if (phone.description) {
+    <p class="phone-description">{{ phone.description }}</p>
+    } @if (phone.whatsapp) {
+    <p>
+      <a [href]="'whatsapp://send?phone=' + phone.number"
+        >💬
+        <span class="underline">{{ formatPhoneDisplay(phone.number) }}</span>
+      </a>
+    </p>
+    } @else if (phone.sms) {
+    <p>
+      <a [href]="'sms://' + stripInternationalPrefix(phone.number)"
+        >✉️<span class="underline">{{ formatPhoneDisplay(phone.number) }}</span>
+      </a>
+    </p>
+    } @else {
+    <p>
+      <a [href]="'tel://' + phone.number"
+        >📞
+        <span class="underline">{{ formatPhoneDisplay(phone.number) }}</span></a
+      >
+    </p>
+    }
+  </div>
+  }
+</div>

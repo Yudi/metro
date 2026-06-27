@@ -1,0 +1,7 @@
+{
+  "name": "shared-storybook-mocks",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/shared/storybook-mocks/src",
+  "projectType": "library",
+  "tags": ["type:test", "scope:shared"]
+}

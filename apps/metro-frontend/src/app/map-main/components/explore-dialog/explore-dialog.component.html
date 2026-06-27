@@ -1,0 +1,72 @@
+<div class="explore-dialog">
+  <div class="dialog-header">
+    <button
+      mat-icon-button
+      mat-dialog-close
+      class="close-button"
+      aria-label="Fechar"
+    >
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <div class="search-row">
+    <mat-form-field appearance="outline" class="search-field">
+      <mat-label>Buscar endereço ou lugar</mat-label>
+      <input
+        matInput
+        type="text"
+        #searchInput
+        placeholder="Digite um endereço..."
+        [value]="query()"
+        (input)="onSearchInput($event)"
+        autocomplete="off"
+      />
+      <mat-icon matPrefix>search</mat-icon>
+      @if (isSearching()) {
+        <mat-spinner matSuffix diameter="20"></mat-spinner>
+      }
+    </mat-form-field>
+  </div>
+
+  <button
+    mat-stroked-button
+    type="button"
+    class="manual-button"
+    (click)="selectManual()"
+  >
+    <mat-icon>touch_app</mat-icon>
+    <span>Escolher no mapa</span>
+  </button>
+
+  <mat-dialog-content class="results-container">
+    @if (isSearching()) {
+      <div class="empty-state">
+        <mat-spinner diameter="40"></mat-spinner>
+        <p>Buscando...</p>
+      </div>
+    } @else if (hasResults()) {
+      <mat-nav-list class="results-list">
+        @for (result of results(); track result.id) {
+          <button mat-list-item type="button" (click)="selectResult(result)">
+            <mat-icon matListItemIcon>{{ iconForType(result.type) }}</mat-icon>
+            <span matListItemTitle>{{ result.name }}</span>
+            @if (result.description) {
+              <span matListItemLine>{{ result.description }}</span>
+            }
+          </button>
+        }
+      </mat-nav-list>
+    } @else if (showNoResults()) {
+      <div class="empty-state">
+        <mat-icon>search_off</mat-icon>
+        <h3>Nenhum resultado encontrado</h3>
+      </div>
+    } @else {
+      <div class="empty-state">
+        <mat-icon>explore</mat-icon>
+        <h3>Explorar local</h3>
+      </div>
+    }
+  </mat-dialog-content>
+</div>

@@ -1,0 +1,52 @@
+<section class="detail-section">
+  <h3>Próximos trens</h3>
+
+  @if (loading()) {
+    <div class="loading-state">
+      <lite-spinner size="md"></lite-spinner>
+      <span>Carregando próximos trens...</span>
+    </div>
+  } @else if (error()) {
+    <div class="error-state">
+      <span>⚠</span>
+      <span>{{ error() }}</span>
+    </div>
+  } @else if (groups().length > 0) {
+    <div class="line-groups">
+      @for (group of groups(); track group.lineCode + group.stationCode) {
+        <article class="line-group">
+          <header class="line-header">
+            <span
+              class="line-badge"
+              [style.background-color]="getLineColor(group.lineCode).bg"
+              [style.color]="getLineColor(group.lineCode).text"
+            >
+              {{ group.lineCode }}
+            </span>
+            <strong>{{ getLineName(group.lineCode) }}</strong>
+          </header>
+
+          @if (group.trains.length > 0) {
+            <div class="trains-list">
+              @for (train of group.trains; track $index) {
+                <div class="train-item">
+                  <div class="train-destination">
+                    <span>→</span>
+                    {{ getTrainTerminal(train) }}
+                  </div>
+                  <div class="train-time" [class.at-platform]="train.isAtPlatform">
+                    {{ getArrivalDisplay(train) }}
+                  </div>
+                </div>
+              }
+            </div>
+          } @else {
+            <p class="no-trains">Nenhum trem previsto nesta linha agora</p>
+          }
+        </article>
+      }
+    </div>
+  } @else {
+    <p class="no-trains">Nenhum trem previsto no momento</p>
+  }
+</section>

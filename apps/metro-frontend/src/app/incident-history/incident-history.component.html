@@ -1,0 +1,221 @@
+<section class="incident-history-page">
+  <header class="page-header">
+    <div>
+      <h1>Histórico de ocorrências</h1>
+    </div>
+    <button
+      mat-stroked-button
+      type="button"
+      (click)="fetchIncidents()"
+      [disabled]="loadState() === 'loading'"
+    >
+      <mat-icon>refresh</mat-icon>
+      Atualizar
+    </button>
+  </header>
+
+  <section class="filter-panel" aria-label="Filtros do histórico">
+    <mat-form-field appearance="outline">
+      <mat-label>Início</mat-label>
+      <input
+        matInput
+        type="date"
+        [ngModel]="startDate()"
+        (ngModelChange)="onStartDateChange($event)"
+      />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Fim</mat-label>
+      <input
+        matInput
+        type="date"
+        [ngModel]="endDate()"
+        (ngModelChange)="onEndDateChange($event)"
+      />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Empresa</mat-label>
+      <mat-select
+        [ngModel]="selectedAgency()"
+        (ngModelChange)="onAgencyChange($event)"
+      >
+        <mat-option value="all">Todas</mat-option>
+        @for (agency of agencies(); track agency) {
+          <mat-option [value]="agency">{{ agency }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Linha</mat-label>
+      <mat-select
+        [ngModel]="selectedLine()"
+        (ngModelChange)="onLineChange($event)"
+      >
+        <mat-option value="all">Todas</mat-option>
+        @for (line of lines(); track line) {
+          <mat-option [value]="line">{{ line }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Situação</mat-label>
+      <mat-select
+        [ngModel]="selectedSituation()"
+        (ngModelChange)="onSituationChange($event)"
+      >
+        <mat-option value="all">Todas</mat-option>
+        @for (situation of situations(); track situation) {
+          <mat-option [value]="situation">{{ situation }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-checkbox
+      [ngModel]="incidentsOnly()"
+      (ngModelChange)="onIncidentsOnlyChange($event)"
+    >
+      Somente incidentes
+    </mat-checkbox>
+
+    <div class="filter-actions">
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        (click)="fetchIncidents()"
+        [disabled]="loadState() === 'loading'"
+      >
+        <mat-icon>search</mat-icon>
+        Filtrar
+      </button>
+      <button mat-icon-button type="button" (click)="clearFilters()">
+        <mat-icon>close</mat-icon>
+      </button>
+    </div>
+  </section>
+
+  @if (loadState() === 'loading') {
+    <section class="state-panel">
+      <mat-spinner diameter="32"></mat-spinner>
+      <span>Carregando histórico de ocorrências...</span>
+    </section>
+  } @else if (loadState() === 'error') {
+    <section class="state-panel error-panel" role="alert">
+      <mat-icon>cloud_off</mat-icon>
+      <div>
+        <h2>Não foi possível carregar o histórico</h2>
+        <p>{{ errorMessage() }}</p>
+      </div>
+    </section>
+  } @else {
+    <section class="results-header">
+      <div>
+        <strong>{{ summaryText() }}</strong>
+      </div>
+      @if (response()?.meta?.cache; as cache) {
+        <span class="cache-note">
+          {{ cache.hit ? 'Resposta em cache' : 'Dados recém-buscados' }}
+        </span>
+      }
+    </section>
+
+    @if (filteredIncidents().length === 0) {
+      <section class="state-panel">
+        <mat-icon>search_off</mat-icon>
+        <span>Nenhuma ocorrência encontrada para os filtros selecionados.</span>
+      </section>
+    } @else {
+      <div class="table-shell">
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Linha</th>
+              <th>Empresa</th>
+              <th>Situação</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (incident of pagedIncidents(); track incident.id) {
+              <tr>
+                <td>{{ formatDateTime(incident.data_hora) }}</td>
+                <td>
+                  <div class="line-identity">
+                    @if (lineBadge(incident); as badge) {
+                      <span
+                        class="line-badge"
+                        [style.backgroundColor]="badge.backgroundColor"
+                        [style.color]="badge.textColor"
+                      >
+                        {{ badge.code }}
+                      </span>
+                    }
+                    <strong>{{ incident.linha.nome }}</strong>
+                  </div>
+                </td>
+                <td>
+                  <div class="agency-identity">
+                    @if (agencyIconPath(incident); as iconPath) {
+                      <img
+                        class="agency-icon"
+                        [ngSrc]="iconPath"
+                        width="28"
+                        height="28"
+                        alt=""
+                      />
+                    }
+                    <span>{{ incident.empresa.nome }}</span>
+                  </div>
+                </td>
+                <td>
+                  <span class="situation">{{ incident.situacao }}</span>
+                  <span
+                    class="classification"
+                    [class.counts-incident]="
+                      incident.classificacao.conta_incidente
+                    "
+                  >
+                    {{ incident.classificacao.label }}
+                  </span>
+                </td>
+              </tr>
+              @if (hasDescription(incident)) {
+                <tr class="description-row">
+                  <td colspan="4">
+                    <blockquote>{{ incident.descricao }}</blockquote>
+                  </td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <nav class="pagination" aria-label="Paginação do histórico">
+        <button
+          mat-stroked-button
+          type="button"
+          (click)="previousPage()"
+          [disabled]="currentPage() === 1"
+        >
+          <mat-icon>chevron_left</mat-icon>
+          Anterior
+        </button>
+        <span>Página {{ currentPage() }} de {{ totalPages() }}</span>
+        <button
+          mat-stroked-button
+          type="button"
+          (click)="nextPage()"
+          [disabled]="currentPage() === totalPages()"
+        >
+          Próxima
+          <mat-icon>chevron_right</mat-icon>
+        </button>
+      </nav>
+    }
+  }
+</section>

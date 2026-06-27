@@ -1,0 +1,27 @@
+<div class="container">
+  <div class="station-list">
+    @for (station of stations(); track trackStation($index, station); let i = $index) {
+      <div class="station">
+        <div class="left-time"></div>
+        <div class="icon">
+          <a [href]="stationHref(station.code)">
+            <img [src]="stationIcon(i)" alt="" />
+          </a>
+        </div>
+        <div class="right-time"></div>
+        <div class="station-name">
+          <a [href]="stationHref(station.code)">{{ station.name }}</a>
+        </div>
+      </div>
+      @if (i !== stations().length - 1) {
+        <div class="station">
+          <div class="left-time"></div>
+          <div class="icon">
+            <img [src]="plainIcon()" alt="" />
+          </div>
+          <div class="right-time"></div>
+        </div>
+      }
+    }
+  </div>
+</div>

@@ -1,0 +1,169 @@
+<app-dialog-header
+  icon="train"
+  [title]="displayName"
+  description="Estação de metrô/trem"
+/>
+
+<mat-dialog-content class="station-content">
+  @if (data.stop.description) {
+    <p class="station-description">{{ data.stop.description }}</p>
+    <mat-divider></mat-divider>
+  }
+
+  <div class="subway-lines-section">
+    <!-- <h3>
+      <mat-icon inline>train</mat-icon>
+      Linhas nesta estação
+    </h3> -->
+
+    @if (errorMessage()) {
+      <div class="status-warning-banner">
+        <mat-icon inline>cloud_off</mat-icon>
+        <span>{{ errorMessage() }}</span>
+      </div>
+    }
+    @if (staticLineInfo().length > 0) {
+      <!-- Always show lines immediately using static info, status loads in background -->
+      <div class="subway-lines-grid">
+        @for (staticLine of staticLineInfo(); track staticLine.code) {
+          <div
+            class="subway-line-card"
+            [class.has-issue]="
+              getLineStatus(staticLine.code) &&
+              lineHasIssue(getLineStatus(staticLine.code)!)
+            "
+          >
+            <div
+              class="line-badge"
+              [style.background-color]="staticLine.colorHex"
+            >
+              {{ staticLine.code }}
+            </div>
+            <div class="line-details">
+              <span class="line-name">{{ staticLine.colorName }}</span>
+              @if (loadingStatus() && !getLineStatus(staticLine.code)) {
+                <!-- Skeleton for status while loading -->
+                <div class="status-badge status-skeleton">
+                  <span class="status-skeleton-bar"></span>
+                </div>
+              } @else if (getLineStatus(staticLine.code); as line) {
+                <!-- Real status loaded -->
+                <div class="status-badge" [attr.data-status]="line.statusCode">
+                  <span class="status-dot"></span>
+                  <span class="status-text">{{ line.statusLabel }}</span>
+                </div>
+              } @else {
+                <!-- Fallback when status unavailable -->
+                <div class="status-badge status-unavailable">
+                  <span class="status-dot"></span>
+                  <span class="status-text">Status indisponível</span>
+                </div>
+              }
+            </div>
+            @if (getLineStatus(staticLine.code); as line) {
+              @if (
+                line.description &&
+                line.statusCode !== 'OperacaoNormal' &&
+                line.statusCode !== 'OperacaoEncerrada' &&
+                line.statusCode !== 'DadosIndisponiveis'
+              ) {
+                <div class="line-description">
+                  <mat-icon inline>warning</mat-icon>
+                  <div>
+                    <p>{{ line.description }}</p>
+                    @if (line.detail) {
+                      <p>{{ line.detail }}</p>
+                    }
+                  </div>
+                </div>
+              }
+            }
+          </div>
+        }
+      </div>
+
+      @if (lastUpdated()) {
+        <p class="last-updated">
+          Atualizado às {{ lastUpdated() | date: 'HH:mm' }}
+        </p>
+      }
+    } @else if (!loadingStatus()) {
+      <div class="no-lines-info">
+        <mat-icon>info</mat-icon>
+        <p>Informações das linhas não disponíveis</p>
+      </div>
+    }
+  </div>
+
+  <!-- Next Train Section for L4/L8/L9/CPTM stations -->
+  @if (hasNextTrainFeature()) {
+    <mat-divider></mat-divider>
+    <div class="next-train-section">
+      @for (station of resolvedNextTrainStations(); track station.lineCode) {
+        <app-next-train-card
+          [lineCode]="station.lineCode"
+          [stationCode]="station.stationCode"
+          [stationName]="displayName"
+          [showLineName]="showLineNameInCards()"
+        />
+      }
+    </div>
+  }
+
+  @if (staticCompositionGroups().length > 0) {
+    <mat-divider></mat-divider>
+    <div class="static-composition-section">
+      @for (group of staticCompositionGroups(); track group.line.lineId) {
+        <section class="static-composition-line">
+          <div class="static-composition-line__header">
+            <div
+              class="line-badge static-composition-line__badge"
+              [style.background-color]="group.line.colorHex"
+            >
+              {{ group.line.code }}
+            </div>
+            <span class="static-composition-line__name">
+              {{ group.line.fullName }}
+            </span>
+          </div>
+
+          <div class="static-composition-line__directions">
+            @for (
+              composition of group.compositions;
+              track composition.directionName
+            ) {
+              <div class="static-composition-line__direction">
+                <div class="static-composition-line__direction-header">
+                  <mat-icon>arrow_forward</mat-icon>
+                  <span>{{ composition.directionName }}</span>
+                </div>
+                <lib-train-composition
+                  [composition]="composition"
+                  [compactContext]="true"
+                />
+              </div>
+            }
+          </div>
+        </section>
+      }
+    </div>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button
+    mat-icon-button
+    class="favorite-button"
+    [class.favorited]="isFavorite()"
+    (click)="toggleFavorite()"
+    (mouseenter)="setFavoriteHover(true)"
+    (mouseleave)="setFavoriteHover(false)"
+    [disabled]="!canFavorite()"
+    [attr.aria-label]="
+      isFavorite() ? 'Remover dos favoritos' : 'Adicionar aos favoritos'
+    "
+  >
+    <mat-icon>{{ favoriteIcon() }}</mat-icon>
+  </button>
+  <button mat-button (click)="close()">Fechar</button>
+</mat-dialog-actions>

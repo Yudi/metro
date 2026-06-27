@@ -1,0 +1,31 @@
+<div class="status-bar">
+  <span> DEBUG: </span>
+  @if (isLoading()) {
+    <div class="status-chip loading">
+      <mat-icon>hourglass_empty</mat-icon>
+      <span>Carregando...</span>
+    </div>
+  } @else if (displayMode() === 'selected') {
+    <div class="status-chip">
+      <mat-icon>route</mat-icon>
+      <span>{{ routeCount() }} rotas</span>
+    </div>
+    <div class="status-chip">
+      <mat-icon>directions_bus</mat-icon>
+      <span>{{ stopCount() }} paradas</span>
+    </div>
+    <div class="status-chip">
+      <mat-icon>visibility</mat-icon>
+      <span>{{ visibleCount() }} visíveis</span>
+    </div>
+  } @else if (displayMode() === 'nearby') {
+    <div class="status-chip">
+      <mat-icon>near_me</mat-icon>
+      <span>{{ nearbyStopsCount() }} pontos</span>
+    </div>
+    <div class="status-chip accent">
+      <mat-icon>straighten</mat-icon>
+      <span>{{ nearbyRadius() }}m</span>
+    </div>
+  }
+</div>

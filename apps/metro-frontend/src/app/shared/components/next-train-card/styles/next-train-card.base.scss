@@ -1,0 +1,53 @@
+@use '../../../styles/rail-status' as rail;
+
+/* base card container and header styles */
+.next-train-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: var(--mat-sys-surface-container-low, #f8f9fa);
+  border-radius: 12px;
+  border: 1px solid var(--mat-sys-outline-variant, rgba(0, 0, 0, 0.08));
+}
+
+/* Header */
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  mat-icon {
+    color: var(--mat-sys-primary, #0b71d0);
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+
+  .header-title {
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--mat-sys-on-surface, #333);
+    flex: 1;
+  }
+
+  .live-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    color: #00a78e;
+    font-weight: 500;
+    padding: 2px 8px;
+    background: rgba(0, 167, 142, 0.1);
+    border-radius: 12px;
+
+    .live-dot {
+      width: 6px;
+      height: 6px;
+      background: #00a78e;
+      border-radius: 50%;
+      // Opacity controlled via JS breathingBrightness signal
+    }
+  }
+}

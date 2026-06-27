@@ -1,0 +1,258 @@
+/**
+ * Shared rail status styles for subway/metro line components.
+ * Source of truth: line-status-grid.component
+ *
+ * Usage:
+ *   @use 'app/shared/styles/rail-status' as rail;
+ *   @include rail.status-badge;
+ *   @include rail.skeleton-shimmer;
+ */
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Status Colors (Rail Status Code based)
+// ─────────────────────────────────────────────────────────────────────────────
+
+$status-normal: rgba(0, 184, 148, 1);
+$status-normal-bg: rgba(0, 184, 148, 0.1);
+$status-normal-border: rgba(0, 128, 0, 0.18);
+
+$status-warning: rgba(255, 211, 0, 1);
+$status-warning-bg: rgba(255, 211, 0, 0.15);
+$status-warning-border: rgba(255, 211, 0, 0.12);
+
+$status-critical: rgba(238, 64, 52, 1);
+$status-critical-bg: rgba(238, 64, 52, 0.1);
+$status-critical-border: rgba(238, 64, 52, 0.12);
+
+$status-closed: rgba(128, 128, 128, 1);
+$status-closed-bg: rgba(128, 128, 128, 0.1);
+$status-closed-border: rgba(128, 128, 128, 0.12);
+
+$status-unavailable: rgba(255, 152, 0, 1);
+$status-unavailable-bg: rgba(255, 152, 0, 0.1);
+$status-unavailable-border: rgba(255, 152, 0, 0.2);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Status Badge Mixin
+// ─────────────────────────────────────────────────────────────────────────────
+
+@mixin status-badge {
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    background-color: $status-closed-bg;
+    color: var(--mat-sys-on-surface);
+    font-size: 0.8rem;
+    width: fit-content;
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+      flex: 0 0 auto;
+      background-color: $status-closed;
+    }
+
+    // OperacaoNormal - Green
+    &[data-status*='OperacaoNormal'],
+    &[data-status*='OperacaoEspecial'] {
+      background-color: $status-normal-bg;
+      border-color: $status-normal-border;
+
+      .status-dot {
+        background-color: $status-normal;
+      }
+    }
+
+    // Warning statuses - Yellow
+    &[data-status*='AtividadeProgramada'],
+    &[data-status*='VelocidadeReduzida'],
+    &[data-status*='OperacaoTransitoria'],
+    &[data-status*='OperacaoComImpactoPontual'],
+    &[data-status*='CirculacaoDeTrens'],
+    &[data-status*='OperacaoParcial'] {
+      background-color: $status-warning-bg;
+      border-color: $status-warning-border;
+
+      .status-dot {
+        background-color: $status-warning;
+      }
+    }
+
+    // Paralisada - Red (Critical)
+    &[data-status*='Paralisada'] {
+      background-color: $status-critical-bg;
+      border-color: $status-critical-border;
+
+      .status-dot {
+        background-color: $status-critical;
+      }
+    }
+
+    // OperacaoEncerrada - Gray (Closed)
+    &[data-status*='OperacaoEncerrada'] {
+      background-color: $status-closed-bg;
+      border-color: $status-closed-border;
+
+      .status-dot {
+        background-color: $status-closed;
+      }
+    }
+
+    // DadosIndisponiveis - Orange (Unavailable data)
+    &[data-status*='DadosIndisponiveis'] {
+      background-color: $status-unavailable-bg;
+      border-color: $status-unavailable-border;
+
+      .status-dot {
+        background-color: $status-unavailable;
+      }
+    }
+
+    // Utility class for unavailable state
+    &.status-unavailable {
+      background-color: $status-closed-bg;
+      border-color: $status-closed-border;
+
+      .status-dot {
+        background-color: $status-closed;
+      }
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Skeleton Animation Keyframes
+// ─────────────────────────────────────────────────────────────────────────────
+
+@mixin skeleton-shimmer-keyframes {
+  @keyframes skeleton-shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Skeleton Loading Mixin
+// ─────────────────────────────────────────────────────────────────────────────
+
+@mixin skeleton-loading {
+  @include skeleton-shimmer-keyframes;
+
+  .status-skeleton {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background-color: $status-closed-bg;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+    position: relative;
+  }
+
+  .status-skeleton-bar {
+    width: 60px;
+    height: 20.4px;
+    background: linear-gradient(
+      90deg,
+      rgba(128, 128, 128, 0.15) 25%,
+      rgba(128, 128, 128, 0.25) 50%,
+      rgba(128, 128, 128, 0.15) 75%
+    );
+    background-size: 200% 100%;
+    border-radius: 4px;
+    animation: skeleton-shimmer 1.5s infinite ease-in-out;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Warning Banner Mixin
+// ─────────────────────────────────────────────────────────────────────────────
+
+@mixin status-warning-banner {
+  .status-warning-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    background: $status-unavailable-bg;
+    border: 1px solid rgba(255, 152, 0, 0.3);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    color: #8a5300;
+
+    @media (prefers-color-scheme: dark) {
+      color: #ffb74d;
+    }
+
+    mat-icon {
+      font-size: 1.1rem;
+      width: 1.1rem;
+      height: 1.1rem;
+      color: #ff9800;
+      flex-shrink: 0;
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Line Description (Issue Details) Mixin
+// ─────────────────────────────────────────────────────────────────────────────
+
+@mixin line-description {
+  .line-description {
+    width: 100%;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 8px 12px;
+    margin-top: 4px;
+    background: $status-unavailable-bg;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    color: #8a5300;
+
+    @media (prefers-color-scheme: dark) {
+      color: #ffb74d;
+    }
+
+    mat-icon {
+      font-size: 1rem;
+      width: 1rem;
+      height: 1rem;
+      color: #ff9800;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    p {
+      margin: 0 0 4px;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// All Rail Status Styles Combined
+// ─────────────────────────────────────────────────────────────────────────────
+
+@mixin all {
+  @include status-badge;
+  @include skeleton-loading;
+  @include status-warning-banner;
+  @include line-description;
+}

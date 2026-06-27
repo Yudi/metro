@@ -1,0 +1,256 @@
+<mat-card class="stop-arrivals-card" [class.compact-card]="compact()">
+  @if (!compact()) {
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon>schedule</mat-icon>
+        Previsão de chegada
+      </mat-card-title>
+      @if (arrivals(); as data) {
+        <mat-card-subtitle> Atualizado às {{ data.hr }} </mat-card-subtitle>
+      }
+    </mat-card-header>
+  }
+
+  <mat-card-content>
+    @if (isLoading()) {
+      <div class="loading-state">
+        <mat-spinner [diameter]="compact() ? 24 : 40"></mat-spinner>
+        <p>{{ compact() ? 'Carregando...' : 'Carregando previsões...' }}</p>
+      </div>
+    } @else if (hasArrivals()) {
+      <div class="arrivals-list">
+        @for (line of arrivalLines(); track line.c + line.sl + line.lt0) {
+          <div class="arrival-line">
+            <div class="line-header">
+              <div class="line-info">
+                <span
+                  class="line-code"
+                  [style.background-color]="getLineRouteColor(line)"
+                  [style.color]="getLineRouteTextColor(line)"
+                  >{{ line.c }}</span
+                >
+                <span class="line-destination">
+                  <mat-icon class="small-icon">arrow_forward</mat-icon>
+                  {{ line.lt0 }}
+                </span>
+              </div>
+              @if (!compact() && line.qv > 0) {
+                <span class="vehicle-count">{{ line.qv }} veículo(s)</span>
+              }
+            </div>
+
+            <div class="vehicles-list">
+              @for (vehicle of getVisibleVehicles(line); track vehicle.p) {
+                <div class="vehicle-arrival">
+                  <div class="vehicle-info">
+                    <span class="vehicle-id">
+                      {{ compact() ? vehicle.p : 'Veículo ' + vehicle.p }}
+                    </span>
+                    @if (vehicle.a) {
+                      <mat-icon class="accessible-icon" title="Acessível">
+                        accessible
+                      </mat-icon>
+                    }
+                  </div>
+                  <div class="arrival-info">
+                    @if (vehicle.t) {
+                      <span class="arrival-countdown">{{
+                        getMinutesUntilArrival(vehicle.t)
+                      }}</span>
+                      <span class="arrival-time">{{
+                        formatArrivalTime(vehicle.t)
+                      }}</span>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+
+            @if (hasHiddenVehicles(line)) {
+              <button
+                mat-button
+                type="button"
+                class="show-vehicles-button"
+                (click)="toggleArrivalLineVehicles(line)"
+              >
+                <mat-icon>{{
+                  isArrivalLineExpanded(line) ? 'expand_less' : 'expand_more'
+                }}</mat-icon>
+                {{
+                  isArrivalLineExpanded(line)
+                    ? 'Mostrar menos veículos'
+                    : getHiddenVehiclesLabel(line)
+                }}
+              </button>
+            }
+
+            @if (!compact() && getLineRailStations(line).length > 0) {
+              <div class="rail-service">
+                <div class="rail-service-header">
+                  <mat-icon>train</mat-icon>
+                  <span>Atende estação sobre trilhos neste sentido</span>
+                </div>
+
+                <div class="rail-stations">
+                  @for (
+                    station of getLineRailStations(line);
+                    track station.id
+                  ) {
+                    <div class="rail-station">
+                      <span class="rail-station-name">{{ station.name }}</span>
+                      <span class="rail-station-meta">{{
+                        formatStationMeta(station)
+                      }}</span>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    } @else {
+      <div class="no-data-state">
+        <mat-icon>info</mat-icon>
+        <p>
+          {{
+            compact()
+              ? 'Sem previsão para esta linha no momento'
+              : 'Nenhuma previsão disponível no momento'
+          }}
+        </p>
+        @if (!compact()) {
+          <p class="hint">Os dados são atualizados a cada 15 segundos</p>
+        }
+      </div>
+    }
+
+    @if (!compact() && routes().length > 0) {
+      <section
+        class="route-rail-section"
+        aria-label="Linhas que atendem o ponto"
+      >
+        <div class="route-rail-header">
+          <div>
+            <h4>Linhas do ponto</h4>
+            <p>Integrações com metrô e trem nos próximos pontos.</p>
+          </div>
+
+          @if (railConnectionsLoading()) {
+            <mat-spinner diameter="22"></mat-spinner>
+          }
+        </div>
+
+        <div class="route-chip-list">
+          @for (route of routes(); track route.id) {
+            <div class="route-chip-item">
+              <button
+                type="button"
+                class="route-chip"
+                [class.route-chip-expanded]="isRouteExpanded(route)"
+                (click)="toggleRoute(route)"
+              >
+                <span
+                  class="route-badge"
+                  [style.background-color]="'#' + route.color"
+                  [style.color]="'#' + route.textColor"
+                  >{{ route.shortName }}</span
+                >
+                <span class="route-label">{{ route.longName }}</span>
+
+                @if (!railConnectionsLoading() && routeServesRail(route)) {
+                  <span class="rail-count">
+                    <mat-icon>train</mat-icon>
+                    {{ getRouteRailStationCount(route) }}
+                  </span>
+                } @else if (!railConnectionsLoading()) {
+                  <span class="no-rail-count">sem trilhos</span>
+                }
+
+                <mat-icon class="expand-icon">{{
+                  isRouteExpanded(route) ? 'expand_less' : 'expand_more'
+                }}</mat-icon>
+              </button>
+
+              @if (isRouteExpanded(route)) {
+                <div class="route-rail-details">
+                  @if (railConnectionsLoading()) {
+                    <div class="route-detail-state">
+                      <mat-spinner diameter="24"></mat-spinner>
+                      <span
+                        >Verificando estações próximas aos próximos
+                        pontos...</span
+                      >
+                    </div>
+                  } @else if (railConnectionsError()) {
+                    <div class="route-detail-state">
+                      <mat-icon>error_outline</mat-icon>
+                      <span
+                        >Não foi possível carregar as conexões
+                        ferroviárias.</span
+                      >
+                    </div>
+                  } @else if (getRouteDirectionsWithRail(route).length > 0) {
+                    <div class="direction-list">
+                      @for (
+                        direction of getRouteDirectionsWithRail(route);
+                        track direction.directionId + direction.headsign
+                      ) {
+                        <div class="direction-block">
+                          <div class="direction-title">
+                            <mat-icon>arrow_forward</mat-icon>
+                            <span>Sentido {{ direction.headsign }}</span>
+                          </div>
+
+                          @for (
+                            station of direction.stations;
+                            track station.id
+                          ) {
+                            <div class="rail-station detail-station">
+                              <span class="rail-station-name">{{
+                                station.name
+                              }}</span>
+                              <span class="rail-station-meta">{{
+                                formatStationMeta(station)
+                              }}</span>
+                            </div>
+                          }
+                        </div>
+                      }
+                    </div>
+                  } @else {
+                    <div class="route-detail-state">
+                      <mat-icon>directions_bus</mat-icon>
+                      <span>
+                        Neste sentido, esta linha não serve estações de metrô ou
+                        de trem nos próximos pontos.
+                      </span>
+                    </div>
+                  }
+
+                  @if (showMapActions()) {
+                    <div class="route-detail-actions">
+                      <button
+                        mat-button
+                        type="button"
+                        (click)="showRouteOnMap($event, route)"
+                        [disabled]="isRouteSelected(route)"
+                      >
+                        <mat-icon>map</mat-icon>
+                        {{
+                          isRouteSelected(route)
+                            ? 'Exibida no mapa'
+                            : 'Exibir no mapa'
+                        }}
+                      </button>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </section>
+    }
+  </mat-card-content>
+</mat-card>

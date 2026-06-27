@@ -1,0 +1,23 @@
+{
+  "/api": {
+    "target": "http://localhost:3000",
+    "secure": false
+  },
+  "/metro-backend-api": {
+    "target": "http://localhost:3000",
+    "secure": false
+  },
+  "/socket.io": {
+    "target": "http://localhost:3000",
+    "secure": false,
+    "ws": true,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  },
+  "/__/auth": {
+    "target": "https://br-com-yudi-metro.firebaseapp.com",
+    "secure": true,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  }
+}

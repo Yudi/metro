@@ -1,0 +1,50 @@
+// Lite Chip Styles
+
+.lite-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 0.25rem 0.75rem;
+
+  // Sizes
+  &--sm {
+    padding: 0.125rem 0.5rem;
+    font-size: 0.75rem;
+    min-height: 1.25rem;
+  }
+
+  &--md {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.875rem;
+    min-height: 1.5rem;
+  }
+
+  // Variants
+  &--default {
+    background-color: var(--lite-surface-hover, #f3f4f6);
+    color: var(--lite-text, #1f2937);
+  }
+
+  &--primary {
+    background-color: var(--lite-primary-subtle, rgba(37, 99, 235, 0.1));
+    color: var(--lite-primary, #2563eb);
+  }
+
+  &--success {
+    background-color: var(--lite-success-subtle, rgba(22, 163, 74, 0.1));
+    color: var(--lite-success, #16a34a);
+  }
+
+  &--warning {
+    background-color: var(--lite-warning-subtle, rgba(234, 179, 8, 0.1));
+    color: var(--lite-warning, #ca8a04);
+  }
+
+  &--error {
+    background-color: var(--lite-error-subtle, rgba(220, 38, 38, 0.1));
+    color: var(--lite-error, #dc2626);
+  }
+}

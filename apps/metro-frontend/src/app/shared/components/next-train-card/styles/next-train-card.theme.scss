@@ -1,0 +1,48 @@
+@media (prefers-color-scheme: dark) {
+  .next-train-card {
+    background: var(--mat-sys-surface-container-low, #1e1e1e);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .train-list {
+    background: var(--mat-sys-surface, #2a2a2a);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  }
+
+  .train-icon {
+    background: var(--mat-sys-surface-container, #3a3a3a);
+  }
+
+  .platform-badge {
+    box-shadow: 0 2px 8px rgba(0, 167, 142, 0.3);
+  }
+
+  .headway-badge {
+    background: rgba(108, 99, 255, 0.15);
+    color: #b4aeff;
+  }
+}
+
+/* dark theme for new elements */
+@media (prefers-color-scheme: dark) {
+  .next-train-prominent {
+    background: var(--mat-sys-surface, #2a2a2a);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+
+  .train-icon-large {
+    background: var(--mat-sys-surface-container, #3a3a3a);
+  }
+
+  .train-chip {
+    background: var(--mat-sys-surface-container, #3a3a3a);
+
+    &:hover {
+      background: var(--mat-sys-surface-container-high, #4a4a4a);
+    }
+  }
+
+  .position-indicator {
+    background: var(--mat-sys-surface-container, #3a3a3a);
+  }
+}

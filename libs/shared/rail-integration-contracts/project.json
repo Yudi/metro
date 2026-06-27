@@ -1,0 +1,15 @@
+{
+  "name": "shared-rail-integration-contracts",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/shared/rail-integration-contracts/src",
+  "projectType": "library",
+  "targets": {
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "options": {
+        "lintFilePatterns": ["libs/shared/rail-integration-contracts/**/*.ts"]
+      }
+    }
+  },
+  "tags": ["scope:shared", "type:contracts"]
+}

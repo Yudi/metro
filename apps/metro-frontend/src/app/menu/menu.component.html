@@ -1,0 +1,69 @@
+<div class="main-container">
+  <mat-nav-list>
+    @defer (when authReady(); prefetch on idle) {
+      <section mat-list-item class="auth-section">
+        @if (firebaseUser(); as user) {
+          <div class="header-item">
+            <div class="header-content">
+              <img
+                alt="Avatar do usuário"
+                class="avatar"
+                [src]="user.photoURL"
+              />
+              <span matListItemTitle>{{ user.displayName }}</span>
+            </div>
+            <mat-icon class="auth-icon" button (click)="logout()">
+              logout
+            </mat-icon>
+          </div>
+        } @else {
+          <div
+            class="header-item login-header"
+            (click)="login()"
+            (keypress)="login()"
+            tabindex="0"
+          >
+            <div class="header-content">
+              <img
+                alt="user avatar"
+                class="avatar"
+                src="/app/icons/avatar-placeholder.avif"
+              />
+              <span matListItemTitle>Fazer login com o Google</span>
+            </div>
+            <mat-icon class="auth-icon" button>login</mat-icon>
+          </div>
+        }
+      </section>
+    }
+
+    <section>
+      @for (section of sections; track section) {
+        <div>
+          @if (section === 'null') {
+            <div class="null-header"></div>
+          } @else {
+            <h3 matSubheader>{{ section }}</h3>
+          }
+          @for (item of menuList[section] || []; track item.label) {
+            @if (item.route) {
+              <a
+                mat-list-item
+                [routerLink]="item.route"
+                [queryParams]="item.queryParams"
+              >
+                <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
+                <span matListItemTitle>{{ item.label }}</span>
+              </a>
+            } @else if (item.url) {
+              <a mat-list-item [href]="item.url">
+                <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
+                <span matListItemTitle>{{ item.label }}</span>
+              </a>
+            }
+          }
+        </div>
+      }
+    </section>
+  </mat-nav-list>
+</div>

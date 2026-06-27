@@ -1,0 +1,27 @@
+<section class="bike-section">
+  <h3>Disponibilidade Bike</h3>
+
+  @if (availability(); as data) {
+    <div class="availability-grid">
+      <div class="availability-item">
+        <span class="availability-value">{{ data.numBikesAvailable }}</span>
+        <span class="availability-label">bicicletas</span>
+      </div>
+      <div class="availability-item">
+        <span class="availability-value">{{ data.electricBikesAvailable }}</span>
+        <span class="availability-label">elétricas</span>
+      </div>
+      <div class="availability-item">
+        <span class="availability-value">
+          {{ availableDocks() === null ? '–' : availableDocks() }}
+        </span>
+        <span class="availability-label">vagas</span>
+      </div>
+    </div>
+  } @else {
+    <div class="availability-empty">
+      <span>🚲</span>
+      <p>Disponibilidade indisponível no momento</p>
+    </div>
+  }
+</section>

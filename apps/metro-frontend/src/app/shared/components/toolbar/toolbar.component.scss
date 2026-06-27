@@ -1,0 +1,78 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.spacer {
+  flex: 1 1 auto;
+}
+
+.desktop-nav {
+  display: none;
+  gap: 8px;
+}
+
+.back-button {
+  flex: 0 0 auto;
+  margin-right: 0.25rem;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  text-decoration: none;
+  color: inherit;
+  .brand-icon {
+    flex: 0 0 auto;
+    margin-right: 0.5rem;
+    width: 2rem;
+    height: 2rem;
+  }
+  .brand-text {
+    overflow: hidden;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  @media (max-width: 380px) {
+    .brand-text {
+      font-size: 1.1rem;
+    }
+  }
+}
+
+@media (min-width: 768px) {
+  .desktop-nav {
+    display: flex;
+    align-items: center;
+  }
+
+  .toolbar-content {
+    padding: 16px;
+    padding-bottom: 0;
+  }
+}
+
+@media (max-width: 767px) {
+  .toolbar-content {
+    padding: 16px;
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+.toolbar-content {
+  flex: 1;
+}
+
+.toolbar-content.no-x-padding {
+  padding-left: 0;
+  padding-right: 0;
+  /* RTL support: if the page is in a right-to-left language, we should remove left padding instead of right padding */
+  padding-inline: 0;
+}
+
+.list-item-label {
+  text-wrap: wrap;
+}

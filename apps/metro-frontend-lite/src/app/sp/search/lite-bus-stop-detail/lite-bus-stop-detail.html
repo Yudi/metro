@@ -1,0 +1,136 @@
+<section class="detail-section">
+  <h3>Previsão de chegada</h3>
+
+  @if (!connected() && !arrivals()) {
+  <div class="loading-state">
+    <lite-spinner size="sm"></lite-spinner>
+    <span>Conectando ao tempo real...</span>
+  </div>
+  } @else if (hasArrivals()) {
+  <div class="arrivals-list">
+    @for (line of arrivals()!.p.l; track line.c + line.sl) {
+    <article class="arrival-line">
+      <div class="arrival-line-header">
+        <span class="route-code">{{ line.c }}</span>
+        <span class="route-destination">→ {{ line.lt0 }}</span>
+        @if (line.qv > 0) {
+        <span class="vehicle-count">{{ line.qv }} veículo(s)</span>
+        }
+      </div>
+
+      <div class="vehicles-list">
+        @for (vehicle of line.vs; track vehicle.p) {
+        <div class="vehicle-arrival">
+          <span class="vehicle-id">
+            Veículo {{ vehicle.p }} @if (vehicle.a) { ♿ }
+          </span>
+          @if (vehicle.t) {
+          <span class="arrival-countdown">
+            {{ getMinutesUntilArrival(vehicle.t) }}
+          </span>
+          <span class="arrival-time">{{ vehicle.t }}</span>
+          }
+        </div>
+        }
+      </div>
+
+      @if (getLineRailStations(line).length > 0) {
+      <div class="rail-service">
+        <strong>🚆 Atende estação sobre trilhos neste sentido</strong>
+        @for (station of getLineRailStations(line); track station.id) {
+        <div class="rail-station">
+          <span>{{ station.name }}</span>
+          <small>{{ formatStationMeta(station) }}</small>
+        </div>
+        }
+      </div>
+      }
+    </article>
+    }
+  </div>
+  } @else {
+  <div class="empty-state">
+    <span>ℹ</span>
+    <p>Nenhuma previsão disponível no momento</p>
+  </div>
+  }
+</section>
+
+@if (routes().length > 0) {
+<section class="detail-section">
+  <div class="section-title-row">
+    <h3>Linhas do ponto</h3>
+    @if (railConnectionsLoading()) {
+    <lite-spinner size="sm"></lite-spinner>
+    }
+  </div>
+
+  <div class="routes-list">
+    @for (route of routes(); track route.id) {
+    <article class="route-item">
+      <button
+        type="button"
+        class="route-button"
+        [class.expanded]="isRouteExpanded(route)"
+        (click)="toggleRoute(route)"
+      >
+        <span
+          class="route-badge"
+          [style.background-color]="'#' + route.color"
+          [style.color]="'#' + route.textColor"
+        >
+          {{ route.shortName }}
+        </span>
+        <span class="route-name">{{ route.longName }}</span>
+
+        @if (!railConnectionsLoading() && routeServesRail(route)) {
+        <lite-chip size="sm" variant="primary">
+          🚆 {{ getRouteRailStationCount(route) }}
+        </lite-chip>
+        } @else if (!railConnectionsLoading()) {
+        <span class="route-meta">sem trilhos</span>
+        }
+
+        <span class="expand-icon">
+          {{ isRouteExpanded(route) ? '⌃' : '⌄' }}
+        </span>
+      </button>
+
+      @if (isRouteExpanded(route)) {
+      <div class="route-details">
+        @if (railConnectionsLoading()) {
+        <div class="route-detail-state">
+          <lite-spinner size="sm"></lite-spinner>
+          <span>Verificando estações próximas...</span>
+        </div>
+        } @else if (railConnectionsError()) {
+        <div class="route-detail-state">
+          <span>⚠ Não foi possível carregar as conexões.</span>
+        </div>
+        } @else if (getRouteDirectionsWithRail(route).length > 0) { @for (
+        direction of getRouteDirectionsWithRail(route); track
+        direction.directionId + direction.headsign ) {
+        <div class="direction-block">
+          <strong>Sentido {{ direction.headsign }}</strong>
+          @for (station of direction.stations; track station.id) {
+          <div class="rail-station detail-station">
+            <span>{{ station.name }}</span>
+            <small>{{ formatStationMeta(station) }}</small>
+          </div>
+          }
+        </div>
+        } } @else {
+        <div class="route-detail-state">
+          <span>
+            Neste sentido, esta linha não serve estações de metrô ou de trem nos
+            próximos pontos.
+          </span>
+        </div>
+        }
+      </div>
+      }
+    </article>
+    }
+  </div>
+</section>
+}

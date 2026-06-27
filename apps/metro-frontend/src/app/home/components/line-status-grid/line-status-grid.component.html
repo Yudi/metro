@@ -1,0 +1,179 @@
+<div class="container">
+  @if (showHeader()) {
+    <div class="global-header">{{ headerText() }}</div>
+  }
+  @let lineStatus = lineStatusSignal();
+  @let lines = regularLines();
+  @if (lineStatus.success) {
+    <div class="status-content">
+      @if (lines.length > 0) {
+        <div class="grid regular-grid">
+          @for (line of lines; track line.code) {
+            <div
+              class="line-card"
+              [class.clickable]="isLineClickable(line)"
+              (click)="lineClick(line)"
+              (keydown.enter)="lineClick(line)"
+              [tabindex]="isLineClickable(line) ? 0 : -1"
+            >
+              <div
+                class="badge"
+                [style.backgroundColor]="line.colorHex || '#000'"
+              >
+                {{ line.code }}
+              </div>
+              <div class="content">
+                <div class="line-name">
+                  {{ formatLineName(line.colorName) }}
+                </div>
+                <div class="status-badge" [attr.data-status]="line.statusCode">
+                  <span class="status-dot"></span>
+                  <span class="status-text">{{
+                    statusLabelFormat(line.statusLabel)
+                  }}</span>
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+      } @else if (!showSpecialServices() || visibleSpecialLines().length === 0) {
+        <div class="empty-message">{{ emptyText() }}</div>
+      }
+
+      @if (
+        showSpecialServices() &&
+        ((lineStatus.specialLines?.length ?? 0) > 0 ||
+          (lineStatus.specialInfoCards?.length ?? 0) > 0)
+      ) {
+        <div class="special-section">
+          <div class="special-section-title">Serviços especiais</div>
+          <div class="grid special-grid">
+            @for (
+              specialLine of visibleSpecialLines();
+              track specialLine.code
+            ) {
+              @if (shouldShowSpecialLine(specialLine)) {
+              <div
+                class="line-card special-line"
+                [class.clickable]="isSpecialLineClickable(specialLine)"
+                (click)="specialLineClick(specialLine)"
+                (keydown.enter)="specialLineClick(specialLine)"
+                [tabindex]="isSpecialLineClickable(specialLine) ? 0 : -1"
+                [class.expresso-linha-10]="isExpressoLinha10(specialLine)"
+              >
+                <div
+                  class="badge"
+                  [style.backgroundColor]="specialLine.colorHex"
+                >
+                  {{ specialLine.code }}
+                </div>
+                <div class="content">
+                  <div class="line-name">
+                    {{ formatSpecialLineName(specialLine) }}
+                  </div>
+
+                  @if (shouldShowSpecialIssues(specialLine)) {
+                    <div
+                      class="status-badge"
+                      [attr.data-status]="specialLine.statusCode"
+                    >
+                      <span class="status-dot"></span>
+                      <span class="status-text">Alterações</span>
+                    </div>
+                  } @else if (shouldShowSpecialSchedule(specialLine)) {
+                    <div class="schedule-block">
+                      @if (getScheduleTitle(specialLine)) {
+                        <div class="schedule-title">
+                          {{ getScheduleTitle(specialLine) }}
+                        </div>
+                      }
+
+                      @for (
+                        departure of specialLine.nextDepartures;
+                        track departure.label
+                      ) {
+                        <div class="schedule-row">
+                          @if (departure.label !== 'Próxima partida') {
+                            <span>
+                              {{ formatDepartureLabel(departure.label) }}</span
+                            >
+                          }
+                          <strong>{{ departure.time }}</strong>
+                        </div>
+                      }
+                    </div>
+                  } @else {
+                    <div
+                      class="status-badge"
+                      [attr.data-status]="specialLine.statusCode"
+                    >
+                      <span class="status-dot"></span>
+                      <span class="status-text">{{
+                        statusLabelFormat(specialLine.statusLabel)
+                      }}</span>
+                    </div>
+                  }
+                </div>
+              </div>
+              }
+            }
+
+            @for (
+              infoCard of lineStatus.specialInfoCards ?? [];
+              track infoCard.id
+            ) {
+              <div
+                class="line-card special-line special-info-card"
+                [class.clickable]="isSpecialInfoCardClickable(infoCard)"
+                (click)="specialInfoCardClick(infoCard)"
+                (keydown.enter)="specialInfoCardClick(infoCard)"
+                [tabindex]="isSpecialInfoCardClickable(infoCard) ? 0 : -1"
+              >
+                <div
+                  class="badge"
+                  [style.backgroundColor]="infoCard.badgeColorHex"
+                >
+                  <mat-icon class="badge-icon">{{
+                    infoCard.badgeIcon
+                  }}</mat-icon>
+                </div>
+                <div class="content">
+                  <div class="line-name">{{ infoCard.title }}</div>
+                  <div class="line-subtitle">{{ infoCard.subtitle }}</div>
+                  <div
+                    class="status-badge"
+                    [attr.data-status]="infoCard.statusCode"
+                  >
+                    <span class="status-dot"></span>
+                    <span class="status-text">{{ infoCard.statusLabel }}</span>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      }
+
+      <div class="updated">
+        Atualizado às
+        {{ lineStatus.lastUpdated | date: 'HH:mm' }}
+      </div>
+    </div>
+  } @else if (lineStatus.success === null) {
+    <div class="grid regular-grid" aria-hidden="true">
+      @for (i of [].constructor(14); track $index) {
+        <div class="line-card skeleton">
+          <div class="badge placeholder"></div>
+          <div class="content">
+            <div class="line-name placeholder short"></div>
+            <div class="status placeholder"></div>
+          </div>
+        </div>
+      }
+    </div>
+  } @else {
+    <div class="error-message">
+      Ocorreu um erro ao carregar o status das linhas. Tente novamente.
+    </div>
+  }
+</div>

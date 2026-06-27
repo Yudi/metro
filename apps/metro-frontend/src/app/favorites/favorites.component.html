@@ -1,0 +1,267 @@
+<section class="favorites-page">
+  <header class="page-header">
+    <div>
+      <h1>Favoritos</h1>
+    </div>
+  </header>
+
+  @if (!hasFavorites()) {
+    <div class="empty-state">
+      <mat-icon>favorite_border</mat-icon>
+      <h2>Nenhum favorito ainda</h2>
+      <p>Abra uma estação, linha ou ponto no mapa e toque no coração.</p>
+    </div>
+  } @else {
+    <div class="favorites-grid">
+      <mat-card appearance="outlined">
+        <mat-card-header>
+          <mat-icon mat-card-avatar>directions_bus</mat-icon>
+          <mat-card-title>Ônibus</mat-card-title>
+          <mat-card-subtitle>
+            {{ busStops().length + busRoutes().length }} favoritos
+          </mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <section class="category-section">
+            <h2>Pontos</h2>
+            <div
+              class="config-list"
+              aria-label="Pontos de ônibus favoritos"
+            >
+              @if (busStops().length === 0) {
+                <span class="empty-category">Nenhum ponto salvo.</span>
+              } @else {
+                @for (stop of busStops(); track stop.stopId) {
+                  <div class="config-item">
+                    <mat-chip-set aria-label="Ponto favorito">
+                      <mat-chip
+                        removable
+                        (removed)="removeFavorite(stop.stopId, 'busStop')"
+                      >
+                        <mat-icon matChipAvatar>directions_bus</mat-icon>
+                        {{ stop.name }}
+                        <button
+                          matChipRemove
+                          matTooltip="Remover dos favoritos"
+                          [aria-label]="
+                            'Remover ' + stop.name + ' dos favoritos'
+                          "
+                        >
+                          <mat-icon>favorite</mat-icon>
+                        </button>
+                      </mat-chip>
+                    </mat-chip-set>
+
+                    @let routes = getRoutesForStop(stop.stopId);
+                    @if (routes.length > 0) {
+                      <div
+                        class="selection-row"
+                        aria-label="Linhas exibidas no painel"
+                      >
+                        @for (route of routes; track route.routeId) {
+                          <button
+                            type="button"
+                            class="choice-button"
+                            [class.selected]="
+                              isBusStopRouteSelected(stop.stopId, route)
+                            "
+                            (click)="toggleBusStopRoute(stop.stopId, route)"
+                          >
+                            <span
+                              class="route-badge"
+                              [style.backgroundColor]="routeColor(route)"
+                              [style.color]="routeTextColor(route)"
+                            >
+                              {{ route.shortName }}
+                            </span>
+                          </button>
+                        }
+                      </div>
+                    } @else {
+                      <span class="empty-category">Carregando linhas...</span>
+                    }
+                  </div>
+                }
+              }
+            </div>
+          </section>
+
+          <section class="category-section">
+            <h2>Linhas</h2>
+            <mat-chip-set
+              class="chip-list"
+              aria-label="Linhas de ônibus favoritas"
+            >
+              @if (busRoutes().length === 0) {
+                <span class="empty-category">Nenhuma linha salva.</span>
+              } @else {
+                @for (route of busRoutes(); track route.routeId) {
+                  <mat-chip
+                    removable
+                    (removed)="removeFavorite(route.routeId, 'busRoute')"
+                  >
+                    <mat-icon matChipAvatar>route</mat-icon>
+                    {{ route.shortName }} - {{ route.longName }}
+                    <button
+                      matChipRemove
+                      matTooltip="Remover dos favoritos"
+                      [aria-label]="
+                        'Remover ' + route.longName + ' dos favoritos'
+                      "
+                    >
+                      <mat-icon>favorite</mat-icon>
+                    </button>
+                  </mat-chip>
+                }
+              }
+            </mat-chip-set>
+          </section>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card appearance="outlined">
+        <mat-card-header>
+          <mat-icon mat-card-avatar>train</mat-icon>
+          <mat-card-title>Trilhos</mat-card-title>
+          <mat-card-subtitle>
+            {{ railStations().length + railLines().length }} favoritos
+          </mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <section class="category-section">
+            <h2>Estações</h2>
+            <div
+              class="config-list"
+              aria-label="Estações de trem ou metrô favoritas"
+            >
+              @if (railStations().length === 0) {
+                <span class="empty-category">Nenhuma estação salva.</span>
+              } @else {
+                @for (station of railStations(); track station.id) {
+                  <div class="config-item">
+                    <mat-chip-set aria-label="Estação favorita">
+                      <mat-chip
+                        removable
+                        (removed)="removeRailStationFavorite(station)"
+                      >
+                        <mat-icon matChipAvatar>train</mat-icon>
+                        {{ station.name }}
+                        <button
+                          matChipRemove
+                          matTooltip="Remover dos favoritos"
+                          [aria-label]="
+                            'Remover ' + station.name + ' dos favoritos'
+                          "
+                        >
+                          <mat-icon>favorite</mat-icon>
+                        </button>
+                      </mat-chip>
+                    </mat-chip-set>
+
+                    @if (station.lines.length > 0) {
+                      <div
+                        class="selection-row"
+                        aria-label="Linhas exibidas no painel"
+                      >
+                        @for (line of station.lines; track line.id) {
+                          <button
+                            type="button"
+                            class="choice-button text-choice"
+                            [class.selected]="
+                              isRailStationLineSelected(station, line.id)
+                            "
+                            (click)="toggleRailStationLine(station, line.id)"
+                          >
+                            <span
+                              class="line-badge"
+                              [style.backgroundColor]="line.colorHex"
+                              [style.color]="lineTextColor(line.colorHex)"
+                            >
+                              {{ line.lineCode }}
+                            </span>
+                            <span>{{ line.lineName }}</span>
+                          </button>
+                        }
+                      </div>
+                    }
+                  </div>
+                }
+              }
+            </div>
+          </section>
+
+          <section class="category-section">
+            <h2>Linhas</h2>
+            <mat-chip-set
+              class="chip-list"
+              aria-label="Linhas de trem ou metrô favoritas"
+            >
+              @if (railLines().length === 0) {
+                <span class="empty-category">Nenhuma linha salva.</span>
+              } @else {
+                @for (line of railLines(); track line.id) {
+                  <mat-chip
+                    removable
+                    (removed)="removeFavorite(line.id, 'railLine')"
+                  >
+                    <mat-icon matChipAvatar>route</mat-icon>
+                    {{ line.name }}
+                    <button
+                      matChipRemove
+                      matTooltip="Remover dos favoritos"
+                      [aria-label]="'Remover ' + line.name + ' dos favoritos'"
+                    >
+                      <mat-icon>favorite</mat-icon>
+                    </button>
+                  </mat-chip>
+                }
+              }
+            </mat-chip-set>
+          </section>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card appearance="outlined">
+        <mat-card-header>
+          <mat-icon mat-card-avatar>pedal_bike</mat-icon>
+          <mat-card-title>Bicicleta</mat-card-title>
+          <mat-card-subtitle>
+            {{ bikeStations().length }} favoritos
+          </mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          <section class="category-section">
+            <h2>Estações</h2>
+            <mat-chip-set
+              class="chip-list"
+              aria-label="Estações de bicicleta favoritas"
+            >
+              @if (bikeStations().length === 0) {
+                <span class="empty-category">Nenhuma estação salva.</span>
+              } @else {
+                @for (station of bikeStations(); track station.stationId) {
+                  <mat-chip
+                    removable
+                    (removed)="removeFavorite(station.stationId, 'bikeStation')"
+                  >
+                    <mat-icon matChipAvatar>pedal_bike</mat-icon>
+                    {{ station.name }}
+                    <button
+                      matChipRemove
+                      matTooltip="Remover dos favoritos"
+                      [aria-label]="
+                        'Remover ' + station.name + ' dos favoritos'
+                      "
+                    >
+                      <mat-icon>favorite</mat-icon>
+                    </button>
+                  </mat-chip>
+                }
+              }
+            </mat-chip-set>
+          </section>
+        </mat-card-content>
+      </mat-card>
+    </div>
+  }
+</section>

@@ -1,0 +1,58 @@
+<mat-card class="result-card" (click)="onCardClick()" tabindex="0">
+  <mat-card-content>
+    <div class="result-header">
+      <div class="result-icon-wrapper" [class]="result().type">
+        <mat-icon>{{ getResultIcon(result().type) }}</mat-icon>
+      </div>
+      <div class="result-info">
+        <h4 class="result-title">{{ result().name }}</h4>
+        <p class="result-type">{{ formatResultType() }}</p>
+      </div>
+      @if (result().isViaMobilidade) {
+        <mat-chip class="realtime-chip">
+          <mat-icon>schedule</mat-icon>
+          Tempo real
+        </mat-chip>
+      } @else if (result().distance !== undefined) {
+        <mat-chip class="distance-chip">
+          {{ formatDistance(result().distance!) }}
+        </mat-chip>
+      }
+    </div>
+
+    @if (result().source === 'gtfs' && result().description) {
+      <p class="result-description">{{ result().description }}</p>
+    }
+
+    @if (shouldShowLineCodes()) {
+      <div class="result-lines">
+        <span class="lines-label">Linhas:</span>
+        <div class="lines-chips">
+          @for (line of lineCodesWithColors(); track line.code) {
+            <span
+              class="line-chip"
+              [style.background-color]="line.colors.bg"
+              [style.color]="line.colors.text"
+            >
+              L{{ line.code }}
+            </span>
+          }
+        </div>
+      </div>
+    } @else if (shouldShowRoutes()) {
+      <div class="result-routes">
+        <span class="routes-label">Linhas:</span>
+        <mat-chip-set class="routes-chips">
+          @for (route of result().routes!.slice(0, 5); track route) {
+            <mat-chip>{{ route }}</mat-chip>
+          }
+          @if (result().routes!.length > 5) {
+            <mat-chip class="more-routes"
+              >+{{ result().routes!.length - 5 }} mais</mat-chip
+            >
+          }
+        </mat-chip-set>
+      </div>
+    }
+  </mat-card-content>
+</mat-card>

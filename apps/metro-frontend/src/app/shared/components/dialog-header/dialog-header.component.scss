@@ -1,0 +1,30 @@
+.dialog-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 1rem;
+  padding-bottom: 0.5rem;
+
+  .header-icon {
+    margin-top: 4px;
+    color: var(--mat-sys-primary, #1976d2);
+  }
+
+  .header-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 500;
+  }
+
+  .description {
+    margin: 0;
+    color: #666;
+    font-size: 0.875rem;
+  }
+}

@@ -1,0 +1,33 @@
+services:
+  metro-db:
+    image: postgis/postgis:17-3.5
+    platform: linux/x86_64
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - '5432:5432'
+    volumes:
+      - /Volumes/Mobile/metro/db:/var/lib/postgresql/data
+      - ../tmp:/tmp/shared_import # Shared directory for COPY operations
+    networks:
+      - postgis_network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+    volumes:
+      - /Volumes/Mobile/metro/redis:/data
+    networks:
+      - postgis_network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+networks:
+  postgis_network:
+    driver: bridge
+
+

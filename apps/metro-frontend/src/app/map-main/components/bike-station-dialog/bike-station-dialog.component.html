@@ -1,0 +1,162 @@
+<app-dialog-header
+  icon="pedal_bike"
+  [title]="station().name"
+  [description]="station().address || 'Estação de bicicletas'"
+/>
+
+<mat-dialog-content class="dialog-content">
+  <section class="summary">
+    <div class="summary-item">
+      <span class="value">
+        {{ station().numBikesAvailable }}
+        @if (hasElectricBikes()) {
+          <mat-icon
+            class="electric-icon"
+            aria-label="Bicicletas elétricas disponíveis"
+            >bolt</mat-icon
+          >
+        }
+      </span>
+      <span class="label">Bicicletas disponíveis</span>
+    </div>
+    <div class="summary-item">
+      <span class="value">{{ station().numDocksAvailable }}</span>
+      <span class="label">Docks livres</span>
+    </div>
+    <!-- <div class="summary-item">
+      <span class="value">{{ station().effectiveCapacity }}</span>
+      <span class="label">Capacidade total</span>
+    </div> -->
+    <p>Capacidade total: {{ station().effectiveCapacity }}</p>
+    <p class="last-updated">
+      Atualizado às {{ station().lastReportedIso | date: 'HH:mm:ss' }}
+    </p>
+  </section>
+
+  <mat-chip-set aria-label="Status da estação" class="status-chips">
+    @if (isDevMode) {
+      <mat-chip color="primary" selected
+        >Debug: {{ station().status }}</mat-chip
+      >
+    }
+    @if (station().isRenting) {
+      <mat-chip color="primary" selected> Alugando </mat-chip>
+    }
+    @if (station().isReturning) {
+      <mat-chip color="primary" selected> Aceitando devoluções </mat-chip>
+    }
+  </mat-chip-set>
+
+  <mat-divider></mat-divider>
+
+  <section class="vehicle-section">
+    <h3>Veículos disponíveis</h3>
+    @if (!detailsLoaded()) {
+      <p class="empty-state">Carregando detalhes em tempo real…</p>
+    } @else if (availableVehicles().length === 0) {
+      <p class="empty-state">Nenhuma bicicleta disponível neste momento.</p>
+    } @else {
+      <div class="vehicle-list">
+        @for (vehicle of availableVehicles(); track vehicle.vehicleTypeId) {
+          <article class="vehicle-card">
+            <header>
+              <div class="vehicle-heading">
+                <h4>{{ formatVehicleName(vehicle.name) }}</h4>
+                <span class="vehicle-meta">
+                  {{ formatFormFactor(vehicle.formFactor) | titlecase }} ·
+                  {{ formatPropulsionType(vehicle.propulsionType) | titlecase }}
+                </span>
+              </div>
+              <span class="count">
+                @if (isElectric(vehicle)) {
+                  <mat-icon
+                    class="electric-icon"
+                    aria-label="Bicicletas elétricas disponíveis"
+                    >bolt</mat-icon
+                  >
+                }
+                {{ vehicle.count }}
+              </span>
+            </header>
+            @if (vehicle.pricingPlan; as plan) {
+              <mat-divider></mat-divider>
+              <div class="pricing">
+                <span class="plan-name">{{ plan.name }}</span>
+                <span class="plan-price"
+                  >{{ plan.initialPriceFormatted }}
+                  @if (plan.activationFee !== null) {
+                    /mês
+                  }
+                </span>
+                @if (plan.activationFee !== null) {
+                  <span class="plan-detail"
+                    >Ativação: {{ plan.activationFeeFormatted }}</span
+                  >
+                }
+                @if (plan.perMinuteRateFormatted) {
+                  <span class="plan-detail">
+                    Após {{ plan.perMinuteChargingStartsAfterMinutes }} min:
+                    {{ plan.perMinuteRateFormatted }}
+                  </span>
+                }
+                @if (plan.maxUsageMinutes) {
+                  <span class="plan-detail"
+                    >Máx: {{ plan.maxUsageMinutes }} min por viagem</span
+                  >
+                }
+              </div>
+            }
+          </article>
+        }
+      </div>
+    }
+  </section>
+
+  @if (isDevMode && detailsLoaded() && unavailableVehicles().length > 0) {
+    <section class="vehicle-section muted">
+      <h3>DEBUG: Tipos indisponíveis</h3>
+      <div class="vehicle-list muted">
+        @for (vehicle of unavailableVehicles(); track vehicle.vehicleTypeId) {
+          <article class="vehicle-card">
+            <header>
+              <div class="vehicle-heading">
+                <h4>{{ formatVehicleName(vehicle.name) }}</h4>
+                <span class="vehicle-meta">
+                  {{ formatFormFactor(vehicle.formFactor) | titlecase }} ·
+                  {{ formatPropulsionType(vehicle.propulsionType) | titlecase }}
+                </span>
+              </div>
+              <span class="count">0</span>
+            </header>
+          </article>
+        }
+      </div>
+    </section>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button
+    mat-icon-button
+    class="favorite-button"
+    [class.favorited]="isFavorite()"
+    (click)="toggleFavorite()"
+    (mouseenter)="setFavoriteHover(true)"
+    (mouseleave)="setFavoriteHover(false)"
+    [attr.aria-label]="
+      isFavorite() ? 'Remover dos favoritos' : 'Adicionar aos favoritos'
+    "
+  >
+    <mat-icon>{{ favoriteIcon() }}</mat-icon>
+  </button>
+  <button mat-button type="button" (click)="close()">Fechar</button>
+  <button
+    mat-flat-button
+    color="primary"
+    type="button"
+    (click)="selectStation()"
+  >
+    <mat-icon>push_pin</mat-icon>
+    Fixar estação
+  </button>
+</mat-dialog-actions>

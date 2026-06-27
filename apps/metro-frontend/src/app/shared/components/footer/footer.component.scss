@@ -1,0 +1,66 @@
+@use '@angular/material' as mat;
+@media (max-width: 769px) {
+  .footer-toolbar {
+    display: none;
+  }
+}
+
+.footer-toolbar {
+  margin-top: 2rem;
+  background-color: var(--mat-sys-surface-container-low);
+  border-top: 1px solid var(--mat-sys-outline-variant);
+  min-height: 64px;
+  padding: 0 16px;
+
+  .footer-content {
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+
+    .footer-text {
+      font-size: 14px;
+      color: var(--mat-sys-on-surface-variant);
+      font-weight: 400;
+    }
+
+    .footer-links {
+      .footer-link {
+        font-size: 14px;
+        color: var(--mat-sys-on-surface-variant);
+        text-decoration: none;
+        margin-left: 16px;
+        transition: color 0.3s ease;
+
+        &:hover {
+          color: var(--mat-sys-on-surface);
+          text-decoration: underline;
+        }
+
+        &:first-child {
+          margin-left: 0;
+        }
+      }
+    }
+  }
+}
+
+@media (max-width: 767px) {
+  .footer-toolbar {
+    .footer-content {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+
+      .footer-links {
+        .footer-link {
+          margin-left: 0;
+          margin-right: 16px;
+
+          &:last-child {
+            margin-right: 0;
+          }
+        }
+      }
+    }
+  }
+}

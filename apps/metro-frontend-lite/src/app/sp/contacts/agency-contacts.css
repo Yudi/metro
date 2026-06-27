@@ -1,0 +1,38 @@
+.data-container p {
+  margin: 0;
+}
+
+.data-container {
+  margin-bottom: 1rem;
+}
+
+h3 {
+  margin: 0.5rem 0;
+}
+
+.agency-container {
+  margin-bottom: 2.5rem;
+}
+
+.agency-logo {
+  width: auto;
+  height: 1.5rem;
+}
+
+.agency-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.additional-information {
+  margin: 0.25rem 0rem 0.5rem 0;
+}
+
+.phone-description {
+  white-space: pre-wrap;
+}
+
+.underline {
+  text-decoration: underline;
+}

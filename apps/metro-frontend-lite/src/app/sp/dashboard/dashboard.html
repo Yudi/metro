@@ -1,0 +1,248 @@
+<section class="dashboard-page">
+  <header class="page-header">
+    <div>
+      <h2><a routerLink="/">←</a> Painel</h2>
+      <p>Favoritos salvos neste navegador.</p>
+    </div>
+
+    <button
+      type="button"
+      class="refresh-button"
+      (click)="refreshDashboard()"
+      [disabled]="loading()"
+    >
+      @if (loading()) { Atualizando... } @else { ↻ Atualizar }
+    </button>
+  </header>
+
+  @if (error()) {
+  <div class="alert">{{ error() }}</div>
+  } @if (lastLoadedAt()) {
+  <p class="updated">Atualizado às {{ lastLoadedAt() | date: "HH:mm" }}</p>
+  } @if (loading() && !favorites()) {
+  <div class="skeleton-list" aria-hidden="true">
+    @for (item of [1, 2, 3, 4]; track item) {
+    <div class="skeleton-card"></div>
+    }
+  </div>
+  } @else if (!hasRelevantFavorites()) {
+  <article class="empty-state">
+    <span>♡</span>
+    <h3>Nenhum favorito encontrado</h3>
+    <p>
+      Use a versão completa para salvar pontos, linhas ou estações no painel.
+    </p>
+  </article>
+  } @else { @if (favoriteRailStatuses().length > 0 || favoriteSpecialRailStatuses().length > 0) {
+  <section class="panel">
+    <div class="panel-title">
+      <span>🚆</span>
+      <div>
+        <h3>Status das linhas</h3>
+        @if (railStatus()?.lastUpdated) {
+        <small>Dados de {{ railStatus()?.lastUpdated | date: "HH:mm" }}</small>
+        }
+      </div>
+    </div>
+
+    <div class="status-grid">
+      @for (item of favoriteRailStatuses(); track item.code) {
+      <article class="status-row">
+        <span
+          class="line-pill"
+          [style.background-color]="lineColor(item.code)"
+          [style.color]="lineTextColor(item.code)"
+        >
+          L{{ item.code }}
+        </span>
+        <div>
+          <p>
+            <strong>{{ item.line?.colorName ?? lineName(item.code) }}</strong>
+          </p>
+          <p>
+            {{ statusLabelFormat(item.status?.statusLabel ?? "Indisponível") }}
+          </p>
+          @let statusDescription = item.status?.description ?? '';
+          <!-- prettier-ignore -->
+          @if (
+            statusDescription &&
+            !['Operação Normal', 'Operação Encerrada'].includes(statusDescription)
+          ) {
+          <p>{{ statusDescription }}</p>
+          }
+          @if (item.status?.detail) {
+          <p>{{ item.status?.detail }}</p>
+          }
+        </div>
+      </article>
+      }
+      @for (line of favoriteSpecialRailStatuses(); track line.code) {
+      <article class="status-row">
+        <span
+          class="line-pill"
+          [style.background-color]="line.colorHex"
+          [style.color]="lineTextColor(line.code === '10X' ? 10 : 0)"
+        >
+          {{ line.code }}
+        </span>
+        <div>
+          <p><strong>{{ line.line }}</strong></p>
+          <p>{{ statusLabelFormat(line.statusLabel) }}</p>
+          @for (departure of line.nextDepartures; track departure.label) {
+          <p>{{ departure.label }}: {{ departure.time }}</p>
+          }
+        </div>
+      </article>
+      }
+    </div>
+  </section>
+  }
+
+  <div class="content-grid">
+    @if (busStops().length > 0 || busRoutes().length > 0) {
+    <section class="panel">
+      <div class="panel-title">
+        <span>🚌</span>
+        <div>
+          <h3>Ônibus</h3>
+        </div>
+      </div>
+
+      @if (busStops().length > 0) {
+      <div class="section-block">
+        <h4>Pontos favoritos</h4>
+        <div class="item-list">
+          @for (stop of busStops(); track stop.stopId) {
+          <article class="item-row">
+            <div>
+              <strong>{{ stop.name }}</strong>
+              <small>{{ stop.stopId }}</small>
+            </div>
+
+            @let selectedRoutes = getSelectedBusRoutes(stop.stopId); @if
+            (selectedRoutes.length > 0) {
+            <div class="chip-row">
+              @for (route of selectedRoutes; track route.routeId) {
+              <span
+                class="route-chip"
+                [style.background-color]="routeColor(route)"
+                [style.color]="routeTextColor(route)"
+              >
+                {{ route.shortName }}
+              </span>
+              }
+            </div>
+            } @else if (stop.routeShortNames.length > 0) {
+            <div class="chip-row">
+              @for (route of stop.routeShortNames.slice(0, 6); track route) {
+              <span class="soft-chip">{{ route }}</span>
+              }
+            </div>
+            } @else {
+            <small>Linhas indisponíveis.</small>
+            } @let arrivalLines = getBusArrivalLines(stop.stopId); @if
+            (arrivalLines.length > 0) {
+            <div class="arrival-box">
+              <strong>Próximas chegadas</strong>
+              @for (line of arrivalLines.slice(0, 3); track line.c + line.sl) {
+              <div class="arrival-row">
+                <span>{{ line.c }} → {{ line.lt0 }} </span>
+                @if (line.vs.length > 0 && line.vs[0].t) {
+                <b>{{ getMinutesUntilArrival(line.vs[0].t) }} </b>
+                <time>{{ line.vs[0].t }}</time>
+                } @else {
+                <small>Sem horário</small>
+                }
+              </div>
+              }
+            </div>
+            } @else if (!loading()) {
+            <small>Sem previsão de chegada no último carregamento.</small>
+            }
+          </article>
+          }
+        </div>
+      </div>
+      } @if (busRoutes().length > 0) {
+      <div class="section-block">
+        <h4>Linhas favoritas</h4>
+        <div class="item-list">
+          @for (route of busRoutes(); track route.routeId) {
+          <article class="item-row route-row">
+            <span
+              class="route-chip large"
+              [style.background-color]="routeColor(route)"
+              [style.color]="routeTextColor(route)"
+            >
+              {{ route.shortName }}
+            </span>
+            <div>
+              <strong>{{ route.longName }}</strong>
+              <small>{{ route.routeId }}</small>
+            </div>
+          </article>
+          }
+        </div>
+      </div>
+      }
+    </section>
+    }
+
+    <section class="panel">
+      <div class="panel-title">
+        <span>🚉</span>
+        <div>
+          <h3>Estações</h3>
+        </div>
+      </div>
+
+      @if (railStations().length === 0) {
+      <p class="muted">Nenhuma estação salva.</p>
+      } @else {
+      <div class="item-list">
+        @for (station of railStations(); track station.key) {
+        <article class="item-row station-row">
+          <div>
+            <strong>{{ station.name }}</strong>
+            @let selectedLines = getSelectedRailLines(station); @if
+            (selectedLines.length > 0) {
+            <div class="chip-row">
+              @for (line of selectedLines; track line.id) {
+              <span
+                class="line-chip"
+                [style.background-color]="line.colorHex"
+                [style.color]="lineTextColor(line.lineCode)"
+              >
+                {{ formatLineLabel(line) }}
+              </span>
+              }
+            </div>
+            } @else {
+            <small>Nenhuma linha selecionada para o painel.</small>
+            }
+          </div>
+
+          @for (group of nextTrainGroups(); track group.key) { @if
+          (group.stationName === station.name) {
+          <div class="train-box">
+            <strong>{{ formatLineLabel(group.line) }} · próximos trens</strong>
+            @if (group.trains.length === 0) {
+            <small>Sem previsão disponível.</small>
+            } @else { @for (train of group.trains.slice(0, 3); track
+            train.destinationCode + train.arrivalTime) {
+            <div class="train-row">
+              <span>{{ train.destinationName }}</span>
+              <b>{{ getMinutesUntilArrival(train.arrivalTime) }}</b>
+              <time>{{ formatTrainTime(train.arrivalTime) }}</time>
+            </div>
+            } }
+          </div>
+          } }
+        </article>
+        }
+      </div>
+      }
+    </section>
+  </div>
+  }
+</section>

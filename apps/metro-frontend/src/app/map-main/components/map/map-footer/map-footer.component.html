@@ -1,0 +1,21 @@
+<footer class="map-footer">
+  <div class="footer-content">
+    <!-- Realtime Status -->
+    <app-realtime-status></app-realtime-status>
+
+    <!-- Selected Feature Info -->
+    @if (isDevMode) {
+      @if (hasSelectedFeature()) {
+        <button
+          mat-stroked-button
+          class="feature-info-button"
+          (click)="featureInfoClick.emit()"
+        >
+          <mat-icon>info</mat-icon>
+
+          <span class="button-label">DEBUG: Ver detalhes</span>
+        </button>
+      }
+    }
+  </div>
+</footer>

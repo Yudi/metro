@@ -1,0 +1,38 @@
+<mat-toolbar
+  class="bottom-toolbar"
+  role="navigation"
+  aria-label="Barra de navegação inferior"
+  #toolbar
+>
+  @for (item of items(); track item.label) {
+    @if (item.route === '/mapa') {
+      <button
+        mat-button
+        class="nav-btn"
+        [class.active]="isMapItemActive(item)"
+        [attr.aria-label]="item.label"
+        (click)="onNavigateClick($event, item)"
+      >
+        <span class="icon-wrap">
+          <mat-icon aria-hidden="true">{{ item.icon }}</mat-icon>
+        </span>
+        <span class="label">{{ item.shortLabel }}</span>
+      </button>
+    } @else {
+      <button
+        mat-button
+        class="nav-btn"
+        [routerLink]="item.route"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }"
+        [attr.aria-label]="item.label"
+        [queryParams]="item.queryParams"
+      >
+        <span class="icon-wrap">
+          <mat-icon aria-hidden="true">{{ item.icon }}</mat-icon>
+        </span>
+        <span class="label">{{ item.shortLabel }}</span>
+      </button>
+    }
+  }
+</mat-toolbar>

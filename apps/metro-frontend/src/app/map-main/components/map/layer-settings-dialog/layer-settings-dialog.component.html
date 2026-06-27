@@ -1,0 +1,34 @@
+<div class="layer-settings-dialog">
+  <h2 mat-dialog-title>
+    <mat-icon>layers</mat-icon>
+    <span>Camadas do mapa</span>
+  </h2>
+
+  <mat-dialog-content>
+    <div class="layer-list">
+      @for (layer of toggleableLayers(); track layer.id) {
+      <div class="layer-item">
+        <mat-checkbox
+          [checked]="layer.visible"
+          (change)="onLayerToggle(layer.id, layer.isVectorTile)"
+          color="primary"
+        >
+          <div class="layer-content">
+            <div class="layer-info">
+              <mat-icon class="layer-icon">{{
+                getLayerIcon(layer.id)
+              }}</mat-icon>
+              <span class="layer-name">{{ layer.name }}</span>
+            </div>
+          </div>
+        </mat-checkbox>
+      </div>
+      <mat-divider></mat-divider>
+      }
+    </div>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button mat-button (click)="close()">Fechar</button>
+  </mat-dialog-actions>
+</div>

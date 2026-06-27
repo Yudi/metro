@@ -1,0 +1,62 @@
+:host {
+  display: inline-block;
+  line-height: 0;
+}
+
+.train-car-load {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.train-car-load__band {
+  fill: var(--mat-sys-surface, #ffffff);
+}
+
+.train-car-load__band--active {
+  transition: fill 160ms ease;
+}
+
+.train-car-load__door-marker {
+  stroke: var(--mat-sys-on-surface, #000000);
+  stroke-opacity: 0.16;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.train-car-load__outline {
+  fill: none;
+  stroke: var(--mat-sys-outline, #777777);
+  stroke-width: 5;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.train-car-load.load-low .train-car-load__band--active {
+  fill: #43a047;
+}
+
+.train-car-load.load-medium .train-car-load__band--active {
+  fill: #f9a825;
+}
+
+.train-car-load.load-high .train-car-load__band--active {
+  fill: #e53935;
+}
+
+.train-car-load.load-empty .train-car-load__band--active {
+  fill: var(--mat-sys-surface, #ffffff);
+}
+
+.train-car-load.load-unavailable .train-car-load__band {
+  fill: var(--mat-sys-surface, #ffffff);
+}
+
+.train-car-load.load-unavailable .train-car-load__door-marker {
+  stroke-opacity: 0.12;
+}
+
+.train-car-load.load-unavailable .train-car-load__outline {
+  stroke: var(--mat-sys-outline-variant, #9e9e9e);
+}

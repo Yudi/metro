@@ -1,0 +1,205 @@
+:host {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.train-composition-card {
+  --train-composition-car-width: 6.85rem;
+  --train-composition-gap-width: 1rem;
+  --train-composition-extremity-width: 1.35rem;
+  --train-composition-feature-size: 1.45rem;
+  --train-composition-feature-icon-size: 0.98rem;
+  --train-composition-feature-row-height: 1.65rem;
+  --train-composition-min-height: 7.65rem;
+
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.55rem;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 0.85rem;
+  border: 1px solid var(--mat-sys-outline-variant, #d8d8d8);
+  border-radius: 0.5rem;
+  background: var(--mat-sys-surface-container-lowest, #ffffff);
+}
+
+.train-composition-card--compact {
+  --train-composition-car-width: 5.35rem;
+  --train-composition-gap-width: 0.55rem;
+  --train-composition-extremity-width: 1.05rem;
+  --train-composition-feature-size: 1.2rem;
+  --train-composition-feature-icon-size: 0.82rem;
+  --train-composition-feature-row-height: 1.35rem;
+  --train-composition-min-height: 5.9rem;
+
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.train-composition-card__header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.train-composition-card__eyebrow {
+  display: block;
+  margin-bottom: 0.1rem;
+  color: var(--mat-sys-primary, #0b71d0);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.train-composition-card__title {
+  margin: 0;
+  color: var(--mat-sys-on-surface, #1f1f1f);
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+.train-composition-card__subtitle {
+  margin: 0.15rem 0 0;
+  color: var(--mat-sys-on-surface-variant, #666666);
+  font-size: 0.74rem;
+}
+
+.train-composition-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: 0.35rem;
+}
+
+.train-composition-card__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  min-height: 1.45rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: var(--mat-sys-surface-container, #eeeeee);
+  color: var(--mat-sys-on-surface-variant, #555555);
+  font-size: 0.68rem;
+  font-weight: 650;
+  white-space: nowrap;
+
+  .material-symbols-outlined {
+    font-size: 0.95rem;
+  }
+}
+
+.train-composition-card__viewport {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.1rem 0 0.35rem;
+  scrollbar-width: thin;
+}
+
+.train-composition {
+  display: flex;
+  align-items: end;
+  width: 100%;
+}
+
+.train-composition__car {
+  position: relative;
+  flex: 0 0 var(--train-composition-car-width);
+}
+
+.train-composition__feature-row {
+  display: grid;
+  align-items: end;
+  min-height: var(--train-composition-feature-row-height);
+}
+
+.train-composition__feature-stack {
+  position: relative;
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 0.15rem;
+  width: var(--train-composition-feature-size);
+  transform: translateX(-50%);
+}
+
+.train-composition__feature {
+  display: inline-grid;
+  place-items: center;
+  width: var(--train-composition-feature-size);
+  height: var(--train-composition-feature-size);
+  padding: 0;
+  border: 1px solid var(--mat-sys-outline, #777777);
+  border-radius: 999px;
+  background: var(--mat-sys-surface, #ffffff);
+  color: var(--mat-sys-on-surface, #333333);
+  cursor: help;
+
+  .material-symbols-outlined {
+    font-family: 'Material Symbols Outlined';
+    font-size: var(--train-composition-feature-icon-size);
+    line-height: 1;
+  }
+}
+
+.train-composition__feature--between-doors {
+  border-style: dashed;
+}
+
+.train-composition__feature--between-cars,
+.train-composition__feature--extremity {
+  background: var(--mat-sys-secondary-container, #e8def8);
+  color: var(--mat-sys-on-secondary-container, #1d192b);
+}
+
+.train-composition__car-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+  color: var(--mat-sys-on-surface-variant, #666666);
+  font-size: 0.65rem;
+}
+
+.train-composition__car-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-weight: 650;
+}
+
+.train-composition__accessible {
+  color: var(--mat-sys-primary, #0b71d0);
+  font-family: 'Material Symbols Outlined';
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.train-composition__between-cars,
+.train-composition__extremity {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: start;
+  gap: 0.15rem;
+  flex: 0 0 var(--train-composition-gap-width);
+  align-self: stretch;
+  min-height: var(--train-composition-min-height);
+  padding-top: 0.1rem;
+}
+
+.train-composition__extremity {
+  flex-basis: var(--train-composition-extremity-width);
+}

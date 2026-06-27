@@ -1,0 +1,202 @@
+.result-card {
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 12px;
+
+  &:hover,
+  &:focus {
+    border-color: var(--mat-sys-primary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    outline: none;
+  }
+
+  &:active {
+    transform: scale(0.99);
+  }
+
+  mat-card-content {
+    padding: 12px 16px;
+  }
+
+  .result-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+
+    .result-icon-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      flex-shrink: 0;
+
+      mat-icon {
+        font-size: 22px;
+        width: 22px;
+        height: 22px;
+      }
+
+      &.subway_station {
+        background-color: var(--mat-sys-tertiary-container);
+        color: var(--mat-sys-on-tertiary-container);
+      }
+
+      &.bus_stop {
+        background-color: var(--mat-sys-secondary-container);
+        color: var(--mat-sys-on-secondary-container);
+      }
+
+      &.bike_station {
+        background-color: var(--mat-sys-surface-container-highest);
+        color: var(--mat-sys-on-surface);
+      }
+
+      &.route {
+        background-color: var(--mat-sys-primary-container);
+        color: var(--mat-sys-on-primary-container);
+      }
+    }
+
+    .result-info {
+      flex: 1;
+      min-width: 0;
+
+      .result-title {
+        margin: 0 0 2px;
+        font-size: 1rem;
+        font-weight: 500;
+        line-height: 1.3;
+        color: var(--mat-sys-on-surface);
+      }
+
+      .result-type {
+        margin: 0;
+        font-size: 0.8125rem;
+        color: var(--mat-sys-on-surface-variant);
+      }
+    }
+
+    .distance-chip {
+      flex-shrink: 0;
+      --mdc-chip-container-height: 24px;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+
+    .realtime-chip {
+      flex-shrink: 0;
+      background-color: var(--mat-sys-primary-container);
+      color: var(--mat-sys-on-primary-container);
+      font-size: 0.75rem;
+      height: 28px;
+
+      mat-icon {
+        font-size: 14px;
+        width: 14px;
+        height: 14px;
+        margin-right: 4px;
+      }
+    }
+  }
+
+  .result-description {
+    margin: 8px 0 0 52px;
+    font-size: 0.8125rem;
+    color: var(--mat-sys-on-surface-variant);
+    line-height: 1.4;
+  }
+
+  .result-lines {
+    margin-top: 10px;
+    padding-left: 52px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+
+    .lines-label {
+      font-size: 0.8125rem;
+      color: var(--mat-sys-on-surface-variant);
+    }
+
+    .lines-chips {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+
+      .line-chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2px 10px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        min-width: 36px;
+        height: 24px;
+      }
+    }
+  }
+
+  .result-routes {
+    margin-top: 10px;
+    padding-left: 52px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    flex-wrap: wrap;
+
+    .routes-label {
+      font-size: 0.8125rem;
+      color: var(--mat-sys-on-surface-variant);
+      line-height: 24px;
+    }
+
+    .routes-chips {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 4px;
+
+      .mat-mdc-chip {
+        --mdc-chip-container-height: 24px;
+        font-size: 0.75rem;
+      }
+
+      .more-routes {
+        font-style: italic;
+        opacity: 0.8;
+      }
+    }
+  }
+}
+
+// Mobile responsive styles
+@media (max-width: 600px) {
+  .result-card {
+    .result-header {
+      .result-icon-wrapper {
+        width: 36px;
+        height: 36px;
+
+        mat-icon {
+          font-size: 20px;
+          width: 20px;
+          height: 20px;
+        }
+      }
+    }
+
+    .result-description {
+      margin-left: 48px;
+    }
+
+    .result-lines,
+    .result-routes {
+      padding-left: 48px;
+    }
+  }
+}

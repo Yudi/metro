@@ -1,0 +1,226 @@
+<section class="insights-page">
+  <header class="page-header">
+    <div>
+      <h1 class="global-header">Painel</h1>
+    </div>
+    <a mat-stroked-button routerLink="/favoritos">
+      <mat-icon>settings</mat-icon>
+      Configurar
+    </a>
+  </header>
+
+  @if (!hasRelevantFavorites()) {
+    <div class="empty-state">
+      <mat-icon>favorite_border</mat-icon>
+      <h2>Nenhum favorito</h2>
+      <p>
+        Salve pontos, linhas ou estações na busca ou no mapa para montar seu
+        painel.
+      </p>
+    </div>
+  } @else {
+    @if (lookupError()) {
+      <div class="error-message">{{ lookupError() }}</div>
+    }
+
+    <div class="dashboard-grid">
+      @if (busStops().length + busRoutes().length > 0) {
+        <mat-card appearance="outlined">
+          <mat-card-header>
+            <mat-icon mat-card-avatar>directions_bus</mat-icon>
+            <mat-card-title>Ônibus</mat-card-title>
+            <mat-card-subtitle>
+              {{ busStops().length + busRoutes().length }} favoritos
+            </mat-card-subtitle>
+          </mat-card-header>
+          <mat-card-content>
+            <section class="category-section">
+              <h2>Pontos favoritos</h2>
+              @if (loadingBusDetails()) {
+                <div class="loading-row">Carregando pontos...</div>
+              } @else if (busStops().length === 0) {
+                <div class="empty-category">Nenhum ponto salvo.</div>
+              } @else {
+                <div class="item-list">
+                  @for (stop of busStops(); track stop.stopId) {
+                    <article class="insight-row">
+                      <mat-icon class="row-icon">departure_board</mat-icon>
+                      <div class="row-content">
+                        <h3>{{ stop.name }}</h3>
+                        @let routes = getRoutesForStop(stop.stopId);
+                        @if (routes.length > 0) {
+                          @let selectedRoutes =
+                            getSelectedBusRoutes(stop.stopId);
+                          @if (selectedRoutes.length > 0) {
+                            <div class="chip-row">
+                              @for (
+                                route of selectedRoutes;
+                                track route.routeId
+                              ) {
+                                <span
+                                  class="route-badge compact-badge"
+                                  [style.backgroundColor]="routeColor(route)"
+                                  [style.color]="routeTextColor(route)"
+                                >
+                                  {{ route.shortName }}
+                                </span>
+                              }
+                            </div>
+
+                            <app-stop-arrivals
+                              [stop]="stop"
+                              [routes]="selectedRoutes"
+                              [selectedRouteKeys]="
+                                getSelectedBusRouteKeys(stop.stopId)
+                              "
+                              [compact]="true"
+                            />
+                          } @else {
+                            <div class="muted-state">
+                              <mat-icon>visibility_off</mat-icon>
+                              <span>Nenhuma linha selecionada no painel.</span>
+                            </div>
+                          }
+                        } @else {
+                          <div class="chip-row">
+                            @if (stop.routeShortNames.length === 0) {
+                              <span class="muted">Carregando linhas...</span>
+                            } @else {
+                              @for (
+                                route of visibleRoutes(stop.routeShortNames);
+                                track route
+                              ) {
+                                <span class="soft-chip">{{ route }}</span>
+                              }
+                              @if (hiddenRouteCount(stop.routeShortNames) > 0) {
+                                <span class="muted">
+                                  +{{ hiddenRouteCount(stop.routeShortNames) }}
+                                </span>
+                              }
+                            }
+                          </div>
+                        }
+                      </div>
+                    </article>
+                  }
+                </div>
+              }
+            </section>
+
+            <section class="category-section">
+              <h2>Linhas favoritas</h2>
+              @if (loadingBusDetails()) {
+                <div class="loading-row">Carregando linhas...</div>
+              } @else if (busRoutes().length === 0) {
+                <div class="empty-category">Nenhuma linha salva.</div>
+              } @else {
+                <div class="item-list">
+                  @for (route of busRoutes(); track route.routeId) {
+                    <article class="insight-row">
+                      <span
+                        class="route-badge"
+                        [style.backgroundColor]="routeColor(route)"
+                        [style.color]="routeTextColor(route)"
+                      >
+                        {{ route.shortName }}
+                      </span>
+                      <div class="row-content">
+                        <h3>{{ route.longName }}</h3>
+                        <span class="muted">{{ route.routeId }}</span>
+                      </div>
+                    </article>
+                  }
+                </div>
+              }
+            </section>
+          </mat-card-content>
+        </mat-card>
+      }
+
+      <mat-card appearance="outlined">
+        <mat-card-header>
+          <mat-icon mat-card-avatar>train</mat-icon>
+          <mat-card-title>Estações</mat-card-title>
+          <mat-card-subtitle>
+            {{ railStations().length }} favoritas
+          </mat-card-subtitle>
+        </mat-card-header>
+        <mat-card-content>
+          @if (railStations().length === 0) {
+            <div class="empty-category">Nenhuma estação salva.</div>
+          } @else {
+            <div class="item-list">
+              @for (station of railStations(); track station.key) {
+                <article class="insight-row">
+                  <mat-icon class="row-icon">train</mat-icon>
+                  <div class="row-content">
+                    <h3>{{ station.name }}</h3>
+                    @if (station.lines.length > 0) {
+                      @let selectedLines = getSelectedRailLines(station);
+                      @if (selectedLines.length > 0) {
+                        <div class="chip-row">
+                          @for (line of selectedLines; track line.id) {
+                            <span
+                              class="line-chip compact-badge"
+                              [style.backgroundColor]="line.colorHex"
+                              [style.color]="lineTextColor(line.lineCode)"
+                            >
+                              {{ line.lineCode }}
+                            </span>
+                          }
+                        </div>
+
+                        @for (line of selectedLines; track line.id) {
+                          @if (hasNextTrain(line)) {
+                            <app-next-train-card
+                              [lineCode]="line.nextTrainLineCode"
+                              [stationCode]="line.stationCode"
+                              [showLineName]="true"
+                            />
+                          }
+                        }
+                      } @else {
+                        <div class="muted-state">
+                          <mat-icon>visibility_off</mat-icon>
+                          <span>Nenhuma linha selecionada no painel.</span>
+                        </div>
+                      }
+                    } @else {
+                      <div class="chip-row">
+                        @for (code of station.lineCodes; track code) {
+                          <span
+                            class="line-chip"
+                            [style.backgroundColor]="lineColor(code)"
+                            [style.color]="lineTextColor(code)"
+                          >
+                            {{ lineName(code) }}
+                          </span>
+                        }
+                        @if (station.lineCodes.length === 0) {
+                          <span class="muted">Linhas indisponíveis.</span>
+                        }
+                      </div>
+                    }
+                  </div>
+                </article>
+              }
+            </div>
+          }
+        </mat-card-content>
+      </mat-card>
+    </div>
+
+    @if (railStatusCodes().length > 0 || specialRailLineFavoriteCodes().length > 0) {
+      <section class="status-section">
+        <app-line-status-grid
+          headerText="Status das linhas favoritas"
+          [lineCodes]="railStatusCodes()"
+          [issueLineCodes]="railIssueStatusCodes()"
+          [specialLineCodes]="specialRailLineFavoriteCodes()"
+          [showSpecialServices]="specialRailLineFavoriteCodes().length > 0"
+          emptyText="Nenhum status encontrado para seus favoritos."
+        />
+      </section>
+    }
+  }
+</section>

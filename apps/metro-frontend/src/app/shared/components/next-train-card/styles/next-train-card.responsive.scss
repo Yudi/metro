@@ -1,0 +1,72 @@
+@media (max-width: 400px) {
+  .next-train-card {
+    padding: 12px;
+  }
+
+  .train-item {
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .train-icon {
+    width: 32px;
+    height: 32px;
+
+    mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+  }
+
+  .arrival-time {
+    font-size: 0.95rem;
+  }
+
+  .train-location {
+    font-size: 0.75rem;
+  }
+}
+
+/* Responsive for prominent display */
+@media (max-width: 400px) {
+  .next-train-prominent {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .train-icon-large {
+    width: 40px;
+    height: 40px;
+
+    mat-icon {
+      font-size: 24px;
+      width: 24px;
+      height: 24px;
+    }
+  }
+
+  .arrival-time-large {
+    font-size: 1.25rem;
+  }
+
+  .train-location-status {
+    font-size: 0.85rem;
+  }
+
+  .position-indicator {
+    width: 32px;
+    height: 32px;
+
+    mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+  }
+
+  .train-chip {
+    padding: 3px 8px;
+    font-size: 0.75rem;
+  }
+}

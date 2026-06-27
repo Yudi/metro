@@ -1,0 +1,94 @@
+<header class="map-header">
+  <div class="header-content">
+    <!-- Display Mode Toggle -->
+    <mat-button-toggle-group
+      class="display-mode-toggle"
+      [value]="displayMode()"
+      (change)="onDisplayModeChange($event.value)"
+      hideSingleSelectionIndicator
+    >
+      <mat-button-toggle value="selected" aria-label="Modo selecionados">
+        <mat-icon>playlist_add_check</mat-icon>
+        <span class="toggle-label">Seleção</span>
+      </mat-button-toggle>
+      <mat-button-toggle
+        value="nearby"
+        aria-label="Modo próximos"
+        [disabled]="isNearbyDisabled()"
+        [matTooltip]="nearbyTooltip()"
+      >
+        @if (isRequestingLocation()) {
+          <mat-spinner diameter="18" class="toggle-spinner"></mat-spinner>
+        } @else {
+          <mat-icon>{{
+            isNearbyDisabled() ? 'location_off' : 'near_me'
+          }}</mat-icon>
+        }
+        <span class="toggle-label">Próximos</span>
+      </mat-button-toggle>
+    </mat-button-toggle-group>
+
+    <!-- Desktop Actions -->
+    <div class="desktop-actions">
+      <button
+        mat-icon-button
+        (click)="searchClick.emit()"
+        matTooltip="Pesquisar linhas e paradas"
+        aria-label="Pesquisar"
+      >
+        <mat-icon>search</mat-icon>
+      </button>
+
+      <button
+        mat-icon-button
+        (click)="exploreClick.emit()"
+        matTooltip="Explorar outro local"
+        aria-label="Explorar outro local"
+      >
+        <mat-icon>explore</mat-icon>
+      </button>
+
+      <button
+        mat-icon-button
+        (click)="layersClick.emit()"
+        matTooltip="Configurar camadas"
+        aria-label="Camadas"
+      >
+        <mat-icon>layers</mat-icon>
+      </button>
+
+      <button
+        mat-icon-button
+        [disabled]="isLocationDisabled() || isRequestingLocation()"
+        (click)="centerOnUserClick.emit()"
+        matTooltip="Centralizar em sua localização"
+        aria-label="Centralizar em minha localização"
+      >
+        <mat-icon>{{
+          isLocationDisabled() ? 'location_off' : 'my_location'
+        }}</mat-icon>
+      </button>
+
+      <button
+        mat-icon-button
+        (click)="centerClick.emit()"
+        matTooltip="Centralizar em São Paulo"
+        aria-label="Centralizar mapa"
+      >
+        <mat-icon>location_city</mat-icon>
+      </button>
+
+      @if (hasSelections()) {
+        <button
+          mat-icon-button
+          color="warn"
+          (click)="clearClick.emit()"
+          matTooltip="Limpar seleções"
+          aria-label="Limpar todas as seleções"
+        >
+          <mat-icon>clear_all</mat-icon>
+        </button>
+      }
+    </div>
+  </div>
+</header>

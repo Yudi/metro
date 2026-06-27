@@ -1,0 +1,165 @@
+<section
+  class="train-composition-card"
+  [class.train-composition-card--compact]="compactContext()"
+>
+  @if (!compactContext()) {
+    <header class="train-composition-card__header">
+      <div>
+        <span class="train-composition-card__eyebrow">{{ title() }}</span>
+        <h3 class="train-composition-card__title">
+          {{ composition().stationName }}
+        </h3>
+        <p class="train-composition-card__subtitle">
+          {{ composition().lineCode }} · sentido
+          {{ composition().directionName }}
+        </p>
+      </div>
+
+      @if (disembarkingSideLabel(); as sideLabel) {
+        <div class="train-composition-card__meta">
+          <span class="train-composition-card__pill">
+            <span class="material-symbols-outlined" aria-hidden="true">
+              door_open
+            </span>
+            {{ sideLabel }}
+          </span>
+        </div>
+      }
+    </header>
+  }
+
+  <div
+    class="train-composition-card__viewport"
+    tabindex="0"
+    aria-label="Composição do trem"
+  >
+    <div
+      class="train-composition"
+      role="group"
+      [attr.aria-label]="ariaLabel()"
+    >
+      @if (composition().leftExtremityFeatures.length > 0) {
+        <div class="train-composition__extremity">
+          @for (
+            feature of composition().leftExtremityFeatures;
+            track feature.id
+          ) {
+            <button
+              type="button"
+              class="train-composition__feature train-composition__feature--extremity"
+              [attr.aria-label]="feature.label"
+              [matTooltip]="feature.label"
+              matTooltipPosition="above"
+              matTooltipTouchGestures="auto"
+            >
+              <span class="material-symbols-outlined" aria-hidden="true">
+                {{ getFeatureIcon(feature) }}
+              </span>
+            </button>
+          }
+        </div>
+      }
+
+      @for (car of composition().cars; track car.carPosition) {
+        <article
+          class="train-composition__car"
+          [attr.aria-label]="getCarAriaLabel(car)"
+        >
+          <div class="train-composition__feature-row">
+            @for (stack of car.featureStacks; track stack.positionRatio) {
+              <div
+                class="train-composition__feature-stack"
+                [style.left.%]="stack.positionRatio * 100"
+              >
+                @for (feature of stack.features; track feature.id) {
+                  <button
+                    type="button"
+                    class="train-composition__feature"
+                    [class.train-composition__feature--between-doors]="feature.anchorType === 'between-doors'"
+                    [attr.aria-label]="feature.label"
+                    [matTooltip]="feature.label"
+                    matTooltipPosition="above"
+                    matTooltipTouchGestures="auto"
+                  >
+                    <span class="material-symbols-outlined" aria-hidden="true">
+                      {{ getFeatureIcon(feature) }}
+                    </span>
+                  </button>
+                }
+              </div>
+            }
+          </div>
+
+          <lib-train-car-load-indicator
+            [load]="car.load"
+            [mode]="car.mode"
+            [doorsPerCar]="car.doorCount"
+            [carPosition]="car.carPosition"
+          />
+
+          <footer class="train-composition__car-footer">
+            <span class="train-composition__car-label">
+              Carro {{ car.carPosition }}
+              @if (car.wheelchairAccessible) {
+                <span
+                  class="material-symbols-outlined train-composition__accessible"
+                  aria-label="Carro acessível"
+                  matTooltip="Carro acessível"
+                  matTooltipPosition="above"
+                  matTooltipTouchGestures="auto"
+                  tabindex="0"
+                >
+                  accessible
+                </span>
+              }
+            </span>
+          </footer>
+        </article>
+
+        @if (!$last) {
+          <div class="train-composition__between-cars">
+            @for (
+              feature of getBetweenCarsFeaturesAfterDisplayedCar(car);
+              track feature.id
+            ) {
+              <button
+                type="button"
+                class="train-composition__feature train-composition__feature--between-cars"
+                [attr.aria-label]="feature.label"
+                [matTooltip]="feature.label"
+                matTooltipPosition="above"
+                matTooltipTouchGestures="auto"
+              >
+                <span class="material-symbols-outlined" aria-hidden="true">
+                  {{ getBetweenCarsFeatureIcon(feature) }}
+                </span>
+              </button>
+            }
+          </div>
+        }
+      }
+
+      @if (composition().rightExtremityFeatures.length > 0) {
+        <div class="train-composition__extremity">
+          @for (
+            feature of composition().rightExtremityFeatures;
+            track feature.id
+          ) {
+            <button
+              type="button"
+              class="train-composition__feature train-composition__feature--extremity"
+              [attr.aria-label]="feature.label"
+              [matTooltip]="feature.label"
+              matTooltipPosition="above"
+              matTooltipTouchGestures="auto"
+            >
+              <span class="material-symbols-outlined" aria-hidden="true">
+                {{ getFeatureIcon(feature) }}
+              </span>
+            </button>
+          }
+        </div>
+      }
+    </div>
+  </div>
+</section>

@@ -1,0 +1,137 @@
+.next-train-prominent {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: var(--mat-sys-surface, #fff);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  position: relative;
+  overflow: hidden;
+
+  // // Status indicator border
+  // &::before {
+  //   content: '';
+  //   position: absolute;
+  //   left: 0;
+  //   top: 0;
+  //   bottom: 0;
+  //   width: 4px;
+  //   background: var(--mat-sys-primary, #0b71d0);
+  //   transition: background-color 0.3s ease;
+  // }
+
+  // &.at-platform {
+  //   background: rgba(0, 167, 142, 0.08);
+
+  //   &::before {
+  //     background: #00a78e;
+  //   }
+  // }
+
+  // &.status-approaching::before {
+  //   background: #f59e0b; // Amber for approaching
+  // }
+
+  // &.status-at-station::before {
+  //   background: #00a78e; // Teal for at station
+  // }
+
+  // &.status-departing::before {
+  //   background: #6366f1; // Indigo for departing
+  // }
+}
+
+.train-icon-large {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: var(--mat-sys-surface-container, #f0f0f0);
+  flex-shrink: 0;
+
+  mat-icon {
+    font-size: 28px;
+    width: 28px;
+    height: 28px;
+    color: var(--mat-sys-primary, #0b71d0);
+  }
+
+  .at-platform & {
+    background: rgba(0, 167, 142, 0.15);
+
+    mat-icon {
+      color: #00a78e;
+    }
+  }
+}
+
+.train-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.arrival-time-large {
+  font-weight: 700;
+  font-size: 1.5rem;
+  color: var(--mat-sys-on-surface, #333);
+  line-height: 1.2;
+
+  &.platform {
+    color: #00a78e;
+  }
+}
+
+.train-location-status {
+  font-size: 0.9rem;
+  color: var(--mat-sys-on-surface-variant, #666);
+  font-weight: 500;
+}
+
+// Position indicator icon
+.position-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--mat-sys-surface-container, #f0f0f0);
+  flex-shrink: 0;
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    color: var(--mat-sys-on-surface-variant, #666);
+  }
+
+  &.status-approaching {
+    background: rgba(245, 158, 11, 0.15);
+
+    mat-icon {
+      color: #f59e0b;
+    }
+  }
+
+  &.status-at-station {
+    background: rgba(0, 167, 142, 0.15);
+
+    mat-icon {
+      color: #00a78e;
+    }
+  }
+
+  &.status-departing {
+    background: rgba(99, 102, 241, 0.15);
+
+    mat-icon {
+      color: #6366f1;
+    }
+  }
+}

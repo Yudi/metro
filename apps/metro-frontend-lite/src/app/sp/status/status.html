@@ -1,0 +1,70 @@
+<div class="container">
+  <h2><a routerLink="/">←</a><span class="header"> Estado das linhas</span></h2>
+
+  <div class="grid">
+    @if (lineStatusSignal(); as lineStatus) { @for (line of lineStatus.lines;
+    track line) {
+
+    <div
+      class="line"
+      [class.clickable]="!isOperationNormal(line.statusColor, line.statusCode)"
+      (click)="lineClick(line)"
+      (keypress)="lineClick(line)"
+      tabindex="0"
+    >
+      <div class="badge" [style.backgroundColor]="line.colorHex || '#000'">
+        {{ line.code }}
+      </div>
+      <div class="line-name">{{ formatLineName(line.colorName) }}</div>
+      <div class="status">{{ statusLabelFormat(line.statusLabel) }}</div>
+      <div [class]="getStatusColor(line.statusColor)"></div>
+    </div>
+    @if (expandedLine() === line.code.toString()) {
+    <div class="description">
+      <div class="description-title">
+        {{ line.code }} - {{ line.colorName }}
+      </div>
+      <p>{{ line.description }}</p>
+      @if (line.detail) {
+      <p>{{ line.detail }}</p>
+      }
+    </div>
+    } } @if ((lineStatus.specialLines?.length ?? 0) > 0) {
+    <h3>Serviços especiais</h3>
+    @for (line of lineStatus.specialLines ?? []; track line.code) {
+    <div
+      class="line clickable"
+      (click)="specialLineClick(line)"
+      (keypress)="specialLineClick(line)"
+      tabindex="0"
+    >
+      <div class="badge" [style.backgroundColor]="line.colorHex">
+        {{ line.code }}
+      </div>
+      <div class="line-name">{{ line.line }}</div>
+      <div class="status">{{ statusLabelFormat(line.statusLabel) }}</div>
+      <div [class]="getStatusColor(line.statusColor)"></div>
+    </div>
+    @if (expandedLine() === line.code) {
+    <div class="description">
+      <div class="description-title">{{ line.code }} - {{ line.line }}</div>
+    </div>
+    } } }
+    <div class="updated">
+      Atualizado às {{ lineStatus.lastUpdated | date: "HH:mm" }}
+    </div>
+    } @else {
+    <div class="skeleton-rows" aria-hidden="true">
+      @for (i of [].constructor(13); track $index) {
+      <div class="line-card skeleton">
+        <div class="badge placeholder"></div>
+        <div class="content">
+          <div class="line-name placeholder short"></div>
+          <div class="status placeholder"></div>
+        </div>
+      </div>
+      }
+    </div>
+    }
+  </div>
+</div>

@@ -1,0 +1,136 @@
+x-logging: &default-logging
+  driver: 'json-file'
+  options:
+    max-size: '500k'
+
+services:
+  frontend:
+    build:
+      context: ..
+      dockerfile: apps/metro-frontend/Dockerfile
+    networks:
+      - traefik
+      - default
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.scope=public'
+      - 'traefik.docker.network=traefik'
+      - 'traefik.http.routers.frontend.rule=Host(`metro.yudi.com.br`) && PathPrefix(`/app`)'
+      - 'traefik.http.routers.frontend.priority=5'
+      - 'traefik.http.services.frontend-svc.loadbalancer.server.port=4000'
+      - 'traefik.http.routers.frontend.entrypoints=web, websecure'
+      - 'traefik.http.routers.frontend.service=frontend-svc'
+      - 'traefik.http.routers.frontend.tls=true'
+      - 'traefik.http.routers.frontend.tls.certResolver=letsencrypt'
+      # Redirect root / to /app
+      - 'traefik.http.middlewares.frontend-redirect-root.redirectregex.regex=^/$'
+      - 'traefik.http.middlewares.frontend-redirect-root.redirectregex.replacement=/app'
+      - 'traefik.http.middlewares.frontend-redirect-root.redirectregex.permanent=true'
+      - 'traefik.http.routers.frontend-root.rule=Host(`metro.yudi.com.br`) && Path(`/`)'
+      - 'traefik.http.routers.frontend-root.priority=100'
+      - 'traefik.http.routers.frontend-root.entrypoints=web, websecure'
+      - 'traefik.http.routers.frontend-root.service=frontend-svc'
+      - 'traefik.http.routers.frontend-root.tls=true'
+      - 'traefik.http.routers.frontend-root.tls.certResolver=letsencrypt'
+
+    depends_on:
+      - backend
+    logging: *default-logging
+    restart: unless-stopped
+
+  frontend-lite:
+    build:
+      context: ..
+      dockerfile: apps/metro-frontend-lite/Dockerfile
+    networks:
+      - traefik
+      - default
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.scope=public'
+      - 'traefik.docker.network=traefik'
+      - 'traefik.http.routers.frontend-lite.rule=Host(`metro.yudi.com.br`) && PathPrefix(`/lite`)'
+      - 'traefik.http.routers.frontend-lite.priority=50'
+      - 'traefik.http.services.frontend-lite-svc.loadbalancer.server.port=4000'
+      - 'traefik.http.routers.frontend-lite.entrypoints=web, websecure'
+      - 'traefik.http.routers.frontend-lite.service=frontend-lite-svc'
+      - 'traefik.http.routers.frontend-lite.tls=true'
+      - 'traefik.http.routers.frontend-lite.tls.certResolver=letsencrypt'
+    #      - 'traefik.http.middlewares.frontend-lite-strip.stripprefix.prefixes=/lite'
+    #      - 'traefik.http.routers.frontend-lite.middlewares=frontend-lite-strip'
+    depends_on:
+      - backend
+    logging: *default-logging
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ..
+      dockerfile: apps/metro-backend/Dockerfile
+    volumes:
+      - /media/zfs-docker/yudi-metro/shared_import_data:/app/temp # Shared volume for COPY operations
+    networks:
+      - backend
+      - traefik
+      - default
+    env_file:
+      - .env
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.scope=public'
+      - 'traefik.docker.network=traefik'
+      - 'traefik.http.routers.backend.rule=Host(`metro.yudi.com.br`) && PathPrefix(`/api`)'
+      - 'traefik.http.routers.backend.priority=50'
+      - 'traefik.http.services.backend-svc.loadbalancer.server.port=3000'
+      - 'traefik.http.routers.backend.entrypoints=web, websecure'
+      - 'traefik.http.routers.backend.service=backend-svc'
+      - 'traefik.http.routers.backend.tls=true'
+      - 'traefik.http.routers.backend.tls.certResolver=letsencrypt'
+    depends_on:
+      db:
+        condition: service_healthy
+    logging: *default-logging
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    expose:
+      - 6379
+    volumes:
+      - /media/zfs-docker/yudi-metro/redis:/data
+    networks:
+      - backend
+    logging: *default-logging
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  db:
+    image: postgis/postgis:17-3.5
+    container_name: postgis_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U postgres -d postgres -h localhost || exit 1',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    volumes:
+      - /media/zfs-docker/yudi-metro/db:/var/lib/postgresql/data
+      - /media/zfs-docker/yudi-metro/shared_import_data:/tmp/shared_import # Named volume for production COPY operations
+    networks:
+      - backend
+    logging: *default-logging
+    restart: unless-stopped
+
+networks:
+  default:
+  backend:
+  traefik:
+    external: true

@@ -1,0 +1,45 @@
+<app-dialog-header
+  icon="directions_bus"
+  [title]="data.stop.name"
+  [description]="'Ponto de ônibus · ID: ' + data.stop.stopId"
+/>
+
+<mat-dialog-content class="stop-content">
+  @if (data.stop.description) {
+    <p class="stop-description">{{ data.stop.description }}</p>
+    <mat-divider></mat-divider>
+  }
+
+  <!-- Real-time arrivals -->
+  <div class="arrivals-section">
+    <app-stop-arrivals
+      [stop]="data.stop"
+      [routes]="routesSortedByFavorite()"
+      [selectedRoutes]="data.selectedRoutes"
+      [showMapActions]="showMapActions"
+      (selectRoute)="selectRouteById($event)"
+    ></app-stop-arrivals>
+  </div>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button
+    mat-icon-button
+    class="favorite-button"
+    [class.favorited]="isFavorite()"
+    (click)="toggleFavorite()"
+    (mouseenter)="setFavoriteHover(true)"
+    (mouseleave)="setFavoriteHover(false)"
+    [attr.aria-label]="
+      isFavorite() ? 'Remover dos favoritos' : 'Adicionar aos favoritos'
+    "
+  >
+    <mat-icon>{{ favoriteIcon() }}</mat-icon>
+  </button>
+  <button mat-button (click)="close()">Fechar</button>
+  @if (showMapActions) {
+    <button mat-raised-button color="primary" (click)="addToSelection()">
+      Adicionar à seleção
+    </button>
+  }
+</mat-dialog-actions>

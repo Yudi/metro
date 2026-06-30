@@ -10,14 +10,14 @@
       "options": {
         "command": "webpack-cli build",
         "args": [
-          "--node-env=production"
+          "--config-node-env=production"
         ],
         "cwd": "apps/metro-backend"
       },
       "configurations": {
         "development": {
           "args": [
-            "--node-env=development"
+            "--config-node-env=development"
           ]
         }
       }
@@ -60,13 +60,7 @@
       "continuous": true,
       "executor": "@nx/js:node",
       "defaultConfiguration": "development",
-      "dependsOn": [
-        {
-          "projects": ["metro-core-private"],
-          "target": "serve"
-        },
-        "build"
-      ],
+      "dependsOn": ["build"],
       "options": {
         "buildTarget": "metro-backend:build",
         "runBuildTargetDependencies": false
@@ -94,12 +88,6 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "bunx prisma generate --config=apps/metro-backend/prisma.config.ts"
-      }
-    },
-    "prisma-generate-private": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "bunx prisma generate --schema=private/metro-core-private/prisma/schema.prisma"
       }
     },
     "prisma-migrate": {

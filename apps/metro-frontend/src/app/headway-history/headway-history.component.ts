@@ -5,7 +5,6 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { HttpErrorResponse } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -18,12 +17,23 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { RailGraphqlService } from '@metro/shared/api';
 import {
   AGENCIES_DATA,
-  DEFAULT_TRANSIT_TIME_ZONE,
   HistoricalHeadwaySnapshot,
   getRailLineById,
 } from '@metro/shared/utils';
-
-type LoadState = 'idle' | 'loading' | 'loaded' | 'error';
+import {
+  HistoryLoadState,
+  daysAgo,
+  describeHistoryError,
+  formatDateInput,
+  formatTransitDateTime,
+  getHistoryTotalPages,
+  nextHistoryPage,
+  previousHistoryPage,
+  sliceHistoryPage,
+  uniqueHistoryOptions,
+} from '../shared/history-view.utils';
+import { HistoryPaginationComponent } from '../shared/history-pagination.component';
+import { HistoryDateRangeFieldsComponent } from '../shared/history-date-range-fields.component';
 
 interface HeadwayHistoryRow {
   snapshot: HistoricalHeadwaySnapshot;
@@ -44,6 +54,8 @@ interface HeadwayHistoryRow {
     MatProgressSpinnerModule,
     MatSelectModule,
     MatTooltipModule,
+    HistoryDateRangeFieldsComponent,
+    HistoryPaginationComponent,
   ],
   templateUrl: './headway-history.component.html',
   styleUrl: './headway-history.component.scss',
@@ -54,13 +66,13 @@ export class HeadwayHistoryComponent {
   private readonly pageSize = 30;
   private readonly historyFetchLimit = 500;
 
-  readonly startDate = signal(this.formatDateInput(this.daysAgo(7)));
-  readonly endDate = signal(this.formatDateInput(new Date()));
+  readonly startDate = signal(formatDateInput(daysAgo(7)));
+  readonly endDate = signal(formatDateInput(new Date()));
   readonly selectedAgency = signal('all');
   readonly selectedLine = signal('all');
   readonly selectedStation = signal('all');
   readonly selectedDirection = signal('all');
-  readonly loadState = signal<LoadState>('idle');
+  readonly loadState = signal<HistoryLoadState>('idle');
   readonly errorMessage = signal<string | null>(null);
   readonly snapshots = signal<HistoricalHeadwaySnapshot[]>([]);
   readonly currentPage = signal(1);
@@ -70,19 +82,19 @@ export class HeadwayHistoryComponent {
   );
 
   readonly agencies = computed(() =>
-    this.uniqueOptions(this.rows().map((row) => row.agencyName)),
+    uniqueHistoryOptions(this.rows().map((row) => row.agencyName)),
   );
 
   readonly lines = computed(() =>
-    this.uniqueOptions(this.rows().map((row) => row.lineName)),
+    uniqueHistoryOptions(this.rows().map((row) => row.lineName)),
   );
 
   readonly stations = computed(() =>
-    this.uniqueOptions(this.rows().map((row) => row.stationName)),
+    uniqueHistoryOptions(this.rows().map((row) => row.stationName)),
   );
 
   readonly directions = computed(() =>
-    this.uniqueOptions(this.rows().map((row) => row.snapshot.direction)),
+    uniqueHistoryOptions(this.rows().map((row) => row.snapshot.direction)),
   );
 
   readonly filteredRows = computed(() => {
@@ -106,15 +118,17 @@ export class HeadwayHistoryComponent {
   });
 
   readonly totalPages = computed(() =>
-    Math.max(1, Math.ceil(this.filteredRows().length / this.pageSize)),
+    getHistoryTotalPages(this.filteredRows().length, this.pageSize),
   );
 
-  readonly pagedRows = computed(() => {
-    const safePage = Math.min(this.currentPage(), this.totalPages());
-    const start = (safePage - 1) * this.pageSize;
-
-    return this.filteredRows().slice(start, start + this.pageSize);
-  });
+  readonly pagedRows = computed(() =>
+    sliceHistoryPage(
+      this.filteredRows(),
+      this.currentPage(),
+      this.totalPages(),
+      this.pageSize,
+    ),
+  );
 
   readonly summaryText = computed(() => {
     const returned = this.rows().length;
@@ -164,11 +178,11 @@ export class HeadwayHistoryComponent {
   }
 
   previousPage(): void {
-    this.currentPage.update((page) => Math.max(1, page - 1));
+    this.currentPage.update((page) => previousHistoryPage(page));
   }
 
   nextPage(): void {
-    this.currentPage.update((page) => Math.min(this.totalPages(), page + 1));
+    this.currentPage.update((page) => nextHistoryPage(page, this.totalPages()));
   }
 
   onStartDateChange(value: string): void {
@@ -200,20 +214,7 @@ export class HeadwayHistoryComponent {
   }
 
   formatDateTime(value: string): string {
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-      return value;
-    }
-
-    return new Intl.DateTimeFormat('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: DEFAULT_TRANSIT_TIME_ZONE,
-    }).format(date);
+    return formatTransitDateTime(value);
   }
 
   formatAverageSeconds(value: number | null | undefined): string {
@@ -277,26 +278,17 @@ export class HeadwayHistoryComponent {
     this.selectedDirection.set('all');
   }
 
-  private uniqueOptions(values: string[]): string[] {
-    return Array.from(new Set(values.filter(Boolean))).sort((a, b) =>
-      a.localeCompare(b, 'pt-BR'),
-    );
-  }
-
   private describeError(error: unknown): string {
-    if (!(error instanceof HttpErrorResponse)) {
-      return 'Não foi possível carregar o histórico por um erro inesperado na aplicação.';
-    }
-
-    if (error.status === 0) {
-      return 'Não foi possível conectar ao backend. O servidor pode estar desligado, reiniciando ou indisponível na rede.';
-    }
-
-    if (error.status >= 500) {
-      return 'O backend respondeu, mas não conseguiu consultar o histórico de intervalos agora. Tente novamente em alguns instantes.';
-    }
-
-    return `Não foi possível carregar o histórico de intervalos. O backend respondeu com HTTP ${error.status}.`;
+    return describeHistoryError(error, {
+      unexpected:
+        'Não foi possível carregar o histórico por um erro inesperado na aplicação.',
+      backendDown:
+        'Não foi possível conectar ao backend. O servidor pode estar desligado, reiniciando ou indisponível na rede.',
+      serverError:
+        'O backend respondeu, mas não conseguiu consultar o histórico de intervalos agora. Tente novamente em alguns instantes.',
+      fallback: (status) =>
+        `Não foi possível carregar o histórico de intervalos. O backend respondeu com HTTP ${status}.`,
+    });
   }
 
   private toIsoDateTime(value: string, edge: 'start' | 'end'): string {
@@ -308,19 +300,5 @@ export class HeadwayHistoryComponent {
 
   private transitOffset(): string {
     return '-03:00';
-  }
-
-  private daysAgo(days: number): Date {
-    const date = new Date();
-    date.setDate(date.getDate() - days);
-    return date;
-  }
-
-  private formatDateInput(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-
-    return `${year}-${month}-${day}`;
   }
 }

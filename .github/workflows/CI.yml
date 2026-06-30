@@ -25,13 +25,11 @@ jobs:
     timeout-minutes: 20
 
     steps:
-      - name: Checkout trusted source and private submodules
+      - name: Checkout trusted source
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          submodules: recursive
           persist-credentials: false
-          token: ${{ secrets.PRIVATE_SUBMODULE_TOKEN }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -40,9 +38,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Generate Prisma clients
-        run: |
-          bunx nx run metro-backend:prisma-generate
-          bunx nx run metro-core-private:prisma-generate
+        run: bunx nx run metro-backend:prisma-generate
 
       - name: Set Nx SHAs
         uses: nrwl/nx-set-shas@v5

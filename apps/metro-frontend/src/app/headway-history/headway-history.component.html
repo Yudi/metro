@@ -25,25 +25,12 @@
   </section>
 
   <section class="filter-panel" aria-label="Filtros do histórico de intervalos">
-    <mat-form-field appearance="outline">
-      <mat-label>Início</mat-label>
-      <input
-        matInput
-        type="date"
-        [ngModel]="startDate()"
-        (ngModelChange)="onStartDateChange($event)"
-      />
-    </mat-form-field>
-
-    <mat-form-field appearance="outline">
-      <mat-label>Fim</mat-label>
-      <input
-        matInput
-        type="date"
-        [ngModel]="endDate()"
-        (ngModelChange)="onEndDateChange($event)"
-      />
-    </mat-form-field>
+    <app-history-date-range-fields
+      [startDate]="startDate()"
+      [endDate]="endDate()"
+      (startDateChange)="onStartDateChange($event)"
+      (endDateChange)="onEndDateChange($event)"
+    />
 
     <mat-form-field appearance="outline">
       <mat-label>Empresa</mat-label>
@@ -114,12 +101,12 @@
     </div>
   </section>
 
-  @if (loadState() === 'loading') {
+  @if (loadState() === "loading") {
     <section class="state-panel">
       <mat-spinner diameter="32"></mat-spinner>
       <span>Carregando histórico de intervalos...</span>
     </section>
-  } @else if (loadState() === 'error') {
+  } @else if (loadState() === "error") {
     <section class="state-panel error-panel" role="alert">
       <mat-icon>cloud_off</mat-icon>
       <div>
@@ -168,7 +155,7 @@
                     {{ formatAverageSeconds(row.snapshot.averageSeconds) }}
                   </strong>
                   @let fallbackTooltip =
-                    'Fallback significa que não havia amostras suficientes no período atual, então usamos o período anterior mais próximo com dados para estimar o intervalo.';
+                    "Fallback significa que não havia amostras suficientes no período atual, então usamos o período anterior mais próximo com dados para estimar o intervalo.";
                   @if (row.snapshot.isFallback) {
                     <span
                       class="fallback-badge"
@@ -267,27 +254,13 @@
         </table>
       </div>
 
-      <nav class="pagination" aria-label="Paginação do histórico de intervalos">
-        <button
-          mat-stroked-button
-          type="button"
-          (click)="previousPage()"
-          [disabled]="currentPage() === 1"
-        >
-          <mat-icon>chevron_left</mat-icon>
-          Anterior
-        </button>
-        <span>Página {{ currentPage() }} de {{ totalPages() }}</span>
-        <button
-          mat-stroked-button
-          type="button"
-          (click)="nextPage()"
-          [disabled]="currentPage() === totalPages()"
-        >
-          Próxima
-          <mat-icon>chevron_right</mat-icon>
-        </button>
-      </nav>
+      <app-history-pagination
+        ariaLabel="Paginação do histórico de intervalos"
+        [currentPage]="currentPage()"
+        [totalPages]="totalPages()"
+        (previousPage)="previousPage()"
+        (nextPage)="nextPage()"
+      />
     }
   }
 </section>

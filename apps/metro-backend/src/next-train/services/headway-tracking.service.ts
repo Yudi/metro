@@ -50,6 +50,14 @@ interface CalculatedStationHeadway {
   }[];
 }
 
+interface SaoPauloDateParts {
+  year: number;
+  month: number;
+  day: number;
+  hours: number;
+  minutes: number;
+}
+
 /** Minimum time between two recorded passages for the same direction (ms) */
 const MIN_PASSAGE_INTERVAL = 60_000; // 1 minute
 
@@ -210,8 +218,8 @@ export class HeadwayTrackingService implements OnModuleDestroy {
       // must not depend on the arrival time remaining unchanged.
       for (const prevTrain of prevTrains) {
         if (this.wasAtPlatform(prevTrain)) {
-          const stillPresent = currTrains.some(
-            (ct) => this.isSamePlatformTrain(prevTrain, ct, lineCode),
+          const stillPresent = currTrains.some((ct) =>
+            this.isSamePlatformTrain(prevTrain, ct, lineCode),
           );
           if (!stillPresent) {
             await this.recordPassage(
@@ -249,10 +257,7 @@ export class HeadwayTrackingService implements OnModuleDestroy {
           // so exact string matching would cause false disappearances.
           const stillPresent = currTrains.some((ct) => {
             if (ct.destinationCode !== prevTrain.destinationCode) return false;
-            const ctMs = this.parseArrivalToMs(
-              ct.arrivalTime,
-              fetchedAt,
-            );
+            const ctMs = this.parseArrivalToMs(ct.arrivalTime, fetchedAt);
             if (ctMs === null) return false;
             return Math.abs(ctMs - arrivalMs) < 120_000;
           });
@@ -569,39 +574,81 @@ export class HeadwayTrackingService implements OnModuleDestroy {
       return new Date();
     }
 
-    const reference = new Date();
-    const saoPauloReference = new Date(
-      reference.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }),
-    );
-    const boundary = new Date(saoPauloReference);
+    const saoPauloReference = this.getSaoPauloDateParts(new Date());
     const endHours = Math.floor(bucket.endMinutes / 60);
     const endMinutes = bucket.endMinutes % 60;
+    let boundary: SaoPauloDateParts = {
+      ...saoPauloReference,
+      hours: endHours,
+      minutes: endMinutes,
+    };
 
     if (bucket.endMinutes === 24 * 60) {
-      boundary.setHours(0, 0, 0, 0);
-      boundary.setDate(boundary.getDate() + 1);
-    } else {
-      boundary.setHours(endHours, endMinutes, 0, 0);
+      boundary = {
+        ...saoPauloReference,
+        day: saoPauloReference.day + 1,
+        hours: 0,
+        minutes: 0,
+      };
     }
 
-    if (boundary.getTime() > saoPauloReference.getTime()) {
-      boundary.setDate(boundary.getDate() - 1);
+    if (
+      this.buildSaoPauloDate(boundary).getTime() >
+      this.buildSaoPauloDate(saoPauloReference).getTime()
+    ) {
+      boundary = {
+        ...boundary,
+        day: boundary.day - 1,
+      };
     }
 
     return this.buildSaoPauloDate(boundary);
   }
 
-  private buildSaoPauloDate(date: Date): Date {
-    const year = date.getFullYear();
-    const month = this.padDatePart(date.getMonth() + 1);
-    const day = this.padDatePart(date.getDate());
-    const hours = this.padDatePart(date.getHours());
-    const minutes = this.padDatePart(date.getMinutes());
-    return new Date(`${year}-${month}-${day}T${hours}:${minutes}:00-03:00`);
+  private getSaoPauloDateParts(date: Date): SaoPauloDateParts {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Sao_Paulo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(date);
+
+    const value = (type: Intl.DateTimeFormatPartTypes) =>
+      Number(parts.find((part) => part.type === type)?.value);
+
+    return {
+      year: value('year'),
+      month: value('month'),
+      day: value('day'),
+      hours: value('hour'),
+      minutes: value('minute'),
+    };
   }
 
-  private padDatePart(value: number): string {
-    return value.toString().padStart(2, '0');
+  private buildSaoPauloDate(date: Date | SaoPauloDateParts): Date {
+    const parts =
+      date instanceof Date
+        ? {
+            year: date.getFullYear(),
+            month: date.getMonth() + 1,
+            day: date.getDate(),
+            hours: date.getHours(),
+            minutes: date.getMinutes(),
+          }
+        : date;
+
+    return new Date(
+      Date.UTC(
+        parts.year,
+        parts.month - 1,
+        parts.day,
+        parts.hours + 3,
+        parts.minutes,
+      ),
+    );
   }
 
   /**
@@ -728,18 +775,24 @@ export class HeadwayTrackingService implements OnModuleDestroy {
     const hours = parseInt(match[1], 10);
     const minutes = parseInt(match[2], 10);
 
-    // Build today's date in São Paulo timezone
     const now = new Date(fetchedAt);
-    const spDate = new Date(
-      now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }),
-    );
-    spDate.setHours(hours, minutes, 0, 0);
+    const spParts = this.getSaoPauloDateParts(now);
+    const spDate = this.buildSaoPauloDate({
+      ...spParts,
+      hours,
+      minutes,
+    });
 
     // Handle midnight crossing: if the parsed time is more than 6 hours behind,
     // assume it's tomorrow
     const diff = spDate.getTime() - now.getTime();
     if (diff < -6 * 3600_000) {
-      spDate.setDate(spDate.getDate() + 1);
+      return this.buildSaoPauloDate({
+        ...spParts,
+        day: spParts.day + 1,
+        hours,
+        minutes,
+      }).getTime();
     }
 
     return spDate.getTime();

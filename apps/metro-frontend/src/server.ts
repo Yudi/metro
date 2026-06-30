@@ -42,18 +42,6 @@ app.use(
   }),
 );
 
-/**
- * Handle all other requests by rendering the Angular application.
- */
-app.use('/{*splat}', (req, res, next) => {
-  angularApp
-    .handle(req)
-    .then((response) =>
-      response ? writeResponseToNodeResponse(response, res) : next(),
-    )
-    .catch(next);
-});
-
 app.get('/app/sitemap.xml', (req, res) => {
   const root = xmlbuilder.create('sitemapindex', {
     version: '1.0',
@@ -92,6 +80,18 @@ app.get('/app/sitemap-main.xml', (req, res) => {
 
   res.type('application/xml; charset=utf-8');
   res.send(root.end({ pretty: true }));
+});
+
+/**
+ * Handle all other requests by rendering the Angular application.
+ */
+app.use('/{*splat}', (req, res, next) => {
+  angularApp
+    .handle(req)
+    .then((response) =>
+      response ? writeResponseToNodeResponse(response, res) : next(),
+    )
+    .catch(next);
 });
 
 /**

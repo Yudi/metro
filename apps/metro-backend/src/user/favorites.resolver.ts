@@ -3,7 +3,7 @@ import { UseGuards } from '@nestjs/common';
 import { AuthGuard } from '../shared/guards/auth.guard';
 import { CurrentUserId } from '../shared/decorators/current-user-id.decorator';
 import { PrismaService } from '../prisma/prisma.service';
-import { emptyFavorites } from '@metro/shared/utils';
+import { createEmptyFavorites } from '@metro/shared/utils';
 import {
   FavoriteList,
   FavoriteListInput,
@@ -26,7 +26,7 @@ export class FavoritesResolver {
       where: { userId },
     });
 
-    const favorites: FavoriteList = { ...emptyFavorites };
+    const favorites = createEmptyFavorites();
     existing.forEach((item) => {
       const list = favorites[item.type as FavoriteType];
       if (Array.isArray(list)) {
@@ -80,10 +80,9 @@ export class FavoritesResolver {
     favorites: FavoriteListInput,
     @CurrentUserId() userId: string,
   ): Promise<MutationResponse> {
-    const desired = (Object.entries(favorites) as [FavoriteType, string[]][])
-      .flatMap(([type, codes]) =>
-        codes.map((code) => ({ type, code })),
-      );
+    const desired = (
+      Object.entries(favorites) as [FavoriteType, string[]][]
+    ).flatMap(([type, codes]) => codes.map((code) => ({ type, code })));
 
     const existing = await this.prisma.favorite.findMany({
       where: { userId },

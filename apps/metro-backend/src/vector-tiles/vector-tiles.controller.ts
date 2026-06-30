@@ -13,7 +13,11 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
-import { VectorTilesService, VectorTileLayer } from './vector-tiles.service';
+import {
+  VectorTilesService,
+  VectorTileLayer,
+  VectorTileOptions,
+} from './vector-tiles.service';
 import { RailVectorTileService } from './services/rail-vector-tile.service';
 import { SubwayStationProcessorService } from './services/subway-station-processor.service';
 import { DevelopmentOnlyGuard } from '../shared/guards/development-only.guard';
@@ -78,21 +82,7 @@ export class VectorTilesController {
     @Param('y', ParseIntPipe) y: number,
     @Res() res: Response,
   ): Promise<void> {
-    this.validateTileCoordinates(z, x, y);
-
-    const tile = await this.vectorTilesService.getTile(
-      VectorTileLayer.RAIL_STATIONS,
-      z,
-      x,
-      y,
-    );
-
-    if (!tile || tile.length === 0) {
-      res.status(HttpStatus.NO_CONTENT).end();
-      return;
-    }
-
-    res.send(tile);
+    await this.sendVectorTile(res, VectorTileLayer.RAIL_STATIONS, z, x, y);
   }
 
   @Get('rail-routes/:z/:x/:y.pbf')
@@ -139,21 +129,7 @@ export class VectorTilesController {
     @Param('y', ParseIntPipe) y: number,
     @Res() res: Response,
   ): Promise<void> {
-    this.validateTileCoordinates(z, x, y);
-
-    const tile = await this.vectorTilesService.getTile(
-      VectorTileLayer.RAIL_ROUTES,
-      z,
-      x,
-      y,
-    );
-
-    if (!tile || tile.length === 0) {
-      res.status(HttpStatus.NO_CONTENT).end();
-      return;
-    }
-
-    res.send(tile);
+    await this.sendVectorTile(res, VectorTileLayer.RAIL_ROUTES, z, x, y);
   }
 
   @Get('bus-routes/:z/:x/:y.pbf')
@@ -173,22 +149,9 @@ export class VectorTilesController {
     @Query('routeIds') routeIds: string | undefined,
     @Res() res: Response,
   ): Promise<void> {
-    this.validateTileCoordinates(z, x, y);
-
-    const tile = await this.vectorTilesService.getTile(
-      VectorTileLayer.BUS_ROUTES,
-      z,
-      x,
-      y,
-      { routeIds: this.parseCsv(routeIds) },
-    );
-
-    if (!tile || tile.length === 0) {
-      res.status(HttpStatus.NO_CONTENT).end();
-      return;
-    }
-
-    res.send(tile);
+    await this.sendVectorTile(res, VectorTileLayer.BUS_ROUTES, z, x, y, {
+      routeIds: this.parseCsv(routeIds),
+    });
   }
 
   @Get('bus-stops/:z/:x/:y.pbf')
@@ -212,8 +175,6 @@ export class VectorTilesController {
     @Query('radiusMeters') radiusMeters: string | undefined,
     @Res() res: Response,
   ): Promise<void> {
-    this.validateTileCoordinates(z, x, y);
-
     const nearby =
       lat !== undefined && lon !== undefined && radiusMeters !== undefined
         ? {
@@ -223,24 +184,11 @@ export class VectorTilesController {
           }
         : undefined;
 
-    const tile = await this.vectorTilesService.getTile(
-      VectorTileLayer.BUS_STOPS,
-      z,
-      x,
-      y,
-      {
-        routeIds: this.parseCsv(routeIds),
-        stopIds: this.parseCsv(stopIds),
-        nearby,
-      },
-    );
-
-    if (!tile || tile.length === 0) {
-      res.status(HttpStatus.NO_CONTENT).end();
-      return;
-    }
-
-    res.send(tile);
+    await this.sendVectorTile(res, VectorTileLayer.BUS_STOPS, z, x, y, {
+      routeIds: this.parseCsv(routeIds),
+      stopIds: this.parseCsv(stopIds),
+      nearby,
+    });
   }
 
   @Get('bike-stations/:z/:x/:y.pbf')
@@ -259,21 +207,7 @@ export class VectorTilesController {
     @Param('y', ParseIntPipe) y: number,
     @Res() res: Response,
   ): Promise<void> {
-    this.validateTileCoordinates(z, x, y);
-
-    const tile = await this.vectorTilesService.getTile(
-      VectorTileLayer.BIKE_STATIONS,
-      z,
-      x,
-      y,
-    );
-
-    if (!tile || tile.length === 0) {
-      res.status(HttpStatus.NO_CONTENT).end();
-      return;
-    }
-
-    res.send(tile);
+    await this.sendVectorTile(res, VectorTileLayer.BIKE_STATIONS, z, x, y);
   }
 
   @Post('debug/refresh-merged-stations')
@@ -327,6 +261,26 @@ export class VectorTilesController {
         `Tile coordinates must be between 0 and ${maxCoordinate} for zoom ${z}`,
       );
     }
+  }
+
+  private async sendVectorTile(
+    res: Response,
+    layer: VectorTileLayer,
+    z: number,
+    x: number,
+    y: number,
+    options?: VectorTileOptions,
+  ): Promise<void> {
+    this.validateTileCoordinates(z, x, y);
+
+    const tile = await this.vectorTilesService.getTile(layer, z, x, y, options);
+
+    if (!tile || tile.length === 0) {
+      res.status(HttpStatus.NO_CONTENT).end();
+      return;
+    }
+
+    res.send(tile);
   }
 
   private parseCsv(value: string | undefined): string[] {

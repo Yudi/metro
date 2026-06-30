@@ -17,10 +17,14 @@ export type FavoriteList = {
   [K in FavoriteTypes]: string[];
 };
 
-export const emptyFavorites: FavoriteList = {
-  bikeStation: [],
-  railStation: [],
-  railLine: [],
-  busStop: [],
-  busRoute: [],
-};
+export function createEmptyFavorites(): FavoriteList {
+  return {
+    bikeStation: [],
+    railStation: [],
+    railLine: [],
+    busStop: [],
+    busRoute: [],
+  };
+}
+
+export const emptyFavorites: FavoriteList = createEmptyFavorites();

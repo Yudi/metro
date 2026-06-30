@@ -59,10 +59,7 @@ describe('HeadwayTrackingService', () => {
       recordPassage: jest.fn().mockResolvedValue(undefined),
       getPassages: jest.fn().mockResolvedValue(eveningPassages),
       calculateHeadwayForBucket: jest.fn(
-        (
-          _timestamps: number[],
-          targetBucket: HeadwayBucketId,
-        ) => ({
+        (_timestamps: number[], targetBucket: HeadwayBucketId) => ({
           averageSeconds: 300,
           sampleCount: 2,
           bucket: targetBucket,
@@ -142,6 +139,39 @@ describe('HeadwayTrackingService', () => {
     };
     const firstPollAt = new Date('2026-06-11T12:33:30-03:00').getTime();
     const secondPollAt = new Date('2026-06-11T12:34:30-03:00').getTime();
+
+    await service.processPollResult('L4', 'BUT', [train], firstPollAt);
+    await service.processPollResult('L4', 'BUT', [], secondPollAt);
+
+    const passageAt = new Date('2026-06-11T12:34:00-03:00');
+    expect(cache.recordPassage).toHaveBeenCalledWith(
+      'L4',
+      'BUT',
+      'Luz',
+      passageAt.getTime(),
+    );
+    expect(prisma.trainPassage.create).toHaveBeenCalledWith({
+      data: {
+        lineCode: 'L4',
+        stationCode: 'BUT',
+        direction: 'Luz',
+        passedAt: passageAt,
+        trainId: '12:34',
+      },
+    });
+  });
+
+  it('records L4 passages from São Paulo clock times when fetched in UTC', async () => {
+    const train = {
+      destinationCode: 'LUZ',
+      destinationName: 'Luz',
+      trainCurrentStationName: '',
+      arrivalTime: '12:34',
+      isAtPlatform: null,
+      isTrainStopped: null,
+    };
+    const firstPollAt = new Date('2026-06-11T15:33:30.000Z').getTime();
+    const secondPollAt = new Date('2026-06-11T15:34:30.000Z').getTime();
 
     await service.processPollResult('L4', 'BUT', [train], firstPollAt);
     await service.processPollResult('L4', 'BUT', [], secondPollAt);

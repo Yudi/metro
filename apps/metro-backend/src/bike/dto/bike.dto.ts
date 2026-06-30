@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, OmitType } from '@nestjs/swagger';
 import { Field, Float, Int, ObjectType } from '@nestjs/graphql';
 
 export class BikePricingPlanDto {
@@ -341,49 +341,18 @@ export class BikeStationsUpdatePayloadDto {
   removed?: string[];
 }
 
-export class BikeStationDetailsEventStationDto {
-  @ApiProperty({ description: 'Unique station identifier from the GBFS feed' })
-  stationId!: string;
-
-  @ApiProperty({ description: 'Station display name' })
-  name!: string;
-
-  @ApiProperty({ description: 'Station latitude in WGS84' })
-  latitude!: number;
-
-  @ApiProperty({ description: 'Station longitude in WGS84' })
-  longitude!: number;
-
+export class BikeStationDetailsEventStationDto extends OmitType(
+  BikeStationDto,
+  [
+    'address',
+    'lastReported',
+    'lastReportedIso',
+    'status',
+    'effectiveCapacity',
+  ] as const,
+) {
   @ApiProperty({ description: 'Station street address', nullable: true })
   address!: string | null;
-
-  @ApiProperty({
-    description: 'Total parking capacity of the station (docks)',
-    nullable: true,
-    type: Number,
-  })
-  capacity!: number | null;
-
-  @ApiProperty({ description: 'Available bikes ready to rent' })
-  numBikesAvailable!: number;
-
-  @ApiProperty({ description: 'Unavailable bikes (maintenance/disabled)' })
-  numBikesDisabled!: number;
-
-  @ApiProperty({ description: 'Available docks to return bikes' })
-  numDocksAvailable!: number;
-
-  @ApiProperty({ description: 'Unavailable docks (maintenance/disabled)' })
-  numDocksDisabled!: number;
-
-  @ApiProperty({ description: 'Is the station installed in the field' })
-  isInstalled!: boolean;
-
-  @ApiProperty({ description: 'Is the station currently renting bikes' })
-  isRenting!: boolean;
-
-  @ApiProperty({ description: 'Is the station accepting bike returns' })
-  isReturning!: boolean;
 
   @ApiProperty({
     description: 'Unix timestamp (seconds) when the station last reported',
@@ -397,22 +366,6 @@ export class BikeStationDetailsEventStationDto {
     nullable: true,
   })
   lastReportedIso!: string | null;
-
-  @ApiProperty({
-    description: 'Total number of electric-assist bikes currently available',
-  })
-  electricBikesAvailable!: number;
-
-  @ApiProperty({
-    description: 'Does the station currently have any electric-assist bikes',
-  })
-  hasElectricBikesAvailable!: boolean;
-
-  @ApiProperty({
-    description: 'Vehicle availability grouped by vehicle type',
-    type: [BikeVehicleAvailabilityDto],
-  })
-  vehicleAvailability!: BikeVehicleAvailabilityDto[];
 }
 
 export class BikeStationDetailsEventPayloadDto {

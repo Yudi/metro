@@ -18,7 +18,6 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { IncidentHistoryService } from '@metro/shared/api';
 import {
-  DEFAULT_TRANSIT_TIME_ZONE,
   getAgencyIconPath,
   getContrastColor,
   getRailLineByCode,
@@ -26,8 +25,20 @@ import {
   IncidentHistoryResponse,
   parseRailLineCode,
 } from '@metro/shared/utils';
-
-type LoadState = 'idle' | 'loading' | 'loaded' | 'error';
+import {
+  HistoryLoadState,
+  daysAgo,
+  describeHistoryError,
+  formatDateInput,
+  formatTransitDateTime,
+  getHistoryTotalPages,
+  nextHistoryPage,
+  previousHistoryPage,
+  sliceHistoryPage,
+  uniqueHistoryOptions,
+} from '../shared/history-view.utils';
+import { HistoryPaginationComponent } from '../shared/history-pagination.component';
+import { HistoryDateRangeFieldsComponent } from '../shared/history-date-range-fields.component';
 
 @Component({
   selector: 'app-incident-history',
@@ -43,6 +54,8 @@ type LoadState = 'idle' | 'loading' | 'loaded' | 'error';
     MatProgressSpinnerModule,
     MatSelectModule,
     MatTooltipModule,
+    HistoryDateRangeFieldsComponent,
+    HistoryPaginationComponent,
   ],
   templateUrl: './incident-history.component.html',
   styleUrl: './incident-history.component.scss',
@@ -52,13 +65,13 @@ export class IncidentHistoryComponent {
   private readonly incidentHistoryService = inject(IncidentHistoryService);
   private readonly pageSize = 30;
 
-  readonly startDate = signal(this.formatDateInput(this.daysAgo(30)));
-  readonly endDate = signal(this.formatDateInput(new Date()));
+  readonly startDate = signal(formatDateInput(daysAgo(30)));
+  readonly endDate = signal(formatDateInput(new Date()));
   readonly selectedAgency = signal('all');
   readonly selectedLine = signal('all');
   readonly selectedSituation = signal('all');
   readonly incidentsOnly = signal(false);
-  readonly loadState = signal<LoadState>('idle');
+  readonly loadState = signal<HistoryLoadState>('idle');
   readonly errorMessage = signal<string | null>(null);
   readonly response = signal<IncidentHistoryResponse | null>(null);
   readonly currentPage = signal(1);
@@ -66,17 +79,19 @@ export class IncidentHistoryComponent {
   readonly incidents = computed(() => this.response()?.ocorrencias ?? []);
 
   readonly agencies = computed(() =>
-    this.uniqueOptions(
+    uniqueHistoryOptions(
       this.incidents().map((incident) => incident.empresa.nome),
     ),
   );
 
   readonly lines = computed(() =>
-    this.uniqueOptions(this.incidents().map((incident) => incident.linha.nome)),
+    uniqueHistoryOptions(
+      this.incidents().map((incident) => incident.linha.nome),
+    ),
   );
 
   readonly situations = computed(() =>
-    this.uniqueOptions(this.incidents().map((incident) => incident.situacao)),
+    uniqueHistoryOptions(this.incidents().map((incident) => incident.situacao)),
   );
 
   readonly filteredIncidents = computed(() => {
@@ -98,15 +113,17 @@ export class IncidentHistoryComponent {
   });
 
   readonly totalPages = computed(() =>
-    Math.max(1, Math.ceil(this.filteredIncidents().length / this.pageSize)),
+    getHistoryTotalPages(this.filteredIncidents().length, this.pageSize),
   );
 
-  readonly pagedIncidents = computed(() => {
-    const safePage = Math.min(this.currentPage(), this.totalPages());
-    const start = (safePage - 1) * this.pageSize;
-
-    return this.filteredIncidents().slice(start, start + this.pageSize);
-  });
+  readonly pagedIncidents = computed(() =>
+    sliceHistoryPage(
+      this.filteredIncidents(),
+      this.currentPage(),
+      this.totalPages(),
+      this.pageSize,
+    ),
+  );
 
   readonly summaryText = computed(() => {
     const total = this.response()?.total ?? this.incidents().length;
@@ -155,11 +172,11 @@ export class IncidentHistoryComponent {
   }
 
   previousPage(): void {
-    this.currentPage.update((page) => Math.max(1, page - 1));
+    this.currentPage.update((page) => previousHistoryPage(page));
   }
 
   nextPage(): void {
-    this.currentPage.update((page) => Math.min(this.totalPages(), page + 1));
+    this.currentPage.update((page) => nextHistoryPage(page, this.totalPages()));
   }
 
   onStartDateChange(value: string): void {
@@ -219,23 +236,7 @@ export class IncidentHistoryComponent {
   }
 
   formatDateTime(value: string): string {
-    const normalizedValue = value.includes('Z')
-      ? value
-      : `${value.replace(/\.\d+$/, '')}-03:00`;
-    const date = new Date(normalizedValue);
-
-    if (Number.isNaN(date.getTime())) {
-      return value;
-    }
-
-    return new Intl.DateTimeFormat('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: DEFAULT_TRANSIT_TIME_ZONE,
-    }).format(date);
+    return formatTransitDateTime(value, { assumeTransitOffset: true });
   }
 
   private resetLocalFilters(): void {
@@ -254,33 +255,20 @@ export class IncidentHistoryComponent {
     return lineCode === undefined ? undefined : getRailLineByCode(lineCode);
   }
 
-  private uniqueOptions(values: string[]): string[] {
-    return Array.from(new Set(values.filter(Boolean))).sort((a, b) =>
-      a.localeCompare(b, 'pt-BR'),
-    );
-  }
-
   private describeError(error: unknown): string {
-    if (!(error instanceof HttpErrorResponse)) {
-      return 'Não foi possível carregar o histórico por um erro inesperado na aplicação.';
-    }
-
-    if (error.status === 0) {
-      return 'Não foi possível conectar ao backend. O servidor pode estar desligado, reiniciando ou indisponível na rede.';
-    }
-
-    if (error.status === 400) {
-      const backendMessage = this.extractBackendMessage(error);
-      return (
-        backendMessage || 'O backend recusou o intervalo de datas informado.'
-      );
-    }
-
-    if (error.status >= 500) {
-      return 'O backend respondeu, mas não conseguiu consultar o histórico armazenado agora. Tente novamente em alguns instantes.';
-    }
-
-    return `Não foi possível carregar o histórico. O backend respondeu com HTTP ${error.status}.`;
+    return describeHistoryError(error, {
+      unexpected:
+        'Não foi possível carregar o histórico por um erro inesperado na aplicação.',
+      backendDown:
+        'Não foi possível conectar ao backend. O servidor pode estar desligado, reiniciando ou indisponível na rede.',
+      badRequest: (httpError) =>
+        this.extractBackendMessage(httpError) ||
+        'O backend recusou o intervalo de datas informado.',
+      serverError:
+        'O backend respondeu, mas não conseguiu consultar o histórico armazenado agora. Tente novamente em alguns instantes.',
+      fallback: (status) =>
+        `Não foi possível carregar o histórico. O backend respondeu com HTTP ${status}.`,
+    });
   }
 
   private extractBackendMessage(error: HttpErrorResponse): string | null {
@@ -291,18 +279,5 @@ export class IncidentHistoryComponent {
     }
 
     return typeof message === 'string' ? message : null;
-  }
-
-  private daysAgo(days: number): Date {
-    const date = new Date();
-    date.setDate(date.getDate() - days);
-    return date;
-  }
-
-  private formatDateInput(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
   }
 }

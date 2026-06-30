@@ -8,7 +8,7 @@ import { from, map, switchMap, tap } from 'rxjs';
 import {
   FavoriteList,
   FavoriteTypes,
-  emptyFavorites,
+  createEmptyFavorites,
 } from '@metro/shared/utils';
 
 interface FavoriteRecord {
@@ -75,7 +75,7 @@ export class FavoritesService {
   private dashboardSelectionsSubscription?: { unsubscribe(): void };
   private syncInFlight = false;
 
-  private readonly _favorites = signal<FavoriteList>({ ...emptyFavorites });
+  private readonly _favorites = signal<FavoriteList>(createEmptyFavorites());
   readonly favorites: Signal<FavoriteList> = this._favorites.asReadonly();
   private readonly _dashboardSelections = signal<DashboardFavoriteSelections>(
     this.createEmptyDashboardSelections(),
@@ -176,7 +176,8 @@ export class FavoritesService {
   }
 
   toggleDashboardRailStationLine(stationKey: string, lineId: string): void {
-    const current = this._dashboardSelections().railStationLines[stationKey] ?? [];
+    const current =
+      this._dashboardSelections().railStationLines[stationKey] ?? [];
     this.setDashboardRailStationLines(
       stationKey,
       this.toggleSelectionValue(current, lineId),
@@ -267,9 +268,7 @@ export class FavoritesService {
     this.dashboardSelectionsSubscription = liveQuery(() =>
       db.dashboardSelections.toArray(),
     ).subscribe((records) => {
-      this._dashboardSelections.set(
-        this.recordsToDashboardSelections(records),
-      );
+      this._dashboardSelections.set(this.recordsToDashboardSelections(records));
     });
   }
 
@@ -505,13 +504,7 @@ export class FavoritesService {
   }
 
   private createEmptyFavorites(): FavoriteList {
-    return {
-      bikeStation: [],
-      railStation: [],
-      railLine: [],
-      busStop: [],
-      busRoute: [],
-    };
+    return createEmptyFavorites();
   }
 
   private createEmptyDashboardSelections(): DashboardFavoriteSelections {

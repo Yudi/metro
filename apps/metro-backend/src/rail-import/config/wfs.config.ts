@@ -12,6 +12,7 @@ export class WFSConfig {
   static readonly WFS_VERSION = '1.0.0';
   static readonly OUTPUT_FORMAT = 'application/json';
   static readonly DAILY_IMPORT_CRON = '0 0 4 * * *';
+  static readonly IMPORT_LOCK_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 hours
 
   static readonly SOURCES = {
     METRO_LINE: {

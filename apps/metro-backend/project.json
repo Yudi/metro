@@ -87,7 +87,7 @@
     "prisma-generate": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "bunx prisma generate --config=apps/metro-backend/prisma.config.ts"
+        "command": "DATABASE_URL=\"postgresql://user:password@localhost:5432/db?schema=public\" bunx prisma generate --config=apps/metro-backend/prisma.config.ts"
       }
     },
     "prisma-migrate": {

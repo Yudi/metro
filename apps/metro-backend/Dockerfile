@@ -2,9 +2,10 @@
 
 FROM rust:alpine AS rust-builder
 WORKDIR /workspace/dataset-handling
-COPY dataset-handling/Cargo.toml dataset-handling/Cargo.lock ./
+COPY dataset-handling/Cargo.toml ./
 RUN mkdir src \
     && printf 'fn main() {}' > src/main.rs \
+    && cargo generate-lockfile \
     && cargo build --release --locked \
     && rm -rf src
 COPY dataset-handling/src ./src

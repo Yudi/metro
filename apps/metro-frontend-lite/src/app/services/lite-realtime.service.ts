@@ -37,7 +37,7 @@ export interface LiteStopArrivalUpdate {
     py: number;
     px: number;
     l: LiteArrivalLine[];
-  };
+  } | null;
   cacheTimestamp: number;
 }
 

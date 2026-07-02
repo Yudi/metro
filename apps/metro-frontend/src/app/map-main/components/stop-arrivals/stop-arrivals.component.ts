@@ -64,7 +64,7 @@ export class StopArrivalsComponent {
   expandedArrivalLines = signal<Set<string>>(new Set());
 
   readonly arrivalLines = computed(() => {
-    const lines = this.arrivals()?.p.l ?? [];
+    const lines = this.arrivals()?.p?.l ?? [];
     const selectedRouteKeys = [
       ...this.selectedRouteKeys(),
       ...(this.selectedRouteKey() ? [this.selectedRouteKey() as string] : []),

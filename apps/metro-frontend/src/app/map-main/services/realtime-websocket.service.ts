@@ -39,7 +39,7 @@ export interface StopArrivalUpdate {
     py: number; // Latitude
     px: number; // Longitude
     l: LineWithVehicles[]; // Lines with arrivals
-  };
+  } | null;
   cacheTimestamp: number;
 }
 

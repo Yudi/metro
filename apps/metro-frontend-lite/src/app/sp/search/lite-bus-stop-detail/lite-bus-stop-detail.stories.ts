@@ -143,9 +143,21 @@ export const NoArrivals: Story = {
     arrivals: {
       ...arrivals,
       p: {
-        ...arrivals.p,
+        cp: 701441,
+        np: stop.name,
+        py: stop.latitude,
+        px: stop.longitude,
         l: [],
       },
+    },
+  },
+};
+
+export const NoPredictionPayload: Story = {
+  args: {
+    arrivals: {
+      ...arrivals,
+      p: null,
     },
   },
 };

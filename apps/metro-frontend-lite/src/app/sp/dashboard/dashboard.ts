@@ -338,7 +338,7 @@ export class Dashboard implements OnInit {
   }
 
   getBusArrivalLines(stopId: string): LiteArrivalLine[] {
-    return this.busArrivalsByStopId().get(stopId)?.p.l ?? [];
+    return this.busArrivalsByStopId().get(stopId)?.p?.l ?? [];
   }
 
   getMinutesUntilArrival(arrivalTime: string): string {

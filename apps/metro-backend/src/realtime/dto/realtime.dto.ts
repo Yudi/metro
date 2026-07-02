@@ -155,8 +155,8 @@ export class StopArrivalResponse {
   @ApiProperty({ description: 'Reference time' })
   hr!: string;
 
-  @ApiProperty({ description: 'Stop with predictions' })
-  p!: StopWithPredictions;
+  @ApiProperty({ description: 'Stop with predictions', nullable: true })
+  p!: StopWithPredictions | null;
 }
 
 /**

@@ -36,8 +36,9 @@ export class LiteBusStopDetail {
   readonly expandedRoutes = signal<Set<string>>(new Set());
 
   readonly routes = computed(() => this.stop().routes ?? []);
+  readonly arrivalLines = computed(() => this.arrivals()?.p?.l ?? []);
   readonly hasArrivals = computed(
-    () => (this.arrivals()?.p?.l?.length ?? 0) > 0,
+    () => this.arrivalLines().length > 0,
   );
   readonly connectionMap = computed(() => {
     const map = new Map<string, LiteRouteRailConnection>();

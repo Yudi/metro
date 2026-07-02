@@ -12,8 +12,8 @@ import { WsThrottlerGuard } from '../../common/guards/ws-throttler.guard';
 import { Server, Socket } from 'socket.io';
 import { RealtimePollingService } from '../services/realtime-polling.service';
 import { RouteStopMappingService } from '../services/route-stop-mapping.service';
-import {
-  RealtimeMessageType,
+import { RealtimeMessageType } from '../dto/realtime.dto';
+import type {
   SubscriptionRequest,
   PositionResponse,
   StopArrivalResponse,

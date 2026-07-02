@@ -25,7 +25,7 @@ import {
 import { SearchFiltersInput } from '../dto/search.input';
 import { DevelopmentOnlyGuard } from '../../shared/guards/development-only.guard';
 import { DevOnly } from '../../shared/decorators/development-only.decorator';
-import { GraphQLLoaders } from '../../shared/graphql/loaders.service';
+import type { GraphQLLoaders } from '../../shared/graphql/loaders.service';
 import { Loaders } from '../../shared/graphql/loaders.decorator';
 import {
   RAIL_LINES,

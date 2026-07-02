@@ -13,9 +13,9 @@ import {
 import {
   SearchTypes,
   SearchTypesEnum,
-  StopsAndStations,
   StopsAndStationsValues,
 } from '@metro/shared/utils';
+import type { StopsAndStations } from '@metro/shared/utils';
 
 import { registerEnumType } from '@nestjs/graphql';
 

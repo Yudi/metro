@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
+import type {
   ExtendedNextTrainLineCode,
   DirectionHeadway,
   TrainCarOccupancy,

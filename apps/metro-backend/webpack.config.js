@@ -1,9 +1,12 @@
 const { NxAppWebpackPlugin } = require('@nx/webpack/app-plugin');
 const { join } = require('path');
 
+const workspaceRoot = join(__dirname, '../..');
+
 module.exports = {
+  context: workspaceRoot,
   output: {
-    path: join(__dirname, '../../dist/apps/metro-backend'),
+    path: join(workspaceRoot, 'dist/apps/metro-backend'),
     ...(process.env.NODE_ENV !== 'production' && {
       devtoolModuleFilenameTemplate: '[absolute-resource-path]',
     }),
@@ -11,10 +14,10 @@ module.exports = {
   plugins: [
     new NxAppWebpackPlugin({
       target: 'node',
-      compiler: 'tsc',
-      main: './src/main.ts',
-      tsConfig: './tsconfig.app.json',
-      assets: ['./src/assets'],
+      compiler: 'babel',
+      main: 'apps/metro-backend/src/main.ts',
+      tsConfig: 'apps/metro-backend/tsconfig.app.json',
+      assets: ['apps/metro-backend/src/assets'],
       optimization: false,
       outputHashing: 'none',
       generatePackageJson: true,

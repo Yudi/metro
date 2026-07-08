@@ -43,7 +43,7 @@ jobs:
       - name: Set Nx SHAs
         uses: nrwl/nx-set-shas@v5
         with:
-          main-branch-name: monorepo-dev
+          main-branch-name: main
 
       - name: Lint affected projects
         run: bunx nx affected -t lint --parallel=3

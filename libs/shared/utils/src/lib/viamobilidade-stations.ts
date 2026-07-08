@@ -5,7 +5,7 @@ import {
 
 /**
  * Station data for lines with real-time next train information.
- * - L4 (Amarela): ViaQuatro/CCR
+ * - L4 (Amarela): Motiva
  * - L8 (Diamante): ViaMobilidade
  * - L9 (Esmeralda): ViaMobilidade
  */
@@ -23,7 +23,7 @@ export interface NextTrainStation {
 /**
  * Line 4 - Amarela stations (Luz → Vila Sônia)
  * Order: Terminal 1 (LUZ) to Terminal 2 (VSO)
- * Operated by ViaQuatro/CCR
+ * Operated by Motiva
  */
 export const L4_STATIONS: NextTrainStation[] = [
   { code: 'LUZ', name: 'Luz' },
@@ -103,7 +103,7 @@ export const L9_STATIONS: NextTrainStation[] = [
 ];
 
 /**
- * Line code type for ViaMobilidade/ViaQuatro lines with next-train data
+ * Line code type for lines with next-train data
  */
 export type NextTrainLineCode = 'L4' | 'L8' | 'L9';
 

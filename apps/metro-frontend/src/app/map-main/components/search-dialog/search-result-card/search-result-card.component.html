@@ -8,7 +8,7 @@
         <h4 class="result-title">{{ result().name }}</h4>
         <p class="result-type">{{ formatResultType() }}</p>
       </div>
-      @if (result().isViaMobilidade) {
+      @if (result().liveTrainTrackingApiIds?.length) {
         <mat-chip class="realtime-chip">
           <mat-icon>schedule</mat-icon>
           Tempo real

@@ -2,7 +2,10 @@ import {
   BusRouteGraphQL,
   BusShapeGraphQL,
 } from '../../services/geography-graphql.service';
-import type { SpecialRailService } from '@metro/shared/utils';
+import type {
+  LiveTrainTrackingApiId,
+  SpecialRailService,
+} from '@metro/shared/utils';
 
 export interface BusShapeWithRoute extends BusShapeGraphQL {
   routeInfo?: BusRouteGraphQL;
@@ -57,8 +60,8 @@ export interface SearchResult {
     route_type: number;
     source?: 'gtfs' | 'rail'; // Data source: GTFS (bus) or rail (from RAIL_LINES)
   };
-  /** Whether this station supports L8/L9 real-time data */
-  isViaMobilidade?: boolean;
+  /** Private API IDs that can serve real-time train data for this station */
+  liveTrainTrackingApiIds?: LiveTrainTrackingApiId[];
   /** Line codes for subway stations */
   lineCodes?: number[];
   /** Data source: gtfs (bus), rail (rail lines), gpkg (rail stations), or bike */

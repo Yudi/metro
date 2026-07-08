@@ -45,6 +45,7 @@ import {
   hardNormalizeString,
   SpecialRailService,
   extractLineCodesFromRouteNames,
+  getLiveTrainTrackingApiIds,
   mapTypesenseStopToTransitSearchResult,
 } from '@metro/shared/utils';
 import { GeographyGraphQLService } from '../../services/geography-graphql.service';
@@ -296,7 +297,7 @@ export class SearchDialogComponent implements AfterViewInit {
       routes: result.routes,
       lineCodes: result.lineCodes,
       source: result.source,
-      isViaMobilidade: result.isViaMobilidade,
+      liveTrainTrackingApiIds: result.liveTrainTrackingApiIds,
     });
     this.dialogRef.close(result);
   }
@@ -462,11 +463,16 @@ export class SearchDialogComponent implements AfterViewInit {
                 result.type === 'subway_station'
                   ? extractLineCodesFromRouteNames(routes)
                   : undefined;
-              // isViaMobilidade is true only for L8/L9 stations
-              const isViaMobilidade =
-                lineCodes !== undefined &&
-                (lineCodes.includes(8) || lineCodes.includes(9));
-              return { ...result, routes, lineCodes, isViaMobilidade };
+              const liveTrainTrackingApiIds =
+                lineCodes !== undefined
+                  ? getLiveTrainTrackingApiIds(lineCodes)
+                  : [];
+              return {
+                ...result,
+                routes,
+                lineCodes,
+                liveTrainTrackingApiIds,
+              };
             }
             return result;
           });

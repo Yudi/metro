@@ -18,17 +18,13 @@ export function getAgencyLogoForRoute(routeName: string): string {
     return '/app/shared/agencies/metro.svg';
   }
 
-  // ViaQuatro (Line 4)
-  if (normalizedRoute === 'L4') {
-    return '/app/shared/agencies/viaquatro.svg';
+  // Motiva (Lines 4 and 5)
+  if (normalizedRoute === 'L4' || normalizedRoute === 'L5') {
+    return '/app/shared/agencies/motiva.svg';
   }
 
-  // ViaMobilidade (Line 5 and CPTM 8, 9)
-  if (
-    normalizedRoute === 'L5' ||
-    normalizedRoute === 'L8' ||
-    normalizedRoute === 'L9'
-  ) {
+  // ViaMobilidade (Lines 8 and 9)
+  if (normalizedRoute === 'L8' || normalizedRoute === 'L9') {
     return '/app/shared/agencies/viamobilidade.svg';
   }
 

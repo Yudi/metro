@@ -1,6 +1,15 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { getRailLineByCode, getRailLinesByAgency } from './rail-line.utils';
+import {
+  getRailLineByCode,
+  getRailLinesByAgency,
+  LINE_AGENCY_MAPPING,
+} from './rail-line.utils';
+import { getAgencyLogoForRoute } from './agency-logo.utils';
+import {
+  getLiveTrainTrackingApiIds,
+  hasLiveTrainTrackingLine,
+} from './search.utils';
 import { getRouteAgency, TransitAgency } from './transit-agency.utils';
 
 describe('Linha 17 agency', () => {
@@ -15,5 +24,37 @@ describe('Linha 17 agency', () => {
         (line) => line.code === 17,
       ),
     ).toBe(false);
+  });
+});
+
+describe('Motiva agency', () => {
+  it('registers Linha 4 and Linha 5 as operated by Motiva', () => {
+    expect(getRailLineByCode(4)?.agency).toBe(TransitAgency.MOTIVA);
+    expect(getRailLineByCode(5)?.agency).toBe(TransitAgency.MOTIVA);
+    expect(getRouteAgency('L4')).toBe(TransitAgency.MOTIVA);
+    expect(getRouteAgency('L5')).toBe(TransitAgency.MOTIVA);
+    expect(LINE_AGENCY_MAPPING[4]).toBe(TransitAgency.MOTIVA);
+    expect(LINE_AGENCY_MAPPING[5]).toBe(TransitAgency.MOTIVA);
+    expect(getAgencyLogoForRoute('L4')).toBe('/app/shared/agencies/motiva.svg');
+    expect(getAgencyLogoForRoute('L5')).toBe('/app/shared/agencies/motiva.svg');
+  });
+
+  it('does not treat Linha 5 as a live train tracking line', () => {
+    expect(hasLiveTrainTrackingLine([4])).toBe(true);
+    expect(hasLiveTrainTrackingLine([5])).toBe(false);
+    expect(hasLiveTrainTrackingLine([8])).toBe(true);
+    expect(hasLiveTrainTrackingLine([9])).toBe(true);
+  });
+
+  it('keeps live train tracking APIs separate from line operators', () => {
+    expect(getLiveTrainTrackingApiIds([4])).toEqual(['api3', 'api1']);
+    expect(getLiveTrainTrackingApiIds([5])).toEqual([]);
+    expect(getLiveTrainTrackingApiIds([8, 9])).toEqual(['api2']);
+    expect(getLiveTrainTrackingApiIds([10, 11, 12, 13])).toEqual(['api1']);
+    expect(getLiveTrainTrackingApiIds([4, 5, 8, 10])).toEqual([
+      'api3',
+      'api2',
+      'api1',
+    ]);
   });
 });

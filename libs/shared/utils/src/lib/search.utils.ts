@@ -40,6 +40,7 @@ export type TransitSearchStopType =
   | 'subway_station'
   | 'bike_station';
 export type TransitSearchStopSource = 'gtfs' | 'gpkg' | 'bike';
+export type LiveTrainTrackingApiId = 'api1' | 'api2' | 'api3';
 
 export interface TypesenseTransitStopLike {
   stop_id: string;
@@ -61,7 +62,7 @@ export interface TransitSearchStopResult {
   longitude: number;
   source: TransitSearchStopSource;
   lineCodes?: number[];
-  isViaMobilidade: boolean;
+  liveTrainTrackingApiIds: LiveTrainTrackingApiId[];
 }
 
 export interface MapTransitStopOptions {
@@ -106,8 +107,45 @@ export function extractLineCodesFromRouteNames(routes: string[]): number[] {
   return [...lineCodes].sort((a, b) => a - b);
 }
 
-export function hasViaMobilidadeLine(lineCodes: number[]): boolean {
-  return lineCodes.includes(8) || lineCodes.includes(9);
+const LIVE_TRAIN_TRACKING_API_ORDER: LiveTrainTrackingApiId[] = [
+  'api3',
+  'api2',
+  'api1',
+];
+
+const LIVE_TRAIN_TRACKING_APIS_BY_LINE_CODE: Partial<
+  Record<number, LiveTrainTrackingApiId[]>
+> = {
+  4: ['api3', 'api1'],
+  8: ['api2'],
+  9: ['api2'],
+  10: ['api1'],
+  11: ['api1'],
+  12: ['api1'],
+  13: ['api1'],
+};
+
+export function getLiveTrainTrackingApiIds(
+  lineCodes: number[],
+): LiveTrainTrackingApiId[] {
+  const apiIds = new Set<LiveTrainTrackingApiId>();
+
+  for (const lineCode of lineCodes) {
+    const lineApiIds = LIVE_TRAIN_TRACKING_APIS_BY_LINE_CODE[lineCode] ?? [];
+    for (const apiId of lineApiIds) {
+      apiIds.add(apiId);
+    }
+  }
+
+  return [...apiIds].sort(
+    (a, b) =>
+      LIVE_TRAIN_TRACKING_API_ORDER.indexOf(a) -
+      LIVE_TRAIN_TRACKING_API_ORDER.indexOf(b),
+  );
+}
+
+export function hasLiveTrainTrackingLine(lineCodes: number[]): boolean {
+  return getLiveTrainTrackingApiIds(lineCodes).length > 0;
 }
 
 export function mapTypesenseStopToTransitSearchResult(
@@ -128,7 +166,7 @@ export function mapTypesenseStopToTransitSearchResult(
       longitude: stop.stop_lon,
       source,
       lineCodes: [],
-      isViaMobilidade: false,
+      liveTrainTrackingApiIds: [],
     };
   }
 
@@ -153,7 +191,7 @@ export function mapTypesenseStopToTransitSearchResult(
       longitude: stop.stop_lon,
       source: 'gpkg',
       lineCodes,
-      isViaMobilidade: hasViaMobilidadeLine(lineCodes),
+      liveTrainTrackingApiIds: getLiveTrainTrackingApiIds(lineCodes),
     };
   }
 
@@ -176,6 +214,6 @@ export function mapTypesenseStopToTransitSearchResult(
     longitude: stop.stop_lon,
     source: 'gtfs',
     lineCodes,
-    isViaMobilidade: hasViaMobilidadeLine(lineCodes),
+    liveTrainTrackingApiIds: getLiveTrainTrackingApiIds(lineCodes),
   };
 }

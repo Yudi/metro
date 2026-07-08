@@ -99,7 +99,7 @@ export interface CptmVehicleUpdate {
 
 /**
  * Service for real-time next train data via WebSocket
- * Supports L4 (ViaQuatro), L8/L9 (ViaMobilidade), and L10-L13 (CPTM) lines
+ * Supports L4 (Motiva), L8/L9 (ViaMobilidade), and L10-L13 (CPTM) lines
  */
 @Injectable({
   providedIn: 'root',

@@ -11,7 +11,11 @@ import { MatChipsModule } from '@angular/material/chips';
 import { MatIconModule } from '@angular/material/icon';
 
 import { TypesenseRoute } from '../../../../services/typesense-search.service';
-import { getLineColors, SpecialRailService } from '@metro/shared/utils';
+import {
+  getLineColors,
+  LiveTrainTrackingApiId,
+  SpecialRailService,
+} from '@metro/shared/utils';
 
 /** Search result type */
 export type SearchResultType =
@@ -32,8 +36,8 @@ export interface SearchResult {
   longitude?: number;
   /** Original route data for route results */
   routeData?: TypesenseRoute;
-  /** Whether this station supports L8/L9 real-time data */
-  isViaMobilidade?: boolean;
+  /** Private API IDs that can serve real-time train data for this station */
+  liveTrainTrackingApiIds?: LiveTrainTrackingApiId[];
   /** Line codes for subway stations */
   lineCodes?: number[];
   /** Data source: gtfs (bus), rail (rail lines), gpkg (rail stations), or bike */
@@ -87,7 +91,7 @@ export class SearchResultCardComponent {
     const result = this.result();
     switch (result.type) {
       case 'subway_station':
-        if (result.isViaMobilidade) {
+        if (result.liveTrainTrackingApiIds?.length) {
           return 'Estação de metrô/trem · Próximo trem disponível';
         }
         return 'Estação de metrô/trem';

@@ -32,6 +32,7 @@ import {
 import { GeolocationService } from '@metro/shared/geolocation';
 import { LoggerService } from '@metro/shared/api';
 import {
+  LiveTrainTrackingApiId,
   mapTypesenseStopToTransitSearchResult,
   SAO_PAULO_CITY_CENTER,
 } from '@metro/shared/utils';
@@ -47,7 +48,7 @@ export interface SearchResultItem {
   score?: number;
   routes?: string[];
   lineCodes?: number[];
-  isViaMobilidade?: boolean;
+  liveTrainTrackingApiIds?: LiveTrainTrackingApiId[];
   source?: 'gtfs' | 'rail' | 'gpkg' | 'bike';
 }
 
@@ -331,7 +332,7 @@ export class SearchComponent {
       score,
       routes: result.routes,
       lineCodes: result.lineCodes,
-      isViaMobilidade: result.isViaMobilidade,
+      liveTrainTrackingApiIds: result.liveTrainTrackingApiIds,
       source: result.source,
     };
   }

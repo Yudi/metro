@@ -114,7 +114,7 @@ export const L3_NORMAL: RailLineStatus = {
   description: null,
 };
 
-// L4 - Amarela (ViaQuatro)
+// L4 - Amarela (Motiva)
 export const L4_NORMAL: RailLineStatus = {
   code: 4,
   colorName: 'Amarela',
@@ -137,7 +137,7 @@ export const L4_PARTIAL: RailLineStatus = {
   description: 'Circulação interrompida entre Luz e Paulista.',
 };
 
-// L5 - Lilás (ViaMobilidade)
+// L5 - Lilás (Motiva)
 export const L5_NORMAL: RailLineStatus = {
   code: 5,
   colorName: 'Lilás',

@@ -3,6 +3,7 @@
  */
 export enum TransitAgency {
   METRO = 'metro',
+  MOTIVA = 'motiva',
   VIAQUATRO = 'viaquatro',
   VIAMOBILIDADE = 'viamobilidade',
   TICTRENS = 'tictrens',
@@ -57,6 +58,35 @@ export const AGENCIES_DATA: AgenciesData = {
       site: 'https://www.metro.sp.gov.br/',
       additionalInformation:
         'Para registrar ocorrências de baixa urgência, contate a Central de Informações ou use o aplicativo Metrô Conecta.',
+    },
+  },
+  [TransitAgency.MOTIVA]: {
+    name: 'Motiva',
+    shortName: 'Motiva',
+    type: 'rail',
+    contact: {
+      phones: [
+        {
+          number: '+5511912776323',
+          title: 'Atendimento por WhatsApp',
+          description: 'Seg a Sex das 6h30 às 22h\nSáb e Dom das 8h às 18h',
+          whatsapp: true,
+          sms: false,
+        },
+        {
+          number: '08007707100',
+          title: 'Central de Atendimento - Linha 4',
+          whatsapp: false,
+          sms: false,
+        },
+        {
+          number: '08007707106',
+          title: 'Central de Atendimento - Linha 5',
+          whatsapp: false,
+          sms: false,
+        },
+      ],
+      site: 'https://trilhos.motiva.com.br/',
     },
   },
   [TransitAgency.VIAQUATRO]: {
@@ -208,11 +238,11 @@ const ROUTE_AGENCY_MAP: Record<string, TransitAgency> = {
   L17: TransitAgency.METRO,
   '15': TransitAgency.METRO,
 
-  // ViaQuatro (viaquatro.svg)
-  L4: TransitAgency.VIAQUATRO,
+  // Motiva (motiva.svg)
+  L4: TransitAgency.MOTIVA,
+  L5: TransitAgency.MOTIVA,
 
   // ViaMobilidade (viamobilidade.svg)
-  L5: TransitAgency.VIAMOBILIDADE,
   L8: TransitAgency.VIAMOBILIDADE,
   L9: TransitAgency.VIAMOBILIDADE,
 

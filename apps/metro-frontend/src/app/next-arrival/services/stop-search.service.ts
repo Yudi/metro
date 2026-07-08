@@ -23,6 +23,7 @@ import {
   SearchTypes,
   getCanonicalRailStationName,
   extractLineCodesFromRouteNames,
+  getLiveTrainTrackingApiIds,
   mapTypesenseStopToTransitSearchResult,
 } from '@metro/shared/utils';
 import {
@@ -43,7 +44,7 @@ export interface StopSearchResult extends SearchResult {
 
 /**
  * Service for searching stops only (no routes)
- * Prioritizes L8/L9 stations, then other subway stations, then bus stops
+ * Prioritizes live-tracked stations, then other subway stations, then bus stops
  */
 @Injectable()
 export class StopSearchService {
@@ -227,7 +228,7 @@ export class StopSearchService {
         description: stop.stop_desc || undefined,
         latitude: stop.stop_lat,
         longitude: stop.stop_lon,
-        isViaMobilidade: false,
+        liveTrainTrackingApiIds: [],
         lineCodes: [],
         routes,
         source: 'gtfs',
@@ -248,7 +249,7 @@ export class StopSearchService {
         type: 'subway_station',
         latitude: station.latitude || 0,
         longitude: station.longitude || 0,
-        isViaMobilidade: lineCodes.includes(8) || lineCodes.includes(9),
+        liveTrainTrackingApiIds: getLiveTrainTrackingApiIds(lineCodes),
         lineCodes,
         routes: aliases,
         source: 'gpkg',
@@ -304,14 +305,14 @@ export class StopSearchService {
               const allLineCodes = [
                 ...new Set([...existingLineCodes, ...extractedLineCodes]),
               ];
-              const isViaMobilidade =
-                allLineCodes.includes(8) || allLineCodes.includes(9);
+              const liveTrainTrackingApiIds =
+                getLiveTrainTrackingApiIds(allLineCodes);
 
               return {
                 ...result,
                 routes,
                 lineCodes: allLineCodes,
-                isViaMobilidade,
+                liveTrainTrackingApiIds,
               };
             }
             return result;
@@ -370,8 +371,7 @@ export class StopSearchService {
           name: normalizeStationName(base.name),
           lineCodes: mergedLineCodes,
           routes: Array.from(allRoutes).sort(),
-          isViaMobilidade:
-            mergedLineCodes.includes(8) || mergedLineCodes.includes(9),
+          liveTrainTrackingApiIds: getLiveTrainTrackingApiIds(mergedLineCodes),
         };
       },
     );
@@ -381,9 +381,13 @@ export class StopSearchService {
 
   private sortResults(results: StopSearchResult[]): StopSearchResult[] {
     return results.sort((a, b) => {
-      // Priority 1: L8/L9 stations first
-      if (a.isViaMobilidade && !b.isViaMobilidade) return -1;
-      if (!a.isViaMobilidade && b.isViaMobilidade) return 1;
+      // Priority 1: live-tracked stations first
+      const aHasLiveTrainTracking =
+        (a.liveTrainTrackingApiIds?.length ?? 0) > 0;
+      const bHasLiveTrainTracking =
+        (b.liveTrainTrackingApiIds?.length ?? 0) > 0;
+      if (aHasLiveTrainTracking && !bHasLiveTrainTracking) return -1;
+      if (!aHasLiveTrainTracking && bHasLiveTrainTracking) return 1;
 
       // Priority 2: Subway stations before bus stops
       if (a.type === 'subway_station' && b.type !== 'subway_station') return -1;

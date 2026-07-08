@@ -267,7 +267,48 @@ export const L2_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
         id: 'l2-tti-towards-vmd',
         direction: { destinationCodes: ['VMD'] },
         disembarkingSide: 'right',
-        features: [],
+        features: [
+          {
+            id: 'l2-tti-vmd-exit-door-8',
+            type: 'exit',
+            label: 'Saída da estação na porta 8',
+            anchor: {
+              type: 'door',
+              carPosition: 2,
+              doorPosition: 4,
+            },
+          },
+          {
+            id: 'l2-tti-vmd-exit-door-9',
+            type: 'exit',
+            label: 'Saída da estação na porta 9',
+            anchor: {
+              type: 'door',
+              carPosition: 3,
+              doorPosition: 1,
+            },
+          },
+          {
+            id: 'l2-tti-vmd-exit-door-10',
+            type: 'exit',
+            label: 'Saída da estação na porta 10',
+            anchor: {
+              type: 'door',
+              carPosition: 3,
+              doorPosition: 2,
+            },
+          },
+          {
+            id: 'l2-tti-vmd-exit-door-11',
+            type: 'exit',
+            label: 'Saída da estação na porta 11',
+            anchor: {
+              type: 'door',
+              carPosition: 3,
+              doorPosition: 3,
+            },
+          },
+        ],
       },
     ],
 

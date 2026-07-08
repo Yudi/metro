@@ -1,37 +1,36 @@
+name: metro
 x-logging: &default-logging
-  driver: 'json-file'
+  driver: "json-file"
   options:
-    max-size: '500k'
+    max-size: "500k"
 
 services:
   frontend:
-    build:
-      context: ..
-      dockerfile: apps/metro-frontend/Dockerfile
+    image: ghcr.io/yudi/metro/metro-frontend:latest
     networks:
       - traefik
       - default
     labels:
-      - 'traefik.enable=true'
-      - 'traefik.scope=public'
-      - 'traefik.docker.network=traefik'
-      - 'traefik.http.routers.frontend.rule=Host(`metro.yudi.com.br`) && PathPrefix(`/app`)'
-      - 'traefik.http.routers.frontend.priority=5'
-      - 'traefik.http.services.frontend-svc.loadbalancer.server.port=4000'
-      - 'traefik.http.routers.frontend.entrypoints=web, websecure'
-      - 'traefik.http.routers.frontend.service=frontend-svc'
-      - 'traefik.http.routers.frontend.tls=true'
-      - 'traefik.http.routers.frontend.tls.certResolver=letsencrypt'
+      - "traefik.enable=true"
+      - "traefik.scope=public"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.metro-frontend.rule=Host(`metro.yudi.com.br`) && PathPrefix(`/app`)"
+      - "traefik.http.routers.metro-frontend.priority=5"
+      - "traefik.http.services.metro-frontend-svc.loadbalancer.server.port=4000"
+      - "traefik.http.routers.metro-frontend.entrypoints=web, websecure"
+      - "traefik.http.routers.metro-frontend.service=metro-frontend-svc"
+      - "traefik.http.routers.metro-frontend.tls=true"
+      - "traefik.http.routers.metro-frontend.tls.certResolver=letsencrypt"
       # Redirect root / to /app
-      - 'traefik.http.middlewares.frontend-redirect-root.redirectregex.regex=^/$'
-      - 'traefik.http.middlewares.frontend-redirect-root.redirectregex.replacement=/app'
-      - 'traefik.http.middlewares.frontend-redirect-root.redirectregex.permanent=true'
-      - 'traefik.http.routers.frontend-root.rule=Host(`metro.yudi.com.br`) && Path(`/`)'
-      - 'traefik.http.routers.frontend-root.priority=100'
-      - 'traefik.http.routers.frontend-root.entrypoints=web, websecure'
-      - 'traefik.http.routers.frontend-root.service=frontend-svc'
-      - 'traefik.http.routers.frontend-root.tls=true'
-      - 'traefik.http.routers.frontend-root.tls.certResolver=letsencrypt'
+      - "traefik.http.middlewares.metro-frontend-redirect-root.redirectregex.regex=^/$"
+      - "traefik.http.middlewares.metro-frontend-redirect-root.redirectregex.replacement=/app"
+      - "traefik.http.middlewares.metro-frontend-redirect-root.redirectregex.permanent=true"
+      - "traefik.http.routers.metro-frontend-root.rule=Host(`metro.yudi.com.br`) && Path(`/`)"
+      - "traefik.http.routers.metro-frontend-root.priority=100"
+      - "traefik.http.routers.metro-frontend-root.entrypoints=web, websecure"
+      - "traefik.http.routers.metro-frontend-root.service=metro-frontend-svc"
+      - "traefik.http.routers.metro-frontend-root.tls=true"
+      - "traefik.http.routers.metro-frontend-root.tls.certResolver=letsencrypt"
 
     depends_on:
       - backend
@@ -39,34 +38,30 @@ services:
     restart: unless-stopped
 
   frontend-lite:
-    build:
-      context: ..
-      dockerfile: apps/metro-frontend-lite/Dockerfile
+    image: ghcr.io/yudi/metro/metro-frontend-lite:latest
     networks:
       - traefik
       - default
     labels:
-      - 'traefik.enable=true'
-      - 'traefik.scope=public'
-      - 'traefik.docker.network=traefik'
-      - 'traefik.http.routers.frontend-lite.rule=Host(`metro.yudi.com.br`) && PathPrefix(`/lite`)'
-      - 'traefik.http.routers.frontend-lite.priority=50'
-      - 'traefik.http.services.frontend-lite-svc.loadbalancer.server.port=4000'
-      - 'traefik.http.routers.frontend-lite.entrypoints=web, websecure'
-      - 'traefik.http.routers.frontend-lite.service=frontend-lite-svc'
-      - 'traefik.http.routers.frontend-lite.tls=true'
-      - 'traefik.http.routers.frontend-lite.tls.certResolver=letsencrypt'
-    #      - 'traefik.http.middlewares.frontend-lite-strip.stripprefix.prefixes=/lite'
-    #      - 'traefik.http.routers.frontend-lite.middlewares=frontend-lite-strip'
+      - "traefik.enable=true"
+      - "traefik.scope=public"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.metro-frontend-lite.rule=Host(`metro.yudi.com.br`) && PathPrefix(`/lite`)"
+      - "traefik.http.routers.metro-frontend-lite.priority=50"
+      - "traefik.http.services.metro-frontend-lite-svc.loadbalancer.server.port=4000"
+      - "traefik.http.routers.metro-frontend-lite.entrypoints=web, websecure"
+      - "traefik.http.routers.metro-frontend-lite.service=metro-frontend-lite-svc"
+      - "traefik.http.routers.metro-frontend-lite.tls=true"
+      - "traefik.http.routers.metro-frontend-lite.tls.certResolver=letsencrypt"
+    #      - 'traefik.http.middlewares.metro-frontend-lite-strip.stripprefix.prefixes=/lite'
+    #      - 'traefik.http.routers.metro-frontend-lite.middlewares=metro-frontend-lite-strip'
     depends_on:
       - backend
     logging: *default-logging
     restart: unless-stopped
 
   backend:
-    build:
-      context: ..
-      dockerfile: apps/metro-backend/Dockerfile
+    image: ghcr.io/yudi/metro/metro-backend:latest
     volumes:
       - /media/zfs-docker/yudi-metro/shared_import_data:/app/temp # Shared volume for COPY operations
     networks:
@@ -75,22 +70,81 @@ services:
       - default
     env_file:
       - .env
+    environment:
+      NODE_ENV: production
+      RAIL_INTEGRATION_API_URL: ${RAIL_INTEGRATION_API_URL:-http://metro-core-private:3000/api}
     labels:
-      - 'traefik.enable=true'
-      - 'traefik.scope=public'
-      - 'traefik.docker.network=traefik'
-      - 'traefik.http.routers.backend.rule=Host(`metro.yudi.com.br`) && PathPrefix(`/api`)'
-      - 'traefik.http.routers.backend.priority=50'
-      - 'traefik.http.services.backend-svc.loadbalancer.server.port=3000'
-      - 'traefik.http.routers.backend.entrypoints=web, websecure'
-      - 'traefik.http.routers.backend.service=backend-svc'
-      - 'traefik.http.routers.backend.tls=true'
-      - 'traefik.http.routers.backend.tls.certResolver=letsencrypt'
+      - "traefik.enable=true"
+      - "traefik.scope=public"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.metro-backend.rule=Host(`metro.yudi.com.br`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.metro-backend.priority=50"
+      - "traefik.http.services.metro-backend-svc.loadbalancer.server.port=3000"
+      - "traefik.http.routers.metro-backend.entrypoints=web, websecure"
+      - "traefik.http.routers.metro-backend.service=metro-backend-svc"
+      - "traefik.http.routers.metro-backend.tls=true"
+      - "traefik.http.routers.metro-backend.tls.certResolver=letsencrypt"
     depends_on:
       db:
         condition: service_healthy
+      backend-migrate:
+        condition: service_completed_successfully
+      metro-core-private:
+        condition: service_healthy
     logging: *default-logging
     restart: unless-stopped
+
+  metro-core-private:
+    image: ghcr.io/yudi/metro-core-private:latest
+    networks:
+      - backend
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/postgres}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      backend-migrate:
+        condition: service_completed_successfully
+    expose:
+      - 3000
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "const socket = require('node:net').connect(3000, 'localhost'); socket.on('connect', () => { socket.end(); process.exit(0) }); socket.on('error', () => process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      start_period: 120s
+      retries: 5
+    logging: *default-logging
+    restart: unless-stopped
+
+  backend-migrate:
+    build:
+      context: ..
+      dockerfile: apps/metro-backend/Dockerfile
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/postgres}
+    command:
+      - sh
+      - -c
+      - cd /app && ./node_modules/.bin/prisma migrate deploy --config prisma.config.ts
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - backend
 
   redis:
     image: redis:7-alpine
@@ -106,7 +160,8 @@ services:
 
   db:
     image: postgis/postgis:17-3.5
-    container_name: postgis_db
+    #    ports:
+    #      - 5432:5432
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -114,8 +169,8 @@ services:
     healthcheck:
       test:
         [
-          'CMD-SHELL',
-          'pg_isready -U postgres -d postgres -h localhost || exit 1',
+          "CMD-SHELL",
+          "pg_isready -U postgres -d postgres -h localhost || exit 1",
         ]
       interval: 10s
       timeout: 5s

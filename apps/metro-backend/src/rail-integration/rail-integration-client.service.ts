@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
+import { AxiosError, isAxiosError } from 'axios';
 import { firstValueFrom } from 'rxjs';
 import {
   ActualCptmLineCode,
@@ -18,6 +19,8 @@ import {
   RailStatusSourcePort,
 } from '@metro/rail-integration-contracts';
 
+const LOCAL_RAIL_INTEGRATION_API_URL = 'http://localhost:3001/api';
+
 @Injectable()
 export class RailIntegrationClientService
   extends RailRealtimeSourcePort
@@ -31,9 +34,24 @@ export class RailIntegrationClientService
     configService: ConfigService,
   ) {
     super();
+    const configuredBaseUrl = configService
+      .get<string>('RAIL_INTEGRATION_API_URL')
+      ?.trim();
+
+    if (!configuredBaseUrl && process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'RAIL_INTEGRATION_API_URL is required in production. Set it to the private rail integration service URL.',
+      );
+    }
+
+    if (!configuredBaseUrl) {
+      this.logger.warn(
+        `RAIL_INTEGRATION_API_URL is not set; using local default ${LOCAL_RAIL_INTEGRATION_API_URL}`,
+      );
+    }
+
     this.baseUrl = (
-      configService.get<string>('RAIL_INTEGRATION_API_URL') ??
-      'http://localhost:3001/api'
+      configuredBaseUrl ?? LOCAL_RAIL_INTEGRATION_API_URL
     ).replace(/\/+$/, '');
   }
 
@@ -126,7 +144,9 @@ export class RailIntegrationClientService
       );
       return response.data;
     } catch (error) {
-      this.logger.error(`Rail integration GET ${path} failed`, error);
+      this.logger.error(
+        `Rail integration GET ${path} failed: ${this.formatRequestError(error)}`,
+      );
       throw error;
     }
   }
@@ -142,8 +162,37 @@ export class RailIntegrationClientService
       );
       return response.data;
     } catch (error) {
-      this.logger.error(`Rail integration POST ${path} failed`, error);
+      this.logger.error(
+        `Rail integration POST ${path} failed: ${this.formatRequestError(error)}`,
+      );
       throw error;
     }
+  }
+
+  private formatRequestError(error: unknown): string {
+    if (!isAxiosError(error)) {
+      return error instanceof Error ? error.message : String(error);
+    }
+
+    const parts = [
+      this.formatAxiosErrorCode(error),
+      error.config?.url ? `url=${error.config.url}` : undefined,
+      error.response?.status ? `status=${error.response.status}` : undefined,
+      error.message,
+    ].filter(Boolean);
+
+    return parts.join(' ');
+  }
+
+  private formatAxiosErrorCode(error: AxiosError): string | undefined {
+    const causeCode =
+      error.cause &&
+      typeof error.cause === 'object' &&
+      'code' in error.cause &&
+      typeof error.cause.code === 'string'
+        ? error.cause.code
+        : undefined;
+
+    return error.code ?? causeCode;
   }
 }

@@ -7,9 +7,13 @@ import { switchMap } from 'rxjs/operators';
 import {
   LineDescriptionDialogComponent,
   LineDescriptionDialogData,
+  LineScheduleSection,
 } from './line-description-dialog.component';
 import { ApiService } from '@metro/shared/api';
 import {
+  AEROMOVEL_GRU_OPERATION,
+  EXPRESSO_AEROPORTO_SCHEDULE,
+  EXPRESSO_LINHA_10_SCHEDULE,
   RailLineStatus,
   RailLinesStatusResponse,
   SpecialRailInfoCardStatus,
@@ -20,8 +24,19 @@ import {
 } from '@metro/shared/utils';
 import { DatePipe } from '@angular/common';
 
+const CPTM_TRANSFER_INTERVALS_URL =
+  'https://www.cptm.sp.gov.br/cptm/sua-viagem/transferencias-e-intervalos';
+
+const EXPRESSO_LINHA_10_SOURCE_URL =
+  'https://www.cptm.sp.gov.br/dx/api/dam/v1/collections/05321fd9-3791-4689-a8ac-9e2adde39c4b/items/996297d1-45bf-4a2c-adb2-23cf38c61c9a/renditions/9bb7e05d-a547-40da-9b30-181dc8154c8d?binary=true';
+
+function formatWholeHour(time: string): string {
+  const [hour = time] = time.split(':');
+  return hour === '00' ? '00h' : `${Number.parseInt(hour, 10)}h`;
+}
+
 const AEROMOVEL_GRU_DIALOG_INFO = {
-  intervalLabel: 'Intervalo teórico: 6 minutos.',
+  scheduleText: `Todos os dias, das ${formatWholeHour(AEROMOVEL_GRU_OPERATION.openFrom)} às ${formatWholeHour(AEROMOVEL_GRU_OPERATION.openUntil)}, com intervalo teórico de 6 minutos.`,
   shuttleMessage:
     'Você também pode optar por translado por ônibus das 04h às 00h.',
   shuttleUrl:
@@ -36,18 +51,46 @@ const SPECIAL_INFO_CARD_DETAILS: Record<string, string[]> = {
   ],
 };
 
-const SPECIAL_LINE_DIALOG_INFO = {
+const EXPRESSO_LINHA_10_SCHEDULE_SECTIONS: LineScheduleSection[] = [
+  {
+    title: 'Santo André → Tamanduateí',
+    description:
+      'Ida com parada em São Caetano; retorno de Tamanduateí para Santo André.',
+    times: EXPRESSO_LINHA_10_SCHEDULE.departures.santoAndre,
+  },
+  {
+    title: 'Tamanduateí → Santo André',
+    description:
+      'Ida com parada em São Caetano; retorno de Santo André para Tamanduateí.',
+    times: EXPRESSO_LINHA_10_SCHEDULE.departures.tamanduatei,
+  },
+];
+
+const SPECIAL_LINE_DIALOG_INFO: Record<
+  string,
+  {
+    description: string;
+    details?: readonly string[];
+    scheduleSections?: readonly LineScheduleSection[];
+    note?: string;
+    linkLabel: string;
+    url: string;
+  }
+> = {
   [SPECIAL_RAIL_LINE_CODES.EXPRESSO_AEROPORTO]: {
+    description: `De segunda a sábado, partidas a cada ${EXPRESSO_AEROPORTO_SCHEDULE.weekdayIntervalMinutes} minutos, das 5h às 00h. Aos domingos, a cada ${EXPRESSO_AEROPORTO_SCHEDULE.sundayIntervalMinutes} minutos no mesmo período.`,
     details: [
-      'Confira o site da CPTM para informações atualizadas sobre o horário das partidas.',
+      'As partidas seguem o horário programado e podem variar conforme condições operacionais.',
     ],
-    url: 'https://www.cptm.sp.gov.br/cptm/sua-viagem/transferencias-e-intervalos',
+    linkLabel: 'Ver página da CPTM',
+    url: CPTM_TRANSFER_INTERVALS_URL,
   },
   [SPECIAL_RAIL_LINE_CODES.EXPRESSO_LINHA_10]: {
-    details: [
-      'Confira o site da CPTM para informações atualizadas sobre o horário das partidas.',
-    ],
-    url: 'https://www.cptm.sp.gov.br/cptm/sua-viagem/transferencias-e-intervalos',
+    description: 'Dias úteis, nos picos da manhã e da tarde.',
+    scheduleSections: EXPRESSO_LINHA_10_SCHEDULE_SECTIONS,
+    note: 'Horários programados sujeitos às condições operacionais.',
+    linkLabel: 'Fonte: CPTM',
+    url: EXPRESSO_LINHA_10_SOURCE_URL,
   },
 } as const;
 
@@ -208,7 +251,7 @@ export class LineStatusGridComponent {
         data: {
           title: `${line.code} - ${line.line}`,
           details: [
-            AEROMOVEL_GRU_DIALOG_INFO.intervalLabel,
+            AEROMOVEL_GRU_DIALOG_INFO.scheduleText,
             AEROMOVEL_GRU_DIALOG_INFO.shuttleMessage,
           ],
           link: {
@@ -228,8 +271,12 @@ export class LineStatusGridComponent {
       this.dialog.open(LineDescriptionDialogComponent, {
         data: {
           title: `${line.code} - ${line.line}`,
-          details: [...dialogInfo.details],
-          link: { label: 'Saiba mais', url: dialogInfo.url },
+          description: dialogInfo.description,
+          details: [...(dialogInfo.details ?? [])],
+          scheduleSections: dialogInfo.scheduleSections,
+          note: dialogInfo.note,
+          issues: line.issues,
+          link: { label: dialogInfo.linkLabel, url: dialogInfo.url },
           specialLineCode: line.code,
         } satisfies LineDescriptionDialogData,
       });

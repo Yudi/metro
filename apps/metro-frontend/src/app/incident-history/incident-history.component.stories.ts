@@ -32,8 +32,9 @@ const MOCK_ROWS: IncidentHistoryItem[] = [
     linha: { id: '5', nome: 'Linha 9-Esmeralda', codigo: '9' },
     empresa: {
       id: 1,
-      nome: 'Monitoramento das linhas',
-      badge: 'LINHAS',
+      nome: 'ViaMobilidade',
+      key: 'viamobilidade',
+      badge: 'VIAMOBILIDADE',
     },
     situacao: 'Operação com velocidade reduzida',
     descricao:
@@ -50,8 +51,9 @@ const MOCK_ROWS: IncidentHistoryItem[] = [
     linha: { id: '4', nome: 'Linha 8-Diamante', codigo: '8' },
     empresa: {
       id: 1,
-      nome: 'Monitoramento das linhas',
-      badge: 'LINHAS',
+      nome: 'ViaMobilidade',
+      key: 'viamobilidade',
+      badge: 'VIAMOBILIDADE',
     },
     situacao: 'Operação Normal',
     descricao: 'Operação recuperada após falha operacional anterior.',
@@ -85,8 +87,9 @@ const MOCK_ROWS: IncidentHistoryItem[] = [
     linha: { id: '15', nome: 'Linha 15-Prata', codigo: '15' },
     empresa: {
       id: 1,
-      nome: 'Monitoramento das linhas',
-      badge: 'LINHAS',
+      nome: 'Metrô',
+      key: 'metro',
+      badge: 'METRO',
     },
     situacao: 'Operação com velocidade reduzida',
     descricao:
@@ -103,8 +106,9 @@ const MOCK_ROWS: IncidentHistoryItem[] = [
     linha: { id: '3', nome: 'Linha 3-Vermelha', codigo: '3' },
     empresa: {
       id: 1,
-      nome: 'Monitoramento das linhas',
-      badge: 'LINHAS',
+      nome: 'Metrô',
+      key: 'metro',
+      badge: 'METRO',
     },
     situacao: 'Operação Normal',
     descricao: 'Operação normalizada após interferência na via.',

@@ -6,6 +6,7 @@ export enum TransitAgency {
   MOTIVA = 'motiva',
   VIAQUATRO = 'viaquatro',
   VIAMOBILIDADE = 'viamobilidade',
+  LINHAUNI = 'linhauni',
   TICTRENS = 'tictrens',
   TRIVIATRENS = 'triviatrens',
   CPTM = 'cptm',
@@ -136,6 +137,15 @@ export const AGENCIES_DATA: AgenciesData = {
       site: 'https://www.viamobilidade.com.br/',
     },
   },
+  [TransitAgency.LINHAUNI]: {
+    name: 'LinhaUni',
+    shortName: 'LinhaUni',
+    type: 'rail',
+    contact: {
+      phones: [],
+      site: 'https://www.linhauni.com.br/',
+    },
+  },
   [TransitAgency.TICTRENS]: {
     name: 'TicTrens',
     shortName: 'TicTrens',
@@ -241,6 +251,9 @@ const ROUTE_AGENCY_MAP: Record<string, TransitAgency> = {
   // Motiva (motiva.svg)
   L4: TransitAgency.MOTIVA,
   L5: TransitAgency.MOTIVA,
+
+  // LinhaUni (linhauni.svg)
+  L6: TransitAgency.LINHAUNI,
 
   // ViaMobilidade (viamobilidade.svg)
   L8: TransitAgency.VIAMOBILIDADE,

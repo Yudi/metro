@@ -497,6 +497,7 @@ export class RailGraphqlService {
             id
             observedAt
             lineCode
+            agency
             stationName
             direction
             averageSeconds

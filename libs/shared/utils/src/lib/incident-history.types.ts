@@ -7,6 +7,7 @@ export interface IncidentHistoryLine {
 export interface IncidentHistoryAgency {
   id: number;
   nome: string;
+  key?: string;
   badge?: string;
 }
 

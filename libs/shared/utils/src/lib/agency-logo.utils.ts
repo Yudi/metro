@@ -23,6 +23,10 @@ export function getAgencyLogoForRoute(routeName: string): string {
     return '/app/shared/agencies/motiva.svg';
   }
 
+  if (normalizedRoute === 'L6') {
+    return '/app/shared/agencies/linhauni.svg';
+  }
+
   // ViaMobilidade (Lines 8 and 9)
   if (normalizedRoute === 'L8' || normalizedRoute === 'L9') {
     return '/app/shared/agencies/viamobilidade.svg';

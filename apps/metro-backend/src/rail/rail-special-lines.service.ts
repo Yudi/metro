@@ -39,12 +39,17 @@ export class RailSpecialLinesService {
   getSpecialLinesStatus(
     regularLines: RailLine[],
     now: Date = new Date(),
+    options: { isHoliday?: boolean } = {},
   ): SpecialRailLine[] {
     const saoPauloNow = this.getSaoPauloNow(now);
 
     return [
       this.buildExpressoAeroportoStatus(regularLines, saoPauloNow),
-      this.buildExpressoLinha10Status(regularLines, saoPauloNow),
+      this.buildExpressoLinha10Status(
+        regularLines,
+        saoPauloNow,
+        options.isHoliday ?? false,
+      ),
       this.buildAeromovelGruStatus(saoPauloNow),
     ];
   }
@@ -97,6 +102,7 @@ export class RailSpecialLinesService {
   private buildExpressoLinha10Status(
     regularLines: RailLine[],
     now: Date,
+    isHoliday: boolean,
   ): SpecialRailLine {
     const line10 = regularLines.find((line) => line.code === 10);
     const line10Description = line10?.description;
@@ -146,6 +152,7 @@ export class RailSpecialLinesService {
       !isAfter(now, closedUntil) || isAfter(now, closedAfter);
 
     if (
+      isHoliday ||
       (EXPRESSO_LINHA_10_SCHEDULE.weekdaysOnly && isWeekendDay) ||
       isClosedByTime
     ) {

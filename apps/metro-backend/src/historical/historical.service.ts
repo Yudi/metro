@@ -9,6 +9,7 @@ import {
   historical_incident_event_type,
 } from '../../generated/prisma/client';
 import {
+  getRailLineByCode,
   getStationName as getStaticStationName,
   isKnownRailLineCode,
   isActualCptmLine,
@@ -236,6 +237,7 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
         data: {
           observedAt: params.observedAt ?? new Date(),
           lineCode: params.lineCode,
+          agency: this.getRequiredRailAgency(params.lineCode),
           stationCode: params.stationCode,
           stationName: await this.resolveStationName(
             params.lineCode,
@@ -436,6 +438,7 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
       lineCode: `L${line.code}`,
       lineNumber: line.code,
       lineName: line.line,
+      agency: this.getRequiredRailAgency(line.code),
       statusCode: line.statusCode,
       statusLabel: line.statusLabel,
       statusColor: line.statusColor,
@@ -456,6 +459,7 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
     return {
       observedAt: new Date(headway.updatedAt),
       lineCode: headway.lineCode,
+      agency: this.getRequiredRailAgency(headway.lineCode),
       stationCode: headway.stationCode,
       stationName,
       direction: direction.direction,
@@ -677,6 +681,28 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
 
   private isStaticNextTrainLine(lineCode: string): lineCode is NextTrainLineCode {
     return lineCode === 'L4' || lineCode === 'L8' || lineCode === 'L9';
+  }
+
+  private getRequiredRailAgency(lineCode: string | number): string {
+    const lineNumber =
+      typeof lineCode === 'number'
+        ? lineCode
+        : this.parseRailLineNumber(lineCode);
+    const agency =
+      lineNumber === undefined
+        ? undefined
+        : getRailLineByCode(lineNumber)?.agency;
+
+    if (!agency) {
+      throw new Error(`No transit agency configured for line ${lineCode}`);
+    }
+
+    return agency;
+  }
+
+  private parseRailLineNumber(lineCode: string): number | undefined {
+    const match = lineCode.match(/L?(\d+)/i);
+    return match ? Number.parseInt(match[1], 10) : undefined;
   }
 
   private async runSafely(

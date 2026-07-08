@@ -96,6 +96,17 @@ export const RAIL_LINES: RailLineInfo[] = [
     carDoorCount: 4,
   },
   {
+    code: 6,
+    lineId: 'L6',
+    colorName: 'Laranja',
+    colorHex: '#F47322',
+    agency: TransitAgency.LINHAUNI,
+    fullName: 'Linha 6 - Laranja',
+    stations: [],
+    carCount: 6,
+    carDoorCount: 4,
+  },
+  {
     code: 7,
     lineId: 'L7',
     colorName: 'Rubi',

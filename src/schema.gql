@@ -237,6 +237,9 @@ type HistoricalHeadwaySnapshotEntity {
   """Rail line code, such as L9"""
   lineCode: String!
 
+  """Transit agency recorded when this snapshot was generated"""
+  agency: String!
+
   """Structured metadata for diagnostics and future analysis"""
   metadata: JSON
 
@@ -293,6 +296,9 @@ type HistoricalIncidentEventEntity {
 
   """Rail line display name"""
   lineName: String
+
+  """Transit agency recorded when this event was generated"""
+  agency: String
 
   """Numeric rail line code"""
   lineNumber: Int

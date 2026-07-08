@@ -34,4 +34,21 @@ describe('RailHolidayService', () => {
     ]);
     expect(queryRaw).toHaveBeenCalledTimes(1);
   });
+
+  it('detects today as a São Paulo holiday using the cached holiday set', async () => {
+    const prisma = {
+      $queryRaw: jest.fn().mockResolvedValue([
+        {
+          date: '2026-07-09',
+          name: 'Revolução Constitucionalista de 1932',
+          type: 'local',
+        },
+      ]),
+    } as unknown as PrismaService;
+    const service = new RailHolidayService(prisma);
+
+    await expect(
+      service.isHolidayInSaoPaulo(new Date('2026-07-09T15:00:00-03:00')),
+    ).resolves.toBe(true);
+  });
 });

@@ -17,7 +17,9 @@ describe('Linha 17 agency', () => {
     expect(getRailLineByCode(17)?.agency).toBe(TransitAgency.METRO);
     expect(getRouteAgency('L17')).toBe(TransitAgency.METRO);
     expect(
-      getRailLinesByAgency(TransitAgency.METRO).some((line) => line.code === 17),
+      getRailLinesByAgency(TransitAgency.METRO).some(
+        (line) => line.code === 17,
+      ),
     ).toBe(true);
     expect(
       getRailLinesByAgency(TransitAgency.VIAMOBILIDADE).some(
@@ -56,5 +58,27 @@ describe('Motiva agency', () => {
       'api2',
       'api1',
     ]);
+  });
+});
+
+describe('LinhaUni agency', () => {
+  it('registers Linha 6 as operated by LinhaUni', () => {
+    expect(getRailLineByCode(6)).toMatchObject({
+      agency: TransitAgency.LINHAUNI,
+      colorHex: '#F47322',
+      carCount: 6,
+      carDoorCount: 4,
+      stations: [],
+    });
+    expect(getRouteAgency('L6')).toBe(TransitAgency.LINHAUNI);
+    expect(LINE_AGENCY_MAPPING[6]).toBe(TransitAgency.LINHAUNI);
+    expect(
+      getRailLinesByAgency(TransitAgency.LINHAUNI).some(
+        (line) => line.code === 6,
+      ),
+    ).toBe(true);
+    expect(getAgencyLogoForRoute('L6')).toBe(
+      '/app/shared/agencies/linhauni.svg',
+    );
   });
 });

@@ -149,7 +149,19 @@ export const L5_NORMAL: RailLineStatus = {
   description: null,
 };
 
-// L7 - Rubi (CPTM)
+// L6 - Laranja (LinhaUni)
+export const L6_NORMAL: RailLineStatus = {
+  code: 6,
+  colorName: 'Laranja',
+  colorHex: '#F47322',
+  line: 'Linha 6 - Laranja',
+  statusCode: 'OperacaoNormal',
+  statusLabel: 'Operação Normal',
+  statusColor: 'verde',
+  description: null,
+};
+
+// L7 - Rubi (TicTrens)
 export const L7_NORMAL: RailLineStatus = {
   code: 7,
   colorName: 'Rubi',
@@ -287,6 +299,7 @@ export const ALL_LINES_NORMAL: RailLineStatus[] = [
   L3_NORMAL,
   L4_NORMAL,
   L5_NORMAL,
+  L6_NORMAL,
   L7_NORMAL,
   L8_NORMAL,
   L9_NORMAL,
@@ -315,6 +328,7 @@ export const LINES_WITH_ISSUES: RailLineStatus[] = [
   L3_NORMAL,
   L4_PARTIAL,
   L5_NORMAL,
+  L6_NORMAL,
   L7_NORMAL,
   L8_NORMAL,
   L9_REDUCED,
@@ -333,6 +347,7 @@ export const LINES_UNAVAILABLE: RailLineStatus[] = [
   L3_NORMAL,
   L4_NORMAL,
   L5_NORMAL,
+  L6_NORMAL,
   L7_NORMAL,
   L8_NORMAL,
   L9_NORMAL,

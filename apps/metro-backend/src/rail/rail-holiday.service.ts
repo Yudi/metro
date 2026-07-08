@@ -52,6 +52,14 @@ export class RailHolidayService {
     return format(saoPauloNow, 'yyyy-MM-dd');
   }
 
+  async isHolidayInSaoPaulo(now: Date = new Date()): Promise<boolean> {
+    const today = this.getTodayInSaoPaulo(now);
+    const year = Number.parseInt(today.slice(0, 4), 10);
+    const holidays = await this.getHolidaysForYear(year);
+
+    return holidays.some((holiday) => holiday.date === today);
+  }
+
   private async getStoredHolidays(year: number): Promise<RailHoliday[]> {
     return this.prisma.$queryRaw<RailHoliday[]>`
       SELECT "date", "name", "type"

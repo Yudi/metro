@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 26.0.3, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 88 88" style="enable-background:new 0 0 88 88;" xml:space="preserve">
+<style type="text/css">
+	.st0{clip-path:url(#SVGID_00000098907711035564954630000017772943629490592419_);}
+	.st1{clip-path:url(#SVGID_00000027604466821570110450000014402832184159954099_);}
+	.st2{clip-path:url(#SVGID_00000043451699596419186150000009205336466627149242_);}
+	.st3{fill:#F39200;}
+	.st4{display:none;}
+	.st5{display:inline;fill:#00539E;}
+	.st6{display:inline;fill-rule:evenodd;clip-rule:evenodd;fill:#FFFFFF;}
+	.st7{fill:#FFFFFF;}
+	.st8{fill:#FCE4BE;}
+</style>
+<g>
+	<defs>
+		<rect id="SVGID_1_" width="88" height="88"/>
+	</defs>
+	<clipPath id="SVGID_00000021805072205290727630000012799360754619331486_">
+		<use xlink:href="#SVGID_1_"  style="overflow:visible;"/>
+	</clipPath>
+	<g style="clip-path:url(#SVGID_00000021805072205290727630000012799360754619331486_);">
+		<g>
+			<defs>
+				<rect id="SVGID_00000031920251722172898860000015338604018447703189_" width="88" height="88"/>
+			</defs>
+			<clipPath id="SVGID_00000128473826415357697410000000504514618302849457_">
+				<use xlink:href="#SVGID_00000031920251722172898860000015338604018447703189_"  style="overflow:visible;"/>
+			</clipPath>
+			<g style="clip-path:url(#SVGID_00000128473826415357697410000000504514618302849457_);">
+				<g>
+					<defs>
+						<rect id="SVGID_00000049213848318740044130000011278822471028789687_" width="88" height="88"/>
+					</defs>
+					<clipPath id="SVGID_00000071561519250788052020000011015890289686969996_">
+						<use xlink:href="#SVGID_00000049213848318740044130000011278822471028789687_"  style="overflow:visible;"/>
+					</clipPath>
+					<g style="clip-path:url(#SVGID_00000071561519250788052020000011015890289686969996_);">
+						<path class="st3" d="M70,0H18C8.1,0,0,8.1,0,18v52c0,9.9,8.1,18,18,18h52c9.9,0,18-8.1,18-18V18C88,8.1,79.9,0,70,0z"/>
+					</g>
+				</g>
+			</g>
+		</g>
+	</g>
+</g>
+<script  xmlns=""></script>
+<g class="st4">
+	<circle class="st5" cx="44" cy="44" r="44"/>
+	<path class="st6" d="M49.1,64.7V24.3l18.6,20.2l6.4-6.9L44,7L14,37.6l6.4,6.9l18.6-20.2v40.5L20.4,44.5L14,51.4L44,82l30-30.6
+		l-6.4-6.9L49.1,64.7z"/>
+</g>
+<g>
+	<path class="st3" d="M18.1,40.7"/>
+	<path class="st3" d="M61,6.5"/>
+</g>
+<g>
+	<path class="st7" d="M27.7,48.7c2.8-6.5,9.3-10.9,16.8-10.9c10,0,18,7.8,18.3,17.8l0.1,0.6c0,10.1-8.3,18.3-18.3,18.3
+		S26.1,66.2,26.1,56v-0.4c0.1-2.3,0.6-4.6,1.4-6.7L27.7,48.7z M69.6,55.3c-0.1-3.3-0.8-6.4-2.1-9.3c-3.8-9-12.8-15.2-23.1-15.2
+		c-5,0-9.6,1.4-13.5,3.9c-4.2,2.7-7.6,6.6-9.6,11.3c-0.4,0.9-0.7,1.8-1,2.8c-0.6,2.1-0.9,4.2-1,6.4v0.8c0,3.1,0.6,6,1.6,8.7
+		c3.6,9.6,12.8,16.6,23.7,16.6s20.1-6.9,23.7-16.6c1-2.7,1.6-5.6,1.6-8.7C69.6,55.9,69.6,55.7,69.6,55.3L69.6,55.3z"/>
+	<path class="st8" d="M36.9,26.6c6.6-6.5,16.1-10.7,26.9-11.1l-2.8-8.9C39.2,8.3,21.8,22.4,18.2,40.7C22.2,33.8,28.9,28.6,36.9,26.6
+		L36.9,26.6z"/>
+</g>
+</svg>

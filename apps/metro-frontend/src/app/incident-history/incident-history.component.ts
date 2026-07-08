@@ -24,6 +24,7 @@ import {
   IncidentHistoryItem,
   IncidentHistoryResponse,
   parseRailLineCode,
+  TransitAgency,
 } from '@metro/shared/utils';
 import {
   HistoryLoadState,
@@ -230,6 +231,10 @@ export class IncidentHistoryComponent {
   }
 
   agencyIconPath(incident: IncidentHistoryItem): string | null {
+    if (this.isTransitAgency(incident.empresa.key)) {
+      return getAgencyIconPath(incident.empresa.key);
+    }
+
     const line = this.getIncidentRailLine(incident);
 
     return line ? getAgencyIconPath(line.agency) : null;
@@ -253,6 +258,13 @@ export class IncidentHistoryComponent {
     );
 
     return lineCode === undefined ? undefined : getRailLineByCode(lineCode);
+  }
+
+  private isTransitAgency(value: string | undefined): value is TransitAgency {
+    return (
+      value !== undefined &&
+      Object.values(TransitAgency).includes(value as TransitAgency)
+    );
   }
 
   private describeError(error: unknown): string {

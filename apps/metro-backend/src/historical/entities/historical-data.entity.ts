@@ -84,6 +84,12 @@ export class HistoricalIncidentEventEntity {
 
   @Field(() => String, {
     nullable: true,
+    description: 'Transit agency recorded when this event was generated',
+  })
+  agency?: string | null;
+
+  @Field(() => String, {
+    nullable: true,
     description: 'Rail status code at observation time',
   })
   statusCode?: string | null;
@@ -149,6 +155,11 @@ export class HistoricalHeadwaySnapshotEntity {
 
   @Field(() => String, { description: 'Rail line code, such as L9' })
   lineCode!: string;
+
+  @Field(() => String, {
+    description: 'Transit agency recorded when this snapshot was generated',
+  })
+  agency!: string;
 
   @Field(() => String, {
     description: 'Internal station key used by the headway calculation',

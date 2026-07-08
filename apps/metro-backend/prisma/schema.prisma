@@ -134,6 +134,7 @@ model HistoricalIncidentEvent {
   lineCode         String?                        @db.Text
   lineNumber       Int?                           @db.SmallInt
   lineName         String?                        @db.Text
+  agency           String?                        @db.Text
   statusCode       String?                        @db.Text
   statusLabel      String?                        @db.Text
   statusColor      String?                        @db.Text
@@ -156,6 +157,7 @@ model HistoricalHeadwaySnapshot {
   id             String   @id @default(uuid(7)) @db.Uuid
   observedAt     DateTime @default(now()) @db.Timestamptz
   lineCode       String   @db.Text
+  agency         String   @db.Text
   stationCode    String   @db.Text
   stationName    String?  @db.Text
   direction      String   @db.Text

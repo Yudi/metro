@@ -2,6 +2,7 @@ export interface HistoricalHeadwaySnapshot {
   id: string;
   observedAt: string;
   lineCode: string;
+  agency: string;
   stationCode?: string;
   stationName?: string | null;
   direction: string;

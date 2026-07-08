@@ -6,6 +6,7 @@ import { SpecialRailInfoCard } from './entities/rail-special-info-card.entity';
 import { RailSpecialInfoService } from './rail-special-info.service';
 import { SpecialRailService } from './entities/rail-special-service.entity';
 import { RailSpecialServicesService } from './rail-special-services.service';
+import { RailHolidayService } from './rail-holiday.service';
 
 @Resolver(() => SpecialRailLine)
 export class RailSpecialResolver {
@@ -14,6 +15,7 @@ export class RailSpecialResolver {
     private readonly railSpecialLinesService: RailSpecialLinesService,
     private readonly railSpecialInfoService: RailSpecialInfoService,
     private readonly railSpecialServicesService: RailSpecialServicesService,
+    private readonly railHolidayService: RailHolidayService,
   ) {}
 
   @Query(() => [SpecialRailLine], {
@@ -23,8 +25,13 @@ export class RailSpecialResolver {
   })
   async getSpecialLinesStatus(): Promise<SpecialRailLine[]> {
     const regularLinesStatus = await this.railService.getLinesStatus();
+    const now = new Date();
+    const isHoliday = await this.railHolidayService.isHolidayInSaoPaulo(now);
+
     return this.railSpecialLinesService.getSpecialLinesStatus(
       regularLinesStatus.lines,
+      now,
+      { isHoliday },
     );
   }
 

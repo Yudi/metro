@@ -18,6 +18,7 @@ import { RailGraphqlService } from '@metro/shared/api';
 import {
   AGENCIES_DATA,
   HistoricalHeadwaySnapshot,
+  TransitAgency,
   getRailLineById,
 } from '@metro/shared/utils';
 import {
@@ -255,9 +256,7 @@ export class HeadwayHistoryComponent {
 
   private toRow(snapshot: HistoricalHeadwaySnapshot): HeadwayHistoryRow {
     const line = getRailLineById(snapshot.lineCode);
-    const agencyName = line
-      ? AGENCIES_DATA[line.agency].shortName
-      : 'Não identificada';
+    const agencyName = this.formatAgencyName(snapshot.agency, line?.agency);
 
     return {
       snapshot,
@@ -265,6 +264,25 @@ export class HeadwayHistoryComponent {
       agencyName,
       stationName: this.formatStationName(snapshot),
     };
+  }
+
+  private formatAgencyName(
+    recordedAgency: string,
+    fallbackAgency?: TransitAgency,
+  ): string {
+    if (this.isTransitAgency(recordedAgency)) {
+      return AGENCIES_DATA[recordedAgency].shortName;
+    }
+
+    if (fallbackAgency) {
+      return AGENCIES_DATA[fallbackAgency].shortName;
+    }
+
+    return recordedAgency.trim() || 'Não identificada';
+  }
+
+  private isTransitAgency(value: string): value is TransitAgency {
+    return Object.values(TransitAgency).includes(value as TransitAgency);
   }
 
   private formatStationName(snapshot: HistoricalHeadwaySnapshot): string {

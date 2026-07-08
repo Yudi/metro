@@ -83,6 +83,7 @@ export class RailIncidentHistoryService {
       empresa: {
         id: this.getAgencyId(event),
         nome: this.getAgencyLabel(event),
+        key: this.getRailStatusAgency(event),
         badge: this.getAgencyBadge(event),
       },
       situacao: event.statusLabel ?? event.title,
@@ -245,6 +246,11 @@ export class RailIncidentHistoryService {
       return undefined;
     }
 
+    const recordedAgency = this.toTransitAgency(event.agency);
+    if (recordedAgency) {
+      return recordedAgency;
+    }
+
     const lineNumber = event.lineNumber ?? this.parseLineNumber(event.lineCode);
 
     if (lineNumber === undefined) {
@@ -252,6 +258,16 @@ export class RailIncidentHistoryService {
     }
 
     return getRailLineByCode(lineNumber)?.agency;
+  }
+
+  private toTransitAgency(value: string | null): TransitAgency | undefined {
+    if (!value) {
+      return undefined;
+    }
+
+    return Object.values(TransitAgency).includes(value as TransitAgency)
+      ? (value as TransitAgency)
+      : undefined;
   }
 
   private parseLineNumber(value: string | null): number | undefined {

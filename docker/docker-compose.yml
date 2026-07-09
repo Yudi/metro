@@ -85,6 +85,8 @@ services:
       - "traefik.http.routers.metro-backend.tls=true"
       - "traefik.http.routers.metro-backend.tls.certResolver=letsencrypt"
     depends_on:
+      backend-import-data-permissions:
+        condition: service_completed_successfully
       db:
         condition: service_healthy
       backend-migrate:
@@ -93,6 +95,19 @@ services:
         condition: service_healthy
     logging: *default-logging
     restart: unless-stopped
+
+  backend-import-data-permissions:
+    image: ghcr.io/yudi/metro/metro-backend:latest
+    user: "0:0"
+    volumes:
+      - /media/zfs-docker/yudi-metro/shared_import_data:/app/temp
+    command:
+      - sh
+      - -c
+      - mkdir -p /app/temp/gtfs && chown -R app:app /app/temp && chmod -R u+rwX /app/temp
+    restart: "no"
+    networks:
+      - backend
 
   metro-core-private:
     image: ghcr.io/yudi/metro-core-private:latest
@@ -111,6 +126,8 @@ services:
         condition: service_started
       backend-migrate:
         condition: service_completed_successfully
+      metro-core-private-migrate:
+        condition: service_completed_successfully
     expose:
       - 3000
     healthcheck:
@@ -126,10 +143,26 @@ services:
     logging: *default-logging
     restart: unless-stopped
 
+  metro-core-private-migrate:
+    image: ghcr.io/yudi/metro-core-private:latest
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/postgres}
+    command:
+      - sh
+      - -c
+      - cd /app && ./node_modules/.bin/prisma migrate deploy --schema prisma/schema.prisma
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - backend
+
   backend-migrate:
-    build:
-      context: ..
-      dockerfile: apps/metro-backend/Dockerfile
+    image: ghcr.io/yudi/metro/metro-backend:latest
     env_file:
       - .env
     environment:

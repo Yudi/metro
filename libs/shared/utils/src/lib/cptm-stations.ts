@@ -3,6 +3,7 @@ import {
   type StaticRailStation,
 } from './rail-stations.entity';
 import { hardNormalizeString } from './strings.utils';
+import { TRIVIATRENS_LIVE_DATA_ENABLED } from './transit-agency.utils';
 
 /**
  * Vehicle position delivered by the backend for tracked rail lines.
@@ -35,6 +36,13 @@ export type ActualCptmLineCode = 'L10' | 'L11' | 'L12' | 'L13';
 export type SpecialCptmLineCode = 'EA' | '10X';
 
 export type Api1RailLineCode = ActualCptmLineCode | SpecialCptmLineCode;
+
+const TRIVIATRENS_API1_RAIL_LINE_CODES = new Set<Api1RailLineCode>([
+  'L11',
+  'L12',
+  'L13',
+  'EA',
+]);
 
 const API1_PUBLIC_STATION_SOURCE_LINES: Record<
   Api1RailLineCode,
@@ -169,7 +177,14 @@ export function isSpecialCptmLine(
 export function isApi1RailLine(
   lineCode: string,
 ): lineCode is ActualCptmLineCode | SpecialCptmLineCode {
-  return isActualCptmLine(lineCode) || isSpecialCptmLine(lineCode);
+  if (lineCode === 'L10' || lineCode === '10X') {
+    return true;
+  }
+
+  return (
+    TRIVIATRENS_LIVE_DATA_ENABLED &&
+    TRIVIATRENS_API1_RAIL_LINE_CODES.has(lineCode as Api1RailLineCode)
+  );
 }
 
 function getApi1RailPublicStations(
@@ -242,7 +257,7 @@ export function isValidApi1RailStationCode(
 export function hasExternalRailVehicles(
   lineCode: string,
 ): lineCode is CptmLineCode {
-  return isCptmLine(lineCode);
+  return lineCode === 'L4' || isApi1RailLine(lineCode);
 }
 
 /**
@@ -253,6 +268,23 @@ export function hasExternalRailNextTrain(
   lineCode: string,
 ): lineCode is ActualCptmLineCode | SpecialCptmLineCode {
   return isApi1RailLine(lineCode);
+}
+
+/**
+ * Check whether a line currently has a next-train integration.
+ *
+ * Trivia Trens lines are controlled by TRIVIATRENS_LIVE_DATA_ENABLED so their
+ * former CPTM/AP1 source can be retired without changing agency ownership.
+ */
+export function hasNextTrainIntegration(
+  lineCode: string,
+): lineCode is AllNextTrainLineCode {
+  return (
+    lineCode === 'L4' ||
+    lineCode === 'L8' ||
+    lineCode === 'L9' ||
+    isApi1RailLine(lineCode)
+  );
 }
 
 /**

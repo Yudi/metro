@@ -6,6 +6,7 @@ import {
   RAIL_LINES,
   RailLineInfo,
 } from './rail-line.utils';
+import { TRIVIATRENS_LIVE_DATA_ENABLED } from './transit-agency.utils';
 import { ExtendedNextTrainLineCode } from './viamobilidade-stations';
 
 export interface FavoriteRailLineOption {
@@ -24,9 +25,7 @@ const NEXT_TRAIN_LINE_IDS = new Set<string>([
   'L8',
   'L9',
   'L10',
-  'L11',
-  'L12',
-  'L13',
+  ...(TRIVIATRENS_LIVE_DATA_ENABLED ? ['L11', 'L12', 'L13'] : []),
 ]);
 
 export function uniqueIds(ids: string[]): string[] {

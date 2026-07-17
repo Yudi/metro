@@ -36,13 +36,17 @@ export function getAgencyLogoForRoute(routeName: string): string {
     return '/app/shared/agencies/tictrens.svg';
   }
 
-  // CPTM (Lines 7, 10, 11, 12, 13)
+  // Trivia Trens (Lines 11–13)
   if (
-    normalizedRoute === 'L10' ||
     normalizedRoute === 'L11' ||
     normalizedRoute === 'L12' ||
     normalizedRoute === 'L13'
   ) {
+    return '/app/shared/agencies/triviatrens.svg';
+  }
+
+  // CPTM (Line 10)
+  if (normalizedRoute === 'L10') {
     return '/app/shared/agencies/cptm.svg';
   }
 

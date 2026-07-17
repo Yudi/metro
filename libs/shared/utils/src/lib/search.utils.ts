@@ -3,6 +3,7 @@ import {
   getLineCodesFromColorNames,
 } from './rail-line.utils';
 import { toTitleCase } from './station-name.utils';
+import { TRIVIATRENS_LIVE_DATA_ENABLED } from './transit-agency.utils';
 
 export type SearchTypes =
   | 'busRoute'
@@ -120,9 +121,9 @@ const LIVE_TRAIN_TRACKING_APIS_BY_LINE_CODE: Partial<
   8: ['api2'],
   9: ['api2'],
   10: ['api1'],
-  11: ['api1'],
-  12: ['api1'],
-  13: ['api1'],
+  11: TRIVIATRENS_LIVE_DATA_ENABLED ? ['api1'] : [],
+  12: TRIVIATRENS_LIVE_DATA_ENABLED ? ['api1'] : [],
+  13: TRIVIATRENS_LIVE_DATA_ENABLED ? ['api1'] : [],
 };
 
 export function getLiveTrainTrackingApiIds(

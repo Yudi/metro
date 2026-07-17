@@ -14,6 +14,12 @@ export enum TransitAgency {
   EMTU = 'emtu',
 }
 
+/**
+ * Temporary switch for the live data still sourced through the former CPTM
+ * integration on Trivia Trens lines.
+ */
+export const TRIVIATRENS_LIVE_DATA_ENABLED = true;
+
 export type AgenciesData = Record<
   TransitAgency,
   {
@@ -170,12 +176,26 @@ export const AGENCIES_DATA: AgenciesData = {
     },
   },
   [TransitAgency.TRIVIATRENS]: {
-    name: 'Triviatrens',
-    shortName: 'Triviatrens',
+    name: 'Trivia Trens',
+    shortName: 'Trivia Trens',
     type: 'rail',
     contact: {
-      phones: [],
-      site: '',
+      phones: [
+        {
+          number: '+5511919762794',
+          title: 'Atendimento por WhatsApp',
+          description: 'Seg a Sex das 6h30 às 22h\nSáb e Dom das 8h às 18h',
+          whatsapp: true,
+          sms: false,
+        },
+        {
+          number: '08000070670',
+          title: 'Central de Atendimento',
+          whatsapp: false,
+          sms: false,
+        },
+      ],
+      site: 'https://tictrens.com.br/',
     },
   },
   [TransitAgency.CPTM]: {
@@ -264,9 +284,11 @@ const ROUTE_AGENCY_MAP: Record<string, TransitAgency> = {
 
   // CPTM (cptm.svg)
   L10: TransitAgency.CPTM,
-  L11: TransitAgency.CPTM,
-  L12: TransitAgency.CPTM,
-  L13: TransitAgency.CPTM,
+
+  // Trivia Trens (temporary TicTrens placeholder branding)
+  L11: TransitAgency.TRIVIATRENS,
+  L12: TransitAgency.TRIVIATRENS,
+  L13: TransitAgency.TRIVIATRENS,
 };
 
 /**

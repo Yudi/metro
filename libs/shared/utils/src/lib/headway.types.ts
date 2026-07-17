@@ -3,10 +3,17 @@
  *
  * Lines supported: L4, L8, L9, L10, L11, L12, L13
  * Lines L11, L12, L13 may stop providing data in the future and can be disabled
- * via HEADWAY_ENABLED_LINES config.
+ * through the Trivia Trens live-data switch or HEADWAY_ENABLED_LINES config.
  */
 
 import { ExtendedNextTrainLineCode } from './viamobilidade-stations';
+import { TRIVIATRENS_LIVE_DATA_ENABLED } from './transit-agency.utils';
+
+const TRIVIATRENS_NEXT_TRAIN_LINES: ExtendedNextTrainLineCode[] = [
+  'L11',
+  'L12',
+  'L13',
+];
 
 /**
  * Default lines that have headway tracking enabled.
@@ -17,9 +24,7 @@ export const HEADWAY_DEFAULT_ENABLED_LINES: ExtendedNextTrainLineCode[] = [
   'L8',
   'L9',
   'L10',
-  'L11',
-  'L12',
-  'L13',
+  ...(TRIVIATRENS_LIVE_DATA_ENABLED ? TRIVIATRENS_NEXT_TRAIN_LINES : []),
 ];
 
 /** Minimum number of passage samples required to display headway */

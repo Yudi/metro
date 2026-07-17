@@ -11,6 +11,7 @@ import {
   CptmLineCode,
   TrackedRailVehicle,
   getRailLineByCode,
+  hasExternalRailVehicles,
 } from '@metro/shared/utils';
 
 /**
@@ -224,6 +225,11 @@ export class CptmVehicleLayerService {
    * Subscribe to vehicle updates for a CPTM line
    */
   subscribeToLine(lineCode: CptmLineCode): void {
+    if (!hasExternalRailVehicles(lineCode)) {
+      this.logger.debug(`No vehicle tracking available for line ${lineCode}`);
+      return;
+    }
+
     this.nextTrainService.subscribeToCptmVehicles(lineCode);
     this.subscribedLines.update((set) => new Set([...set, lineCode]));
     this.logger.debug(`Subscribed to CPTM vehicles for line ${lineCode}`);

@@ -10,7 +10,12 @@ import {
   getLiveTrainTrackingApiIds,
   hasLiveTrainTrackingLine,
 } from './search.utils';
-import { getRouteAgency, TransitAgency } from './transit-agency.utils';
+import {
+  AGENCIES_DATA,
+  getRouteAgency,
+  TransitAgency,
+  TRIVIATRENS_LIVE_DATA_ENABLED,
+} from './transit-agency.utils';
 
 describe('Linha 17 agency', () => {
   it('registers Linha 17 as operated by Metro', () => {
@@ -80,5 +85,33 @@ describe('LinhaUni agency', () => {
     expect(getAgencyLogoForRoute('L6')).toBe(
       '/app/shared/agencies/linhauni.svg',
     );
+  });
+});
+
+describe('Trivia Trens agency', () => {
+  it('registers Lines 11, 12, and 13 as operated by Trivia Trens', () => {
+    for (const lineCode of [11, 12, 13]) {
+      expect(getRailLineByCode(lineCode)?.agency).toBe(
+        TransitAgency.TRIVIATRENS,
+      );
+      expect(getRouteAgency(`L${lineCode}`)).toBe(
+        TransitAgency.TRIVIATRENS,
+      );
+      expect(LINE_AGENCY_MAPPING[lineCode]).toBe(
+        TransitAgency.TRIVIATRENS,
+      );
+      expect(getAgencyLogoForRoute(`L${lineCode}`)).toBe(
+        '/app/shared/agencies/triviatrens.svg',
+      );
+    }
+
+    expect(AGENCIES_DATA[TransitAgency.TRIVIATRENS].contact).toEqual(
+      AGENCIES_DATA[TransitAgency.TICTRENS].contact,
+    );
+  });
+
+  it('keeps Trivia Trens live data controlled by one switch', () => {
+    expect(TRIVIATRENS_LIVE_DATA_ENABLED).toBe(true);
+    expect(getLiveTrainTrackingApiIds([11, 12, 13])).toEqual(['api1']);
   });
 });

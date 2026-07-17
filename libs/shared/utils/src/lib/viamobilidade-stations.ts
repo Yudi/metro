@@ -1,6 +1,7 @@
 import {
   type ActualCptmLineCode,
   findApi1RailStationByName,
+  hasExternalRailNextTrain,
 } from './cptm-stations';
 
 /**
@@ -383,7 +384,10 @@ export function findNextTrainStations(
   ];
 
   for (const [numericLineCode, lineCode] of cptmLineCodes) {
-    if (!lineCodes.includes(numericLineCode)) {
+    if (
+      !lineCodes.includes(numericLineCode) ||
+      !hasExternalRailNextTrain(lineCode)
+    ) {
       continue;
     }
 

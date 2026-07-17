@@ -23,9 +23,9 @@ import { SubscribeStationDto, NextTrainUpdateDto } from '../dto/next-train.dto';
 import {
   isValidStation,
   hasExternalRailVehicles,
+  hasNextTrainIntegration,
   isApi1RailLine,
   CptmLineCode,
-  ExtendedNextTrainLineCode,
   isValidApi1RailStationCode,
 } from '@metro/shared/utils';
 
@@ -37,18 +37,6 @@ const NEXT_TRAIN_UPDATE_EVENT = 'next_train_update';
 const CPTM_VEHICLE_SUBSCRIBE_EVENT = 'subscribe_cptm_vehicles';
 const CPTM_VEHICLE_UNSUBSCRIBE_EVENT = 'unsubscribe_cptm_vehicles';
 const CPTM_VEHICLE_UPDATE_EVENT = 'cptm_vehicle_update';
-
-const VALID_LINE_CODES: ExtendedNextTrainLineCode[] = [
-  'L4',
-  'L8',
-  'L9',
-  'L10',
-  'L11',
-  'L12',
-  'L13',
-  'EA',
-  '10X',
-];
 
 /**
  * WebSocket gateway for real-time next train updates and vehicle positions
@@ -125,7 +113,7 @@ export class NextTrainGateway
     const { lineCode, stationCode } = body;
 
     // Validate line code
-    if (!VALID_LINE_CODES.includes(lineCode)) {
+    if (!hasNextTrainIntegration(lineCode)) {
       this.logger.warn(`Invalid line code: ${lineCode}`);
       client.emit('error', {
         message:
@@ -202,7 +190,7 @@ export class NextTrainGateway
   ): void {
     const { lineCode, stationCode } = body;
 
-    if (!VALID_LINE_CODES.includes(lineCode)) return;
+    if (!hasNextTrainIntegration(lineCode)) return;
 
     const key = `${lineCode}:${stationCode}`;
     const subs = this.clientSubscriptions.get(client.id);

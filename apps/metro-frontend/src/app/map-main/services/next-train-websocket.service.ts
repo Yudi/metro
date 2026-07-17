@@ -6,6 +6,7 @@ import {
   ExtendedNextTrainLineCode,
   CptmLineCode,
   hasExternalRailVehicles,
+  hasNextTrainIntegration,
   TrackedRailVehicle,
   DirectionHeadway,
   TrainCarOccupancy,
@@ -143,6 +144,11 @@ export class NextTrainWebsocketService implements OnDestroy {
    * Automatically connects if not already connected
    */
   subscribe(lineCode: ExtendedNextTrainLineCode, stationCode: string): void {
+    if (!hasNextTrainIntegration(lineCode)) {
+      this.logger.warn(`No next-train integration for line: ${lineCode}`);
+      return;
+    }
+
     const key: SubscriptionKey = `${lineCode}:${stationCode}`;
 
     if (this.activeSubscriptions.has(key)) {

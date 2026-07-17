@@ -14,23 +14,11 @@ import {
   getStationName,
   isValidStation,
   NextTrainLineCode,
-  ExtendedNextTrainLineCode,
   isApi1RailLine,
+  hasNextTrainIntegration,
   findApi1RailStationByName,
   isValidApi1RailStationCode,
 } from '@metro/shared/utils';
-
-const VALID_LINE_CODES: ExtendedNextTrainLineCode[] = [
-  'L4',
-  'L8',
-  'L9',
-  'L10',
-  'L11',
-  'L12',
-  'L13',
-  'EA',
-  '10X',
-];
 
 @Resolver(() => NextTrainArrival)
 export class NextTrainResolver {
@@ -59,7 +47,7 @@ export class NextTrainResolver {
     stationCode: string,
   ): Promise<StationNextTrains | null> {
     // Validate line code
-    if (!VALID_LINE_CODES.includes(lineCode as ExtendedNextTrainLineCode)) {
+    if (!hasNextTrainIntegration(lineCode)) {
       return null;
     }
 

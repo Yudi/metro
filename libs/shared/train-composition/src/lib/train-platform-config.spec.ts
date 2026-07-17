@@ -91,6 +91,7 @@ describe('train platform configuration', () => {
     );
 
     expect(composition?.hasLiveOccupancy).toBe(false);
+    expect(composition?.disembarkingSide).toBe('left');
     expect(composition?.cars).toHaveLength(6);
     expect(composition?.cars.map((car) => car.carPosition)).toEqual([
       6, 5, 4, 3, 2, 1,
@@ -175,6 +176,7 @@ describe('train platform configuration', () => {
     );
 
     expect(composition?.hasLiveOccupancy).toBe(true);
+    expect(composition?.disembarkingSide).toBe('left');
     expect(composition?.cars.at(-1)).toMatchObject({
       carPosition: 1,
       mode: 'right',

@@ -26,6 +26,15 @@
         </div>
       }
     </header>
+  } @else if (disembarkingSideLabel(); as sideLabel) {
+    <div class="train-composition-card__meta train-composition-card__meta--compact">
+      <span class="train-composition-card__pill">
+        <span class="material-symbols-outlined" aria-hidden="true">
+          door_open
+        </span>
+        {{ sideLabel }}
+      </span>
+    </div>
   }
 
   <div

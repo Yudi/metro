@@ -137,6 +137,10 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
     return this.stationData()?.operationClosed ?? false;
   });
 
+  readonly outOfSchedule = computed(() => {
+    return this.stationData()?.outOfSchedule ?? false;
+  });
+
   /** Headway data per direction */
   readonly headway = computed(() => {
     return this.stationData()?.headway ?? [];

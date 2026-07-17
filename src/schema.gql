@@ -718,6 +718,10 @@ type StationNextTrains {
   """Line code (L4, L8, or L9)"""
   lineCode: String!
 
+  operationClosed: Boolean
+
+  outOfSchedule: Boolean
+
   """Station code"""
   stationCode: String!
 

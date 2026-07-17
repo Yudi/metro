@@ -94,6 +94,7 @@ interface MockNextTrainServiceOptions {
   lineCode: string;
   stationCode: string;
   operationClosed?: boolean;
+  outOfSchedule?: boolean;
 }
 
 function createMockNextTrainService(
@@ -110,6 +111,7 @@ function createMockNextTrainService(
       dataReceived: opts.lastUpdate !== null,
       processing: false,
       operationClosed: opts.operationClosed ?? false,
+      outOfSchedule: opts.outOfSchedule ?? false,
     });
   }
 
@@ -332,6 +334,25 @@ export const OperationClosed: Story = {
         lineCode: 'L9',
         stationCode: 'HBR',
         operationClosed: true,
+      }),
+    }),
+  ],
+};
+
+export const OutOfSchedule: Story = {
+  args: {
+    lineCode: '10X',
+    stationCode: 'TAM',
+  },
+  decorators: [
+    applicationConfig({
+      providers: createProviders({
+        connected: true,
+        lastUpdate: Date.now(),
+        trains: [],
+        lineCode: '10X',
+        stationCode: 'TAM',
+        outOfSchedule: true,
       }),
     }),
   ],

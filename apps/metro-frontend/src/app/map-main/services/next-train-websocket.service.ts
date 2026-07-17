@@ -54,6 +54,7 @@ export interface NextTrainUpdate {
   processing?: boolean;
   /** True when operation is closed and no station arrival data remains relevant */
   operationClosed?: boolean;
+  outOfSchedule?: boolean;
   /** Average headway per direction (if available) */
   headway?: DirectionHeadway[];
 }
@@ -70,6 +71,7 @@ export interface StationTrainData {
   processing: boolean;
   /** True when operation is closed and no station arrival data remains relevant */
   operationClosed: boolean;
+  outOfSchedule: boolean;
   /** Average headway per direction (if available) */
   headway?: DirectionHeadway[];
 }
@@ -370,6 +372,7 @@ export class NextTrainWebsocketService implements OnDestroy {
         dataReceived: !(update.processing ?? false),
         processing: update.processing ?? false,
         operationClosed: update.operationClosed ?? false,
+        outOfSchedule: update.outOfSchedule ?? false,
         headway: update.headway,
       });
       return newMap;

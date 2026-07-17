@@ -9,6 +9,7 @@ import {
   LineCode,
 } from './services/next-train-polling.service';
 import { HeadwayTrackingService } from './services/headway-tracking.service';
+import { NextTrainScheduleService } from './services/next-train-schedule.service';
 import { RailRealtimeSourcePort } from '@metro/rail-integration-contracts';
 import {
   getStationName,
@@ -26,6 +27,7 @@ export class NextTrainResolver {
     private readonly polling: NextTrainPollingService,
     private readonly externalRailProvider: RailRealtimeSourcePort,
     private readonly headwayTracking: HeadwayTrackingService,
+    private readonly schedule: NextTrainScheduleService,
   ) {}
 
   @Query(() => StationNextTrains, {
@@ -67,6 +69,33 @@ export class NextTrainResolver {
       return null;
     }
 
+    const outOfSchedule = !(await this.schedule.isOperating(
+      typedLineCode,
+      new Date(),
+    ));
+
+    if (outOfSchedule) {
+      const stationName =
+        (await this.externalRailProvider.getStationName(
+          typedLineCode,
+          stationCode,
+        )) ??
+        (!isApi1RailLine(typedLineCode)
+          ? getStationName(typedLineCode as NextTrainLineCode, stationCode)
+          : undefined) ??
+        stationCode;
+
+      return {
+        stationCode,
+        stationName,
+        lineCode: typedLineCode,
+        trains: [],
+        operationClosed: false,
+        outOfSchedule: true,
+        fetchedAt: new Date(),
+      };
+    }
+
     // Check cache first
     const cached = this.polling.getCached(typedLineCode, stationCode);
     if (cached) {
@@ -91,6 +120,7 @@ export class NextTrainResolver {
           updatedAt: new Date().toISOString(),
         })),
         operationClosed: cached.operationClosed,
+        outOfSchedule: cached.outOfSchedule,
         fetchedAt: new Date(cached.fetchedAt),
         headway: headway?.directions,
       };
@@ -131,6 +161,7 @@ export class NextTrainResolver {
         updatedAt: new Date().toISOString(),
       })),
       operationClosed: false,
+      outOfSchedule,
       fetchedAt: new Date(),
       headway: headway?.directions,
     };

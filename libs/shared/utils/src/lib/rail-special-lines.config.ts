@@ -23,6 +23,8 @@ export const EXPRESSO_AEROPORTO_SCHEDULE = {
   sundayIntervalMinutes: 30,
 } as const;
 
+export const EXPRESSO_AEROPORTO_QUERY_MARGIN_MINUTES = 40;
+
 export const EXPRESSO_LINHA_10_SCHEDULE = {
   departures: {
     santoAndre: [
@@ -80,6 +82,78 @@ export const EXPRESSO_LINHA_10_SCHEDULE = {
   closedUntil: '04:00',
   closedAfter: '20:00',
 } as const;
+
+export const EXPRESSO_LINHA_10_QUERY_MARGIN_MINUTES = 20;
+
+const WEEKDAY_NAMES = new Set(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
+
+function getSaoPauloScheduleTime(now: Date): {
+  weekday: string;
+  minutes: number;
+} {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: SPECIAL_RAIL_TIMEZONE,
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(now);
+  const valueFor = (type: Intl.DateTimeFormatPartTypes): string =>
+    parts.find((part) => part.type === type)?.value ?? '';
+
+  return {
+    weekday: valueFor('weekday'),
+    minutes:
+      Number.parseInt(valueFor('hour'), 10) * 60 +
+      Number.parseInt(valueFor('minute'), 10),
+  };
+}
+
+export function isExpressoAeroportoScheduledAt(
+  now: Date,
+  marginMinutes: number = EXPRESSO_AEROPORTO_QUERY_MARGIN_MINUTES,
+): boolean {
+  const { weekday, minutes } = getSaoPauloScheduleTime(now);
+  const intervalMinutes =
+    weekday === 'Sun'
+      ? EXPRESSO_AEROPORTO_SCHEDULE.sundayIntervalMinutes
+      : EXPRESSO_AEROPORTO_SCHEDULE.weekdayIntervalMinutes;
+  const departures = Array.from(
+    { length: 1 + (24 * 60 - 5 * 60) / intervalMinutes },
+    (_, index) => 5 * 60 + index * intervalMinutes,
+  );
+  const timelineMinutes = [minutes, minutes + 24 * 60];
+
+  return departures.some((departure) =>
+    timelineMinutes.some(
+      (currentMinute) => Math.abs(currentMinute - departure) <= marginMinutes,
+    ),
+  );
+}
+
+export function isExpressoLinha10ScheduledAt(
+  now: Date,
+  marginMinutes: number = EXPRESSO_LINHA_10_QUERY_MARGIN_MINUTES,
+): boolean {
+  const { weekday, minutes } = getSaoPauloScheduleTime(now);
+
+  if (
+    EXPRESSO_LINHA_10_SCHEDULE.weekdaysOnly &&
+    !WEEKDAY_NAMES.has(weekday)
+  ) {
+    return false;
+  }
+
+  const departures = [
+    ...EXPRESSO_LINHA_10_SCHEDULE.departures.santoAndre,
+    ...EXPRESSO_LINHA_10_SCHEDULE.departures.tamanduatei,
+  ];
+
+  return departures.some((departure) => {
+    const [hour, minute] = departure.split(':').map(Number);
+    return Math.abs(minutes - (hour * 60 + minute)) <= marginMinutes;
+  });
+}
 
 export const AEROMOVEL_GRU_OPERATION = {
   openFrom: '16:00',

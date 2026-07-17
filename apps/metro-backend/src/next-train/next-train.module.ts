@@ -7,6 +7,7 @@ import { HeadwayCacheService } from './services/headway-cache.service';
 import { HeadwayTrackingService } from './services/headway-tracking.service';
 import { CptmHeadwayTrackingService } from './services/cptm-headway-tracking.service';
 import { HeadwayPollingService } from './services/headway-polling.service';
+import { NextTrainScheduleService } from './services/next-train-schedule.service';
 import { WsThrottlerGuard } from '../common/guards/ws-throttler.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { RailIntegrationClientModule } from '../rail-integration/rail-integration-client.module';
@@ -19,6 +20,7 @@ import { RailModule } from '../rail/rail.module';
     WsThrottlerGuard,
     CptmVehiclePollingService,
     NextTrainPollingService,
+    NextTrainScheduleService,
     HeadwayCacheService,
     HeadwayTrackingService,
     CptmHeadwayTrackingService,

@@ -14,6 +14,7 @@ import {
 } from '../dto/next-train.dto';
 import { RailRealtimeSourcePort } from '@metro/rail-integration-contracts';
 import { RailService } from '../../rail/rail.service';
+import { NextTrainScheduleService } from './next-train-schedule.service';
 
 export type LineCode = ExtendedNextTrainLineCode;
 
@@ -31,6 +32,7 @@ export interface StationCacheEntry {
   hasError: boolean;
   /** True when operation is closed and no station arrival data remains relevant */
   operationClosed: boolean;
+  outOfSchedule: boolean;
 }
 
 export interface StationDelta {
@@ -42,6 +44,7 @@ export interface StationDelta {
   hasError: boolean;
   /** True when operation is closed and no station arrival data remains relevant */
   operationClosed: boolean;
+  outOfSchedule: boolean;
 }
 
 type PollCompleteListener = (deltas: StationDelta[]) => void;
@@ -101,6 +104,7 @@ export class NextTrainPollingService implements OnModuleDestroy {
   constructor(
     private readonly externalRailProvider: RailRealtimeSourcePort,
     private readonly railService: RailService,
+    private readonly schedule: NextTrainScheduleService,
   ) {}
 
   onModuleDestroy(): void {
@@ -363,15 +367,26 @@ export class NextTrainPollingService implements OnModuleDestroy {
   ): Promise<{ delta: StationDelta | null; hasError: boolean }> {
     const { lineCode, stationCode } = this.parseKey(key);
     const cached = this.cache.get(key);
-    const operationClosed = await this.shouldCloseOperation(
+    const outOfSchedule = !(await this.schedule.isOperating(
       lineCode,
-      cached,
-      timestamp,
-    );
-    const { trains, isApiError } = operationClosed
+      new Date(timestamp),
+    ));
+    const operationClosed = outOfSchedule
+      ? false
+      : await this.shouldCloseOperation(
+          lineCode,
+          cached,
+          timestamp,
+        );
+    const { trains, isApiError } = operationClosed || outOfSchedule
       ? { trains: [], isApiError: false }
       : await this.fetchTrains(lineCode, stationCode);
-    const newHash = this.computeHash(trains, isApiError, operationClosed);
+    const newHash = this.computeHash(
+      trains,
+      isApiError,
+      operationClosed,
+      outOfSchedule,
+    );
 
     const stationName =
       (await this.externalRailProvider.getStationName(lineCode, stationCode)) ??
@@ -389,16 +404,19 @@ export class NextTrainPollingService implements OnModuleDestroy {
       fetchedAt: timestamp,
       hasError: isApiError,
       operationClosed,
+      outOfSchedule,
     };
     this.cache.set(key, entry);
 
     const errorStateChanged = cached?.hasError !== isApiError;
     const operationStateChanged = cached?.operationClosed !== operationClosed;
+    const scheduleStateChanged = cached?.outOfSchedule !== outOfSchedule;
     if (
       !cached ||
       cached.hash !== newHash ||
       errorStateChanged ||
-      operationStateChanged
+      operationStateChanged ||
+      scheduleStateChanged
     ) {
       return {
         delta: {
@@ -408,6 +426,7 @@ export class NextTrainPollingService implements OnModuleDestroy {
           timestamp,
           hasError: isApiError,
           operationClosed,
+          outOfSchedule,
         },
         hasError: isApiError,
       };
@@ -431,6 +450,7 @@ export class NextTrainPollingService implements OnModuleDestroy {
     trains: NextTrainArrivalDto[],
     hasError: boolean,
     operationClosed: boolean,
+    outOfSchedule: boolean,
   ): string {
     const sorted = [...trains].sort((a, b) => {
       const destCompare = a.destinationCode.localeCompare(b.destinationCode);
@@ -441,6 +461,7 @@ export class NextTrainPollingService implements OnModuleDestroy {
     const data = {
       hasError,
       operationClosed,
+      outOfSchedule,
       trains: sorted.map((t) => ({
         dest: t.destinationCode,
         curr: t.trainCurrentStationName,

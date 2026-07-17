@@ -27,6 +27,6 @@ import { RailIncidentHistoryService } from './rail-incident-history.service';
     RailApiService,
     RailIncidentHistoryService,
   ],
-  exports: [RailService],
+  exports: [RailService, RailHolidayService],
 })
 export class RailModule {}

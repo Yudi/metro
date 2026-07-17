@@ -134,6 +134,13 @@ export class StationNextTrains {
   })
   operationClosed?: boolean;
 
+  @Field(() => Boolean, {
+    nullable: true,
+    description:
+      'Whether a special service has no scheduled departure within its operating margin',
+  })
+  outOfSchedule?: boolean;
+
   @Field(() => Date, {
     nullable: true,
     description: 'When the data was last fetched',

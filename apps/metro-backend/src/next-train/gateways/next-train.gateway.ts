@@ -166,6 +166,7 @@ export class NextTrainGateway
         hasError: cached.hasError,
         processing: false,
         operationClosed: cached.operationClosed,
+        outOfSchedule: cached.outOfSchedule,
         headway: headway?.directions,
       };
       client.emit(NEXT_TRAIN_UPDATE_EVENT, update);
@@ -287,6 +288,7 @@ export class NextTrainGateway
             hasError: delta.hasError,
             processing: false,
             operationClosed: delta.operationClosed,
+            outOfSchedule: delta.outOfSchedule,
             headway: headway?.directions,
           };
 
@@ -306,6 +308,7 @@ export class NextTrainGateway
             hasError: delta.hasError,
             processing: false,
             operationClosed: delta.operationClosed,
+            outOfSchedule: delta.outOfSchedule,
           };
 
           for (const clientId of subscribers) {

@@ -151,6 +151,7 @@ function createMockNextTrainService(
       dataReceived: true,
       processing: false,
       operationClosed: false,
+      outOfSchedule: false,
     });
   }
 

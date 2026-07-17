@@ -127,6 +127,13 @@ export class NextTrainUpdateDto {
   operationClosed?: boolean;
 
   @ApiProperty({
+    description:
+      'Whether a special service has no scheduled departure within its operating margin',
+    required: false,
+  })
+  outOfSchedule?: boolean;
+
+  @ApiProperty({
     description: 'Average headway (time between trains) per direction',
     required: false,
   })

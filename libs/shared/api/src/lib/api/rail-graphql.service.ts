@@ -57,6 +57,7 @@ export interface StationNextTrains {
   lineCode: string;
   trains: RailNextTrainArrival[];
   operationClosed?: boolean;
+  outOfSchedule?: boolean;
   fetchedAt?: string;
 }
 
@@ -420,6 +421,7 @@ export class RailGraphqlService {
           stationName
           lineCode
           operationClosed
+          outOfSchedule
           fetchedAt
           trains {
             lineCode

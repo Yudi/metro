@@ -146,7 +146,10 @@
         </div>
       }
 
-      @for (direction of staticCompositionDirections(); track direction.terminal) {
+      @for (
+        direction of staticCompositionDirections();
+        track direction.terminal
+      ) {
         <div class="direction-group">
           <div class="direction-header">
             <mat-icon>arrow_forward</mat-icon>
@@ -160,6 +163,11 @@
         </div>
       }
     </div>
+  } @else if (outOfSchedule()) {
+    <div class="operation-closed-state">
+      <mat-icon>schedule</mat-icon>
+      <span>Fora do horário de operação</span>
+    </div>
   } @else if (operationClosed()) {
     <div class="operation-closed-state">
       <mat-icon>nightlight</mat-icon>
@@ -167,7 +175,10 @@
     </div>
   } @else if (staticCompositionDirections().length > 0 && dataReceived()) {
     <div class="directions-container">
-      @for (direction of staticCompositionDirections(); track direction.terminal) {
+      @for (
+        direction of staticCompositionDirections();
+        track direction.terminal
+      ) {
         <div class="direction-group">
           <div class="direction-header">
             <mat-icon>arrow_forward</mat-icon>

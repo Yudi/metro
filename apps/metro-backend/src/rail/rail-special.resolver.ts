@@ -1,4 +1,7 @@
+import { Logger } from '@nestjs/common';
 import { Resolver, Query } from '@nestjs/graphql';
+import { RailStatusSourcePort } from '@metro/rail-integration-contracts';
+import { SPECIAL_RAIL_LINE_CODES } from '@metro/shared/utils';
 import { RailService } from './rail.service';
 import { SpecialRailLine } from './entities/rail-special-line.entity';
 import { RailSpecialLinesService } from './rail-special-lines.service';
@@ -10,12 +13,15 @@ import { RailHolidayService } from './rail-holiday.service';
 
 @Resolver(() => SpecialRailLine)
 export class RailSpecialResolver {
+  private readonly logger = new Logger(RailSpecialResolver.name);
+
   constructor(
     private readonly railService: RailService,
     private readonly railSpecialLinesService: RailSpecialLinesService,
     private readonly railSpecialInfoService: RailSpecialInfoService,
     private readonly railSpecialServicesService: RailSpecialServicesService,
     private readonly railHolidayService: RailHolidayService,
+    private readonly railStatusSource: RailStatusSourcePort,
   ) {}
 
   @Query(() => [SpecialRailLine], {
@@ -27,12 +33,26 @@ export class RailSpecialResolver {
     const regularLinesStatus = await this.railService.getLinesStatus();
     const now = new Date();
     const isHoliday = await this.railHolidayService.isHolidayInSaoPaulo(now);
+    const expressoAeroportoStatus = await this.fetchExpressoAeroportoStatus();
 
     return this.railSpecialLinesService.getSpecialLinesStatus(
       regularLinesStatus.lines,
       now,
       { isHoliday },
+      expressoAeroportoStatus,
     );
+  }
+
+  private async fetchExpressoAeroportoStatus() {
+    try {
+      const specialLines =
+        await this.railStatusSource.fetchSpecialRailStatusLines();
+      return specialLines.get(SPECIAL_RAIL_LINE_CODES.EXPRESSO_AEROPORTO);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Could not load special rail statuses: ${message}`);
+      return undefined;
+    }
   }
 
   @Query(() => [SpecialRailInfoCard], {

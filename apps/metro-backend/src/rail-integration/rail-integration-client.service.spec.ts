@@ -2,7 +2,7 @@ import { HttpService } from '@nestjs/axios';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AxiosError, AxiosHeaders } from 'axios';
-import { throwError } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { RailIntegrationClientService } from './rail-integration-client.service';
 
 describe('RailIntegrationClientService', () => {
@@ -80,6 +80,39 @@ describe('RailIntegrationClientService', () => {
 
     expect(loggerErrorSpy).toHaveBeenCalledWith(
       'Rail integration POST rail-integration/next-trains failed: ECONNREFUSED url=http://metro-core-private:3000/api/rail-integration/next-trains connect ECONNREFUSED 127.0.0.1:3001',
+    );
+  });
+
+  it('loads special-service statuses through the generic rail integration route', async () => {
+    const http = {
+      get: jest.fn(() =>
+        of({
+          data: [
+            {
+              code: 'EA',
+              statusCode: 'Paralisada',
+              statusLabel: 'Operação Paralisada',
+              statusColor: 'vermelho',
+              description: 'Serviço temporariamente paralisado.',
+            },
+          ],
+        }),
+      ),
+    } as unknown as HttpService;
+    const service = new RailIntegrationClientService(
+      http,
+      configServiceWithUrl('http://metro-core-private:3000/api'),
+    );
+
+    const lines = await service.fetchSpecialRailStatusLines();
+
+    expect(lines.get('EA')).toMatchObject({
+      statusCode: 'Paralisada',
+      description: 'Serviço temporariamente paralisado.',
+    });
+    expect(http.get).toHaveBeenCalledWith(
+      'http://metro-core-private:3000/api/rail-integration/special-status-lines',
+      { params: undefined, timeout: 120_000 },
     );
   });
 });

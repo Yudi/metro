@@ -13,6 +13,18 @@ export interface RailStatusSourceLine {
   detail?: string;
 }
 
+export interface RailSpecialStatusSourceLine {
+  code: string;
+  statusCode: RailStatusCode;
+  statusLabel: string;
+  statusColor: RailStatusColor;
+  description?: string;
+}
+
 export abstract class RailStatusSourcePort {
   abstract fetchRailStatusLines(): Promise<Map<number, RailStatusSourceLine>>;
+
+  abstract fetchSpecialRailStatusLines(): Promise<
+    Map<string, RailSpecialStatusSourceLine>
+  >;
 }

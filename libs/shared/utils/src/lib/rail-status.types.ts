@@ -108,6 +108,7 @@ export const STATUS_LABEL_TO_CODE: Record<string, RailStatusCode> = {
   operacaoparcial: 'OperacaoParcial',
   maioresintervalos: 'MaioresIntervalos',
   paralisada: 'Paralisada',
+  operacaoparalisada: 'Paralisada',
   statusdesconhecido: 'StatusDesconhecido',
   dadosindisponiveis: 'DadosIndisponiveis',
 };

@@ -48,6 +48,17 @@
     @if (expandedLine() === line.code) {
     <div class="description">
       <div class="description-title">{{ line.code }} - {{ line.line }}</div>
+      @if (line.statusCode !== 'OperacaoNormal') {
+      <p>{{ line.statusLabel }}</p>
+      }
+      @for (issue of line.issues; track issue.description) {
+      <p>{{ issue.description }}</p>
+      }
+      @if (line.statusCode === 'OperacaoNormal') {
+      @for (departure of line.nextDepartures; track departure.label) {
+      <p>{{ departure.label }}: {{ departure.time }}</p>
+      }
+      }
     </div>
     } } }
     <div class="updated">

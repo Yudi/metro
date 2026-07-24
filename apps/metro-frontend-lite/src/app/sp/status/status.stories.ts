@@ -133,6 +133,37 @@ export const ComOcorrencias: Story = {
   ],
 };
 
+export const ExpressoAeroportoParalisado: Story = {
+  decorators: [
+    applicationConfig({
+      providers: [
+        {
+          provide: ApiService,
+          useValue: createApiService({
+            ...createStatusResponse(ALL_LINES_NORMAL),
+            specialLines: [
+              {
+                ...specialServices[0],
+                statusCode: 'Paralisada',
+                statusLabel: 'Operação Paralisada',
+                statusColor: 'vermelho',
+                nextDepartures: [],
+                issues: [
+                  {
+                    code: 0,
+                    line: 'Expresso Aeroporto',
+                    description: 'Serviço temporariamente paralisado.',
+                  },
+                ],
+              },
+            ],
+          }),
+        },
+      ],
+    }),
+  ],
+};
+
 export const Encerrada: Story = {
   decorators: [
     applicationConfig({

@@ -25,6 +25,7 @@ import {
   STATUS_CODE_TO_COLOR,
   STATUS_CODE_TO_LABEL,
 } from '@metro/shared/utils';
+import { RailSpecialStatusSourceLine } from '@metro/rail-integration-contracts';
 import { RailLine } from './entities/rail-line-status.entity';
 import {
   SpecialRailDeparture,
@@ -40,11 +41,16 @@ export class RailSpecialLinesService {
     regularLines: RailLine[],
     now: Date = new Date(),
     options: { isHoliday?: boolean } = {},
+    expressoAeroportoStatus?: RailSpecialStatusSourceLine,
   ): SpecialRailLine[] {
     const saoPauloNow = this.getSaoPauloNow(now);
 
     return [
-      this.buildExpressoAeroportoStatus(regularLines, saoPauloNow),
+      this.buildExpressoAeroportoStatus(
+        regularLines,
+        saoPauloNow,
+        expressoAeroportoStatus,
+      ),
       this.buildExpressoLinha10Status(
         regularLines,
         saoPauloNow,
@@ -57,7 +63,28 @@ export class RailSpecialLinesService {
   private buildExpressoAeroportoStatus(
     regularLines: RailLine[],
     now: Date,
+    externalStatus?: RailSpecialStatusSourceLine,
   ): SpecialRailLine {
+    if (externalStatus && externalStatus.statusCode !== 'OperacaoNormal') {
+      return this.buildSpecialLine({
+        code: SPECIAL_RAIL_LINE_CODES.EXPRESSO_AEROPORTO,
+        line: 'Expresso Aeroporto',
+        colorName: 'Preto',
+        colorHex: '#000000',
+        statusCode: externalStatus.statusCode,
+        statusLabel: externalStatus.statusLabel,
+        issues: externalStatus.description
+          ? [
+              {
+                code: 0,
+                line: 'Expresso Aeroporto',
+                description: externalStatus.description,
+              },
+            ]
+          : [],
+      });
+    }
+
     const issues = this.findIssuesByKeyword(
       regularLines,
       SPECIAL_RAIL_LINE_KEYWORDS.EXPRESSO_AEROPORTO,

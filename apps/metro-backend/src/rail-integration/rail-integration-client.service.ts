@@ -17,6 +17,7 @@ import {
   RailVehiclePosition,
   RailStatusSourceLine,
   RailStatusSourcePort,
+  RailSpecialStatusSourceLine,
 } from '@metro/rail-integration-contracts';
 
 const LOCAL_RAIL_INTEGRATION_API_URL = 'http://localhost:3001/api';
@@ -125,6 +126,15 @@ export class RailIntegrationClientService
   async fetchRailStatusLines(): Promise<Map<number, RailStatusSourceLine>> {
     const lines = await this.get<RailStatusSourceLine[]>(
       'rail-integration/status-lines',
+    );
+    return new Map(lines.map((line) => [line.code, line]));
+  }
+
+  async fetchSpecialRailStatusLines(): Promise<
+    Map<string, RailSpecialStatusSourceLine>
+  > {
+    const lines = await this.get<RailSpecialStatusSourceLine[]>(
+      'rail-integration/special-status-lines',
     );
     return new Map(lines.map((line) => [line.code, line]));
   }

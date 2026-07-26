@@ -177,7 +177,7 @@ describe('train platform configuration', () => {
 
     expect(composition?.hasLiveOccupancy).toBe(true);
     expect(composition?.disembarkingSide).toBe('left');
-    expect(composition?.cars.at(-1)).toMatchObject({
+    expect(composition?.cars.slice(-1)[0]).toMatchObject({
       carPosition: 1,
       mode: 'right',
       load: {
@@ -229,7 +229,7 @@ describe('train platform configuration', () => {
 
     expect(composition?.trainFacingSideRelativeToBoarding).toBeUndefined();
     expect(composition?.cars[0]?.carPosition).toBe(1);
-    expect(composition?.cars.at(-1)?.carPosition).toBe(6);
+    expect(composition?.cars.slice(-1)[0]?.carPosition).toBe(6);
   });
 
   it('positions door anchors using the displayed train orientation', () => {

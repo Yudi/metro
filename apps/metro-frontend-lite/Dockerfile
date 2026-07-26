@@ -17,15 +17,7 @@ ENV NG_BUILD_MAX_WORKERS=1 \
     NODE_OPTIONS=--max-old-space-size=3072
 COPY nx.json tsconfig.base.json ./
 COPY apps/metro-frontend-lite ./apps/metro-frontend-lite
-COPY libs/shared/api ./libs/shared/api
-COPY libs/shared/assets ./libs/shared/assets
-COPY libs/shared/environment ./libs/shared/environment
-COPY libs/shared/firebase ./libs/shared/firebase
-COPY libs/shared/geolocation ./libs/shared/geolocation
-COPY libs/shared/lite-ui ./libs/shared/lite-ui
-COPY libs/shared/seo ./libs/shared/seo
-COPY libs/shared/storybook-mocks ./libs/shared/storybook-mocks
-COPY libs/shared/utils ./libs/shared/utils
+COPY libs ./libs
 RUN --mount=type=cache,target=/workspace/.nx/cache \
     bun x nx build metro-frontend-lite --configuration=production
 

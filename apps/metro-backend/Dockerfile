@@ -34,9 +34,7 @@ FROM prisma-deps AS builder
 WORKDIR /workspace
 COPY nx.json tsconfig.base.json ./
 COPY apps/metro-backend ./apps/metro-backend
-COPY libs/shared/environment ./libs/shared/environment
-COPY libs/shared/rail-integration-contracts ./libs/shared/rail-integration-contracts
-COPY libs/shared/utils ./libs/shared/utils
+COPY libs ./libs
 RUN --mount=type=cache,target=/workspace/.nx/cache \
     bun x nx build metro-backend --configuration=production
 

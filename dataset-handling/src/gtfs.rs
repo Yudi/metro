@@ -153,7 +153,19 @@ pub async fn process_gtfs_shapes(
     shapes_path: &str,
     db_url: &str,
     srid: i32,
+    schema: &str,
 ) -> Result<(), GtfsError> {
+    if schema.is_empty()
+        || !schema
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || character == '_')
+    {
+        return Err(GtfsError::InvalidData(format!(
+            "Invalid PostgreSQL schema name: {}",
+            schema
+        )));
+    }
+
     info!("Starting GTFS shapes processing for {}", shapes_path);
     let shapes = read_shapes(shapes_path)?;
     let linestrings = shapes_to_linestrings(&shapes);
@@ -162,10 +174,11 @@ pub async fn process_gtfs_shapes(
     info!("Successfully connected to PostGIS");
 
     let create_table_query = format!(
-        "CREATE TABLE IF NOT EXISTS \"SPTrans_Shape\" (
+        "CREATE TABLE IF NOT EXISTS \"{}\".\"SPTrans_Shape\" (
         shape_id text PRIMARY KEY,
         geom GEOMETRY(LINESTRING, {}) NOT NULL
     )",
+        schema,
         srid
     );
     client.execute(&create_table_query, &[]).await?;
@@ -187,7 +200,11 @@ pub async fn process_gtfs_shapes(
     info!("Created temporary staging table");
 
     // Prepare insert statement for batching
-    let insert_stmt = tx.prepare("INSERT INTO \"SPTrans_Shape\" (shape_id, geom) VALUES ($1, ST_GeomFromText($2, $3)) ON CONFLICT (shape_id) DO UPDATE SET geom = EXCLUDED.geom").await?;
+    let insert_query = format!(
+        "INSERT INTO \"{}\".\"SPTrans_Shape\" (shape_id, geom) VALUES ($1, ST_GeomFromText($2, $3)) ON CONFLICT (shape_id) DO UPDATE SET geom = EXCLUDED.geom",
+        schema
+    );
+    let insert_stmt = tx.prepare(&insert_query).await?;
     let staging_stmt = tx
         .prepare("INSERT INTO staging_shapes (shape_id) VALUES ($1) ON CONFLICT DO NOTHING")
         .await?;
@@ -212,12 +229,11 @@ pub async fn process_gtfs_shapes(
     info!("Inserted/updated {} shapes", inserted_count);
 
     // Delete missing shapes
-    let delete_result = tx
-        .execute(
-            "DELETE FROM \"SPTrans_Shape\" WHERE shape_id NOT IN (SELECT shape_id FROM staging_shapes)",
-            &[],
-        )
-        .await?;
+    let delete_query = format!(
+        "DELETE FROM \"{}\".\"SPTrans_Shape\" WHERE shape_id NOT IN (SELECT shape_id FROM staging_shapes)",
+        schema
+    );
+    let delete_result = tx.execute(&delete_query, &[]).await?;
     let deleted_count = delete_result as usize;
     info!("Deleted {} obsolete shapes", deleted_count);
 

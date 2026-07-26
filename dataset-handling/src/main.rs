@@ -30,6 +30,9 @@ pub struct DatabaseImporterArgs {
     /// SRID for geometries
     #[arg(long, default_value = "4326")]
     srid: i32,
+    /// PostgreSQL schema containing the GTFS tables
+    #[arg(long, default_value = "external_gtfs")]
+    schema: String,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -43,6 +46,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 &import_args.shapes_path,
                 &import_args.db_url,
                 import_args.srid,
+                &import_args.schema,
             ))?;
         }
     }

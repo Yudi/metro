@@ -46,8 +46,41 @@ export class GTFSDatabaseService {
     try {
       const dataset = await this.prisma.gTFSDataset.findFirst({
         where: { fileHash },
+        include: {
+          gtfsFiles: {
+            where: { fileName: 'shapes.txt' },
+            select: { recordCount: true },
+          },
+        },
       });
-      return dataset !== null;
+      if (!dataset) {
+        return false;
+      }
+
+      const shapesFile = dataset.gtfsFiles[0];
+      if (!shapesFile?.recordCount || shapesFile.recordCount <= 0) {
+        this.logger.warn(
+          'Current GTFS dataset has no successful shapes.txt import; forcing reimport',
+        );
+        return false;
+      }
+
+      const [shapeCount] = await this.prisma.$queryRaw<
+        Array<{ count: bigint }>
+      >`
+        SELECT COUNT(*) AS count
+        FROM "external_gtfs"."SPTrans_Shape"
+        WHERE geom IS NOT NULL
+      `;
+
+      if (!shapeCount || Number(shapeCount.count) === 0) {
+        this.logger.warn(
+          'Current GTFS dataset has no imported shape geometries; forcing reimport',
+        );
+        return false;
+      }
+
+      return true;
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';

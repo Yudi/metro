@@ -17,7 +17,15 @@ module.exports = {
       compiler: 'babel',
       main: 'apps/metro-backend/src/main.ts',
       tsConfig: 'apps/metro-backend/tsconfig.app.json',
-      assets: ['apps/metro-backend/src/assets'],
+      assets: [
+        'apps/metro-backend/src/assets',
+        {
+          input:
+            'libs/shared/rail-integration-contracts/src/assets/grpc',
+          glob: '*.proto',
+          output: 'assets/grpc',
+        },
+      ],
       optimization: false,
       outputHashing: 'none',
       generatePackageJson: true,

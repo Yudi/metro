@@ -40,6 +40,9 @@ jobs:
       - name: Generate Prisma clients
         run: bunx nx run metro-backend:prisma-generate
 
+      - name: Verify rail integration protobuf contract
+        run: node tools/verify-rail-integration-contract.mjs
+
       - name: Set Nx SHAs
         uses: nrwl/nx-set-shas@v5
         with:

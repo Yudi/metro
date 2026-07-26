@@ -1,108 +1,47 @@
-import { HttpService } from '@nestjs/axios';
-import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AxiosError, AxiosHeaders } from 'axios';
-import { of, throwError } from 'rxjs';
+import { Metadata, ServiceError, status } from '@grpc/grpc-js';
+import { RailIntegrationGrpcClient } from '@metro/rail-integration-contracts';
 import { RailIntegrationClientService } from './rail-integration-client.service';
 
 describe('RailIntegrationClientService', () => {
-  const originalNodeEnv = process.env.NODE_ENV;
-
   afterEach(() => {
-    if (originalNodeEnv === undefined) {
-      delete process.env.NODE_ENV;
-    } else {
-      process.env.NODE_ENV = originalNodeEnv;
-    }
     jest.restoreAllMocks();
   });
 
-  it('requires RAIL_INTEGRATION_API_URL in production', () => {
-    process.env.NODE_ENV = 'production';
+  it('uses port 50051 when no target is configured', () => {
+    const service = new RailIntegrationClientService(configService({}));
 
-    expect(
-      () =>
-        new RailIntegrationClientService(
-          {} as HttpService,
-          configServiceWithUrl(undefined),
-        ),
-    ).toThrow('RAIL_INTEGRATION_API_URL is required in production');
+    expect(service).toHaveProperty('target', 'localhost:50051');
+
+    service.onModuleDestroy();
   });
 
-  it('keeps the local rail integration default outside production', () => {
-    process.env.NODE_ENV = 'development';
-
+  it('uses the development target supplied through the environment', () => {
     const service = new RailIntegrationClientService(
-      {} as HttpService,
-      configServiceWithUrl(undefined),
+      configService({
+        RAIL_INTEGRATION_GRPC_URL: '127.0.0.1:55051',
+      }),
     );
 
-    expect(
-      service as unknown as { baseUrl: string },
-    ).toHaveProperty('baseUrl', 'http://localhost:3001/api');
+    expect(service).toHaveProperty('target', '127.0.0.1:55051');
+
+    service.onModuleDestroy();
   });
 
-  it('trims trailing slashes from the configured base URL', () => {
-    process.env.NODE_ENV = 'production';
-
-    const service = new RailIntegrationClientService(
-      {} as HttpService,
-      configServiceWithUrl('http://metro-core-private:3000/api///'),
-    );
-
-    expect(
-      service as unknown as { baseUrl: string },
-    ).toHaveProperty('baseUrl', 'http://metro-core-private:3000/api');
-  });
-
-  it('logs concise request errors without dumping the axios request object', async () => {
-    process.env.NODE_ENV = 'production';
-    const loggerErrorSpy = jest
-      .spyOn(Logger.prototype, 'error')
-      .mockImplementation();
-    const axiosError = new AxiosError(
-      'connect ECONNREFUSED 127.0.0.1:3001',
-      'ECONNREFUSED',
-      {
-        headers: new AxiosHeaders(),
-        url: 'http://metro-core-private:3000/api/rail-integration/next-trains',
-      },
-    );
-    const http = {
-      post: jest.fn(() => throwError(() => axiosError)),
-    } as unknown as HttpService;
-    const service = new RailIntegrationClientService(
-      http,
-      configServiceWithUrl('http://metro-core-private:3000/api'),
-    );
-
-    await expect(service.fetchNextTrains('L9', 'MVN')).rejects.toBe(axiosError);
-
-    expect(loggerErrorSpy).toHaveBeenCalledWith(
-      'Rail integration POST rail-integration/next-trains failed: ECONNREFUSED url=http://metro-core-private:3000/api/rail-integration/next-trains connect ECONNREFUSED 127.0.0.1:3001',
-    );
-  });
-
-  it('loads special-service statuses through the generic rail integration route', async () => {
-    const http = {
-      get: jest.fn(() =>
-        of({
-          data: [
-            {
-              code: 'EA',
-              statusCode: 'Paralisada',
-              statusLabel: 'Operação Paralisada',
-              statusColor: 'vermelho',
-              description: 'Serviço temporariamente paralisado.',
-            },
-          ],
-        }),
-      ),
-    } as unknown as HttpService;
-    const service = new RailIntegrationClientService(
-      http,
-      configServiceWithUrl('http://metro-core-private:3000/api'),
-    );
+  it('performs readiness and maps generic special status responses', async () => {
+    const service = createServiceWithClient({
+      fetchSpecialRailStatusLines: unarySuccess({
+        lines: [
+          {
+            code: 'EA',
+            statusCode: 'Paralisada',
+            statusLabel: 'Operação Paralisada',
+            statusColor: 'vermelho',
+            description: 'Serviço temporariamente paralisado.',
+          },
+        ],
+      }),
+    });
 
     const lines = await service.fetchSpecialRailStatusLines();
 
@@ -110,19 +49,160 @@ describe('RailIntegrationClientService', () => {
       statusCode: 'Paralisada',
       description: 'Serviço temporariamente paralisado.',
     });
-    expect(http.get).toHaveBeenCalledWith(
-      'http://metro-core-private:3000/api/rail-integration/special-status-lines',
-      { params: undefined, timeout: 120_000 },
+    expect(clientOf(service).waitForReady).toHaveBeenCalledTimes(1);
+    expect(clientOf(service).check).toHaveBeenCalledTimes(1);
+
+    service.onModuleDestroy();
+  });
+
+  it('preserves nullable platform fields across the protobuf boundary', async () => {
+    const service = createServiceWithClient({
+      fetchNextTrains: unarySuccess({
+        success: true,
+        isApiError: false,
+        trains: [
+          {
+            destinationCode: 'LUZ',
+            destinationName: 'Luz',
+            trainCurrentStationName: '',
+            arrivalTime: '2026-07-25T22:00:00-03:00',
+            hasIsAtPlatform: false,
+            hasIsTrainStopped: true,
+            isTrainStopped: false,
+          },
+        ],
+      }),
+    });
+
+    await expect(service.fetchNextTrains('L11', 'BAS')).resolves.toMatchObject({
+      trains: [
+        {
+          isAtPlatform: null,
+          isTrainStopped: false,
+        },
+      ],
+    });
+
+    service.onModuleDestroy();
+  });
+
+  it('retries transient failures with bounded attempts', async () => {
+    const unavailable = serviceError(
+      status.UNAVAILABLE,
+      'upstream temporarily unavailable',
     );
+    const getStationCodes = jest
+      .fn()
+      .mockImplementationOnce(unaryFailure(unavailable))
+      .mockImplementationOnce(unarySuccess({ stationCodes: ['LUZ'] }));
+    const service = createServiceWithClient(
+      { getStationCodes },
+      {
+        RAIL_INTEGRATION_GRPC_RETRY_DELAY_MS: 1,
+      },
+    );
+
+    await expect(service.getStationCodes('L11')).resolves.toEqual(['LUZ']);
+    expect(getStationCodes).toHaveBeenCalledTimes(2);
+    expect(clientOf(service).check).toHaveBeenCalledTimes(2);
+
+    service.onModuleDestroy();
+  });
+
+  it('retries transport readiness deadline failures', async () => {
+    const getStationCodes = jest.fn(unarySuccess({ stationCodes: ['LUZ'] }));
+    const service = createServiceWithClient(
+      { getStationCodes },
+      {
+        RAIL_INTEGRATION_GRPC_RETRY_DELAY_MS: 1,
+      },
+    );
+    const waitForReady = clientOf(service).waitForReady as unknown as jest.Mock;
+    waitForReady.mockImplementationOnce(
+      (_deadline: Date, callback: (error?: Error) => void) =>
+        callback(new Error('Failed to connect before the deadline')),
+    );
+
+    await expect(service.getStationCodes('L11')).resolves.toEqual(['LUZ']);
+    expect(waitForReady).toHaveBeenCalledTimes(2);
+    expect(clientOf(service).check).toHaveBeenCalledTimes(1);
+    expect(getStationCodes).toHaveBeenCalledTimes(1);
+
+    service.onModuleDestroy();
+  });
+
+  it('does not retry application errors', async () => {
+    const invalidArgument = serviceError(
+      status.INVALID_ARGUMENT,
+      'lineCode must be a non-empty string',
+    );
+    const getStationCodes = jest.fn(
+      unaryFailure(invalidArgument),
+    );
+    const service = createServiceWithClient({ getStationCodes });
+
+    await expect(service.getStationCodes('L11')).rejects.toBe(invalidArgument);
+    expect(getStationCodes).toHaveBeenCalledTimes(1);
+
+    service.onModuleDestroy();
   });
 });
 
-function configServiceWithUrl(
-  url: string | undefined,
+function createServiceWithClient(
+  methods: Record<string, unknown>,
+  values: Record<string, string | number> = {},
+): RailIntegrationClientService {
+  const service = new RailIntegrationClientService(configService(values));
+  clientOf(service).close();
+  const client = {
+    waitForReady: jest.fn((_deadline, callback) => callback()),
+    check: jest.fn(unarySuccess({ ready: true })),
+    close: jest.fn(),
+    ...methods,
+  } as unknown as RailIntegrationGrpcClient;
+
+  Object.defineProperty(service, 'client', { value: client });
+  return service;
+}
+
+function clientOf(
+  service: RailIntegrationClientService,
+): RailIntegrationGrpcClient {
+  return (
+    service as unknown as {
+      client: RailIntegrationGrpcClient;
+    }
+  ).client;
+}
+
+function unarySuccess(response: unknown) {
+  return (
+    _request: unknown,
+    _deadline: Date,
+    callback: (error: ServiceError | null, response?: unknown) => void,
+  ) => callback(null, response);
+}
+
+function unaryFailure(error: ServiceError) {
+  return (
+    _request: unknown,
+    _deadline: Date,
+    callback: (error: ServiceError | null, response?: unknown) => void,
+  ) => callback(error);
+}
+
+function serviceError(code: status, details: string): ServiceError {
+  return Object.assign(new Error(details), {
+    code,
+    details,
+    metadata: new Metadata(),
+  }) as ServiceError;
+}
+
+function configService(
+  values: Record<string, string | number>,
 ): ConfigService<Record<string, unknown>, false> {
   return {
-    get: jest.fn((key: string) =>
-      key === 'RAIL_INTEGRATION_API_URL' ? url : undefined,
-    ),
+    get: jest.fn((key: string) => values[key]),
   } as unknown as ConfigService<Record<string, unknown>, false>;
 }

@@ -66,13 +66,14 @@ services:
       - /media/zfs-docker/yudi-metro/shared_import_data:/app/temp # Shared volume for COPY operations
     networks:
       - backend
+      - rail-integration
       - traefik
       - default
     env_file:
       - .env
     environment:
       NODE_ENV: production
-      RAIL_INTEGRATION_API_URL: ${RAIL_INTEGRATION_API_URL:-http://metro-core-private:3000/api}
+      RAIL_INTEGRATION_GRPC_URL: ${RAIL_INTEGRATION_GRPC_URL:-metro-core-private-grpc:50051}
     labels:
       - "traefik.enable=true"
       - "traefik.scope=public"
@@ -112,7 +113,10 @@ services:
   metro-core-private:
     image: ghcr.io/yudi/metro-core-private:latest
     networks:
-      - backend
+      backend:
+      rail-integration:
+        aliases:
+          - metro-core-private-grpc
     env_file:
       - .env
     environment:
@@ -130,12 +134,11 @@ services:
         condition: service_completed_successfully
     expose:
       - 3000
+      - 50051
     healthcheck:
       test:
-        - CMD
-        - node
-        - -e
-        - "const socket = require('node:net').connect(3000, 'localhost'); socket.on('connect', () => { socket.end(); process.exit(0) }); socket.on('error', () => process.exit(1))"
+        - CMD-SHELL
+        - "curl --fail --silent http://localhost:3000/api/health/ready >/dev/null && node -e \"const socket = require('node:net').connect(50051, 'localhost'); socket.on('connect', () => { socket.end(); process.exit(0) }); socket.on('error', () => process.exit(1))\""
       interval: 10s
       timeout: 5s
       start_period: 120s
@@ -220,5 +223,7 @@ services:
 networks:
   default:
   backend:
+  rail-integration:
+    internal: true
   traefik:
     external: true

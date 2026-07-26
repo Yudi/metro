@@ -1,8 +1,17 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { HttpService } from '@nestjs/axios';
+import {
+  Injectable,
+  Logger,
+  OnApplicationBootstrap,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { AxiosError, isAxiosError } from 'axios';
-import { firstValueFrom } from 'rxjs';
+import {
+  ChannelCredentials,
+  Client,
+  Metadata,
+  ServiceError,
+  status,
+} from '@grpc/grpc-js';
 import {
   ActualCptmLineCode,
   CptmLineCode,
@@ -10,199 +19,426 @@ import {
   SpecialRailService,
 } from '@metro/shared/utils';
 import {
+  loadRailIntegrationGrpcDefinition,
   RailHeadwayObservation,
+  RailIntegrationGrpcClient,
+  RailNextTrainArrival,
   RailNextTrainFetchResult,
   RailRealtimeSourcePort,
   RailStationLookupResult,
   RailVehiclePosition,
+  RAIL_INTEGRATION_GRPC_DEFAULT_CLIENT_URL,
   RailStatusSourceLine,
   RailStatusSourcePort,
   RailSpecialStatusSourceLine,
 } from '@metro/rail-integration-contracts';
 
-const LOCAL_RAIL_INTEGRATION_API_URL = 'http://localhost:3001/api';
+const DEFAULT_DEADLINE_MS = 120_000;
+const DEFAULT_READINESS_DEADLINE_MS = 5_000;
+const DEFAULT_MAX_ATTEMPTS = 3;
+const DEFAULT_RETRY_DELAY_MS = 250;
+const MAX_RETRY_DELAY_MS = 2_000;
+
+interface StationNameResponse {
+  stationName?: string;
+}
+
+interface NextTrainTransportArrival
+  extends Omit<RailNextTrainArrival, 'isAtPlatform' | 'isTrainStopped'> {
+  hasIsAtPlatform?: boolean;
+  hasIsTrainStopped?: boolean;
+  isAtPlatform?: boolean;
+  isTrainStopped?: boolean;
+}
+
+interface NextTrainsTransportResponse
+  extends Omit<RailNextTrainFetchResult, 'trains'> {
+  trains?: NextTrainTransportArrival[];
+}
+
+interface StationCodesResponse {
+  stationCodes?: string[];
+}
+
+interface StationLookupResponse extends RailStationLookupResult {
+  found: boolean;
+}
+
+interface VehiclesResponse {
+  vehicles?: RailVehiclePosition[];
+}
+
+interface SpecialRailServicesResponse {
+  services?: SpecialRailService[];
+}
+
+interface HeadwayObservationsResponse {
+  observations?: RailHeadwayObservation[];
+}
+
+interface RailStatusLinesResponse {
+  lines?: RailStatusSourceLine[];
+}
+
+interface SpecialRailStatusLinesResponse {
+  lines?: RailSpecialStatusSourceLine[];
+}
+
+type RailIntegrationMethod =
+  | 'fetchNextTrains'
+  | 'getStationName'
+  | 'getStationCodes'
+  | 'getStationByName'
+  | 'getVehiclesForLine'
+  | 'getAvailableSpecialRailServices'
+  | 'fetchHeadwayObservations'
+  | 'fetchRailStatusLines'
+  | 'fetchSpecialRailStatusLines';
 
 @Injectable()
 export class RailIntegrationClientService
   extends RailRealtimeSourcePort
-  implements RailStatusSourcePort
+  implements
+    RailStatusSourcePort,
+    OnApplicationBootstrap,
+    OnModuleDestroy
 {
   private readonly logger = new Logger(RailIntegrationClientService.name);
-  private readonly baseUrl: string;
+  private readonly target: string;
+  private readonly deadlineMs: number;
+  private readonly readinessDeadlineMs: number;
+  private readonly maxAttempts: number;
+  private readonly retryDelayMs: number;
+  private readonly client: RailIntegrationGrpcClient;
+  private readinessPromise?: Promise<void>;
 
-  constructor(
-    private readonly http: HttpService,
-    configService: ConfigService,
-  ) {
+  constructor(configService: ConfigService) {
     super();
-    const configuredBaseUrl = configService
-      .get<string>('RAIL_INTEGRATION_API_URL')
-      ?.trim();
+    this.target =
+      configService.get<string>('RAIL_INTEGRATION_GRPC_URL')?.trim() ||
+      RAIL_INTEGRATION_GRPC_DEFAULT_CLIENT_URL;
+    this.deadlineMs = readPositiveInteger(
+      configService,
+      'RAIL_INTEGRATION_GRPC_DEADLINE_MS',
+      DEFAULT_DEADLINE_MS,
+    );
+    this.readinessDeadlineMs = readPositiveInteger(
+      configService,
+      'RAIL_INTEGRATION_GRPC_READINESS_DEADLINE_MS',
+      DEFAULT_READINESS_DEADLINE_MS,
+    );
+    this.maxAttempts = Math.min(
+      readPositiveInteger(
+        configService,
+        'RAIL_INTEGRATION_GRPC_MAX_ATTEMPTS',
+        DEFAULT_MAX_ATTEMPTS,
+      ),
+      5,
+    );
+    this.retryDelayMs = readPositiveInteger(
+      configService,
+      'RAIL_INTEGRATION_GRPC_RETRY_DELAY_MS',
+      DEFAULT_RETRY_DELAY_MS,
+    );
 
-    if (!configuredBaseUrl && process.env.NODE_ENV === 'production') {
-      throw new Error(
-        'RAIL_INTEGRATION_API_URL is required in production. Set it to the private rail integration service URL.',
-      );
-    }
+    const definition = loadRailIntegrationGrpcDefinition();
+    this.client = new definition.client(
+      this.target,
+      ChannelCredentials.createInsecure(),
+    ) as unknown as RailIntegrationGrpcClient;
+  }
 
-    if (!configuredBaseUrl) {
+  async onApplicationBootstrap(): Promise<void> {
+    try {
+      await this.ensureReady();
+    } catch (error) {
       this.logger.warn(
-        `RAIL_INTEGRATION_API_URL is not set; using local default ${LOCAL_RAIL_INTEGRATION_API_URL}`,
+        `Rail integration gRPC is not ready at startup; requests will retry lazily: ${this.formatGrpcError(error)}`,
       );
     }
+  }
 
-    this.baseUrl = (
-      configuredBaseUrl ?? LOCAL_RAIL_INTEGRATION_API_URL
-    ).replace(/\/+$/, '');
+  onModuleDestroy(): void {
+    this.client.close();
   }
 
   fetchNextTrains(
     lineCode: ExtendedNextTrainLineCode,
     stationCode: string,
   ): Promise<RailNextTrainFetchResult> {
-    return this.post<RailNextTrainFetchResult>('rail-integration/next-trains', {
+    return this.call<NextTrainsTransportResponse>('fetchNextTrains', {
       lineCode,
       stationCode,
-    });
+    }).then((response) => ({
+      success: response.success,
+      isApiError: response.isApiError,
+      trains: (response.trains ?? []).map((train) => ({
+        destinationCode: train.destinationCode,
+        destinationName: train.destinationName,
+        trainCurrentStationName: train.trainCurrentStationName,
+        arrivalTime: train.arrivalTime,
+        isAtPlatform: train.hasIsAtPlatform
+          ? (train.isAtPlatform ?? false)
+          : null,
+        isTrainStopped: train.hasIsTrainStopped
+          ? (train.isTrainStopped ?? false)
+          : null,
+        trainPositionStatus: train.trainPositionStatus,
+        trainNearStationName: train.trainNearStationName,
+        cars: train.cars,
+      })),
+    }));
   }
 
   async getStationName(
     lineCode: ExtendedNextTrainLineCode,
     stationCode: string,
   ): Promise<string | undefined> {
-    const result = await this.get<{ stationName: string | null }>(
-      'rail-integration/station-name',
-      {
-        lineCode,
-        stationCode,
-      },
-    );
-    return result.stationName ?? undefined;
+    const response = await this.call<StationNameResponse>('getStationName', {
+      lineCode,
+      stationCode,
+    });
+    return response.stationName;
   }
 
-  getStationCodes(lineCode: ExtendedNextTrainLineCode): Promise<string[]> {
-    return this.get<string[]>(`rail-integration/station-codes/${lineCode}`);
+  async getStationCodes(
+    lineCode: ExtendedNextTrainLineCode,
+  ): Promise<string[]> {
+    const response = await this.call<StationCodesResponse>('getStationCodes', {
+      lineCode,
+    });
+    return response.stationCodes ?? [];
   }
 
   async getStationByName(
     lineCode: ActualCptmLineCode,
     stationName: string,
   ): Promise<RailStationLookupResult | undefined> {
-    const station = await this.post<RailStationLookupResult | null>(
-      'rail-integration/station-by-name',
+    const response = await this.call<StationLookupResponse>(
+      'getStationByName',
       {
         lineCode,
         stationName,
       },
     );
-    return station ?? undefined;
+
+    if (!response.found) {
+      return undefined;
+    }
+
+    return {
+      stationCode: response.stationCode,
+      stationName: response.stationName,
+      latitude: response.latitude,
+      longitude: response.longitude,
+    };
   }
 
-  getVehiclesForLine(
+  async getVehiclesForLine(
     lineCode: CptmLineCode,
   ): Promise<RailVehiclePosition[]> {
-    return this.get<RailVehiclePosition[]>(
-      `rail-integration/vehicles/${lineCode}`,
+    const response = await this.call<VehiclesResponse>('getVehiclesForLine', {
+      lineCode,
+    });
+    return response.vehicles ?? [];
+  }
+
+  async getAvailableSpecialRailServices(): Promise<SpecialRailService[]> {
+    const response = await this.call<SpecialRailServicesResponse>(
+      'getAvailableSpecialRailServices',
+      {},
     );
+    return response.services ?? [];
   }
 
-  getAvailableSpecialRailServices(): Promise<SpecialRailService[]> {
-    return this.get<SpecialRailService[]>('rail-integration/special-services');
-  }
-
-  fetchHeadwayObservations(
+  async fetchHeadwayObservations(
     lineCode: ActualCptmLineCode,
     stationCode: string,
   ): Promise<RailHeadwayObservation[]> {
-    return this.post<RailHeadwayObservation[]>(
-      'rail-integration/headway-observations',
+    const response = await this.call<HeadwayObservationsResponse>(
+      'fetchHeadwayObservations',
       {
         lineCode,
         stationCode,
       },
     );
+    return response.observations ?? [];
   }
 
   async fetchRailStatusLines(): Promise<Map<number, RailStatusSourceLine>> {
-    const lines = await this.get<RailStatusSourceLine[]>(
-      'rail-integration/status-lines',
+    const response = await this.call<RailStatusLinesResponse>(
+      'fetchRailStatusLines',
+      {},
     );
-    return new Map(lines.map((line) => [line.code, line]));
+    return new Map((response.lines ?? []).map((line) => [line.code, line]));
   }
 
   async fetchSpecialRailStatusLines(): Promise<
     Map<string, RailSpecialStatusSourceLine>
   > {
-    const lines = await this.get<RailSpecialStatusSourceLine[]>(
-      'rail-integration/special-status-lines',
+    const response = await this.call<SpecialRailStatusLinesResponse>(
+      'fetchSpecialRailStatusLines',
+      {},
     );
-    return new Map(lines.map((line) => [line.code, line]));
+    return new Map((response.lines ?? []).map((line) => [line.code, line]));
   }
 
-  private async get<T>(
-    path: string,
-    params?: Record<string, string | number | boolean | undefined>,
-  ): Promise<T> {
-    const url = `${this.baseUrl}/${path}`;
+  private async call<TResponse>(
+    method: RailIntegrationMethod,
+    request: Record<string, unknown>,
+  ): Promise<TResponse> {
+    let lastError: unknown;
 
-    try {
-      const response = await firstValueFrom(
-        this.http.get<T>(url, {
-          params,
-          timeout: 120_000,
-        }),
-      );
-      return response.data;
-    } catch (error) {
-      this.logger.error(
-        `Rail integration GET ${path} failed: ${this.formatRequestError(error)}`,
-      );
+    for (let attempt = 1; attempt <= this.maxAttempts; attempt += 1) {
+      try {
+        await this.ensureReady();
+        return await this.invoke<TResponse>(method, request, this.deadlineMs);
+      } catch (error) {
+        lastError = error;
+        if (!this.isTransient(error) || attempt === this.maxAttempts) {
+          this.logger.error(
+            `Rail integration gRPC ${method} failed after ${attempt} attempt(s): ${this.formatGrpcError(error)}`,
+          );
+          throw error;
+        }
+
+        this.readinessPromise = undefined;
+        const delayMs = Math.min(
+          this.retryDelayMs * 2 ** (attempt - 1),
+          MAX_RETRY_DELAY_MS,
+        );
+        this.logger.warn(
+          `Rail integration gRPC ${method} transient failure; retrying attempt ${attempt + 1}/${this.maxAttempts} in ${delayMs}ms: ${this.formatGrpcError(error)}`,
+        );
+        await delay(delayMs);
+      }
+    }
+
+    throw lastError;
+  }
+
+  private ensureReady(): Promise<void> {
+    this.readinessPromise ??= this.performReadinessHandshake().catch((error) => {
+      this.readinessPromise = undefined;
       throw error;
+    });
+    return this.readinessPromise;
+  }
+
+  private async performReadinessHandshake(): Promise<void> {
+    try {
+      await waitForReady(this.client, this.readinessDeadlineMs);
+    } catch (error) {
+      throw createUnavailableError(
+        `Private rail integration transport is not ready: ${formatError(error)}`,
+      );
+    }
+
+    const response = await this.invoke<{ ready?: boolean }>(
+      'check',
+      {},
+      this.readinessDeadlineMs,
+    );
+
+    if (!response.ready) {
+      throw createUnavailableError('Private rail integration is not ready');
     }
   }
 
-  private async post<T>(path: string, body: unknown): Promise<T> {
-    const url = `${this.baseUrl}/${path}`;
-
-    try {
-      const response = await firstValueFrom(
-        this.http.post<T>(url, body, {
-          timeout: 120_000,
-        }),
+  private invoke<TResponse>(
+    method: RailIntegrationMethod | 'check',
+    request: Record<string, unknown>,
+    deadlineMs: number,
+  ): Promise<TResponse> {
+    return new Promise<TResponse>((resolve, reject) => {
+      const unaryCall = this.client[method] as (
+        request: Record<string, unknown>,
+        deadline: Date,
+        callback: (
+          error: ServiceError | null,
+          response?: unknown,
+        ) => void,
+      ) => unknown;
+      unaryCall.call(
+        this.client,
+        request,
+        new Date(Date.now() + deadlineMs),
+        (error, response) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          if (response === undefined) {
+            reject(createUnavailableError(`Empty gRPC response for ${method}`));
+            return;
+          }
+          resolve(response as TResponse);
+        },
       );
-      return response.data;
-    } catch (error) {
-      this.logger.error(
-        `Rail integration POST ${path} failed: ${this.formatRequestError(error)}`,
-      );
-      throw error;
-    }
+    });
   }
 
-  private formatRequestError(error: unknown): string {
-    if (!isAxiosError(error)) {
+  private isTransient(error: unknown): boolean {
+    if (!isServiceError(error)) {
+      return false;
+    }
+    return [
+      status.ABORTED,
+      status.DEADLINE_EXCEEDED,
+      status.RESOURCE_EXHAUSTED,
+      status.UNAVAILABLE,
+    ].includes(error.code);
+  }
+
+  private formatGrpcError(error: unknown): string {
+    if (!isServiceError(error)) {
       return error instanceof Error ? error.message : String(error);
     }
-
-    const parts = [
-      this.formatAxiosErrorCode(error),
-      error.config?.url ? `url=${error.config.url}` : undefined,
-      error.response?.status ? `status=${error.response.status}` : undefined,
-      error.message,
-    ].filter(Boolean);
-
-    return parts.join(' ');
+    return `code=${status[error.code] ?? error.code} target=${this.target} details=${error.details || error.message}`;
   }
+}
 
-  private formatAxiosErrorCode(error: AxiosError): string | undefined {
-    const causeCode =
-      error.cause &&
-      typeof error.cause === 'object' &&
-      'code' in error.cause &&
-      typeof error.cause.code === 'string'
-        ? error.cause.code
-        : undefined;
+function readPositiveInteger(
+  configService: ConfigService,
+  key: string,
+  fallback: number,
+): number {
+  const value = Number(configService.get<string | number>(key));
+  return Number.isInteger(value) && value > 0 ? value : fallback;
+}
 
-    return error.code ?? causeCode;
-  }
+function waitForReady(client: Client, deadlineMs: number): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    client.waitForReady(new Date(Date.now() + deadlineMs), (error) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
+function isServiceError(error: unknown): error is ServiceError {
+  return (
+    error instanceof Error &&
+    'code' in error &&
+    typeof error.code === 'number'
+  );
+}
+
+function createUnavailableError(message: string): ServiceError {
+  return Object.assign(new Error(message), {
+    code: status.UNAVAILABLE,
+    details: message,
+    metadata: new Metadata(),
+  }) as ServiceError;
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function formatError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

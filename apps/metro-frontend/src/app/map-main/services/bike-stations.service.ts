@@ -1,36 +1,9 @@
 import { Injectable, OnDestroy, signal, inject } from '@angular/core';
 import { io, Socket } from 'socket.io-client';
-import {
-  BikeStation,
-  BikeVehicleAvailability,
-  BikePricingPlan,
-} from '../components/map/map.types';
+import { BikeStation } from '../components/map/map.types';
+import type { BikeVehicleAvailability } from '@metro/shared/bike-contracts';
 import { environment } from '../../../environments/environment';
 import { LoggerService } from '@metro/shared/api';
-
-interface BikePricingPlanApiDto {
-  planId: string;
-  name: string;
-  currency: string;
-  initialPrice: number;
-  initialPriceFormatted: string;
-  perMinuteRate: number | null;
-  perMinuteRateFormatted: string | null;
-  perMinuteChargingStartsAfterMinutes: number;
-  activationFee?: number | null;
-  activationFeeFormatted?: string | null;
-  maxUsageMinutes?: number | null;
-}
-
-interface BikeVehicleAvailabilityApiDto {
-  vehicleTypeId: string;
-  name: string;
-  formFactor: string;
-  propulsionType: string;
-  count: number;
-  maxRangeMeters: number | null;
-  pricingPlan: BikePricingPlanApiDto | null;
-}
 
 interface BikeStationSummaryApiDto {
   stationId: string;
@@ -47,7 +20,7 @@ interface BikeStationDetailsApiDto extends BikeStationSummaryApiDto {
   numBikesDisabled: number;
   numDocksDisabled: number;
   isInstalled: boolean;
-  vehicleAvailability: BikeVehicleAvailabilityApiDto[];
+  vehicleAvailability: BikeVehicleAvailability[];
 }
 
 /**
@@ -286,14 +259,10 @@ export class BikeStationsService implements OnDestroy {
         electricBikesAvailable: station.electricBikesAvailable,
       });
 
-    const mappedAvailability = this.mapVehicleAvailability(
-      station.vehicleAvailability,
-    );
-
     const updatedStation: BikeStation = {
       ...existing,
       ...station,
-      vehicleAvailability: mappedAvailability,
+      vehicleAvailability: station.vehicleAvailability,
       fetchedAt: payload.fetchedAt ?? existing.fetchedAt,
       detailsLoaded: true,
     } satisfies BikeStation;
@@ -314,23 +283,6 @@ export class BikeStationsService implements OnDestroy {
     if (payload.fetchedAt) {
       this.fetchedAt.set(payload.fetchedAt);
     }
-  }
-
-  private mapVehicleAvailability(
-    availability: BikeVehicleAvailabilityApiDto[],
-  ): BikeVehicleAvailability[] {
-    return availability.map((entry) => ({
-      ...entry,
-      pricingPlan: entry.pricingPlan
-        ? ({
-            ...entry.pricingPlan,
-            activationFee: entry.pricingPlan.activationFee ?? null,
-            activationFeeFormatted:
-              entry.pricingPlan.activationFeeFormatted ?? null,
-            maxUsageMinutes: entry.pricingPlan.maxUsageMinutes ?? null,
-          } satisfies BikePricingPlan)
-        : null,
-    }));
   }
 
   private startDetailTimeout(stationId: string): void {

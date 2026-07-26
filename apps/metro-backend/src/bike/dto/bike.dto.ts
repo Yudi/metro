@@ -1,7 +1,11 @@
 import { ApiProperty, OmitType } from '@nestjs/swagger';
 import { Field, Float, Int, ObjectType } from '@nestjs/graphql';
+import type {
+  BikePricingPlan,
+  BikeVehicleAvailability,
+} from '@metro/shared/bike-contracts';
 
-export class BikePricingPlanDto {
+export class BikePricingPlanDto implements BikePricingPlan {
   @ApiProperty({ description: 'Pricing plan identifier' })
   planId!: string;
 
@@ -55,7 +59,7 @@ export class BikePricingPlanDto {
   maxUsageMinutes!: number | null;
 }
 
-export class BikeVehicleAvailabilityDto {
+export class BikeVehicleAvailabilityDto implements BikeVehicleAvailability {
   @ApiProperty({ description: 'Vehicle type identifier as provided by GBFS' })
   vehicleTypeId!: string;
 

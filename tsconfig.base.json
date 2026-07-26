@@ -16,6 +16,9 @@
     "allowSyntheticDefaultImports": true,
     "paths": {
       "@metro/*": ["./libs/*/src/index.ts"],
+      "@metro/shared/bike-contracts": [
+        "./libs/shared/bike-contracts/src/index.ts"
+      ],
       "@metro/rail-integration-contracts": [
         "./libs/shared/rail-integration-contracts/src/index.ts"
       ],

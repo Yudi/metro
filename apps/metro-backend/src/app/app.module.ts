@@ -65,7 +65,7 @@ const isProduction = process.env.NODE_ENV === 'production';
                 embed: false,
                 includeCookies: true,
               }),
-        ],
+        ] as unknown as ApolloDriverConfig['plugins'],
 
         context: ({ req, res }: { req: Request; res: Response }) => ({
           req,

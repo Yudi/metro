@@ -1,6 +1,5 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
-import { AxiosResponse } from 'axios';
 import { firstValueFrom } from 'rxjs';
 import {
   GbfsAutoDiscovery,
@@ -85,7 +84,7 @@ export class GbfsClientService {
 
   private async fetchGbfs<T>(url: string): Promise<GbfsResponse<T>> {
     try {
-      const response: AxiosResponse<GbfsResponse<T>> = await firstValueFrom(
+      const response = await firstValueFrom(
         this.http.get<GbfsResponse<T>>(url, { timeout: 10_000 }),
       );
       this.assertValidResponse(response.data, url);

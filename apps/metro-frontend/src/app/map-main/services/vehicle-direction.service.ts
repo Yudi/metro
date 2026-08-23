@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Service } from '@angular/core';
 import type { Coordinate } from 'ol/coordinate';
 import { fromLonLat } from 'ol/proj';
 
@@ -18,9 +18,7 @@ export interface VehicleDirectionResult {
   hasNewHeading: boolean;
 }
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class VehicleDirectionService {
   /**
    * Minimum displacement (in meters) required to recompute heading. Anything below is treated as GPS jitter.

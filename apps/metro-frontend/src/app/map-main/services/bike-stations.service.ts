@@ -1,4 +1,4 @@
-import { Injectable, OnDestroy, signal, inject } from '@angular/core';
+import { Service, OnDestroy, signal, inject } from '@angular/core';
 import { io, Socket } from 'socket.io-client';
 import { BikeStation } from '../components/map/map.types';
 import type { BikeVehicleAvailability } from '@metro/shared/bike-contracts';
@@ -44,7 +44,7 @@ const BIKE_WS_UPDATE_EVENT = 'stations_update';
 const BIKE_WS_DETAILS_EVENT = 'station_details';
 const BIKE_WS_DETAILS_REQUEST_EVENT = 'station_details_request';
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class BikeStationsService implements OnDestroy {
   private readonly logger = inject(LoggerService);
 

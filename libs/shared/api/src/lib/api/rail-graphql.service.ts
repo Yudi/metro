@@ -1,4 +1,4 @@
-import { Injectable, inject, computed, signal } from '@angular/core';
+import { Service, inject, computed, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, map, catchError, of, tap, shareReplay } from 'rxjs';
 import {
@@ -91,9 +91,7 @@ interface HistoricalHeadwayResponse {
  * Shared rail status service with caching
  * Used by both home page and station dialogs
  */
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class RailGraphqlService {
   private readonly baseUrl = inject(API_BASE_URL);
   private http = inject(HttpClient);

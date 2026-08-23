@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Service, inject } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { GeolocationService } from '@metro/shared/geolocation';
@@ -17,9 +17,7 @@ import { MapDataLoaderService } from './map-data-loader.service';
 import { MapDisplayService } from './map-display.service';
 import { MapStateService } from './map-state.service';
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class MapNearbyModeService {
   private readonly snackBar = inject(MatSnackBar);
   private readonly dialog = inject(MatDialog);

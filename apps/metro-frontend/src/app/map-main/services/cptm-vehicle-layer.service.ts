@@ -1,4 +1,4 @@
-import { Injectable, inject, effect, signal } from '@angular/core';
+import { Service, inject, effect, signal } from '@angular/core';
 import { Feature } from 'ol';
 import { Point } from 'ol/geom';
 import VectorLayer from 'ol/layer/Vector';
@@ -17,9 +17,7 @@ import {
 /**
  * Service to manage CPTM train vehicle markers on the map
  */
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class CptmVehicleLayerService {
   private nextTrainService = inject(NextTrainWebsocketService);
   private logger = inject(LoggerService);

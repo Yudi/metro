@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Service, inject } from '@angular/core';
 import { FeatureLike } from 'ol/Feature';
 import { VectorTileFeatureDetectorService } from './vector-tile-feature-detector.service';
 import { VectorTileFeatureExtractorService } from './vector-tile-feature-extractor.service';
@@ -21,9 +21,7 @@ export type {
   RailStationTileData,
 } from './vector-tile-feature.types';
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class VectorTileFeatureDataService {
   private readonly detector = inject(VectorTileFeatureDetectorService);
   private readonly extractor = inject(VectorTileFeatureExtractorService);

@@ -1,11 +1,9 @@
-import { Injectable, inject } from '@angular/core';
+import { Service, inject } from '@angular/core';
 import { catchError, Observable, of } from 'rxjs';
 import { RailGraphqlService } from './rail-graphql.service';
 import { RailLinesStatusResponse } from '@metro/shared/utils';
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class ApiService {
   private railService = inject(RailGraphqlService);
 

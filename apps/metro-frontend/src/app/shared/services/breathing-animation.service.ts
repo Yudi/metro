@@ -1,13 +1,11 @@
-import { Injectable, signal, computed, OnDestroy } from '@angular/core';
+import { Service, signal, computed, OnDestroy } from '@angular/core';
 
 /**
  * Shared service providing a breathing animation effect.
  * Uses a Gaussian function for smooth, organic pulsing.
  * Shares a single animation frame loop across all consumers.
  */
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class BreathingAnimationService implements OnDestroy {
   private animationFrameId: number | null = null;
   private subscriberCount = 0;

@@ -1,6 +1,6 @@
 import { isPlatformBrowser } from '@angular/common';
 import {
-  Injectable,
+  Service,
   OnDestroy,
   PLATFORM_ID,
   inject,
@@ -50,9 +50,7 @@ const ARRIVAL_PREDICTIONS_EVENT = 'arrival_predictions';
 const SUBSCRIBE_STOP_EVENT = 'subscribe_stop';
 const UNSUBSCRIBE_STOP_EVENT = 'unsubscribe_stop';
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class LiteRealtimeService implements OnDestroy {
   private readonly baseUrl = inject(API_BASE_URL);
   private readonly platformId = inject(PLATFORM_ID);

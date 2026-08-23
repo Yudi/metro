@@ -1,4 +1,4 @@
-import { Injectable, inject, DestroyRef, signal } from '@angular/core';
+import { Service, inject, DestroyRef, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   Subject,
@@ -46,7 +46,7 @@ export interface StopSearchResult extends SearchResult {
  * Service for searching stops only (no routes)
  * Prioritizes live-tracked stations, then other subway stations, then bus stops
  */
-@Injectable()
+@Service()
 export class StopSearchService {
   private readonly typesenseService = inject(TypesenseSearchService);
   private readonly geographyService = inject(GeographyGraphQLService);

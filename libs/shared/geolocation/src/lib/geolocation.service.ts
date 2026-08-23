@@ -1,5 +1,5 @@
 import {
-  Injectable,
+  Service,
   signal,
   computed,
   inject,
@@ -70,9 +70,7 @@ const WATCH_OPTIONS: GeolocationRequestOptions = {
  * permission handling across the application. It supports both one-time
  * location requests and continuous tracking with device orientation.
  */
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class GeolocationService implements OnDestroy {
   private readonly platformId = inject(PLATFORM_ID);
   private readonly ngZone = inject(NgZone);

@@ -1,4 +1,4 @@
-import { Injectable, signal, OnDestroy, inject } from '@angular/core';
+import { Service, signal, OnDestroy, inject } from '@angular/core';
 import { io, Socket } from 'socket.io-client';
 import { environment } from '../../../environments/environment';
 import { LoggerService } from '@metro/shared/api';
@@ -104,9 +104,7 @@ export interface CptmVehicleUpdate {
  * Service for real-time next train data via WebSocket
  * Supports L4 (Motiva), L8/L9 (ViaMobilidade), and L10-L13 (CPTM) lines
  */
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class NextTrainWebsocketService implements OnDestroy {
   private socket: Socket | null = null;
   private readonly socketUrl = environment.apiUrl.replace(/\/api$/, '');

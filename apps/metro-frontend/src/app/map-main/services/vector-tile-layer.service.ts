@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Service, inject, signal } from '@angular/core';
 import { LoggerService } from '@metro/shared/api';
 import { Map as OLMap } from 'ol';
 import MVT from 'ol/format/MVT';
@@ -48,9 +48,7 @@ export interface BusStopTileFilter {
  * Manages OpenLayers vector tile layer lifecycle and tile URL filtering.
  * Styling and feature-data parsing live in category-specific services.
  */
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class VectorTileLayerService {
   private readonly logger = inject(LoggerService);
   private readonly featureData = inject(VectorTileFeatureDataService);

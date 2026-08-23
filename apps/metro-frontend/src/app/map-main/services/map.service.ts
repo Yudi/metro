@@ -1,4 +1,4 @@
-import { Injectable, Signal, signal, inject, PLATFORM_ID } from '@angular/core';
+import { Service, Signal, signal, inject, PLATFORM_ID } from '@angular/core';
 import { Map, View } from 'ol';
 import TileLayer from 'ol/layer/Tile';
 import { fromLonLat, toLonLat } from 'ol/proj';
@@ -47,9 +47,7 @@ export interface MapPointSelection {
   lon: number;
 }
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class MapService {
   private stationNameService = inject(StationNameService);
   private layerService = inject(MapLayerService);

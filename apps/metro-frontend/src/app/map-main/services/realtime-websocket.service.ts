@@ -1,4 +1,4 @@
-import { Injectable, signal, OnDestroy, inject } from '@angular/core';
+import { Service, signal, OnDestroy, inject } from '@angular/core';
 import { io, Socket } from 'socket.io-client';
 import { environment } from '../../../environments/environment';
 import { LoggerService } from '@metro/shared/api';
@@ -56,9 +56,7 @@ enum RealtimeMessageType {
 /**
  * Service to manage WebSocket connection for real-time bus data
  */
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class RealtimeWebsocketService implements OnDestroy {
   private socket: Socket | null = null;
   private readonly socketUrl = environment.apiUrl.replace(/\/api$/, '');

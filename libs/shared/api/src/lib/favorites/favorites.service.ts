@@ -1,6 +1,6 @@
 import { isPlatformBrowser } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Injectable, inject, PLATFORM_ID, signal, Signal } from '@angular/core';
+import { Service, inject, PLATFORM_ID, signal, Signal } from '@angular/core';
 import Dexie, { Table, liveQuery } from 'dexie';
 // eslint-disable-next-line @nx/enforce-module-boundaries
 import { firebaseUser } from '@metro/shared/firebase';
@@ -61,9 +61,7 @@ class FavoritesDatabase extends Dexie {
   }
 }
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class FavoritesService {
   private readonly platformId = inject(PLATFORM_ID);
   private readonly firebaseUser = firebaseUser;

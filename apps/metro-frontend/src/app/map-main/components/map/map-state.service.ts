@@ -1,4 +1,4 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { Service, signal, computed } from '@angular/core';
 import {
   BusRouteGraphQL,
   BusStopGraphQL,
@@ -14,9 +14,7 @@ import {
   SelectedBikeStation,
 } from './map.types';
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class MapStateService {
   // Callback to update display - will be set by the component
   private updateDisplayCallback?: () => void;

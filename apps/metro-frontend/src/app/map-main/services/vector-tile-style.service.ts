@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Service, inject } from '@angular/core';
 import { LoggerService } from '@metro/shared/api';
 import { getRailLineByCode, TransitAgency } from '@metro/shared/utils';
 import { FeatureLike } from 'ol/Feature';
@@ -12,9 +12,7 @@ import { StationNameService } from './station-name.service';
 import { VectorTileFeatureDataService } from './vector-tile-feature-data.service';
 import { VectorTileLayerType } from './vector-tile-layer.config';
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class VectorTileStyleService {
   private readonly stationNameService = inject(StationNameService);
   private readonly featureData = inject(VectorTileFeatureDataService);

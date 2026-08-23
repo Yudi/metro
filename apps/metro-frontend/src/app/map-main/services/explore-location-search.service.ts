@@ -1,5 +1,5 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Injectable, inject } from '@angular/core';
+import { Service, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { SAO_PAULO_CITY_CENTER } from '@metro/shared/utils';
 
@@ -104,9 +104,7 @@ const PRIORITY_CITY_NAMES = new Set([
   'jundiai',
 ]);
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class ExploreLocationSearchService {
   private readonly http = inject(HttpClient);
   private readonly photonUrl = 'https://photon.komoot.io/api/';

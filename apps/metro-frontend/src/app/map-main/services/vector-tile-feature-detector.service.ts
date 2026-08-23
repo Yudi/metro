@@ -1,11 +1,9 @@
-import { Injectable, inject } from '@angular/core';
+import { Service, inject } from '@angular/core';
 import { LoggerService } from '@metro/shared/api';
 import { FeatureLike } from 'ol/Feature';
 import { VectorTileLayerType } from './vector-tile-layer.config';
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class VectorTileFeatureDetectorService {
   private readonly logger = inject(LoggerService);
 

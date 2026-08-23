@@ -1,13 +1,11 @@
 import { SeoService } from './seo.service';
-import { Injectable, inject } from '@angular/core';
+import { Service, inject } from '@angular/core';
 import {
   ActivatedRouteSnapshot,
   CanActivate,
   RouterStateSnapshot,
 } from '@angular/router';
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class SeoGuard implements CanActivate {
   private seo = inject(SeoService);
   public canActivate(

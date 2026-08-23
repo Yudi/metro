@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Service, inject } from '@angular/core';
 import { Feature } from 'ol';
 import { FeatureLike } from 'ol/Feature';
 import { SpecialRailService } from '@metro/shared/utils';
@@ -8,9 +8,7 @@ import { MapNearbyModeService } from './map-nearby-mode.service';
 import { MapSearchInteractionService } from './map-search-interaction.service';
 import { MapSelectionService } from './map-selection.service';
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class MapInteractionService {
   private readonly searchService = inject(MapSearchInteractionService);
   private readonly selectionService = inject(MapSelectionService);

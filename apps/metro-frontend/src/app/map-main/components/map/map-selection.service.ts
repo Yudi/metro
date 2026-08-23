@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Service, inject } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { firstValueFrom } from 'rxjs';
 import {
@@ -20,9 +20,7 @@ import { MapDisplayService } from './map-display.service';
 import { MapStateService } from './map-state.service';
 import { SelectedRoute, SelectedStop } from './map.types';
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class MapSelectionService {
   private readonly snackBar = inject(MatSnackBar);
   private readonly mapState = inject(MapStateService);

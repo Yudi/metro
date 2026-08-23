@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Service } from '@angular/core';
 import { Feature } from 'ol';
 import { Point, LineString } from 'ol/geom';
 import { fromLonLat } from 'ol/proj';
@@ -15,9 +15,7 @@ import { createBikeStationFeatureProperties } from './bike-feature-properties.ut
  * Factory service for creating OpenLayers features from GraphQL data
  * Centralizes feature creation logic to ensure consistency
  */
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class FeatureFactoryService {
   /**
    * Create OpenLayers Feature from a stop

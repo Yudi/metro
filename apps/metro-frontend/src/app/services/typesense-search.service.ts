@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Service, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, catchError, map, of } from 'rxjs';
 import { LoggerService } from '@metro/shared/api';
@@ -133,9 +133,7 @@ export interface NearbyStopsResponse {
   message?: string;
 }
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class TypesenseSearchService {
   private http = inject(HttpClient);
   private logger = inject(LoggerService);

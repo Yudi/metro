@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Service, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { shareReplay } from 'rxjs/operators';
 import {
@@ -11,9 +11,7 @@ import {
  * Cache service for geography data to minimize backend requests
  * Implements smart caching with TTL and cache invalidation
  */
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class GeographyCacheService {
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 

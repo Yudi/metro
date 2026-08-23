@@ -1,4 +1,4 @@
-import { Injectable, signal, computed, inject } from '@angular/core';
+import { Service, signal, computed, inject } from '@angular/core';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
 import ClusterSource from 'ol/source/Cluster';
@@ -38,9 +38,7 @@ export enum LayerType {
  * Service to manage multiple OpenLayers vector layers with toggle functionality
  * Ensures data preservation when layers are hidden/shown
  */
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class MapLayerService {
   private stationNameService = inject(StationNameService);
   private logger = inject(LoggerService);

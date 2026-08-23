@@ -1,4 +1,4 @@
-import { Injectable, inject, effect } from '@angular/core';
+import { Service, inject, effect } from '@angular/core';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
 import { Feature } from 'ol';
@@ -31,9 +31,7 @@ const ACCURACY_CIRCLE_BORDER_COLOR = 'rgba(0, 122, 255, 0.3)';
  * - Accuracy circle that's visible only at appropriate zoom levels
  * - Live updates as the user moves
  */
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class UserLocationLayerService {
   private readonly geolocationService = inject(GeolocationService);
   private readonly logger = inject(LoggerService);

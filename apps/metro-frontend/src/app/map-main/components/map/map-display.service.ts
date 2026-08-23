@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Service, inject } from '@angular/core';
 import { Feature } from 'ol';
 import { Point } from 'ol/geom';
 import { MapService } from '../../services/map.service';
@@ -16,9 +16,7 @@ import { fromLonLat } from 'ol/proj';
 import { SAO_PAULO_CITY_CENTER_COORDINATES } from '@metro/shared/utils';
 import { createBikeStationFeatureProperties } from '../../utils/bike-feature-properties.utils';
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class MapDisplayService {
   private mapService = inject(MapService);
   private geographyService = inject(GeographyGraphQLService);

@@ -1,14 +1,12 @@
 import {
   inject,
-  Injectable,
+  Service,
   Renderer2,
   RendererFactory2,
   DOCUMENT,
 } from '@angular/core';
 import { Title, Meta } from '@angular/platform-browser';
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class SeoService {
   readonly siteTitle = 'Transporte Metropolitano de São Paulo';
   private title = inject(Title);

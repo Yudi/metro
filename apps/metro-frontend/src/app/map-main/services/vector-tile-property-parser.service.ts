@@ -1,9 +1,7 @@
-import { Injectable, inject } from '@angular/core';
+import { Service, inject } from '@angular/core';
 import { LoggerService } from '@metro/shared/api';
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class VectorTilePropertyParserService {
   private readonly logger = inject(LoggerService);
 

@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Service } from '@angular/core';
 import {
   getCanonicalRailStationName,
   getStationDisplayName,
@@ -9,9 +9,7 @@ import {
  * Service for normalizing and formatting station names
  * This wraps the shared utilities and applies business logic for when to normalize/format
  */
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class StationNameService {
   /**
    * Normalizes a station name by removing common transit-related suffixes

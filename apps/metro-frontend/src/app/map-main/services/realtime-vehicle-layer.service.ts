@@ -1,4 +1,4 @@
-import { Injectable, inject, effect } from '@angular/core';
+import { Service, inject, effect } from '@angular/core';
 import { Feature } from 'ol';
 import { Point } from 'ol/geom';
 import VectorLayer from 'ol/layer/Vector';
@@ -15,9 +15,7 @@ import { MapStateService } from '../components/map/map-state.service';
 /**
  * Service to manage real-time vehicle markers on the map
  */
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class RealtimeVehicleLayerService {
   private realtimeService = inject(RealtimeWebsocketService);
   private mapState = inject(MapStateService);

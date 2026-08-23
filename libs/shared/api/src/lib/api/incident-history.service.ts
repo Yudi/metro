@@ -1,5 +1,5 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Injectable, inject } from '@angular/core';
+import { Service, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   IncidentHistoryQuery,
@@ -7,9 +7,7 @@ import {
 } from '@metro/shared/utils';
 import { API_BASE_URL } from './api.tokens';
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class IncidentHistoryService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = inject(API_BASE_URL);

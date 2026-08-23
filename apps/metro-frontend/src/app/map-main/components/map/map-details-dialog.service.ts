@@ -1,4 +1,4 @@
-import { Injectable, effect, inject } from '@angular/core';
+import { Service, effect, inject } from '@angular/core';
 import {
   MatDialog,
   MatDialogRef,
@@ -33,9 +33,7 @@ export interface SubwayStationTileDialogData {
   isMerged: boolean;
 }
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class MapDetailsDialogService {
   private readonly geographyService = inject(GeographyGraphQLService);
   private readonly snackBar = inject(MatSnackBar);

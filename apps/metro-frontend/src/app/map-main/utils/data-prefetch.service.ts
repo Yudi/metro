@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Service, inject } from '@angular/core';
 import { GeographyCacheService } from './geography-cache.service';
 import { LoggerService } from '@metro/shared/api';
 import { firstValueFrom } from 'rxjs';
@@ -6,9 +6,7 @@ import { firstValueFrom } from 'rxjs';
 /**
  * Service for prefetching commonly used data to improve perceived performance
  */
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class DataPrefetchService {
   private cache = inject(GeographyCacheService);
   private logger = inject(LoggerService);

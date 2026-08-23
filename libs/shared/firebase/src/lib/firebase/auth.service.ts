@@ -1,4 +1,4 @@
-import { Injectable, inject, PLATFORM_ID } from '@angular/core';
+import { Service, inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import {
   getAuth,
@@ -8,7 +8,7 @@ import {
   signOut,
 } from 'firebase/auth';
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class AuthService {
   private platformId = inject(PLATFORM_ID);
 

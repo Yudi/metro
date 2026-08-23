@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Service, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, BehaviorSubject, of } from 'rxjs';
 import { map } from 'rxjs/operators';
@@ -110,9 +110,7 @@ export interface BoundingBox {
   maxLng: number;
 }
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class GeographyGraphQLService {
   private http = inject(HttpClient);
   private readonly graphqlEndpoint = '/api/graphql';

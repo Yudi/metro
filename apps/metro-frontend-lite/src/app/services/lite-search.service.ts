@@ -1,4 +1,4 @@
-import { Injectable, inject, signal, computed } from '@angular/core';
+import { Service, inject, signal, computed } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, catchError, map, of, switchMap } from 'rxjs';
 import { API_BASE_URL } from '@metro/shared/api';
@@ -137,9 +137,7 @@ interface BikeStationsSummaryPayload {
  * Minimal search service for lite frontend
  * Uses direct HTTP calls instead of complex dependencies
  */
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class LiteSearchService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = inject(API_BASE_URL);

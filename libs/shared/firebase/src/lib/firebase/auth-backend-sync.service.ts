@@ -1,8 +1,8 @@
-import { Injectable, effect, inject, Injector } from '@angular/core';
+import { Service, effect, inject, Injector } from '@angular/core';
 import { Apollo, gql } from 'apollo-angular';
 import { firebaseUser } from './auth.signal';
 
-@Injectable({ providedIn: 'root' })
+@Service()
 export class AuthBackendSyncService {
   private apollo = inject(Apollo);
   private injector = inject(Injector);

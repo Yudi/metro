@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Service, inject } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { GeographyGraphQLService } from '../../services/geography-graphql.service';
 import { MapStateService } from './map-state.service';
@@ -6,9 +6,7 @@ import { LoggerService } from '@metro/shared/api';
 import { isSubwayRoute } from '../../utils/transit-utils';
 import { VectorTileLayerService } from '../../services/vector-tile-layer.service';
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class MapDataLoaderService {
   private geographyService = inject(GeographyGraphQLService);
   private snackBar = inject(MatSnackBar);

@@ -1,10 +1,8 @@
-import { inject, Injectable } from '@angular/core';
+import { inject, Service } from '@angular/core';
 import { interval, map, Observable, shareReplay, startWith, switchMap } from 'rxjs';
 import { RailGraphqlService } from '@metro/shared/api';
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class Line89NextTrainService {
   private readonly railGraphql = inject(RailGraphqlService);
   private readonly REFRESH_INTERVAL = 1 * 60 * 1000;

@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Service, inject } from '@angular/core';
 import { Apollo, gql } from 'apollo-angular';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
@@ -315,9 +315,7 @@ const REINDEX_MUTATION: DocumentNode = gql`
   }
 `;
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class SearchService {
   private apollo = inject(Apollo);
 

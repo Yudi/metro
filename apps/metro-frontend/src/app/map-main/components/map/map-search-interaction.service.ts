@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Service, inject } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { LoggerService } from '@metro/shared/api';
@@ -10,9 +10,7 @@ import { MapSelectionService } from './map-selection.service';
 import { MapStateService } from './map-state.service';
 import { SearchResult, SelectedStop } from './map.types';
 
-@Injectable({
-  providedIn: 'root',
-})
+@Service()
 export class MapSearchInteractionService {
   private readonly snackBar = inject(MatSnackBar);
   private readonly dialog = inject(MatDialog);

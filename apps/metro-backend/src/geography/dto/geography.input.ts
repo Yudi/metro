@@ -4,8 +4,29 @@ import {
   IsOptional,
   IsString,
   Max,
+  MaxLength,
   Min,
+  Validate,
+  ValidationArguments,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
 } from 'class-validator';
+
+@ValidatorConstraint({ name: 'orderedBoundingBox', async: false })
+class OrderedBoundingBoxConstraint implements ValidatorConstraintInterface {
+  validate(_value: number, args: ValidationArguments): boolean {
+    const bounds = args.object as BoundingBoxInput;
+    return args.property === 'maxLat'
+      ? bounds.minLat <= bounds.maxLat
+      : bounds.minLng <= bounds.maxLng;
+  }
+
+  defaultMessage(args: ValidationArguments): string {
+    return args.property === 'maxLat'
+      ? 'minLat must be less than or equal to maxLat'
+      : 'minLng must be less than or equal to maxLng; antimeridian-crossing boxes are not supported';
+  }
+}
 
 @InputType()
 export class BoundingBoxInput {
@@ -19,6 +40,7 @@ export class BoundingBoxInput {
   @IsNumber()
   @Min(-90)
   @Max(90)
+  @Validate(OrderedBoundingBoxConstraint)
   maxLat!: number;
 
   @Field(() => Number)
@@ -31,6 +53,7 @@ export class BoundingBoxInput {
   @IsNumber()
   @Min(-180)
   @Max(180)
+  @Validate(OrderedBoundingBoxConstraint)
   maxLng!: number;
 }
 
@@ -39,6 +62,7 @@ export class StopSearchInput {
   @Field({ nullable: true })
   @IsOptional()
   @IsString()
+  @MaxLength(160)
   searchTerm?: string;
 
   @Field(() => BoundingBoxInput, { nullable: true })

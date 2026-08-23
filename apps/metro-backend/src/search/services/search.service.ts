@@ -78,15 +78,17 @@ export class SearchService {
   async indexAllData(): Promise<void> {
     this.logger.debug('Starting full data indexing...');
 
+    await this.typesenseService.beginFullRebuild();
     try {
-      await this.typesenseService.clearTransitData();
       await this.indexRoutes();
       await this.indexStops();
       await this.indexRailLines();
       await this.indexRailStations();
       await this.indexBikeStations();
+      await this.typesenseService.finishFullRebuild();
       this.logger.debug('Full data indexing completed successfully');
     } catch (error) {
+      await this.typesenseService.discardFullRebuild();
       this.logger.error('Full data indexing failed:', error);
       throw error;
     }

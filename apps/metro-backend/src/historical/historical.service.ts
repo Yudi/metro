@@ -30,6 +30,7 @@ import {
   HistoricalIncidentEventType,
 } from './entities/historical-data.entity';
 import { PrismaService } from '../prisma/prisma.service';
+import { randomUUID } from 'node:crypto';
 
 export interface RecordRetrievalIssueParams {
   source: string;
@@ -79,6 +80,12 @@ const NON_INCIDENT_RAIL_STATUS_CODES = new Set<RailStatusCode>([
 @Injectable()
 export class HistoricalService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(HistoricalService.name);
+  private readonly backendInstanceSource = `${BACKEND_LIFECYCLE_SOURCE}:${
+    process.env.INSTANCE_ID?.trim() ||
+    (process.env.HOSTNAME?.trim()
+      ? `${process.env.HOSTNAME.trim()}:${process.env.PORT ?? '3000'}`
+      : randomUUID())
+  }`;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -129,13 +136,13 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
       incidents: incidents.map((event) => ({
         ...event,
         eventType: event.eventType as HistoricalIncidentEventType,
-        metadata: event.metadata ?? undefined,
+        metadata: this.sanitizeIncidentMetadata(event.metadata),
       })),
       headwaySnapshots: enrichedHeadwaySnapshots.map((snapshot) => ({
         ...snapshot,
         samples: snapshot.samples ?? undefined,
-        errors: snapshot.errors ?? undefined,
-        metadata: snapshot.metadata ?? undefined,
+        errors: this.sanitizeHeadwayErrors(snapshot.errors),
+        metadata: this.sanitizeHeadwayMetadata(snapshot.metadata),
       })),
     };
   }
@@ -159,25 +166,27 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
     params: RecordRetrievalIssueParams,
   ): Promise<void> {
     await this.runSafely('record retrieval issue', async () => {
-      const openIssue = await this.findOpenRetrievalIssue(params.source);
-      if (openIssue) {
-        return;
-      }
+      await this.withIncidentLock(`retrieval:${params.source}`, async (tx) => {
+        const openIssue = await this.findOpenRetrievalIssue(params.source, tx);
+        if (openIssue) {
+          return;
+        }
 
-      await this.prisma.historicalIncidentEvent.create({
-        data: {
-          eventType: historical_incident_event_type.RETRIEVAL_ISSUE,
-          observedAt: params.attemptedAt,
-          startedAt: params.attemptedAt,
-          source: params.source,
-          severity: 'critical',
-          title: 'Falha na recuperação de dados externos',
-          description:
-            'A recuperação de dados externos falhou temporariamente.',
-          metadata: this.compactJsonObject({
-            attemptedAt: params.attemptedAt.toISOString(),
-          }),
-        },
+        await tx.historicalIncidentEvent.create({
+          data: {
+            eventType: historical_incident_event_type.RETRIEVAL_ISSUE,
+            observedAt: params.attemptedAt,
+            startedAt: params.attemptedAt,
+            source: params.source,
+            severity: 'critical',
+            title: 'Falha na recuperação de dados externos',
+            description:
+              'A recuperação de dados externos falhou temporariamente.',
+            metadata: this.compactJsonObject({
+              attemptedAt: params.attemptedAt.toISOString(),
+            }),
+          },
+        });
       });
     });
   }
@@ -186,24 +195,26 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
     params: RecordRetrievalRecoveredParams,
   ): Promise<void> {
     await this.runSafely('record retrieval recovery', async () => {
-      const openIssue = await this.findOpenRetrievalIssue(params.source);
-      if (!openIssue) {
-        return;
-      }
+      await this.withIncidentLock(`retrieval:${params.source}`, async (tx) => {
+        const openIssue = await this.findOpenRetrievalIssue(params.source, tx);
+        if (!openIssue) {
+          return;
+        }
 
-      const startedAt = openIssue.startedAt ?? openIssue.observedAt;
+        const startedAt = openIssue.startedAt ?? openIssue.observedAt;
 
-      await this.prisma.historicalIncidentEvent.update({
-        where: { id: openIssue.id },
-        data: {
-          endedAt: params.recoveredAt,
-          durationSeconds: Math.max(
-            0,
-            Math.round(
-              (params.recoveredAt.getTime() - startedAt.getTime()) / 1000,
+        await tx.historicalIncidentEvent.update({
+          where: { id: openIssue.id },
+          data: {
+            endedAt: params.recoveredAt,
+            durationSeconds: Math.max(
+              0,
+              Math.round(
+                (params.recoveredAt.getTime() - startedAt.getTime()) / 1000,
+              ),
             ),
-          ),
-        },
+          },
+        });
       });
     });
   }
@@ -268,9 +279,9 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
         data: {
           eventType: historical_incident_event_type.BACKEND_ONLINE,
           observedAt: new Date(),
-          source: BACKEND_LIFECYCLE_SOURCE,
+          source: this.backendInstanceSource,
           severity: 'normal',
-          title: 'Backend online',
+          title: 'Instância do backend online',
           metadata: this.compactJsonObject({
             pid: process.pid,
             nodeEnv: process.env.NODE_ENV,
@@ -280,8 +291,11 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private findOpenRetrievalIssue(source: string) {
-    return this.prisma.historicalIncidentEvent.findFirst({
+  private findOpenRetrievalIssue(
+    source: string,
+    client: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    return client.historicalIncidentEvent.findFirst({
       where: {
         source,
         eventType: historical_incident_event_type.RETRIEVAL_ISSUE,
@@ -295,7 +309,7 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
     const latestLifecycleEvent =
       await this.prisma.historicalIncidentEvent.findFirst({
         where: {
-          source: BACKEND_LIFECYCLE_SOURCE,
+          source: this.backendInstanceSource,
           eventType: {
             in: [
               historical_incident_event_type.BACKEND_ONLINE,
@@ -331,9 +345,9 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
         startedAt: latestLifecycleEvent.observedAt,
         endedAt: observedAt,
         durationSeconds,
-        source: BACKEND_LIFECYCLE_SOURCE,
+        source: this.backendInstanceSource,
         severity: 'warning',
-        title: 'Backend possivelmente ficou offline',
+        title: 'Instância do backend possivelmente ficou offline',
         description:
           'O processo anterior não registrou um desligamento limpo antes desta inicialização.',
         metadata: this.compactJsonObject({
@@ -350,9 +364,9 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
         data: {
           eventType: historical_incident_event_type.BACKEND_OFFLINE,
           observedAt: new Date(),
-          source: BACKEND_LIFECYCLE_SOURCE,
+          source: this.backendInstanceSource,
           severity: 'warning',
-          title: 'Backend offline',
+          title: 'Instância do backend offline',
           description: reason,
           metadata: this.compactJsonObject({
             pid: process.pid,
@@ -368,58 +382,62 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
     metadata?: Prisma.InputJsonValue,
   ): Promise<void> {
     const lineCode = `L${line.code}`;
-    const latestEvent = await this.prisma.historicalIncidentEvent.findFirst({
-      where: {
-        source: RAIL_STATUS_SOURCE,
-        lineCode,
-        eventType: {
-          in: [
-            historical_incident_event_type.RAIL_STATUS_INCIDENT,
-            historical_incident_event_type.RAIL_STATUS_RECOVERED,
-          ],
+    await this.withIncidentLock(`rail-status:${lineCode}`, async (tx) => {
+      const latestEvent = await tx.historicalIncidentEvent.findFirst({
+        where: {
+          source: RAIL_STATUS_SOURCE,
+          lineCode,
+          eventType: {
+            in: [
+              historical_incident_event_type.RAIL_STATUS_INCIDENT,
+              historical_incident_event_type.RAIL_STATUS_RECOVERED,
+            ],
+          },
         },
-      },
-      orderBy: { observedAt: 'desc' },
-    });
+        orderBy: { observedAt: 'desc' },
+      });
 
-    const countsAsIncident = this.countsRailStatusAsIncident(line.statusCode);
-    const eventType = countsAsIncident
-      ? historical_incident_event_type.RAIL_STATUS_INCIDENT
-      : historical_incident_event_type.RAIL_STATUS_RECOVERED;
+      const countsAsIncident = this.countsRailStatusAsIncident(line.statusCode);
+      const eventType = countsAsIncident
+        ? historical_incident_event_type.RAIL_STATUS_INCIDENT
+        : historical_incident_event_type.RAIL_STATUS_RECOVERED;
 
-    const changed =
-      !latestEvent ||
-      latestEvent.eventType !== eventType ||
-      latestEvent.statusCode !== line.statusCode ||
-      latestEvent.description !== (line.description ?? null) ||
-      latestEvent.incidentCategory !== (line.incidentCategory ?? null) ||
-      latestEvent.detail !== (line.detail ?? null);
+      const changed =
+        !latestEvent ||
+        latestEvent.eventType !== eventType ||
+        latestEvent.statusCode !== line.statusCode ||
+        latestEvent.description !== (line.description ?? null) ||
+        latestEvent.incidentCategory !== (line.incidentCategory ?? null) ||
+        latestEvent.detail !== (line.detail ?? null);
 
-    if (!changed) {
-      return;
-    }
+      if (!changed) {
+        return;
+      }
 
-    const recoveredFromIncident =
-      latestEvent?.eventType ===
-        historical_incident_event_type.RAIL_STATUS_INCIDENT &&
-      eventType === historical_incident_event_type.RAIL_STATUS_RECOVERED;
+      const recoveredFromIncident =
+        latestEvent?.eventType ===
+          historical_incident_event_type.RAIL_STATUS_INCIDENT &&
+        eventType === historical_incident_event_type.RAIL_STATUS_RECOVERED;
 
-    await this.prisma.historicalIncidentEvent.create({
-      data: {
-        ...this.buildRailEventData(line, metadata),
-        eventType,
-        title: recoveredFromIncident
-          ? `${line.line}: operação recuperada`
-          : `${line.line}: ${line.statusLabel}`,
-        startedAt: recoveredFromIncident ? latestEvent.observedAt : undefined,
-        endedAt: recoveredFromIncident ? new Date() : undefined,
-        durationSeconds: recoveredFromIncident
-          ? Math.max(
-              0,
-              Math.round((Date.now() - latestEvent.observedAt.getTime()) / 1000),
-            )
-          : undefined,
-      },
+      await tx.historicalIncidentEvent.create({
+        data: {
+          ...this.buildRailEventData(line, metadata),
+          eventType,
+          title: recoveredFromIncident
+            ? `${line.line}: operação recuperada`
+            : `${line.line}: ${line.statusLabel}`,
+          startedAt: recoveredFromIncident ? latestEvent.observedAt : undefined,
+          endedAt: recoveredFromIncident ? new Date() : undefined,
+          durationSeconds: recoveredFromIncident
+            ? Math.max(
+                0,
+                Math.round(
+                  (Date.now() - latestEvent.observedAt.getTime()) / 1000,
+                ),
+              )
+            : undefined,
+        },
+      });
     });
   }
 
@@ -576,13 +594,55 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
       return this.compactJsonObject({
         name: error.name,
         message: error.message,
-        stack: error.stack,
       });
     }
 
     return {
       message: String(error),
     };
+  }
+
+  private sanitizeIncidentMetadata(value: Prisma.JsonValue | null): unknown {
+    return this.pickPublicJsonFields(value, [
+      'attemptedAt',
+      'detectionReason',
+      'reason',
+    ]);
+  }
+
+  private sanitizeHeadwayMetadata(value: Prisma.JsonValue | null): unknown {
+    return this.pickPublicJsonFields(value, [
+      'updatedAt',
+      'minSamples',
+    ]);
+  }
+
+  private sanitizeHeadwayErrors(value: Prisma.JsonValue | null): unknown {
+    return this.pickPublicJsonFields(value, ['reason']);
+  }
+
+  private pickPublicJsonFields(
+    value: Prisma.JsonValue | null,
+    allowedFields: string[],
+  ): Prisma.InputJsonObject | undefined {
+    if (!value || Array.isArray(value) || typeof value !== 'object') {
+      return undefined;
+    }
+
+    const output: Record<string, Prisma.InputJsonValue> = {};
+    for (const field of allowedFields) {
+      const candidate = value[field];
+      if (
+        typeof candidate === 'string' ||
+        typeof candidate === 'number' ||
+        typeof candidate === 'boolean'
+      ) {
+        output[field] =
+          typeof candidate === 'string' ? candidate.slice(0, 256) : candidate;
+      }
+    }
+
+    return Object.keys(output).length > 0 ? output : undefined;
   }
 
   private compactJsonObject(
@@ -703,6 +763,18 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
   private parseRailLineNumber(lineCode: string): number | undefined {
     const match = lineCode.match(/L?(\d+)/i);
     return match ? Number.parseInt(match[1], 10) : undefined;
+  }
+
+  private async withIncidentLock<T>(
+    key: string,
+    callback: (transaction: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    return this.prisma.$transaction(async (transaction) => {
+      await transaction.$queryRaw`
+        SELECT pg_advisory_xact_lock(hashtext(${key}))
+      `;
+      return callback(transaction);
+    });
   }
 
   private async runSafely(

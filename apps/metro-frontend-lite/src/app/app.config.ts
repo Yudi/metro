@@ -3,6 +3,7 @@ import {
   provideBrowserGlobalErrorListeners,
   provideZonelessChangeDetection,
   isDevMode,
+  ErrorHandler,
 } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { routes } from './app.routes';
@@ -10,23 +11,40 @@ import {
   provideClientHydration,
   withEventReplay,
 } from '@angular/platform-browser';
-import { provideHttpClient, withFetch } from '@angular/common/http';
-import { API_BASE_URL } from '@metro/shared/api';
+import {
+  provideHttpClient,
+  withFetch,
+  withInterceptors,
+} from '@angular/common/http';
+import {
+  API_BASE_URL,
+  ErrorTrackingService,
+  TelemetryErrorHandler,
+} from '@metro/shared/api';
 import { environment } from '../environments/environment';
 import { provideServiceWorker } from '@angular/service-worker';
+import {
+  firebaseAuthInterceptor,
+  provideAuth,
+  provideFirebase,
+} from '@metro/shared/firebase';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideClientHydration(withEventReplay()),
     provideBrowserGlobalErrorListeners(),
+    ErrorTrackingService,
+    { provide: ErrorHandler, useClass: TelemetryErrorHandler },
     provideZonelessChangeDetection(),
     provideRouter(routes),
-    provideHttpClient(withFetch()),
+    provideFirebase(environment.firebase),
+    provideHttpClient(withFetch(), withInterceptors([firebaseAuthInterceptor])),
     { provide: API_BASE_URL, useValue: environment.apiUrl },
     provideServiceWorker('ngsw-worker.js', {
       enabled: !isDevMode(),
       registrationStrategy: 'registerWhenStable:30000',
       type: 'module',
     }),
+    provideAuth(environment.firebase),
   ],
 };

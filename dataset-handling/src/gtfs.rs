@@ -2,7 +2,7 @@ use crate::database::connect_and_check_postgis;
 use anyhow::Result;
 use csv::ReaderBuilder;
 use geo::{LineString, Point};
-use log::{error, info, warn};
+use log::{info, warn};
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
@@ -13,8 +13,6 @@ pub enum GtfsError {
     Io(#[from] std::io::Error),
     #[error("CSV error: {0}")]
     Csv(#[from] csv::Error),
-    #[error("Parse error: {0}")]
-    Parse(String),
     #[error("DB error: {0}")]
     Db(#[from] tokio_postgres::Error),
     #[error("Invalid data: {0}")]
@@ -42,8 +40,19 @@ fn read_shapes(file_path: &str) -> Result<HashMap<String, Vec<ShapePoint>>, Gtfs
     let mut skipped_records = 0;
     let mut total_points = 0;
 
-    for result in rdr.records() {
-        let rec = result?;
+    for (row_index, result) in rdr.records().enumerate() {
+        let rec = match result {
+            Ok(record) => record,
+            Err(error) => {
+                warn!(
+                    "Skipping malformed shapes.txt row {}: {}",
+                    row_index + 2,
+                    error
+                );
+                skipped_records += 1;
+                continue;
+            }
+        };
         let shape_id = rec.get(0).unwrap_or("").trim().to_string();
         let lat_s = rec.get(1).unwrap_or("");
         let lon_s = rec.get(2).unwrap_or("");
@@ -55,35 +64,50 @@ fn read_shapes(file_path: &str) -> Result<HashMap<String, Vec<ShapePoint>>, Gtfs
             continue;
         }
 
-        let lat = lat_s
-            .parse::<f64>()
-            .map_err(|_| GtfsError::Parse(format!("Invalid latitude: {}", lat_s)))?;
-        let lon = lon_s
-            .parse::<f64>()
-            .map_err(|_| GtfsError::Parse(format!("Invalid longitude: {}", lon_s)))?;
-        let sequence = seq_s
-            .parse::<u32>()
-            .map_err(|_| GtfsError::Parse(format!("Invalid sequence: {}", seq_s)))?;
+        let lat = match lat_s.trim().parse::<f64>() {
+            Ok(value) => value,
+            Err(_) => {
+                warn!("Skipping row with invalid latitude: {}", lat_s);
+                skipped_records += 1;
+                continue;
+            }
+        };
+        let lon = match lon_s.trim().parse::<f64>() {
+            Ok(value) => value,
+            Err(_) => {
+                warn!("Skipping row with invalid longitude: {}", lon_s);
+                skipped_records += 1;
+                continue;
+            }
+        };
+        let sequence = match seq_s.trim().parse::<u32>() {
+            Ok(value) => value,
+            Err(_) => {
+                warn!("Skipping row with invalid sequence: {}", seq_s);
+                skipped_records += 1;
+                continue;
+            }
+        };
 
-        if !(lat >= -90.0 && lat <= 90.0) {
-            let err = GtfsError::InvalidData(format!("Latitude out of range: {}", lat));
-            error!("{}", err);
-            return Err(err);
+        if !(-90.0..=90.0).contains(&lat) {
+            warn!("Skipping row with latitude out of range: {}", lat);
+            skipped_records += 1;
+            continue;
         }
-        if !(lon >= -180.0 && lon <= 180.0) {
-            let err = GtfsError::InvalidData(format!("Longitude out of range: {}", lon));
-            error!("{}", err);
-            return Err(err);
+        if !(-180.0..=180.0).contains(&lon) {
+            warn!("Skipping row with longitude out of range: {}", lon);
+            skipped_records += 1;
+            continue;
         }
 
         let seq_set = shape_sequences.entry(shape_id.clone()).or_default();
         if !seq_set.insert(sequence) {
-            let err = GtfsError::InvalidData(format!(
-                "Duplicate sequence {} for shape_id {}",
+            warn!(
+                "Skipping duplicate sequence {} for shape_id {}",
                 sequence, shape_id
-            ));
-            error!("{}", err);
-            return Err(err);
+            );
+            skipped_records += 1;
+            continue;
         }
 
         records.push((shape_id, ShapePoint { lat, lon, sequence }));
@@ -94,21 +118,18 @@ fn read_shapes(file_path: &str) -> Result<HashMap<String, Vec<ShapePoint>>, Gtfs
     let grouped: HashMap<String, Vec<ShapePoint>> = records
         .into_par_iter()
         .fold(
-            || HashMap::<String, Vec<ShapePoint>>::new(),
+            HashMap::<String, Vec<ShapePoint>>::new,
             |mut acc, (sid, sp)| {
                 acc.entry(sid).or_default().push(sp);
                 acc
             },
         )
-        .reduce(
-            || HashMap::<String, Vec<ShapePoint>>::new(),
-            |mut a, b| {
-                for (k, mut v) in b {
-                    a.entry(k).or_default().append(&mut v);
-                }
-                a
-            },
-        );
+        .reduce(HashMap::<String, Vec<ShapePoint>>::new, |mut a, b| {
+            for (k, mut v) in b {
+                a.entry(k).or_default().append(&mut v);
+            }
+            a
+        });
 
     info!(
         "Successfully read {} shapes with {} total points from {}. Skipped {} invalid records.",
@@ -127,14 +148,21 @@ fn shapes_to_linestrings(
 ) -> HashMap<String, LineString<f64>> {
     let linestrings: HashMap<String, LineString<f64>> = shapes
         .par_iter()
-        .map(|(shape_id, points)| {
+        .filter_map(|(shape_id, points)| {
             let mut sorted_points = points.clone();
             sorted_points.sort_by_key(|p| p.sequence);
+            if sorted_points.len() < 2 {
+                warn!(
+                    "Skipping shape_id {} because fewer than two valid points remain",
+                    shape_id
+                );
+                return None;
+            }
             let coords: Vec<Point<f64>> = sorted_points
                 .iter()
                 .map(|p| Point::new(p.lon, p.lat))
                 .collect();
-            (shape_id.clone(), LineString::from(coords))
+            Some((shape_id.clone(), LineString::from(coords)))
         })
         .collect();
     info!(
@@ -169,6 +197,11 @@ pub async fn process_gtfs_shapes(
     info!("Starting GTFS shapes processing for {}", shapes_path);
     let shapes = read_shapes(shapes_path)?;
     let linestrings = shapes_to_linestrings(&shapes);
+    if linestrings.is_empty() {
+        return Err(GtfsError::InvalidData(
+            "shapes.txt contains no usable shapes".to_string(),
+        ));
+    }
 
     let mut client = connect_and_check_postgis(db_url).await?;
     info!("Successfully connected to PostGIS");
@@ -178,8 +211,7 @@ pub async fn process_gtfs_shapes(
         shape_id text PRIMARY KEY,
         geom GEOMETRY(LINESTRING, {}) NOT NULL
     )",
-        schema,
-        srid
+        schema, srid
     );
     client.execute(&create_table_query, &[]).await?;
     info!(
@@ -261,23 +293,62 @@ mod tests {
     }
 
     #[test]
-    fn test_read_shapes_invalid_lat() {
+    fn test_read_shapes_skips_invalid_lat() {
         let mut file = NamedTempFile::new().unwrap();
         writeln!(file, "shape_id,shape_pt_lat,shape_pt_lon,shape_pt_sequence").unwrap();
         writeln!(file, "shape1,100.0,-74.0060,1").unwrap();
 
-        let result = read_shapes(file.path().to_str().unwrap());
-        assert!(matches!(result, Err(GtfsError::InvalidData(_))));
+        writeln!(file, "shape2,40.7128,-74.0060,1").unwrap();
+        writeln!(file, "shape2,40.7130,-74.0070,2").unwrap();
+
+        let shapes = read_shapes(file.path().to_str().unwrap()).unwrap();
+        assert_eq!(shapes.len(), 1);
+        assert_eq!(shapes["shape2"].len(), 2);
     }
 
     #[test]
-    fn test_read_shapes_duplicate_sequence() {
+    fn test_read_shapes_skips_duplicate_sequence() {
         let mut file = NamedTempFile::new().unwrap();
         writeln!(file, "shape_id,shape_pt_lat,shape_pt_lon,shape_pt_sequence").unwrap();
         writeln!(file, "shape1,40.7128,-74.0060,1").unwrap();
         writeln!(file, "shape1,40.7130,-74.0070,1").unwrap();
 
-        let result = read_shapes(file.path().to_str().unwrap());
-        assert!(matches!(result, Err(GtfsError::InvalidData(_))));
+        writeln!(file, "shape1,40.7140,-74.0080,2").unwrap();
+
+        let shapes = read_shapes(file.path().to_str().unwrap()).unwrap();
+        assert_eq!(shapes["shape1"].len(), 2);
+    }
+
+    #[test]
+    fn test_shapes_to_linestrings_skips_incomplete_shapes() {
+        let shapes = HashMap::from([
+            (
+                "incomplete".to_string(),
+                vec![ShapePoint {
+                    lat: 1.0,
+                    lon: 1.0,
+                    sequence: 1,
+                }],
+            ),
+            (
+                "valid".to_string(),
+                vec![
+                    ShapePoint {
+                        lat: 1.0,
+                        lon: 1.0,
+                        sequence: 1,
+                    },
+                    ShapePoint {
+                        lat: 2.0,
+                        lon: 2.0,
+                        sequence: 2,
+                    },
+                ],
+            ),
+        ]);
+
+        let lines = shapes_to_linestrings(&shapes);
+        assert!(!lines.contains_key("incomplete"));
+        assert!(lines.contains_key("valid"));
     }
 }

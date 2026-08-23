@@ -7,7 +7,7 @@ import {
   MessageBody,
   ConnectedSocket,
 } from '@nestjs/websockets';
-import { Logger, UseGuards } from '@nestjs/common';
+import { Logger, OnModuleDestroy, UseGuards } from '@nestjs/common';
 import { WsThrottlerGuard } from '../../common/guards/ws-throttler.guard';
 import { Server, Socket } from 'socket.io';
 import { RealtimePollingService } from '../services/realtime-polling.service';
@@ -38,7 +38,7 @@ type StopArrivalCacheEntry = { data: StopArrivalResponse; timestamp: number };
   },
 })
 export class RealtimeGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
+  implements OnGatewayConnection, OnGatewayDisconnect, OnModuleDestroy
 {
   @WebSocketServer()
   server!: Server;
@@ -62,6 +62,11 @@ export class RealtimeGateway
   ) {
     // Subscribe to poll completion events
     this.pollingService.onPollComplete(this.handlePollComplete);
+  }
+
+  onModuleDestroy(): void {
+    this.pollingService.offPollComplete(this.handlePollComplete);
+    this.clientSubscriptions.clear();
   }
 
   handleConnection(client: Socket): void {

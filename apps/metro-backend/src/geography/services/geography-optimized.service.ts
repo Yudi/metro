@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, PayloadTooLargeException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PostGISService } from './postgis.service';
 import { BusStopServiceOptimized } from './bus-stop-optimized.service';
@@ -22,6 +22,8 @@ const MAX_BUS_ROUTE_LIMIT = 10_000;
 const MAX_BUS_SHAPE_LIMIT = 500;
 const MAX_BATCH_IDS = 500;
 const MAX_ROUTE_RAIL_CONNECTION_ROUTES = 100;
+const MAX_STOP_FULL_DATA_ROUTES = 100;
+const STOP_FULL_DATA_CONCURRENCY = 8;
 const MIN_ROUTE_RAIL_CONNECTION_RADIUS_METERS = 50;
 const MAX_ROUTE_RAIL_CONNECTION_RADIUS_METERS = 5_000;
 
@@ -204,7 +206,10 @@ export class GeographyServiceOptimized {
    * Get complete stop data in a single request.
    * Fetches stop info and full data for all routes passing through it.
    */
-  async getStopFullData(stopId: string): Promise<StopFullData | null> {
+  async getStopFullData(
+    stopId: string,
+    includeRouteDetails = true,
+  ): Promise<StopFullData | null> {
     this.logger.debug(`Getting full data for stop: ${stopId}`);
 
     // Get stop info first
@@ -216,11 +221,37 @@ export class GeographyServiceOptimized {
     // Get routes passing through this stop
     const routesInfo = await this.getRoutesForStop(stopId);
 
-    // Fetch full data for each route in parallel
-    const routeFullDataPromises = routesInfo.map((route) =>
-      this.getRouteFullData(route.routeId),
-    );
-    const routeFullDataResults = await Promise.all(routeFullDataPromises);
+    if (routesInfo.length > MAX_STOP_FULL_DATA_ROUTES) {
+      throw new PayloadTooLargeException(
+        `Stop route details exceed the maximum of ${MAX_STOP_FULL_DATA_ROUTES}`,
+      );
+    }
+
+    if (!includeRouteDetails) {
+      return {
+        stop,
+        routes: routesInfo.map((route) => ({
+          route,
+          trips: [],
+          shapes: [],
+          stops: [],
+        })),
+      };
+    }
+
+    const routeFullDataResults: Array<RouteFullData | null> = [];
+    for (
+      let index = 0;
+      index < routesInfo.length;
+      index += STOP_FULL_DATA_CONCURRENCY
+    ) {
+      const batch = routesInfo.slice(index, index + STOP_FULL_DATA_CONCURRENCY);
+      routeFullDataResults.push(
+        ...(await Promise.all(
+          batch.map((route) => this.getRouteFullData(route.routeId)),
+        )),
+      );
+    }
     const routes = routeFullDataResults.filter(
       (r): r is RouteFullData => r !== null,
     );

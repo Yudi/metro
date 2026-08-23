@@ -10,7 +10,14 @@ import { DataImportHooksService } from './services/data-import-hooks.service';
 import { GTFSConfig } from './config/gtfs.config';
 import { ImportProgress, GTFSProcessingResult } from './types/gtfs.types';
 import { ImportStatusDto } from './dto/gtfs-dataset.dto';
-import { PrismaService } from '../prisma/prisma.service';
+import { ImportLockService } from '../common/import-lock.service';
+
+class ImportFailureError extends Error {
+  constructor(readonly result: GTFSProcessingResult) {
+    super(`GTFS import failed: ${result.errors.join('; ')}`);
+    this.name = 'ImportFailureError';
+  }
+}
 
 @Injectable()
 export class DataImportService implements OnModuleInit {
@@ -22,6 +29,8 @@ export class DataImportService implements OnModuleInit {
     progress: 0,
     message: 'Ready to import',
   };
+  private currentImportRunId = 0;
+  private statusResetTimer?: ReturnType<typeof setTimeout>;
 
   constructor(
     private readonly fileOperationsService: FileOperationsService,
@@ -30,7 +39,7 @@ export class DataImportService implements OnModuleInit {
     private readonly csvProcessingService: CsvProcessingService,
     private readonly rustGtfsService: RustGtfsService,
     private readonly dataImportHooksService: DataImportHooksService,
-    private readonly prisma: PrismaService,
+    private readonly importLockService: ImportLockService,
   ) {}
 
   async onModuleInit() {
@@ -58,17 +67,29 @@ export class DataImportService implements OnModuleInit {
     await this.fileOperationsService.ensureDirectory(this.tempDir);
   }
 
-  private withTimeout<T>(
-    promise: Promise<T>,
+  private async withTimeout<T>(
+    operation: (signal: AbortSignal) => Promise<T>,
     timeoutMs: number,
     timeoutMessage: string,
   ): Promise<T> {
-    return Promise.race([
-      promise,
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs),
-      ),
-    ]);
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+      const operationPromise = operation(controller.signal);
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          controller.abort(new Error(timeoutMessage));
+          reject(new Error(timeoutMessage));
+        }, timeoutMs);
+      });
+
+      return await Promise.race([operationPromise, timeoutPromise]);
+    } finally {
+      if (timer) {
+        clearTimeout(timer);
+      }
+    }
   }
 
   private updateImportStatus(
@@ -103,6 +124,8 @@ export class DataImportService implements OnModuleInit {
    * Reset import status to idle (manual override)
    */
   resetStatus(): void {
+    this.currentImportRunId++;
+    this.clearStatusResetTimer();
     this.logger.debug('Manually resetting import status to idle');
     this.updateImportStatus('idle', 0, 'Ready to import');
   }
@@ -123,25 +146,28 @@ export class DataImportService implements OnModuleInit {
       throw new Error('Import already in progress');
     }
 
+    const runId = ++this.currentImportRunId;
+    this.clearStatusResetTimer();
+
     this.updateImportStatus('downloading', 0, 'Starting GTFS import...');
 
     try {
       const result = await this.performImport();
+      if (!result.success) {
+        throw new ImportFailureError(result);
+      }
+
+      // Post-import work is part of readiness.  A successful data import must
+      // not be reported as complete while search/vector views are stale.
+      await this.dataImportHooksService.onDataImportComplete();
       this.updateImportStatus(
         'completed',
         100,
         'Import completed successfully',
       );
 
-      // Trigger post-import hooks (e.g., search indexing)
-      this.dataImportHooksService.onDataImportComplete().catch((error) => {
-        this.logger.error('Post-import hook failed:', error);
-      });
-
       // Reset to idle after a brief moment
-      setTimeout(() => {
-        this.updateImportStatus('idle', 0, 'Ready to import');
-      }, 1000);
+      this.scheduleStatusReset(1000, runId);
 
       return result;
     } catch (error) {
@@ -150,9 +176,7 @@ export class DataImportService implements OnModuleInit {
       this.updateImportStatus('error', 0, `Import failed: ${errorMessage}`);
 
       // Reset to idle after error as well
-      setTimeout(() => {
-        this.updateImportStatus('idle', 0, 'Ready to import');
-      }, 5000);
+      this.scheduleStatusReset(5000, runId);
 
       throw error;
     }
@@ -162,23 +186,30 @@ export class DataImportService implements OnModuleInit {
     operation: string,
     action: () => Promise<T>,
   ): Promise<T> {
-    return await this.prisma.$transaction(
-      async (tx) => {
-        const [lockResult] = await tx.$queryRaw<Array<{ locked: boolean }>>`
-          SELECT pg_try_advisory_xact_lock(hashtext(${this.importLockName})) AS locked
-        `;
-
-        if (!lockResult?.locked) {
-          throw new Error(`${operation} already in progress in another process`);
-        }
-
-        return await action();
-      },
-      {
-        maxWait: 10_000,
-        timeout: GTFSConfig.IMPORT_LOCK_TIMEOUT_MS,
-      },
+    return await this.importLockService.withLock(
+      this.importLockName,
+      operation,
+      action,
     );
+  }
+
+  private scheduleStatusReset(delayMs: number, runId: number): void {
+    this.clearStatusResetTimer();
+    this.statusResetTimer = setTimeout(() => {
+      this.statusResetTimer = undefined;
+      if (runId !== this.currentImportRunId) {
+        return;
+      }
+
+      this.updateImportStatus('idle', 0, 'Ready to import');
+    }, delayMs);
+  }
+
+  private clearStatusResetTimer(): void {
+    if (this.statusResetTimer) {
+      clearTimeout(this.statusResetTimer);
+      this.statusResetTimer = undefined;
+    }
   }
 
   /**
@@ -208,12 +239,14 @@ export class DataImportService implements OnModuleInit {
       // Step 1: Download GTFS file
       this.updateImportStatus('downloading', 10, 'Downloading GTFS data...');
       await this.withTimeout(
-        this.fileOperationsService.downloadFile(
-          GTFSConfig.SPTRANS_GTFS_URL,
-          zipFilePath,
-          GTFSConfig.DOWNLOAD_TIMEOUT_MS,
-          GTFSConfig.MAX_GTFS_ZIP_BYTES,
-        ),
+        (signal) =>
+          this.fileOperationsService.downloadFile(
+            GTFSConfig.SPTRANS_GTFS_URL,
+            zipFilePath,
+            GTFSConfig.DOWNLOAD_TIMEOUT_MS,
+            GTFSConfig.MAX_GTFS_ZIP_BYTES,
+            signal,
+          ),
         GTFSConfig.DOWNLOAD_TIMEOUT_MS,
         'Download timeout',
       );
@@ -316,7 +349,19 @@ export class DataImportService implements OnModuleInit {
       extractedFiles.some((f) => f.fileName === fileName),
     );
 
-    this.currentImportStatus.totalFiles = filesToProcess.length;
+    const extractedFileNames = new Set(extractedFiles.map((file) => file.fileName));
+    for (const requiredFile of GTFSConfig.getRequiredFiles()) {
+      if (!extractedFileNames.has(requiredFile)) {
+        result.success = false;
+        result.errors.push(`Missing required GTFS file: ${requiredFile}`);
+      }
+    }
+
+    this.currentImportStatus.totalFiles =
+      filesToProcess.length +
+      GTFSConfig.getRequiredFiles().filter(
+        (fileName) => !extractedFileNames.has(fileName),
+      ).length;
     this.currentImportStatus.processedFiles = 0;
 
     for (const fileName of filesToProcess) {
@@ -378,11 +423,14 @@ export class DataImportService implements OnModuleInit {
             throw new Error('DATABASE_URL environment variable not set');
           }
 
-          // Clean the database URL for Rust tool (remove schema parameter)
-          const cleanDbUrl = dbUrl.split('?')[0];
+          // Prisma's `schema` URL option is not understood by the Rust
+          // importer. Preserve every other option (including sslmode and
+          // application settings) so both clients use the same connection
+          // security and database parameters.
+          const rustDbUrl = this.getRustDatabaseUrl(dbUrl);
 
           // Process shapes with Rust tool directly to PostGIS
-          await this.rustGtfsService.processShapes(filePath, cleanDbUrl);
+          await this.rustGtfsService.processShapes(filePath, rustDbUrl);
 
           // Count records in the file for reporting
           recordCount =
@@ -414,9 +462,16 @@ export class DataImportService implements OnModuleInit {
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : 'Unknown error';
-        this.logger.error(`Failed to process ${fileName}:`, errorMessage);
-        result.errors.push(`${fileName}: ${errorMessage}`);
-        result.success = false;
+        if (GTFSConfig.isRequiredFile(fileName)) {
+          this.logger.error(`Failed to process ${fileName}:`, errorMessage);
+          result.errors.push(`${fileName}: ${errorMessage}`);
+          result.success = false;
+        } else {
+          this.logger.warn(
+            `Skipping optional ${fileName} after processing failure: ${errorMessage}`,
+          );
+          result.skippedFiles.push(fileName);
+        }
       }
     }
 
@@ -468,6 +523,19 @@ export class DataImportService implements OnModuleInit {
         error instanceof Error ? error.message : 'Unknown error';
       this.logger.error('Clear and reimport failed:', errorMessage);
       throw error;
+    }
+  }
+
+  private getRustDatabaseUrl(databaseUrl: string): string {
+    try {
+      const url = new URL(databaseUrl);
+      url.searchParams.delete('schema');
+      return url.toString();
+    } catch {
+      // Keep libpq-style connection strings intact. The Rust importer will
+      // validate unsupported options and fail loudly rather than silently
+      // dropping security settings.
+      return databaseUrl;
     }
   }
 }

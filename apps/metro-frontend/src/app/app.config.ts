@@ -3,6 +3,8 @@ import {
   provideZonelessChangeDetection,
   inject,
   isDevMode,
+  ErrorHandler,
+  provideBrowserGlobalErrorListeners,
 } from '@angular/core';
 import { provideRouter } from '@angular/router';
 
@@ -19,7 +21,11 @@ import {
 import { provideApollo } from 'apollo-angular';
 import { ApolloLink, InMemoryCache } from '@apollo/client/core';
 import { HttpLink } from 'apollo-angular/http';
-import { API_BASE_URL } from '@metro/shared/api';
+import {
+  API_BASE_URL,
+  ErrorTrackingService,
+  TelemetryErrorHandler,
+} from '@metro/shared/api';
 import { environment } from '../environments/environment';
 
 import { MatIconRegistry } from '@angular/material/icon';
@@ -35,6 +41,9 @@ import { firebaseIdToken } from '@metro/shared/firebase';
 export const appConfig: ApplicationConfig = {
   providers: [
     provideZonelessChangeDetection(),
+    provideBrowserGlobalErrorListeners(),
+    ErrorTrackingService,
+    { provide: ErrorHandler, useClass: TelemetryErrorHandler },
     provideFirebase(environment.firebase),
     provideRouter(routes),
     provideClientHydration(withEventReplay()),

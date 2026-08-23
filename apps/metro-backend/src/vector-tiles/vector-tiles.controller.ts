@@ -9,6 +9,7 @@ import {
   HttpStatus,
   ParseIntPipe,
   Header,
+  InternalServerErrorException,
   UseGuards,
 } from '@nestjs/common';
 import { Response } from 'express';
@@ -240,13 +241,11 @@ export class VectorTilesController {
         success: true,
         message: 'Merged stations refreshed successfully',
       };
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      return {
-        success: false,
-        message: `Failed to refresh stations: ${errorMessage}`,
-      };
+    } catch {
+      throw new InternalServerErrorException({
+        code: 'STATION_REFRESH_FAILED',
+        message: 'Failed to refresh merged stations',
+      });
     }
   }
 

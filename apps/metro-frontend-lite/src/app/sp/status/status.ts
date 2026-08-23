@@ -2,7 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, inject, signal, WritableSignal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
-import { ApiService, FavoritesService } from '@metro/shared/api';
+import { ApiService } from '@metro/shared/api';
 import {
   RailLineStatus,
   RailStatusCode,
@@ -18,7 +18,6 @@ import {
 })
 export class Status {
   apiService = inject(ApiService);
-  favoritesService = inject(FavoritesService);
   lineStatusSignal = toSignal(this.apiService.getRailStatus(), {
     initialValue: null,
   });
@@ -79,17 +78,5 @@ export class Status {
 
   specialLineClick(line: SpecialRailLineStatus): void {
     this.expandedLine.set(this.expandedLine() === line.code ? null : line.code);
-  }
-
-  isSpecialFavorite(code: string): boolean {
-    return this.favoritesService.isFavorite(code, 'railLine');
-  }
-
-  toggleSpecialFavorite(code: string): void {
-    if (this.isSpecialFavorite(code)) {
-      this.favoritesService.removeFavorite(code, 'railLine');
-    } else {
-      this.favoritesService.addFavorite(code, 'railLine');
-    }
   }
 }

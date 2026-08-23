@@ -3,6 +3,7 @@ import {
   Logger,
   OnApplicationBootstrap,
   OnModuleDestroy,
+  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -32,6 +33,7 @@ import {
   RailStatusSourcePort,
   RailSpecialStatusSourceLine,
 } from '@metro/rail-integration-contracts';
+import { RequestContextService } from '../common/request-context/request-context.service';
 
 const DEFAULT_DEADLINE_MS = 120_000;
 const DEFAULT_READINESS_DEADLINE_MS = 5_000;
@@ -95,6 +97,11 @@ type RailIntegrationMethod =
   | 'fetchRailStatusLines'
   | 'fetchSpecialRailStatusLines';
 
+type UnaryCallback = (
+  error: ServiceError | null,
+  response?: unknown,
+) => void;
+
 @Injectable()
 export class RailIntegrationClientService
   extends RailRealtimeSourcePort
@@ -110,9 +117,13 @@ export class RailIntegrationClientService
   private readonly maxAttempts: number;
   private readonly retryDelayMs: number;
   private readonly client: RailIntegrationGrpcClient;
+  private readonly shutdownController = new AbortController();
   private readinessPromise?: Promise<void>;
 
-  constructor(configService: ConfigService) {
+  constructor(
+    configService: ConfigService,
+    @Optional() private readonly requestContext?: RequestContextService,
+  ) {
     super();
     this.target =
       configService.get<string>('RAIL_INTEGRATION_GRPC_URL')?.trim() ||
@@ -159,6 +170,7 @@ export class RailIntegrationClientService
   }
 
   onModuleDestroy(): void {
+    this.shutdownController.abort();
     this.client.close();
   }
 
@@ -290,6 +302,9 @@ export class RailIntegrationClientService
     let lastError: unknown;
 
     for (let attempt = 1; attempt <= this.maxAttempts; attempt += 1) {
+      if (this.shutdownController.signal.aborted) {
+        throw createUnavailableError('Rail integration client is shutting down');
+      }
       try {
         await this.ensureReady();
         return await this.invoke<TResponse>(method, request, this.deadlineMs);
@@ -310,7 +325,7 @@ export class RailIntegrationClientService
         this.logger.warn(
           `Rail integration gRPC ${method} transient failure; retrying attempt ${attempt + 1}/${this.maxAttempts} in ${delayMs}ms: ${this.formatGrpcError(error)}`,
         );
-        await delay(delayMs);
+        await delay(delayMs, this.shutdownController.signal);
       }
     }
 
@@ -359,22 +374,33 @@ export class RailIntegrationClientService
           response?: unknown,
         ) => void,
       ) => unknown;
-      unaryCall.call(
-        this.client,
-        request,
-        new Date(Date.now() + deadlineMs),
-        (error, response) => {
-          if (error) {
-            reject(error);
-            return;
-          }
-          if (response === undefined) {
-            reject(createUnavailableError(`Empty gRPC response for ${method}`));
-            return;
-          }
-          resolve(response as TResponse);
-        },
-      );
+      const callback: UnaryCallback = (error, response) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        if (response === undefined) {
+          reject(createUnavailableError(`Empty gRPC response for ${method}`));
+          return;
+        }
+        resolve(response as TResponse);
+      };
+      const deadline = new Date(Date.now() + deadlineMs);
+      const correlationId = this.requestContext?.getRequestId();
+      if (correlationId) {
+        const metadata = new Metadata();
+        metadata.set('x-correlation-id', correlationId);
+        (
+          unaryCall as unknown as (
+            request: Record<string, unknown>,
+            metadata: Metadata,
+            options: { deadline: Date },
+            callback: UnaryCallback,
+          ) => unknown
+        ).call(this.client, request, metadata, { deadline }, callback);
+        return;
+      }
+      unaryCall.call(this.client, request, deadline, callback);
     });
   }
 
@@ -435,8 +461,25 @@ function createUnavailableError(message: string): ServiceError {
   }) as ServiceError;
 }
 
-function delay(milliseconds: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+function delay(milliseconds: number, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) {
+    return Promise.reject(
+      createUnavailableError('Rail integration client is shutting down'),
+    );
+  }
+
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, milliseconds);
+    const onAbort = () => {
+      clearTimeout(timeoutId);
+      signal.removeEventListener('abort', onAbort);
+      reject(createUnavailableError('Rail integration client is shutting down'));
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
 }
 
 function formatError(error: unknown): string {

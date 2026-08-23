@@ -8,7 +8,7 @@ import { Logger } from '@nestjs/common';
 export class PollingCoordinator {
   private readonly eventEmitter = new EventEmitter();
   private pollingInterval: NodeJS.Timeout | null = null;
-  private isPolling = false;
+  private activePoll: Promise<void> | null = null;
 
   constructor(
     private readonly logger: Logger,
@@ -73,13 +73,16 @@ export class PollingCoordinator {
   }
 
   private async executePoll(): Promise<void> {
-    if (this.isPolling) {
-      this.logger.warn('Poll skipped because a previous poll is still running');
-      return;
+    if (this.activePoll) {
+      this.logger.debug('Joining the poll already in progress');
+      return this.activePoll;
     }
 
-    this.isPolling = true;
+    this.activePoll = this.runPoll();
+    return this.activePoll;
+  }
 
+  private async runPoll(): Promise<void> {
     try {
       await this.pollFn();
       this.eventEmitter.emit('pollComplete');
@@ -88,7 +91,7 @@ export class PollingCoordinator {
         error instanceof Error ? error.stack : JSON.stringify(error);
       this.logger.error('Error during polling cycle', trace);
     } finally {
-      this.isPolling = false;
+      this.activePoll = null;
     }
   }
 }

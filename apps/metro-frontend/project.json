@@ -74,6 +74,31 @@
       },
       "defaultConfiguration": "production"
     },
+    "build-e2e": {
+      "executor": "@angular/build:application",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "baseHref": "/",
+        "outputPath": "dist/apps/metro-frontend-e2e-static",
+        "browser": "apps/metro-frontend/src/main.ts",
+        "tsConfig": "apps/metro-frontend/tsconfig.app.json",
+        "inlineStyleLanguage": "scss",
+        "assets": [
+          {
+            "glob": "**/*",
+            "input": "apps/metro-frontend/public"
+          },
+          {
+            "glob": "**/*",
+            "input": "libs/shared/assets",
+            "output": "shared"
+          }
+        ],
+        "styles": ["apps/metro-frontend/src/styles.scss"],
+        "outputHashing": "all",
+        "optimization": true
+      }
+    },
     "serve": {
       "continuous": true,
       "executor": "@angular/build:dev-server",
@@ -120,6 +145,12 @@
         "port": 4200,
         "staticFilePath": "dist/apps/metro-frontend/browser",
         "spa": true
+      },
+      "configurations": {
+        "ci": {
+          "buildTarget": "metro-frontend:build-e2e",
+          "staticFilePath": "dist/apps/metro-frontend-e2e-static/browser"
+        }
       }
     },
     "storybook": {

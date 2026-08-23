@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { OlhoVivoApiService } from './olhovivo-api.service';
 import { RouteStopMappingService } from './route-stop-mapping.service';
 import { VehicleDirectionBackendService } from './vehicle-direction-backend.service';
@@ -14,7 +14,7 @@ import { PollingCoordinator } from '../../common/polling/polling-coordinator';
  * Polls every 30 seconds and emits events when new data is available
  */
 @Injectable()
-export class RealtimePollingService {
+export class RealtimePollingService implements OnModuleDestroy {
   private readonly logger = new Logger(RealtimePollingService.name);
   private readonly POLL_INTERVAL = 30_000;
   private readonly MAX_ACTIVE_ROUTES = 200;
@@ -48,6 +48,17 @@ export class RealtimePollingService {
     private mapping: RouteStopMappingService,
     private vehicleDirection: VehicleDirectionBackendService,
   ) {}
+
+  onModuleDestroy(): void {
+    this.pollingCoordinator.stopPolling();
+    this.routeSubscriptionCounts.clear();
+    this.stopSubscriptionCounts.clear();
+    this.subscriptions.routeShortNames.clear();
+    this.subscriptions.stopCodes.clear();
+    this.vehiclePositionsCache.clear();
+    this.routeToDirectionsIndex.clear();
+    this.arrivalPredictionsCache.clear();
+  }
 
   /**
    * Subscribe to poll completion events

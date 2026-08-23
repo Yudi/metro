@@ -17,76 +17,47 @@ export class GTFSDatabaseService {
    * Get current dataset (there should only be one)
    */
   async getCurrentDataset(): Promise<GTFSDatasetResponseDto | null> {
-    try {
-      const dataset = await this.prisma.gTFSDataset.findFirst({
-        include: { gtfsFiles: true },
-      });
+    const dataset = await this.findLatestCompleteDataset();
+    if (!dataset) return null;
 
-      if (!dataset) return null;
-
-      return {
-        id: dataset.id,
-        lastUpdated: dataset.lastUpdated,
-        fileHash: dataset.fileHash,
-        fileSize: dataset.fileSize,
-        version: dataset.version || undefined,
-      };
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to get current dataset:`, errorMessage);
-      return null;
-    }
+    return this.toDatasetResponse(dataset);
   }
 
   /**
    * Check if current dataset hash matches the provided hash
    */
   async isCurrentHash(fileHash: string): Promise<boolean> {
-    try {
-      const dataset = await this.prisma.gTFSDataset.findFirst({
-        where: { fileHash },
-        include: {
-          gtfsFiles: {
-            where: { fileName: 'shapes.txt' },
-            select: { recordCount: true },
-          },
-        },
-      });
-      if (!dataset) {
-        return false;
-      }
-
-      const shapesFile = dataset.gtfsFiles[0];
-      if (!shapesFile?.recordCount || shapesFile.recordCount <= 0) {
-        this.logger.warn(
-          'Current GTFS dataset has no successful shapes.txt import; forcing reimport',
-        );
-        return false;
-      }
-
-      const [shapeCount] = await this.prisma.$queryRaw<
-        Array<{ count: bigint }>
-      >`
-        SELECT COUNT(*) AS count
-        FROM "external_gtfs"."SPTrans_Shape"
-        WHERE geom IS NOT NULL
-      `;
-
-      if (!shapeCount || Number(shapeCount.count) === 0) {
-        this.logger.warn(
-          'Current GTFS dataset has no imported shape geometries; forcing reimport',
-        );
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to check current hash:`, errorMessage);
+    const dataset = await this.findLatestCompleteDataset();
+    if (!dataset || dataset.fileHash !== fileHash) {
       return false;
     }
+
+    const shapesFile = dataset.gtfsFiles.find(
+      (file) => file.fileName === 'shapes.txt',
+    );
+    if (!shapesFile?.recordCount || shapesFile.recordCount <= 0) {
+      this.logger.warn(
+        'Current GTFS dataset has no successful shapes.txt import; forcing reimport',
+      );
+      return false;
+    }
+
+    const [shapeCount] = await this.prisma.$queryRaw<
+      Array<{ count: bigint }>
+    >`
+      SELECT COUNT(*) AS count
+      FROM "external_gtfs"."SPTrans_Shape"
+      WHERE geom IS NOT NULL
+    `;
+
+    if (!shapeCount || Number(shapeCount.count) === 0) {
+      this.logger.warn(
+        'Current GTFS dataset has no imported shape geometries; forcing reimport',
+      );
+      return false;
+    }
+
+    return true;
   }
 
   /**
@@ -95,76 +66,46 @@ export class GTFSDatabaseService {
   async createOrUpdateDataset(
     dto: CreateGTFSDatasetDto
   ): Promise<GTFSDatasetResponseDto> {
-    try {
-      // Delete existing dataset (if any) since we only keep the current one
-      await this.prisma.gTFSDataset.deleteMany({});
+    const dataset = await this.prisma.gTFSDataset.upsert({
+      where: { fileHash: dto.fileHash },
+      update: {
+        fileSize: dto.fileSize,
+        version: dto.version,
+        lastUpdated: new Date(),
+      },
+      create: {
+        fileHash: dto.fileHash,
+        fileSize: dto.fileSize,
+        version: dto.version,
+      },
+    });
 
-      // Create new dataset
-      const dataset = await this.prisma.gTFSDataset.create({
-        data: {
-          fileHash: dto.fileHash,
-          fileSize: dto.fileSize,
-          version: dto.version,
-        },
-      });
-
-      return {
-        id: dataset.id,
-        lastUpdated: dataset.lastUpdated,
-        fileHash: dataset.fileHash,
-        fileSize: dataset.fileSize,
-        version: dataset.version || undefined,
-      };
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to create/update dataset:`, errorMessage);
-      throw new Error(`Database error: ${errorMessage}`);
-    }
+    return this.toDatasetResponse(dataset);
   }
 
   /**
    * Find GTFS file by dataset ID and filename
    */
   async findFileByDatasetAndName(datasetId: string, fileName: string) {
-    try {
-      return await this.prisma.gTFSFile.findUnique({
-        where: {
-          datasetId_fileName: {
-            datasetId,
-            fileName,
-          },
+    return await this.prisma.gTFSFile.findUnique({
+      where: {
+        datasetId_fileName: {
+          datasetId,
+          fileName,
         },
-      });
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(
-        `Failed to find file ${fileName} for dataset ${datasetId}:`,
-        errorMessage
-      );
-      return null;
-    }
+      },
+    });
   }
 
   /**
    * Find GTFS file by hash across all datasets
    */
   async findFileByHash(fileHash: string) {
-    try {
-      return await this.prisma.gTFSFile.findFirst({
-        where: { fileHash },
-        include: { dataset: true },
-      });
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(
-        `Failed to find file by hash ${fileHash}:`,
-        errorMessage
-      );
-      return null;
-    }
+    return await this.prisma.gTFSFile.findFirst({
+      where: { fileHash },
+      include: { dataset: true },
+      orderBy: { lastUpdated: 'desc' },
+    });
   }
 
   /**
@@ -244,6 +185,50 @@ export class GTFSDatabaseService {
     }
   }
 
+  private async findLatestCompleteDataset() {
+    const datasets = await this.prisma.gTFSDataset.findMany({
+      include: { gtfsFiles: true },
+      orderBy: { lastUpdated: 'desc' },
+    });
+
+    return datasets.find((dataset) => {
+      const filesByName = new Map(
+        dataset.gtfsFiles.map((file) => [file.fileName, file]),
+      );
+
+      const requiredFilesComplete = GTFSConfig.getRequiredFiles().every(
+        (fileName) => {
+          const file = filesByName.get(fileName);
+          return file?.recordCount !== null && (file?.recordCount ?? 0) > 0;
+        },
+      );
+
+      // Optional files that are present in a feed must also have completed;
+      // absent optional files remain valid for feeds that do not publish them.
+      const presentFilesComplete = dataset.gtfsFiles.every(
+        (file) => (file.recordCount ?? 0) > 0,
+      );
+
+      return requiredFilesComplete && presentFilesComplete;
+    });
+  }
+
+  private toDatasetResponse(dataset: {
+    id: string;
+    lastUpdated: Date;
+    fileHash: string;
+    fileSize: number;
+    version: string | null;
+  }): GTFSDatasetResponseDto {
+    return {
+      id: dataset.id,
+      lastUpdated: dataset.lastUpdated,
+      fileHash: dataset.fileHash,
+      fileSize: dataset.fileSize,
+      version: dataset.version || undefined,
+    };
+  }
+
   /**
    * Get current dataset (alias for getCurrentDataset for backward compatibility)
    */
@@ -277,10 +262,4 @@ export class GTFSDatabaseService {
     }
   }
 
-  /**
-   * Disconnect Prisma client
-   */
-  async onModuleDestroy() {
-    await this.prisma.$disconnect();
-  }
 }

@@ -8,9 +8,11 @@ import {
   effect,
   untracked,
   ChangeDetectionStrategy,
+  DestroyRef,
   isDevMode,
   signal,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 
@@ -81,11 +83,15 @@ export class MapComponent implements AfterViewInit, OnDestroy {
   private favoritesService = inject(FavoritesService);
   private railService = inject(RailGraphqlService);
   private mapViewStateStorage = inject(MapViewStateStorageService);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly appliedFavoriteSelections = new Set<string>();
   private readonly persistenceReady = signal(false);
   private isApplyingSavedState = false;
   private appliedSavedStateForNavigation = false;
   private lastDefaultStateRequest = this.mapViewStateStorage.defaultStateRequests();
+  private initializationTimer: ReturnType<typeof setTimeout> | null = null;
+  private initialDataTimer: ReturnType<typeof setTimeout> | null = null;
+  private destroyed = false;
 
   // Expose state for template access
   readonly displayMode = this.mapState.displayMode;
@@ -122,9 +128,12 @@ export class MapComponent implements AfterViewInit, OnDestroy {
   static readonly DEFAULT_ZOOM = 11;
 
   constructor() {
-    this.railService.fetchSpecialServices().subscribe(() => {
-      this.applyRouteState(this.route.snapshot.queryParamMap);
-    });
+    this.railService
+      .fetchSpecialServices()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        this.applyRouteState(this.route.snapshot.queryParamMap);
+      });
     // Set up display update callbacks
     this.mapState.setUpdateDisplayCallback(() =>
       this.displayService.updateMapDisplay(),
@@ -209,7 +218,9 @@ export class MapComponent implements AfterViewInit, OnDestroy {
     }
 
     // React to future changes to query params while on the page
-    this.route.queryParamMap.subscribe((pm) => this.applyRouteState(pm));
+    this.route.queryParamMap
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((pm) => this.applyRouteState(pm));
   }
 
   ngAfterViewInit(): void {
@@ -217,6 +228,15 @@ export class MapComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.destroyed = true;
+    if (this.initializationTimer) {
+      clearTimeout(this.initializationTimer);
+      this.initializationTimer = null;
+    }
+    if (this.initialDataTimer) {
+      clearTimeout(this.initialDataTimer);
+      this.initialDataTimer = null;
+    }
     this.userLocationLayer.stopTracking();
     this.userLocationLayer.removeFromMap();
     this.mapService.destroy();
@@ -239,7 +259,11 @@ export class MapComponent implements AfterViewInit, OnDestroy {
     };
 
     // Initialize map with vehicle layer included
-    setTimeout(() => {
+    this.initializationTimer = setTimeout(() => {
+      this.initializationTimer = null;
+      if (this.destroyed) {
+        return;
+      }
       this.mapService.initializeMap('ol-map-tab', options);
 
       // Re-apply query params now that the map exists (centers / zooms)
@@ -271,7 +295,11 @@ export class MapComponent implements AfterViewInit, OnDestroy {
       }
 
       // Load initial data after map is ready
-      setTimeout(() => {
+      this.initialDataTimer = setTimeout(() => {
+        this.initialDataTimer = null;
+        if (this.destroyed) {
+          return;
+        }
         this.loadInitialData();
         this.persistenceReady.set(true);
       }, 100);

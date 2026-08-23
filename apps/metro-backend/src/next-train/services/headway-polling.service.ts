@@ -100,6 +100,38 @@ export class HeadwayPollingService implements OnModuleInit, OnModuleDestroy {
   private cptmPollingIndex = 0;
   private isRunning = false;
   private pruneTimer: ReturnType<typeof setInterval> | null = null;
+  private startupTimer: ReturnType<typeof setTimeout> | null = null;
+  private destroyed = false;
+  private readonly nextTrainPollListener: Parameters<
+    NextTrainPollingService['onPollComplete']
+  >[0] = (deltas) => {
+    if (this.destroyed) {
+      return;
+    }
+    for (const delta of deltas) {
+      if (delta.hasError) continue;
+
+      this.lastPollTimes.set(
+        `${delta.lineCode}:${delta.stationCode}`,
+        delta.timestamp,
+      );
+
+      if (isActualCptmLine(delta.lineCode)) {
+        void this.processCptmDelta(
+          delta.lineCode as ActualCptmLineCode,
+          delta.stationCode,
+          delta.timestamp,
+        );
+      } else {
+        void this.headwayTracking.processPollResult(
+          delta.lineCode,
+          delta.stationCode,
+          delta.trains,
+          delta.timestamp,
+        );
+      }
+    }
+  };
 
   /** Per-station last poll timestamp used to avoid rapid repolls */
   private readonly lastPollTimes = new Map<string, number>();
@@ -159,34 +191,15 @@ export class HeadwayPollingService implements OnModuleInit, OnModuleDestroy {
     // For L4/L8/L9: feed formatted trains to snapshot-based tracking.
     // For CPTM (L10-L13): read sanitized headway observations from the
     //   integration source and feed individual-train tracking.
-    this.nextTrainPolling.onPollComplete((deltas) => {
-      for (const delta of deltas) {
-        if (delta.hasError) continue;
-
-        this.lastPollTimes.set(
-          `${delta.lineCode}:${delta.stationCode}`,
-          delta.timestamp,
-        );
-
-        if (isActualCptmLine(delta.lineCode)) {
-          void this.processCptmDelta(
-            delta.lineCode as ActualCptmLineCode,
-            delta.stationCode,
-            delta.timestamp,
-          );
-        } else {
-          void this.headwayTracking.processPollResult(
-            delta.lineCode,
-            delta.stationCode,
-            delta.trains,
-            delta.timestamp,
-          );
-        }
-      }
-    });
+    this.nextTrainPolling.onPollComplete(this.nextTrainPollListener);
 
     // Start proactive polling after a short delay to let other services init
-    setTimeout(() => void this.startProactivePolling(), 5000);
+    this.startupTimer = setTimeout(() => {
+      this.startupTimer = null;
+      if (!this.destroyed) {
+        void this.startProactivePolling();
+      }
+    }, 5000);
 
     // Setup periodic passage pruning
     this.pruneTimer = setInterval(() => {
@@ -195,6 +208,12 @@ export class HeadwayPollingService implements OnModuleInit, OnModuleDestroy {
   }
 
   onModuleDestroy(): void {
+    this.destroyed = true;
+    this.nextTrainPolling.offPollComplete(this.nextTrainPollListener);
+    if (this.startupTimer) {
+      clearTimeout(this.startupTimer);
+      this.startupTimer = null;
+    }
     this.stopAllPolling();
     if (this.pruneTimer) {
       clearInterval(this.pruneTimer);

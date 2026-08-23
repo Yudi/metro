@@ -83,6 +83,11 @@ export class GeolocationService implements OnDestroy {
   private orientationHandler: ((event: DeviceOrientationEvent) => void) | null =
     null;
 
+  private permissionStatus: PermissionStatus | null = null;
+  private permissionChangeHandler: (() => void) | null = null;
+  private locationRequest: Promise<UserLocation | null> | null = null;
+  private destroyed = false;
+
   /** Current permission state */
   readonly permission = signal<LocationPermissionState>('prompt');
 
@@ -143,6 +148,15 @@ export class GeolocationService implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.destroyed = true;
+    if (this.permissionStatus && this.permissionChangeHandler) {
+      this.permissionStatus.removeEventListener(
+        'change',
+        this.permissionChangeHandler,
+      );
+    }
+    this.permissionStatus = null;
+    this.permissionChangeHandler = null;
     this.stopTracking();
   }
 
@@ -168,12 +182,21 @@ export class GeolocationService implements OnDestroy {
           name: 'geolocation',
         });
 
+        if (this.destroyed) {
+          return;
+        }
+
+        this.permissionStatus = result;
+
         this.ngZone.run(() => {
           this.permission.set(result.state as LocationPermissionState);
         });
 
         // Listen for permission changes
-        result.addEventListener('change', () => {
+        this.permissionChangeHandler = () => {
+          if (this.destroyed) {
+            return;
+          }
           this.ngZone.run(() => {
             this.permission.set(result.state as LocationPermissionState);
 
@@ -182,7 +205,8 @@ export class GeolocationService implements OnDestroy {
               this.location.set(null);
             }
           });
-        });
+        };
+        result.addEventListener('change', this.permissionChangeHandler);
       } catch {
         // Permissions API not fully supported, keep default 'prompt' state
         this.permission.set('prompt');
@@ -201,29 +225,36 @@ export class GeolocationService implements OnDestroy {
    * @param options - Optional geolocation request options
    * @returns Promise with the user's location, or null if denied/unavailable
    */
-  async requestLocation(
+  requestLocation(
     options: GeolocationRequestOptions = {}
   ): Promise<UserLocation | null> {
     if (!this.isSupported()) {
       this.permission.set('unavailable');
-      return null;
+      return Promise.resolve(null);
     }
 
-    if (this.isRequesting()) {
-      return null;
+    if (this.locationRequest) {
+      return this.locationRequest;
     }
 
     const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
 
     this.isRequesting.set(true);
 
+    this.locationRequest = this.performLocationRequest(mergedOptions);
+    return this.locationRequest;
+  }
+
+  private async performLocationRequest(
+    options: GeolocationRequestOptions,
+  ): Promise<UserLocation | null> {
     try {
       const position = await new Promise<GeolocationPosition>(
         (resolve, reject) => {
           navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: mergedOptions.enableHighAccuracy,
-            timeout: mergedOptions.timeout,
-            maximumAge: mergedOptions.maximumAge,
+            enableHighAccuracy: options.enableHighAccuracy,
+            timeout: options.timeout,
+            maximumAge: options.maximumAge,
           });
         }
       );
@@ -265,6 +296,7 @@ export class GeolocationService implements OnDestroy {
       this.ngZone.run(() => {
         this.isRequesting.set(false);
       });
+      this.locationRequest = null;
     }
   }
 

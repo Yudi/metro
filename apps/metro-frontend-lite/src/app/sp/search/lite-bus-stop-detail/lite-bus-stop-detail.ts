@@ -17,6 +17,7 @@ import {
   LiteStopArrivalUpdate,
 } from '../../../services/lite-realtime.service';
 import { LiteChip, LiteSpinner } from '@metro/shared/lite-ui';
+import { getTransitTimeDifferenceMinutes } from '@metro/shared/utils';
 
 @Component({
   selector: 'app-lite-bus-stop-detail',
@@ -116,31 +117,20 @@ export class LiteBusStopDetail {
   }
 
   getMinutesUntilArrival(arrivalTime: string): string {
-    try {
-      const [hours, minutes] = arrivalTime.split(':').map(Number);
-      const now = new Date();
-      const arrival = new Date();
-      arrival.setHours(hours, minutes, 0, 0);
-
-      if (arrival < now) {
-        arrival.setDate(arrival.getDate() + 1);
-      }
-
-      const diffMins = Math.round((arrival.getTime() - now.getTime()) / 60000);
-
-      if (diffMins === 0) {
-        return 'Chegando';
-      }
-      if (diffMins === 1) {
-        return 'Em 1 min';
-      }
-      if (diffMins < 0) {
-        return 'Atrasado';
-      }
-      return `Em ${diffMins} min`;
-    } catch {
+    const diffMins = getTransitTimeDifferenceMinutes(arrivalTime);
+    if (diffMins === null) {
       return arrivalTime;
     }
+    if (diffMins === 0) {
+      return 'Chegando';
+    }
+    if (diffMins === 1) {
+      return 'Em 1 min';
+    }
+    if (diffMins < 0) {
+      return 'Atrasado';
+    }
+    return `Em ${diffMins} min`;
   }
 
   formatStationMeta(station: LiteRouteRailConnectionStation): string {

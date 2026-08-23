@@ -41,11 +41,6 @@ export interface LiteStopArrivalUpdate {
   cacheTimestamp: number;
 }
 
-interface LiteRealtimeMessage<TData> {
-  type: string;
-  data: TData;
-}
-
 const ARRIVAL_PREDICTIONS_EVENT = 'arrival_predictions';
 const SUBSCRIBE_STOP_EVENT = 'subscribe_stop';
 const UNSUBSCRIBE_STOP_EVENT = 'unsubscribe_stop';
@@ -58,6 +53,7 @@ export class LiteRealtimeService implements OnDestroy {
   private readonly socketUrl = this.baseUrl.replace(/\/api$/, '');
   private socket: Socket | null = null;
   private readonly subscribedStops = new Set<string>();
+  private readonly pendingRequests = new Set<() => void>();
 
   readonly connected = signal(false);
   readonly stopArrivals = signal<Map<string, LiteStopArrivalUpdate>>(new Map());
@@ -70,32 +66,44 @@ export class LiteRealtimeService implements OnDestroy {
     this.ensureSocket();
 
     return new Promise((resolve) => {
+      let settled = false;
       const timeoutId = window.setTimeout(() => {
-        cleanup();
-        resolve(null);
+        settle(null);
       }, 10000);
 
-      const handler = (payload: LiteRealtimeMessage<LiteStopArrivalUpdate>) => {
+      const handler = (payload: unknown) => {
         const update = this.readArrivalUpdate(payload);
         if (update?.stopCode !== stopCode) {
           return;
         }
 
-        cleanup();
-        resolve(update);
+        settle(update);
       };
 
       const cleanup = () => {
         window.clearTimeout(timeoutId);
         this.socket?.off(ARRIVAL_PREDICTIONS_EVENT, handler);
+        this.pendingRequests.delete(cancel);
 
         if (!this.subscribedStops.has(stopCode)) {
           this.socket?.emit(UNSUBSCRIBE_STOP_EVENT, { stopCode });
         }
       };
 
+      const settle = (update: LiteStopArrivalUpdate | null) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cleanup();
+        resolve(update);
+      };
+
+      const cancel = () => settle(null);
+
       this.socket?.on(ARRIVAL_PREDICTIONS_EVENT, handler);
       this.socket?.emit(SUBSCRIBE_STOP_EVENT, { stopCode });
+      this.pendingRequests.add(cancel);
     });
   }
 
@@ -123,6 +131,7 @@ export class LiteRealtimeService implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.settlePendingRequests();
     this.socket?.disconnect();
     this.socket = null;
     this.connected.set(false);
@@ -152,18 +161,19 @@ export class LiteRealtimeService implements OnDestroy {
 
     this.socket.on('disconnect', () => {
       this.connected.set(false);
+      this.settlePendingRequests();
     });
 
     this.socket.on(
       ARRIVAL_PREDICTIONS_EVENT,
-      (payload: LiteRealtimeMessage<LiteStopArrivalUpdate>) => {
+      (payload: unknown) => {
         this.handleArrivalPredictions(payload);
       },
     );
   }
 
   private handleArrivalPredictions(
-    payload: LiteRealtimeMessage<LiteStopArrivalUpdate>,
+    payload: unknown,
   ): void {
     const update = this.readArrivalUpdate(payload);
     if (!update) {
@@ -176,12 +186,106 @@ export class LiteRealtimeService implements OnDestroy {
   }
 
   private readArrivalUpdate(
-    payload: LiteRealtimeMessage<LiteStopArrivalUpdate>,
+    payload: unknown,
   ): LiteStopArrivalUpdate | null {
-    if (!payload.data?.stopCode) {
+    if (!isRecord(payload) || !isRecord(payload['data'])) {
       return null;
     }
 
-    return payload.data;
+    const data = payload['data'];
+    const stopCode = data['stopCode'];
+    if (typeof stopCode !== 'string' || !stopCode.trim()) {
+      return null;
+    }
+
+    const rawStop = data['p'];
+    const stop = isRecord(rawStop)
+      ? {
+          cp: finiteNumber(rawStop['cp']),
+          np: stringValue(rawStop['np']),
+          py: finiteNumber(rawStop['py']),
+          px: finiteNumber(rawStop['px']),
+          l: Array.isArray(rawStop['l'])
+            ? rawStop['l']
+                .map(readArrivalLine)
+                .filter((line): line is LiteArrivalLine => line !== null)
+            : [],
+        }
+      : null;
+
+    return {
+      stopCode: stopCode.trim(),
+      hr: stringValue(data['hr']),
+      p: stop,
+      cacheTimestamp: finiteNumber(data['cacheTimestamp']),
+    };
   }
+
+  private settlePendingRequests(): void {
+    for (const cancel of [...this.pendingRequests]) {
+      cancel();
+    }
+  }
+}
+
+function readArrivalLine(value: unknown): LiteArrivalLine | null {
+  if (!isRecord(value) || typeof value['c'] !== 'string') {
+    return null;
+  }
+
+  return {
+    c: value['c'].trim(),
+    cl: finiteNumber(value['cl']),
+    sl: finiteNumber(value['sl']),
+    lt0: stringValue(value['lt0']),
+    lt1: stringValue(value['lt1']),
+    qv: finiteNumber(value['qv']),
+    vs: Array.isArray(value['vs'])
+      ? value['vs']
+          .map(readVehiclePosition)
+          .filter((vehicle): vehicle is LiteVehiclePosition => vehicle !== null)
+      : [],
+  };
+}
+
+function readVehiclePosition(value: unknown): LiteVehiclePosition | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const position = readFiniteNumber(value['p']);
+  if (position === null) {
+    return null;
+  }
+
+  return {
+    p: position,
+    a: value['a'] === true,
+    ta: stringValue(value['ta']),
+    py: finiteNumber(value['py']),
+    px: finiteNumber(value['px']),
+    ...(typeof value['t'] === 'string' ? { t: value['t'] } : {}),
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function finiteNumber(value: unknown): number {
+  return readFiniteNumber(value) ?? 0;
+}
+
+function readFiniteNumber(value: unknown): number | null {
+  if (
+    typeof value !== 'number' &&
+    (typeof value !== 'string' || !value.trim())
+  ) {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === 'string' ? value : '';
 }

@@ -2,19 +2,53 @@
   <header class="page-header">
     <div>
       <h2><a routerLink="/">←</a> Painel</h2>
-      <p>Favoritos salvos neste navegador.</p>
+      <p>
+        Favoritos sincronizados da versão completa quando você entra com o Google.
+      </p>
     </div>
 
-    <button
-      type="button"
-      class="refresh-button"
-      (click)="refreshDashboard()"
-      [disabled]="loading()"
-    >
-      @if (loading()) { Atualizando... } @else { ↻ Atualizar }
-    </button>
+    <div class="header-actions">
+      @if (authReady()) {
+        @if (firebaseUser(); as user) {
+          <span class="auth-status">
+            Sincronizado como {{ user.displayName || user.email || "Google" }}
+          </span>
+          <button
+            type="button"
+            class="secondary-button"
+            (click)="logout()"
+            [disabled]="authOperationPending()"
+          >
+            Sair
+          </button>
+        } @else {
+          <button
+            type="button"
+            class="secondary-button"
+            (click)="loginGoogle()"
+            [disabled]="authOperationPending()"
+          >
+            @if (authOperationPending()) { Entrando... } @else { Entrar com Google }
+          </button>
+        }
+      } @else {
+        <span class="auth-status">Verificando login...</span>
+      }
+
+      <button
+        type="button"
+        class="refresh-button"
+        (click)="refreshDashboard()"
+        [disabled]="loading()"
+      >
+        @if (loading()) { Atualizando... } @else { Atualizar }
+      </button>
+    </div>
   </header>
 
+  @if (authError()) {
+  <div class="alert" role="alert">{{ authError() }}</div>
+  }
   @if (error()) {
   <div class="alert">{{ error() }}</div>
   } @if (lastLoadedAt()) {
@@ -71,7 +105,7 @@
           <p>{{ statusDescription }}</p>
           }
           @if (item.status?.detail) {
-          <p>{{ item.status?.detail }}</p>
+          <p>{{ item.status.detail }}</p>
           }
         </div>
       </article>

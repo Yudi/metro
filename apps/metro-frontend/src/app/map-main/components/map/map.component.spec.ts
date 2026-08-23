@@ -133,6 +133,21 @@ describe('MapComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('cancels delayed map initialization when destroyed', () => {
+    jest.useFakeTimers();
+    const mapService = TestBed.inject(MapService);
+    const initializeMap = jest.spyOn(mapService, 'initializeMap');
+
+    (
+      component as unknown as { initializeMap(): void }
+    ).initializeMap();
+    component.ngOnDestroy();
+    jest.advanceTimersByTime(1_100);
+
+    expect(initializeMap).not.toHaveBeenCalled();
+    jest.useRealTimers();
+  });
+
   it('applies ?bike=true to show the bike layer', () => {
     const mapService = TestBed.inject(MapService);
     expect(

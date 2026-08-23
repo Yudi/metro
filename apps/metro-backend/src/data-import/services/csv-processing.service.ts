@@ -21,6 +21,8 @@ type SqlExecutor = {
   $executeRawUnsafe(query: string, ...values: unknown[]): Promise<unknown>;
 };
 
+type RowMapper<T extends SqlValue[]> = (record: CsvRecord) => T;
+
 @Injectable()
 export class CsvProcessingService {
   private readonly logger = new Logger(CsvProcessingService.name);
@@ -28,6 +30,152 @@ export class CsvProcessingService {
   constructor(private readonly prisma: PrismaService) {}
 
   private readonly rawGtfsTables = new Set(GTFSConfig.getRawTables());
+
+  private requiredText(record: CsvRecord, field: string): string {
+    const value = record[field]?.trim();
+    if (!value) {
+      throw new Error(`${field} is required`);
+    }
+
+    return value;
+  }
+
+  private conditionalRouteName(
+    record: CsvRecord,
+    field: 'route_short_name' | 'route_long_name',
+    alternativeField: 'route_short_name' | 'route_long_name',
+  ): string {
+    const value = record[field]?.trim() || '';
+    if (!value && !record[alternativeField]?.trim()) {
+      throw new Error(
+        'route_short_name or route_long_name must be provided',
+      );
+    }
+    return value;
+  }
+
+  private optionalColor(record: CsvRecord, field: string): string {
+    const value = record[field]?.trim().replace(/^#/, '') || '';
+    if (value && !/^[0-9A-Fa-f]{6}$/.test(value)) {
+      this.logger.warn(
+        `Ignoring malformed optional ${field}: expected a six-digit hexadecimal color`,
+      );
+      return '';
+    }
+    return value.toUpperCase();
+  }
+
+  private strictInt(
+    record: CsvRecord,
+    field: string,
+    options: { min?: number; max?: number } = {},
+  ): number {
+    const value = record[field]?.trim();
+    if (!value || !/^-?\d+$/.test(value)) {
+      throw new Error(`${field} must be an integer`);
+    }
+
+    const parsed = Number(value);
+    if (
+      !Number.isSafeInteger(parsed) ||
+      (options.min !== undefined && parsed < options.min) ||
+      (options.max !== undefined && parsed > options.max)
+    ) {
+      throw new Error(`${field} is outside the allowed range`);
+    }
+
+    return parsed;
+  }
+
+  private strictFloat(
+    record: CsvRecord,
+    field: string,
+    options: { min?: number; max?: number } = {},
+  ): number {
+    const value = record[field]?.trim();
+    if (!value || !/^-?(?:\d+\.?\d*|\.\d+)$/.test(value)) {
+      throw new Error(`${field} must be a number`);
+    }
+
+    const parsed = Number(value);
+    if (
+      !Number.isFinite(parsed) ||
+      (options.min !== undefined && parsed < options.min) ||
+      (options.max !== undefined && parsed > options.max)
+    ) {
+      throw new Error(`${field} is outside the allowed range`);
+    }
+
+    return parsed;
+  }
+
+  private strictDate(record: CsvRecord, field: string): string {
+    const value = this.requiredText(record, field);
+    if (!/^\d{8}$/.test(value)) {
+      throw new Error(`${field} must use YYYYMMDD format`);
+    }
+
+    const year = Number(value.slice(0, 4));
+    const month = Number(value.slice(4, 6));
+    const day = Number(value.slice(6, 8));
+    const date = new Date(Date.UTC(year, month - 1, day));
+    if (
+      date.getUTCFullYear() !== year ||
+      date.getUTCMonth() !== month - 1 ||
+      date.getUTCDate() !== day
+    ) {
+      throw new Error(`${field} is not a valid calendar date`);
+    }
+
+    return value;
+  }
+
+  private strictTime(record: CsvRecord, field: string): string {
+    const value = this.requiredText(record, field);
+    const match = value.match(/^(\d{1,2}):([0-5]\d):([0-5]\d)$/);
+    if (!match || Number(match[1]) > 99) {
+      throw new Error(`${field} must use GTFS HH:MM:SS format`);
+    }
+
+    return value;
+  }
+
+  private strictRouteType(record: CsvRecord): number {
+    const value = this.strictInt(record, 'route_type', { min: 0, max: 999 });
+    if (value > 12 && value < 100) {
+      throw new Error('route_type is not a valid GTFS route type');
+    }
+
+    return value;
+  }
+
+  private mapRows<T extends SqlValue[]>(
+    fileName: string,
+    records: CsvRecord[],
+    mapper: RowMapper<T>,
+  ): T[] {
+    const rows: T[] = [];
+    let rejectedCount = 0;
+    let firstRejection: string | undefined;
+
+    records.forEach((record, index) => {
+      try {
+        rows.push(mapper(record));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Invalid row';
+        rejectedCount++;
+        firstRejection ??= `batch row ${index + 1}: ${message}`;
+      }
+    });
+
+    if (rejectedCount > 0) {
+      this.logger.warn(
+        `Skipped ${rejectedCount} malformed row(s) from ${fileName}; first rejection: ${firstRejection}`,
+      );
+    }
+
+    return rows;
+  }
 
   /**
    * Process a single CSV file and sync to database using transaction
@@ -61,7 +209,13 @@ export class CsvProcessingService {
   private async *readCsvBatches(
     filePath: string,
   ): AsyncGenerator<CsvRecord[]> {
-    const stream = createReadStream(filePath).pipe(csv()) as AsyncIterable<CsvRecord>;
+    const input = createReadStream(filePath);
+    const parser = input.pipe(csv());
+    // csv-parser does not always forward an input stream open/read error to
+    // its async iterator. Forward it explicitly so callers can fail the run
+    // instead of hanging and later recording a zero count.
+    input.on('error', (error) => parser.destroy(error));
+    const stream = parser as AsyncIterable<CsvRecord>;
     let batch: CsvRecord[] = [];
 
     for await (const record of stream) {
@@ -101,6 +255,7 @@ export class CsvProcessingService {
 
         if (recordCount === 0) {
           this.logger.warn(`No records found in ${fileName}`);
+          throw new Error(`${fileName} contains no usable records`);
         }
 
         if (tableName === 'SPTrans_Stop' && recordCount > 0) {
@@ -151,23 +306,23 @@ export class CsvProcessingService {
   ): Promise<number> {
     switch (tableName) {
       case 'SPTrans_Agency':
-        return this.importAgency(tx, records);
+        return this.importAgency(tx, records, fileName);
       case 'SPTrans_Calendar':
-        return this.importCalendar(tx, records);
+        return this.importCalendar(tx, records, fileName);
       case 'SPTrans_Route':
-        return this.importRoutes(tx, records);
+        return this.importRoutes(tx, records, fileName);
       case 'SPTrans_Stop':
-        return this.importStops(tx, records);
+        return this.importStops(tx, records, fileName);
       case 'SPTrans_Trip':
-        return this.importTrips(tx, records);
+        return this.importTrips(tx, records, fileName);
       case 'SPTrans_StopTime':
-        return this.importStopTimes(tx, records);
+        return this.importStopTimes(tx, records, fileName);
       case 'SPTrans_Frequency':
-        return this.importFrequencies(tx, records);
+        return this.importFrequencies(tx, records, fileName);
       case 'SPTrans_FareAttribute':
-        return this.importFareAttributes(tx, records);
+        return this.importFareAttributes(tx, records, fileName);
       case 'SPTrans_FareRule':
-        return this.importFareRules(tx, records);
+        return this.importFareRules(tx, records, fileName);
       case 'SPTrans_Shape':
         // Shapes are processed by Rust tool, skip here
         this.logger.debug(`Skipping ${fileName} - processed by Rust tool`);
@@ -184,9 +339,17 @@ export class CsvProcessingService {
   private async importAgency(
     tx: SqlExecutor,
     records: CsvRecord[],
+    fileName: string,
   ): Promise<number> {
-    const validRecords = records.filter((r) => r.agency_id && r.agency_name);
-
+    const rows = this.mapRows(fileName, records, (record) => [
+      record.agency_id?.trim() || '',
+      this.requiredText(record, 'agency_name'),
+      this.requiredText(record, 'agency_url'),
+      this.requiredText(record, 'agency_timezone'),
+      record.agency_lang?.trim() || null,
+      record.agency_phone?.trim() || null,
+      record.agency_fare_url?.trim() || null,
+    ]);
     await this.insertRows(tx, 'SPTrans_Agency', [
       'agency_id',
       'agency_name',
@@ -195,17 +358,9 @@ export class CsvProcessingService {
       'agency_lang',
       'agency_phone',
       'agency_fare_url',
-    ], validRecords.map((record) => [
-      record.agency_id,
-      record.agency_name,
-      record.agency_url || '',
-      record.agency_timezone || '',
-      record.agency_lang || null,
-      record.agency_phone || null,
-      record.agency_fare_url || null,
-    ]));
+    ], rows);
 
-    return validRecords.length;
+    return rows.length;
   }
 
   /**
@@ -214,9 +369,20 @@ export class CsvProcessingService {
   private async importCalendar(
     tx: SqlExecutor,
     records: CsvRecord[],
+    fileName: string,
   ): Promise<number> {
-    const validRecords = records.filter((r) => r.service_id);
-
+    const rows = this.mapRows(fileName, records, (record) => [
+      this.requiredText(record, 'service_id'),
+      this.strictInt(record, 'monday', { min: 0, max: 1 }),
+      this.strictInt(record, 'tuesday', { min: 0, max: 1 }),
+      this.strictInt(record, 'wednesday', { min: 0, max: 1 }),
+      this.strictInt(record, 'thursday', { min: 0, max: 1 }),
+      this.strictInt(record, 'friday', { min: 0, max: 1 }),
+      this.strictInt(record, 'saturday', { min: 0, max: 1 }),
+      this.strictInt(record, 'sunday', { min: 0, max: 1 }),
+      this.strictDate(record, 'start_date'),
+      this.strictDate(record, 'end_date'),
+    ]);
     await this.insertRows(tx, 'SPTrans_Calendar', [
       'service_id',
       'monday',
@@ -228,20 +394,9 @@ export class CsvProcessingService {
       'sunday',
       'start_date',
       'end_date',
-    ], validRecords.map((record) => [
-      record.service_id,
-      parseInt(record.monday) || 0,
-      parseInt(record.tuesday) || 0,
-      parseInt(record.wednesday) || 0,
-      parseInt(record.thursday) || 0,
-      parseInt(record.friday) || 0,
-      parseInt(record.saturday) || 0,
-      parseInt(record.sunday) || 0,
-      record.start_date || '',
-      record.end_date || '',
-    ]));
+    ], rows);
 
-    return validRecords.length;
+    return rows.length;
   }
 
   /**
@@ -250,11 +405,17 @@ export class CsvProcessingService {
   private async importRoutes(
     tx: SqlExecutor,
     records: CsvRecord[],
+    fileName: string,
   ): Promise<number> {
-    const validRecords = records.filter(
-      (r) => r.route_id && r.route_short_name,
-    );
-
+    const rows = this.mapRows(fileName, records, (record) => [
+      this.requiredText(record, 'route_id'),
+      record.agency_id?.trim() || '',
+      this.conditionalRouteName(record, 'route_short_name', 'route_long_name'),
+      this.conditionalRouteName(record, 'route_long_name', 'route_short_name'),
+      this.strictRouteType(record),
+      this.optionalColor(record, 'route_color'),
+      this.optionalColor(record, 'route_text_color'),
+    ]);
     await this.insertRows(tx, 'SPTrans_Route', [
       'route_id',
       'agency_id',
@@ -263,17 +424,9 @@ export class CsvProcessingService {
       'route_type',
       'route_color',
       'route_text_color',
-    ], validRecords.map((record) => [
-      record.route_id,
-      record.agency_id || '',
-      record.route_short_name,
-      record.route_long_name || '',
-      parseInt(record.route_type) || 0,
-      record.route_color || '',
-      record.route_text_color || '',
-    ]));
+    ], rows);
 
-    return validRecords.length;
+    return rows.length;
   }
 
   /**
@@ -282,26 +435,16 @@ export class CsvProcessingService {
   private async importStops(
     tx: SqlExecutor,
     records: CsvRecord[],
+    fileName: string,
   ): Promise<number> {
     // Step 1: Validate and transform records with type safety
     const validationResult = this.validateStopRecords(records);
 
     if (validationResult.invalid.length > 0) {
+      const firstInvalid = validationResult.invalid[0];
       this.logger.warn(
-        `Found ${validationResult.invalid.length} invalid stop records`,
+        `Skipped ${validationResult.invalid.length} malformed stop row(s) from ${fileName}; first rejection: ${firstInvalid.errors.join(', ')}`,
       );
-      validationResult.invalid.forEach((invalidRecord) => {
-        this.logger.warn(
-          `Invalid stop record ${
-            invalidRecord.record.stop_id
-          }: ${invalidRecord.errors.join(', ')}`,
-        );
-      });
-    }
-
-    if (validationResult.valid.length === 0) {
-      this.logger.warn('No valid stop records to import');
-      return 0;
     }
 
     // Step 2: Import CSV data using raw SQL into the external GTFS schema
@@ -340,19 +483,22 @@ export class CsvProcessingService {
       // Required field validation
       if (!record.stop_id) errors.push('stop_id is required');
       if (!record.stop_name) errors.push('stop_name is required');
-      if (!record.stop_lat) errors.push('stop_lat is required');
-      if (!record.stop_lon) errors.push('stop_lon is required');
+      if (!record.stop_lat?.trim()) errors.push('stop_lat is required');
+      if (!record.stop_lon?.trim()) errors.push('stop_lon is required');
 
       // Coordinate validation
-      const lat = parseFloat(record.stop_lat);
-      const lon = parseFloat(record.stop_lon);
-
-      if (isNaN(lat)) errors.push('stop_lat must be a valid number');
-      if (isNaN(lon)) errors.push('stop_lon must be a valid number');
-      if (lat < -90 || lat > 90)
-        errors.push('stop_lat must be between -90 and 90');
-      if (lon < -180 || lon > 180)
-        errors.push('stop_lon must be between -180 and 180');
+      let lat = Number.NaN;
+      let lon = Number.NaN;
+      try {
+        lat = this.strictFloat(record, 'stop_lat', { min: -90, max: 90 });
+      } catch (error) {
+        errors.push(error instanceof Error ? error.message : 'invalid stop_lat');
+      }
+      try {
+        lon = this.strictFloat(record, 'stop_lon', { min: -180, max: 180 });
+      } catch (error) {
+        errors.push(error instanceof Error ? error.message : 'invalid stop_lon');
+      }
 
       if (errors.length > 0) {
         invalid.push({ record, errors });
@@ -387,9 +533,18 @@ export class CsvProcessingService {
   private async importTrips(
     tx: SqlExecutor,
     records: CsvRecord[],
+    fileName: string,
   ): Promise<number> {
-    const validRecords = records.filter((r) => r.trip_id && r.route_id);
-
+    const rows = this.mapRows(fileName, records, (record) => [
+      this.requiredText(record, 'route_id'),
+      this.requiredText(record, 'service_id'),
+      this.requiredText(record, 'trip_id'),
+      record.trip_headsign?.trim() || '',
+      record.direction_id?.trim()
+        ? this.strictInt(record, 'direction_id', { min: 0, max: 1 })
+        : 0,
+      record.shape_id?.trim() || '',
+    ]);
     await this.insertRows(tx, 'SPTrans_Trip', [
       'route_id',
       'service_id',
@@ -397,16 +552,9 @@ export class CsvProcessingService {
       'trip_headsign',
       'direction_id',
       'shape_id',
-    ], validRecords.map((record) => [
-      record.route_id,
-      record.service_id || '',
-      record.trip_id,
-      record.trip_headsign || '',
-      parseInt(record.direction_id) || 0,
-      record.shape_id || '',
-    ]));
+    ], rows);
 
-    return validRecords.length;
+    return rows.length;
   }
 
   /**
@@ -415,24 +563,24 @@ export class CsvProcessingService {
   private async importStopTimes(
     tx: SqlExecutor,
     records: CsvRecord[],
+    fileName: string,
   ): Promise<number> {
-    const validRecords = records.filter((r) => r.trip_id && r.stop_id);
-
+    const rows = this.mapRows(fileName, records, (record) => [
+      this.requiredText(record, 'trip_id'),
+      this.strictTime(record, 'arrival_time'),
+      this.strictTime(record, 'departure_time'),
+      this.requiredText(record, 'stop_id'),
+      this.strictInt(record, 'stop_sequence', { min: 1 }),
+    ]);
     await this.insertRows(tx, 'SPTrans_StopTime', [
       'trip_id',
       'arrival_time',
       'departure_time',
       'stop_id',
       'stop_sequence',
-    ], validRecords.map((record) => [
-      record.trip_id,
-      record.arrival_time || '',
-      record.departure_time || '',
-      record.stop_id,
-      parseInt(record.stop_sequence) || 0,
-    ]));
+    ], rows);
 
-    return validRecords.length;
+    return rows.length;
   }
 
   /**
@@ -441,22 +589,22 @@ export class CsvProcessingService {
   private async importFrequencies(
     tx: SqlExecutor,
     records: CsvRecord[],
+    fileName: string,
   ): Promise<number> {
-    const validRecords = records.filter((r) => r.trip_id);
-
+    const rows = this.mapRows(fileName, records, (record) => [
+      this.requiredText(record, 'trip_id'),
+      this.strictTime(record, 'start_time'),
+      this.strictTime(record, 'end_time'),
+      this.strictInt(record, 'headway_secs', { min: 1 }),
+    ]);
     await this.insertRows(tx, 'SPTrans_Frequency', [
       'trip_id',
       'start_time',
       'end_time',
       'headway_secs',
-    ], validRecords.map((record) => [
-      record.trip_id,
-      record.start_time || '',
-      record.end_time || '',
-      parseInt(record.headway_secs) || 0,
-    ]));
+    ], rows);
 
-    return validRecords.length;
+    return rows.length;
   }
 
   /**
@@ -465,9 +613,18 @@ export class CsvProcessingService {
   private async importFareAttributes(
     tx: SqlExecutor,
     records: CsvRecord[],
+    fileName: string,
   ): Promise<number> {
-    const validRecords = records.filter((r) => r.fare_id);
-
+    const rows = this.mapRows(fileName, records, (record) => [
+      this.requiredText(record, 'fare_id'),
+      this.strictFloat(record, 'price', { min: 0 }),
+      this.requiredText(record, 'currency_type'),
+      this.strictInt(record, 'payment_method', { min: 0, max: 2 }),
+      this.strictInt(record, 'transfers', { min: 0, max: 2 }),
+      record.transfer_duration?.trim()
+        ? this.strictInt(record, 'transfer_duration', { min: 0 })
+        : null,
+    ]);
     await this.insertRows(tx, 'SPTrans_FareAttribute', [
       'fare_id',
       'price',
@@ -475,16 +632,9 @@ export class CsvProcessingService {
       'payment_method',
       'transfers',
       'transfer_duration',
-    ], validRecords.map((record) => [
-      record.fare_id,
-      parseFloat(record.price) || 0,
-      record.currency_type || '',
-      parseInt(record.payment_method) || 0,
-      parseInt(record.transfers) || 0,
-      record.transfer_duration ? parseInt(record.transfer_duration) : null,
-    ]));
+    ], rows);
 
-    return validRecords.length;
+    return rows.length;
   }
 
   /**
@@ -493,24 +643,24 @@ export class CsvProcessingService {
   private async importFareRules(
     tx: SqlExecutor,
     records: CsvRecord[],
+    fileName: string,
   ): Promise<number> {
-    const validRecords = records.filter((r) => r.fare_id);
-
+    const rows = this.mapRows(fileName, records, (record) => [
+      this.requiredText(record, 'fare_id'),
+      this.requiredText(record, 'route_id'),
+      record.origin_id?.trim() || null,
+      record.destination_id?.trim() || null,
+      record.contains_id?.trim() || null,
+    ]);
     await this.insertRows(tx, 'SPTrans_FareRule', [
       'fare_id',
       'route_id',
       'origin_id',
       'destination_id',
       'contains_id',
-    ], validRecords.map((record) => [
-      record.fare_id,
-      record.route_id || '',
-      record.origin_id || null,
-      record.destination_id || null,
-      record.contains_id || null,
-    ]));
+    ], rows);
 
-    return validRecords.length;
+    return rows.length;
   }
 
   private async insertRows(
@@ -580,14 +730,10 @@ export class CsvProcessingService {
       return count;
     } catch (error) {
       this.logger.error(`Failed to count records in ${filePath}:`, error);
-      return 0;
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`CSV record count failed for ${filePath}: ${errorMessage}`);
     }
   }
 
-  /**
-   * Disconnect Prisma client
-   */
-  async onModuleDestroy() {
-    await this.prisma.$disconnect();
-  }
 }

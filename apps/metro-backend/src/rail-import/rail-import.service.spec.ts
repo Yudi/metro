@@ -15,12 +15,11 @@ describe('RailImportService', () => {
     clearAllRailData: jest.Mock;
     getAllDatasets: jest.Mock;
   };
-  let prisma: {
-    $transaction: jest.Mock;
+  let importLockService: {
+    withLock: jest.Mock;
   };
-  let tx: {
-    $queryRaw: jest.Mock;
-  };
+  let railVectorTileService: { refreshMvtViews: jest.Mock };
+  let vectorTilesService: { clearCache: jest.Mock };
 
   beforeEach(() => {
     jest.useFakeTimers();
@@ -42,20 +41,21 @@ describe('RailImportService', () => {
       clearAllRailData: jest.fn().mockResolvedValue(undefined),
       getAllDatasets: jest.fn().mockResolvedValue([]),
     };
-    tx = {
-      $queryRaw: jest.fn().mockResolvedValue([{ locked: true }]),
+    importLockService = {
+      withLock: jest.fn((_: string, __: string, action: () => Promise<unknown>) =>
+        action(),
+      ),
     };
-    prisma = {
-      $transaction: jest.fn((callback) => callback(tx)),
-    };
+    railVectorTileService = { refreshMvtViews: jest.fn() };
+    vectorTilesService = { clearCache: jest.fn() };
 
     service = new RailImportService(
       wfsProcessingService as never,
       wfsDatabaseService as never,
-      { refreshMvtViews: jest.fn() } as never,
-      { clearCache: jest.fn() } as never,
+      railVectorTileService as never,
+      vectorTilesService as never,
       { indexRailLines: jest.fn(), indexRailStations: jest.fn() } as never,
-      prisma as never,
+      importLockService as never,
     );
   });
 
@@ -73,18 +73,20 @@ describe('RailImportService', () => {
       errors: [],
     });
 
-    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
-      maxWait: 10_000,
-      timeout: WFSConfig.IMPORT_LOCK_TIMEOUT_MS,
-    });
-    expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(importLockService.withLock).toHaveBeenCalledWith(
+      'metro-dev:wfs-import',
+      'GeoSampa WFS import',
+      expect.any(Function),
+    );
     expect(wfsProcessingService.downloadLayer).toHaveBeenCalledTimes(
       WFSConfig.getAllSources().length,
     );
   });
 
   it('does not import when another process holds the WFS import lock', async () => {
-    tx.$queryRaw.mockResolvedValueOnce([{ locked: false }]);
+    importLockService.withLock.mockRejectedValueOnce(
+      new Error('GeoSampa WFS import already in progress in another process'),
+    );
 
     await expect(service.startImport()).rejects.toThrow(
       'GeoSampa WFS import already in progress in another process',
@@ -92,5 +94,56 @@ describe('RailImportService', () => {
 
     expect(wfsProcessingService.ensureTargetTables).not.toHaveBeenCalled();
     expect(wfsProcessingService.downloadLayer).not.toHaveBeenCalled();
+  });
+
+  it('does not report rail import completion before required post-processing succeeds', async () => {
+    Object.defineProperty(service, 'performImport', {
+      value: jest.fn().mockResolvedValue({
+        success: true,
+        sourcesProcessed: 1,
+        recordsImported: 1,
+        skippedSources: [],
+        errors: [],
+      }),
+    });
+    railVectorTileService.refreshMvtViews.mockRejectedValue(
+      new Error('MVT refresh failed'),
+    );
+
+    await expect(service.startImport()).rejects.toThrow('MVT refresh failed');
+    expect(service.getImportStatus().status).toBe('error');
+    expect(vectorTilesService.clearCache).not.toHaveBeenCalled();
+  });
+
+  it('returns partial results when one external source fails', async () => {
+    Object.defineProperty(service, 'performImport', {
+      value: jest.fn().mockResolvedValue({
+        success: false,
+        sourcesProcessed: 0,
+        recordsImported: 0,
+        skippedSources: ['metro_line', 'trem_line', 'trem_station'],
+        errors: ['metro_station: upstream unavailable'],
+      }),
+    });
+
+    await expect(service.startImport()).resolves.toMatchObject({
+      success: false,
+      errors: ['metro_station: upstream unavailable'],
+    });
+    expect(service.getImportStatus()).toMatchObject({
+      status: 'completed',
+      message: expect.stringContaining('completed with errors'),
+    });
+  });
+
+  it('acquires the WFS lock before clear-and-reimport destructive work', async () => {
+    await service.clearAndReimport();
+
+    expect(importLockService.withLock).toHaveBeenCalledWith(
+      'metro-dev:wfs-import',
+      'GeoSampa WFS clear and reimport',
+      expect.any(Function),
+    );
+    expect(wfsDatabaseService.clearAllRailData).toHaveBeenCalledTimes(1);
   });
 });

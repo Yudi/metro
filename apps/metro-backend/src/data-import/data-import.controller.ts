@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Logger, UseGuards } from '@nestjs/common';
+import {
+  ConflictException,
+  Controller,
+  Get,
+  InternalServerErrorException,
+  Logger,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { DataImportService } from './data-import.service';
 import {
@@ -58,10 +66,11 @@ export class DataImportController {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       this.logger.error('Manual import failed:', errorMessage);
-      return {
-        success: false,
-        message: errorMessage,
-      };
+      if (errorMessage.includes('already in progress')) {
+        throw new ConflictException('GTFS import already in progress');
+      }
+
+      throw new InternalServerErrorException('GTFS import failed');
     }
   }
 
@@ -97,10 +106,11 @@ export class DataImportController {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       this.logger.error('Clear and import failed:', errorMessage);
-      return {
-        success: false,
-        message: errorMessage,
-      };
+      if (errorMessage.includes('already in progress')) {
+        throw new ConflictException('GTFS import already in progress');
+      }
+
+      throw new InternalServerErrorException('GTFS clear and reimport failed');
     }
   }
 

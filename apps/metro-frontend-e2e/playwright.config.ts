@@ -24,12 +24,17 @@ export default defineConfig({
   },
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: 'bun nx run metro:serve',
+    command: 'bunx nx run metro-frontend:serve-static:ci',
     url: 'http://localhost:4200',
     reuseExistingServer: true,
     cwd: workspaceRoot,
   },
-  projects: [
+  projects: process.env.CI ? [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+    },
+  ] : [
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },

@@ -7,6 +7,8 @@ export class WFSConfig {
     'https://wfs.geosampa.prefeitura.sp.gov.br/geoserver/geoportal/wfs';
   static readonly USER_AGENT = 'Projeto-Transporte-Metropolitano-Backend/1.0';
   static readonly REQUEST_TIMEOUT_MS = 120000;
+  static readonly MAX_RESPONSE_BYTES = 64 * 1024 * 1024;
+  static readonly INSERT_BATCH_SIZE = 250;
   static readonly BETWEEN_REQUEST_DELAY_MS = 750;
   static readonly TARGET_SRID = 3857;
   static readonly WFS_VERSION = '1.0.0';

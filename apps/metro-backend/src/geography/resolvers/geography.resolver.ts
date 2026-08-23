@@ -1,5 +1,15 @@
-import { Resolver, Query, Args, ID, Int } from '@nestjs/graphql';
-import { UseGuards, ValidationPipe } from '@nestjs/common';
+import { Resolver, Query, Args, ID, Info, Int } from '@nestjs/graphql';
+import {
+  FragmentDefinitionNode,
+  GraphQLResolveInfo,
+  Kind,
+  SelectionSetNode,
+} from 'graphql';
+import {
+  BadRequestException,
+  UseGuards,
+  ValidationPipe,
+} from '@nestjs/common';
 import { GeographyServiceOptimized } from '../services/geography-optimized.service';
 import {
   BusStop,
@@ -26,6 +36,8 @@ import { DevelopmentOnlyGuard } from '../../shared/guards/development-only.guard
 const DEFAULT_BUS_STOP_LIMIT = 25_000;
 const DEFAULT_BUS_ROUTE_LIMIT = 10_000;
 const DEFAULT_BUS_SHAPE_LIMIT = 500;
+const MAX_BATCH_IDS = 500;
+const MAX_IDENTIFIER_LENGTH = 128;
 
 @Resolver(() => BusStop)
 export class GeographyResolver {
@@ -101,7 +113,9 @@ export class GeographyResolver {
   async multipleBusStops(
     @Args('ids', { type: () => [ID] }) ids: string[],
   ): Promise<BusStop[]> {
-    return this.geographyService.getMultipleBusStops(ids);
+    return this.geographyService.getMultipleBusStops(
+      validateIdentifiers(ids, 'ids'),
+    );
   }
 
   @Query(() => [BusStop])
@@ -121,7 +135,9 @@ export class GeographyResolver {
   async multipleBusRoutes(
     @Args('ids', { type: () => [ID] }) ids: string[],
   ): Promise<BusRoute[]> {
-    return this.geographyService.getMultipleBusRoutes(ids);
+    return this.geographyService.getMultipleBusRoutes(
+      validateIdentifiers(ids, 'ids'),
+    );
   }
 
   @Query(() => [BusRoute])
@@ -191,7 +207,9 @@ export class GeographyResolver {
     @Args('stopIds', { type: () => [String] }) stopIds: string[],
   ): Promise<StopRoutes[]> {
     const routeMap =
-      await this.geographyService.getBatchRoutesForStops(stopIds);
+      await this.geographyService.getBatchRoutesForStops(
+        validateIdentifiers(stopIds, 'stopIds'),
+      );
     return Array.from(routeMap.entries()).map(([stopId, routeShortNames]) => ({
       stopId,
       routeShortNames,
@@ -267,8 +285,12 @@ export class GeographyResolver {
   })
   async stopFullData(
     @Args('stopId', { type: () => String }) stopId: string,
+    @Info() info: GraphQLResolveInfo,
   ): Promise<StopFullData | null> {
-    return this.geographyService.getStopFullData(stopId);
+    return this.geographyService.getStopFullData(
+      stopId,
+      requestsRouteDetails(info),
+    );
   }
 
   @Query(() => [RouteRailConnection], {
@@ -287,7 +309,7 @@ export class GeographyResolver {
   ): Promise<RouteRailConnection[]> {
     return this.geographyService.getRouteRailConnectionsForStop(
       stopId,
-      routeIds,
+      validateIdentifiers(routeIds, 'routeIds'),
       radiusMeters,
     );
   }
@@ -373,4 +395,95 @@ export class GeographyResolver {
       lines: station.lines,
     };
   }
+}
+
+function requestsRouteDetails(info: GraphQLResolveInfo): boolean {
+  const routeSelectionSets = info.fieldNodes.flatMap((fieldNode) =>
+    findFieldSelectionSets(
+      fieldNode.selectionSet,
+      'routes',
+      info.fragments,
+    ),
+  );
+  return routeSelectionSets.some((selectionSet) =>
+    selectionSetHasAnyField(
+      selectionSet,
+      new Set(['trips', 'shapes', 'stops']),
+      info.fragments,
+    ),
+  );
+}
+
+function validateIdentifiers(values: string[], argumentName: string): string[] {
+  if (values.length > MAX_BATCH_IDS) {
+    throw new BadRequestException(
+      `${argumentName} must contain at most ${MAX_BATCH_IDS} identifiers`,
+    );
+  }
+
+  const identifiers = values.map((value) => value.trim());
+  if (
+    identifiers.some(
+      (value) =>
+        value.length === 0 ||
+        value.length > MAX_IDENTIFIER_LENGTH ||
+        Array.from(value).some((character) => {
+          const codePoint = character.codePointAt(0) ?? 0;
+          return codePoint <= 0x1f || codePoint === 0x7f;
+        }),
+    )
+  ) {
+    throw new BadRequestException(
+      `${argumentName} contains an invalid identifier`,
+    );
+  }
+
+  return Array.from(new Set(identifiers));
+}
+
+function findFieldSelectionSets(
+  selectionSet: SelectionSetNode | undefined,
+  fieldName: string,
+  fragments: Record<string, FragmentDefinitionNode>,
+): SelectionSetNode[] {
+  if (!selectionSet) {
+    return [];
+  }
+
+  const matches: SelectionSetNode[] = [];
+  for (const selection of selectionSet.selections) {
+    if (selection.kind === Kind.FIELD) {
+      if (selection.name.value === fieldName && selection.selectionSet) {
+        matches.push(selection.selectionSet);
+      }
+      continue;
+    }
+    const nestedSelectionSet =
+      selection.kind === Kind.INLINE_FRAGMENT
+        ? selection.selectionSet
+        : fragments[selection.name.value]?.selectionSet;
+    matches.push(
+      ...findFieldSelectionSets(nestedSelectionSet, fieldName, fragments),
+    );
+  }
+  return matches;
+}
+
+function selectionSetHasAnyField(
+  selectionSet: SelectionSetNode,
+  fieldNames: Set<string>,
+  fragments: Record<string, FragmentDefinitionNode>,
+): boolean {
+  return selectionSet.selections.some((selection) => {
+    if (selection.kind === Kind.FIELD) {
+      return fieldNames.has(selection.name.value);
+    }
+    const nestedSelectionSet =
+      selection.kind === Kind.INLINE_FRAGMENT
+        ? selection.selectionSet
+        : fragments[selection.name.value]?.selectionSet;
+    return nestedSelectionSet
+      ? selectionSetHasAnyField(nestedSelectionSet, fieldNames, fragments)
+      : false;
+  });
 }

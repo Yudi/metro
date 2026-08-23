@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM rust:alpine AS rust-builder
+FROM rust:alpine@sha256:a10e64dd139b7387337c7fbe8aca31b959b57b2fd4c8ae20a02cf1d6ea424dce AS rust-builder
 WORKDIR /workspace/dataset-handling
 COPY dataset-handling/Cargo.toml ./
 RUN mkdir src \
@@ -11,9 +11,9 @@ RUN mkdir src \
 COPY dataset-handling/src ./src
 RUN touch src/main.rs && cargo build --release --locked
 
-FROM oven/bun:1-alpine AS bun
+FROM oven/bun:1.3.14-alpine@sha256:5acc90a93e91ff07bf72aa90a7c9f0fa189765aec90b47bdbf2152d2196383c0 AS bun
 
-FROM node:26-alpine AS base
+FROM node:26-alpine@sha256:aadf416b2cdce311a8811ba3f0608a61b77dbf997500e2eafe781b51f6a0b019 AS base
 ENV BUN_INSTALL=/usr/local
 COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 WORKDIR /workspace
@@ -44,7 +44,7 @@ COPY package.json bun.lock ./
 RUN --mount=type=cache,target=/root/.bun/install/cache \
     bun install --frozen-lockfile --production
 
-FROM node:26-alpine AS runtime
+FROM node:26-alpine@sha256:aadf416b2cdce311a8811ba3f0608a61b77dbf997500e2eafe781b51f6a0b019 AS runtime
 ENV NODE_ENV=production \
     PORT=3000
 WORKDIR /app

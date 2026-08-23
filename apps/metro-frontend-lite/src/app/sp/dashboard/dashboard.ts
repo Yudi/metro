@@ -3,9 +3,9 @@ import { HttpClient } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
   Component,
-  OnInit,
   PLATFORM_ID,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -16,6 +16,11 @@ import {
   FavoritesService,
 } from '@metro/shared/api';
 import {
+  AuthService,
+  authReady,
+  firebaseUser,
+} from '@metro/shared/firebase';
+import {
   FavoriteRailLineOption,
   ExtendedNextTrainLineCode,
   FavoriteList,
@@ -23,6 +28,7 @@ import {
   RailLinesStatusResponse,
   createFavoriteRailLineOptions,
   formatTransitTime,
+  getTransitTimeDifferenceMinutes,
   getContrastColor,
   getRailLineFavorites,
   getRailLineByCode,
@@ -132,15 +138,22 @@ interface NextTrainsResponse {
   styleUrl: './dashboard.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class Dashboard implements OnInit {
+export class Dashboard {
   private readonly favoritesService = inject(FavoritesService);
   private readonly http = inject(HttpClient);
   private readonly realtimeService = inject(LiteRealtimeService);
   private readonly baseUrl = inject(API_BASE_URL);
   private readonly platformId = inject(PLATFORM_ID);
+  private readonly authService = inject(AuthService);
   private readonly graphqlEndpoint = `${this.baseUrl}/graphql`;
+  private favoriteSnapshotKey = '';
+  private refreshQueued = false;
 
   readonly loading = signal(false);
+  readonly authReady = authReady;
+  readonly firebaseUser = firebaseUser;
+  readonly authOperationPending = signal(false);
+  readonly authError = signal<string | null>(null);
   readonly error = signal<string | null>(null);
   readonly lastLoadedAt = signal<Date | null>(null);
   readonly favorites = signal<FavoriteList | null>(null);
@@ -250,8 +263,22 @@ export class Dashboard implements OnInit {
     );
   });
 
-  ngOnInit(): void {
-    void this.refreshDashboard();
+  constructor() {
+    effect(() => {
+      const favorites = this.favoritesService.favorites();
+      const selections = this.favoritesService.dashboardSelections();
+      const snapshotKey = JSON.stringify({ favorites, selections });
+
+      this.favorites.set(favorites);
+      this.dashboardSelections.set(selections);
+      if (
+        isPlatformBrowser(this.platformId) &&
+        snapshotKey !== this.favoriteSnapshotKey
+      ) {
+        this.favoriteSnapshotKey = snapshotKey;
+        queueMicrotask(() => this.requestDashboardRefresh());
+      }
+    });
   }
 
   async refreshDashboard(): Promise<void> {
@@ -263,13 +290,10 @@ export class Dashboard implements OnInit {
     this.error.set(null);
 
     try {
-      const [favorites, selections] = await Promise.all([
-        this.favoritesService.readFavoritesSnapshot(),
-        this.favoritesService.readDashboardSelectionsSnapshot(),
-      ]);
-
-      this.favorites.set(favorites);
-      this.dashboardSelections.set(selections);
+      const favorites = this.favorites();
+      if (!favorites) {
+        return;
+      }
 
       if (!this.hasRelevantFavorites()) {
         this.clearRemoteData();
@@ -283,7 +307,50 @@ export class Dashboard implements OnInit {
       this.error.set('Não foi possível carregar o painel agora.');
     } finally {
       this.loading.set(false);
+      if (this.refreshQueued) {
+        this.refreshQueued = false;
+        queueMicrotask(() => this.requestDashboardRefresh());
+      }
     }
+  }
+
+  async loginGoogle(): Promise<void> {
+    if (this.authOperationPending()) {
+      return;
+    }
+
+    this.authOperationPending.set(true);
+    this.authError.set(null);
+    const result = await this.authService.loginGoogle();
+    if (!result.success && result.reason === 'failed') {
+      this.authError.set(
+        'Não foi possível entrar com o Google. Tente novamente.',
+      );
+    }
+    this.authOperationPending.set(false);
+  }
+
+  async logout(): Promise<void> {
+    if (this.authOperationPending()) {
+      return;
+    }
+
+    this.authOperationPending.set(true);
+    this.authError.set(null);
+    const result = await this.authService.logout();
+    if (!result.success && result.reason === 'failed') {
+      this.authError.set('Não foi possível sair agora. Tente novamente.');
+    }
+    this.authOperationPending.set(false);
+  }
+
+  private requestDashboardRefresh(): void {
+    if (this.loading()) {
+      this.refreshQueued = true;
+      return;
+    }
+
+    void this.refreshDashboard();
   }
 
   getSelectedBusRoutes(stopId: string): BusRouteGraphQL[] {
@@ -342,17 +409,10 @@ export class Dashboard implements OnInit {
   }
 
   getMinutesUntilArrival(arrivalTime: string): string {
-    const [hours, minutes] = arrivalTime.split(':').map(Number);
-
-    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+    const diffMins = getTransitTimeDifferenceMinutes(arrivalTime);
+    if (diffMins === null) {
       return arrivalTime;
     }
-
-    const now = new Date();
-    const arrival = new Date();
-    arrival.setHours(hours, minutes, 0, 0);
-
-    const diffMins = Math.round((arrival.getTime() - now.getTime()) / 60_000);
 
     if (diffMins <= 0) {
       return 'Chegando';

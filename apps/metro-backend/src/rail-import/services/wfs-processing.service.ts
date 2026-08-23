@@ -22,6 +22,11 @@ interface MissingWFSColumn {
   column_name: string;
 }
 
+interface WFSFeatureInsert {
+  columns: string[];
+  values: Array<string | number | null>;
+}
+
 @Injectable()
 export class WFSProcessingService {
   private readonly logger = new Logger(WFSProcessingService.name);
@@ -58,7 +63,7 @@ export class WFSProcessingService {
         },
       });
 
-      const text = await response.text();
+      const text = await this.readResponseText(response);
       if (!response.ok) {
         throw new Error(
           `GeoSampa WFS returned ${response.status} ${response.statusText}: ${this.preview(text)}`,
@@ -92,14 +97,40 @@ export class WFSProcessingService {
     featureCollection: WFSFeatureCollection,
     sourceSrid: number,
   ): Promise<number> {
-    const features = featureCollection.features.filter(
-      (feature) => feature.geometry,
-    );
+    const rows: WFSFeatureInsert[] = [];
+    const primaryIndexes = new Set<string>();
+    let rejectedCount = 0;
+    let firstRejection: string | undefined;
 
-    if (features.length === 0) {
-      throw new Error(
-        `GeoSampa WFS returned no geometries for ${source.typeName}`,
+    featureCollection.features.forEach((feature) => {
+      try {
+        const row = this.getFeatureInsert(
+          source,
+          feature,
+          rows.length,
+          sourceSrid,
+        );
+        const primaryIndex = String(row.values[0]);
+        if (primaryIndexes.has(primaryIndex)) {
+          throw new Error(`Duplicate WFS primary index: ${primaryIndex}`);
+        }
+        primaryIndexes.add(primaryIndex);
+        rows.push(row);
+      } catch (error) {
+        rejectedCount++;
+        firstRejection ??=
+          error instanceof Error ? error.message : 'Invalid WFS feature';
+      }
+    });
+
+    if (rejectedCount > 0) {
+      this.logger.warn(
+        `Skipped ${rejectedCount} malformed feature(s) from ${source.typeName}; first rejection: ${firstRejection}`,
       );
+    }
+
+    if (rows.length === 0) {
+      throw new Error(`GeoSampa WFS returned no usable features for ${source.typeName}`);
     }
 
     const tempTable = this.quoteIdent(`wfs_${source.tableName}_import`);
@@ -111,11 +142,16 @@ export class WFSProcessingService {
           `CREATE TEMP TABLE ${tempTable} (LIKE ${targetTable} INCLUDING DEFAULTS INCLUDING CONSTRAINTS) ON COMMIT DROP`,
         );
 
-        for (let index = 0; index < features.length; index++) {
-          await this.insertFeature(tx, tempTable, source, features[index], {
-            index,
-            sourceSrid,
-          });
+        for (
+          let offset = 0;
+          offset < rows.length;
+          offset += WFSConfig.INSERT_BATCH_SIZE
+        ) {
+          await this.insertFeatureBatch(
+            tx,
+            tempTable,
+            rows.slice(offset, offset + WFSConfig.INSERT_BATCH_SIZE),
+          );
         }
 
         await tx.$executeRawUnsafe(`TRUNCATE TABLE ${targetTable}`);
@@ -123,7 +159,7 @@ export class WFSProcessingService {
           `INSERT INTO ${targetTable} SELECT * FROM ${tempTable}`,
         );
 
-        return features.length;
+        return rows.length;
       },
       {
         timeout: 180000,
@@ -135,6 +171,59 @@ export class WFSProcessingService {
   async delayBetweenRequests(): Promise<void> {
     await new Promise((resolve) =>
       setTimeout(resolve, WFSConfig.BETWEEN_REQUEST_DELAY_MS),
+    );
+  }
+
+  private async readResponseText(response: Response): Promise<string> {
+    const contentLength = response.headers.get('content-length');
+    if (contentLength) {
+      const declaredLength = Number(contentLength);
+      if (
+        Number.isFinite(declaredLength) &&
+        declaredLength > WFSConfig.MAX_RESPONSE_BYTES
+      ) {
+        throw new Error(
+          `GeoSampa WFS response exceeds ${WFSConfig.MAX_RESPONSE_BYTES} bytes`,
+        );
+      }
+    }
+
+    if (!response.body) {
+      const text = await response.text();
+      if (Buffer.byteLength(text) > WFSConfig.MAX_RESPONSE_BYTES) {
+        throw new Error(
+          `GeoSampa WFS response exceeds ${WFSConfig.MAX_RESPONSE_BYTES} bytes`,
+        );
+      }
+      return text;
+    }
+
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+
+        totalBytes += value.byteLength;
+        if (totalBytes > WFSConfig.MAX_RESPONSE_BYTES) {
+          await reader.cancel();
+          throw new Error(
+            `GeoSampa WFS response exceeds ${WFSConfig.MAX_RESPONSE_BYTES} bytes`,
+          );
+        }
+        chunks.push(value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))).toString(
+      'utf8',
     );
   }
 
@@ -179,129 +268,117 @@ export class WFSProcessingService {
     `;
   }
 
-  private async insertFeature(
+  private async insertFeatureBatch(
     tx: Prisma.TransactionClient,
     tempTable: string,
+    rows: WFSFeatureInsert[],
+  ): Promise<void> {
+    const first = rows[0];
+    const values: Array<string | number | null> = [];
+    const valueRows = rows.map((row) => {
+      const rowStart = values.length + 1;
+      values.push(...row.values);
+
+      return `(${row.columns
+        .map((column, columnIndex) =>
+          column === 'geom'
+            ? `ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON($${rowStart + columnIndex}), $${rowStart + columnIndex + 1}), ${WFSConfig.TARGET_SRID})`
+            : `$${rowStart + columnIndex}`,
+        )
+        .join(', ')})`;
+    });
+
+    await tx.$executeRawUnsafe(
+      `INSERT INTO ${tempTable} (${first.columns.join(', ')}) VALUES ${valueRows.join(', ')}`,
+      ...values,
+    );
+  }
+
+  private getFeatureInsert(
     source: WFSSourceConfig,
     feature: WFSFeature,
-    options: { index: number; sourceSrid: number },
-  ): Promise<void> {
+    index: number,
+    sourceSrid: number,
+  ): WFSFeatureInsert {
     const properties = feature.properties ?? {};
-    const primaryIndex = this.getPrimaryIndex(feature, options.index);
+    const primaryIndex = this.getPrimaryIndex(feature, index);
+    this.validateGeometry(source, feature.geometry);
     const geometry = this.serializeGeometry(feature.geometry);
 
     switch (source.source) {
       case 'metro_station':
-        await tx.$executeRawUnsafe(
-          `
-          INSERT INTO ${tempTable}
-            (primaryindex, emt_nome, emt_linha, emt_empres, emt_situac, geom)
-          VALUES ($1, $2, $3, $4, $5, ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON($6), $7), ${WFSConfig.TARGET_SRID}))
-          `,
-          primaryIndex,
-          this.requiredText(properties, [
-            'nm_estacao_metro_trem',
+        return {
+          columns: [
+            'primaryindex',
             'emt_nome',
-            'nome',
-            'name',
-          ]),
-          this.optionalText(properties, ['nm_linha_metro_trem', 'emt_linha']),
-          this.optionalText(properties, [
-            'nm_empresa_metro_trem',
+            'emt_linha',
             'emt_empres',
-            'empresa',
-          ]),
-          this.optionalText(properties, [
-            'tx_situacao_metro_trem',
             'emt_situac',
-            'situacao',
-          ]),
-          geometry,
-          options.sourceSrid,
-        );
-        break;
+            'geom',
+          ],
+          values: [
+            primaryIndex,
+            this.requiredText(properties, [
+              'nm_estacao_metro_trem',
+              'emt_nome',
+              'nome',
+              'name',
+            ]),
+            this.optionalText(properties, ['nm_linha_metro_trem', 'emt_linha']),
+            this.optionalText(properties, [
+              'nm_empresa_metro_trem',
+              'emt_empres',
+              'empresa',
+            ]),
+            this.optionalText(properties, [
+              'tx_situacao_metro_trem',
+              'emt_situac',
+              'situacao',
+            ]),
+            geometry,
+            sourceSrid,
+          ],
+        };
       case 'metro_line':
-        await tx.$executeRawUnsafe(
-          `
-          INSERT INTO ${tempTable}
-            (primaryindex, lmt_nome, lmt_linom, lmt_empres, lmt_linha, geom)
-          VALUES ($1, $2, $3, $4, $5, ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON($6), $7), ${WFSConfig.TARGET_SRID}))
-          `,
-          primaryIndex,
-          this.optionalText(properties, [
-            'nm_linha_metro_trem',
-            'lmt_nome',
-            'nome',
-          ]),
-          this.optionalText(properties, [
-            'nr_nome_linha',
-            'lmt_linom',
-            'nome_linha',
-          ]),
-          this.optionalText(properties, [
-            'nm_empresa_metro_trem',
-            'lmt_empres',
-            'empresa',
-          ]),
-          this.optionalNumber(properties, [
-            'cd_identificador_linha',
-            'lmt_linha',
-            'linha',
-          ]),
-          geometry,
-          options.sourceSrid,
-        );
-        break;
+        return {
+          columns: ['primaryindex', 'lmt_nome', 'lmt_linom', 'lmt_empres', 'lmt_linha', 'geom'],
+          values: [
+            primaryIndex,
+            this.optionalText(properties, ['nm_linha_metro_trem', 'lmt_nome', 'nome']),
+            this.optionalText(properties, ['nr_nome_linha', 'lmt_linom', 'nome_linha']),
+            this.optionalText(properties, ['nm_empresa_metro_trem', 'lmt_empres', 'empresa']),
+            this.optionalNumber(properties, ['cd_identificador_linha', 'lmt_linha', 'linha']),
+            geometry,
+            sourceSrid,
+          ],
+        };
       case 'trem_station':
-        await tx.$executeRawUnsafe(
-          `
-          INSERT INTO ${tempTable}
-            (primaryindex, estacao, nr_linha, situacao, nm_linha, empresa, geom)
-          VALUES ($1, $2, $3, $4, $5, $6, ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON($7), $8), ${WFSConfig.TARGET_SRID}))
-          `,
-          primaryIndex,
-          this.requiredText(properties, [
-            'nm_estacao_metro_trem',
-            'estacao',
-            'nome',
-            'name',
-          ]),
-          this.optionalNumber(properties, [
-            'cd_identificador_linha',
-            'nr_linha',
-          ]),
-          this.optionalText(properties, ['tx_situacao_metro_trem', 'situacao']),
-          this.optionalText(properties, ['nm_linha_metro_trem', 'nm_linha']),
-          this.optionalText(properties, ['nm_empresa_metro_trem', 'empresa']),
-          geometry,
-          options.sourceSrid,
-        );
-        break;
+        return {
+          columns: ['primaryindex', 'estacao', 'nr_linha', 'situacao', 'nm_linha', 'empresa', 'geom'],
+          values: [
+            primaryIndex,
+            this.requiredText(properties, ['nm_estacao_metro_trem', 'estacao', 'nome', 'name']),
+            this.optionalNumber(properties, ['cd_identificador_linha', 'nr_linha']),
+            this.optionalText(properties, ['tx_situacao_metro_trem', 'situacao']),
+            this.optionalText(properties, ['nm_linha_metro_trem', 'nm_linha']),
+            this.optionalText(properties, ['nm_empresa_metro_trem', 'empresa']),
+            geometry,
+            sourceSrid,
+          ],
+        };
       case 'trem_line':
-        await tx.$executeRawUnsafe(
-          `
-          INSERT INTO ${tempTable}
-            (primaryindex, nr_linha, nm_linha, empresa, situacao, geom)
-          VALUES ($1, $2, $3, $4, $5, ST_Transform(ST_SetSRID(ST_GeomFromGeoJSON($6), $7), ${WFSConfig.TARGET_SRID}))
-          `,
-          primaryIndex,
-          this.optionalNumber(properties, [
-            'cd_identificador_linha',
-            'nr_linha',
-          ]),
-          this.optionalText(properties, ['nm_linha_metro_trem', 'nm_linha']),
-          this.optionalText(properties, [
-            'nm_empresa_metro_trem',
-            'empresa',
-          ]),
-          this.optionalText(properties, [
-            'tx_situacao_metro_trem',
-            'situacao',
-          ]),
-          geometry,
-          options.sourceSrid,
-        );
-        break;
+        return {
+          columns: ['primaryindex', 'nr_linha', 'nm_linha', 'empresa', 'situacao', 'geom'],
+          values: [
+            primaryIndex,
+            this.optionalNumber(properties, ['cd_identificador_linha', 'nr_linha']),
+            this.optionalText(properties, ['nm_linha_metro_trem', 'nm_linha']),
+            this.optionalText(properties, ['nm_empresa_metro_trem', 'empresa']),
+            this.optionalText(properties, ['tx_situacao_metro_trem', 'situacao']),
+            geometry,
+            sourceSrid,
+          ],
+        };
     }
   }
 
@@ -367,6 +444,60 @@ export class WFSProcessingService {
     return JSON.stringify(geometry);
   }
 
+  private validateGeometry(
+    source: WFSSourceConfig,
+    geometry: GeoJsonGeometry | null,
+  ): void {
+    if (!geometry) {
+      throw new Error('Feature has no geometry');
+    }
+
+    const valid =
+      (source.geometryKind === 'point' &&
+        ((geometry.type === 'Point' &&
+          this.isPosition(geometry.coordinates)) ||
+          (geometry.type === 'MultiPoint' &&
+            this.isPositionCollection(geometry.coordinates)))) ||
+      (source.geometryKind === 'line' &&
+        ((geometry.type === 'LineString' &&
+          this.isLineString(geometry.coordinates)) ||
+          (geometry.type === 'MultiLineString' &&
+            Array.isArray(geometry.coordinates) &&
+            geometry.coordinates.length > 0 &&
+            geometry.coordinates.every((line) => this.isLineString(line)))));
+
+    if (!valid) {
+      throw new Error('Feature geometry contains invalid coordinates');
+    }
+  }
+
+  private isPosition(value: unknown): boolean {
+    return (
+      Array.isArray(value) &&
+      value.length >= 2 &&
+      value.every(
+        (coordinate) =>
+          typeof coordinate === 'number' && Number.isFinite(coordinate),
+      )
+    );
+  }
+
+  private isPositionCollection(value: unknown): boolean {
+    return (
+      Array.isArray(value) &&
+      value.length > 0 &&
+      value.every((position) => this.isPosition(position))
+    );
+  }
+
+  private isLineString(value: unknown): boolean {
+    return (
+      Array.isArray(value) &&
+      value.length >= 2 &&
+      value.every((position) => this.isPosition(position))
+    );
+  }
+
   private getPrimaryIndex(feature: WFSFeature, index: number): string {
     const fromProperties = this.optionalText(feature.properties ?? {}, [
       'primaryindex',
@@ -424,7 +555,14 @@ export class WFSProcessingService {
     }
 
     const numberValue = Number(value);
-    return Number.isFinite(numberValue) ? numberValue : null;
+    if (!Number.isFinite(numberValue)) {
+      this.logger.warn(
+        `Ignoring malformed optional numeric WFS property: ${names.join(' or ')}`,
+      );
+      return null;
+    }
+
+    return numberValue;
   }
 
   private getProperty(

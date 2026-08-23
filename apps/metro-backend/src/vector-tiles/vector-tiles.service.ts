@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { BikePollingService } from '../bike/services/bike-polling.service';
 import { BikeVectorTileService } from './services/bike-vector-tile.service';
 import { BusVectorTileService } from './services/bus-vector-tile.service';
@@ -16,7 +21,7 @@ export type { VectorTileOptions } from './vector-tile.types';
  * class remains the API-facing dispatcher.
  */
 @Injectable()
-export class VectorTilesService implements OnModuleInit {
+export class VectorTilesService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(VectorTilesService.name);
   private readonly bikePollListener = this.handleBikePollComplete.bind(this);
 
@@ -30,6 +35,10 @@ export class VectorTilesService implements OnModuleInit {
 
   onModuleInit(): void {
     this.bikePolling.onPollComplete(this.bikePollListener);
+  }
+
+  onModuleDestroy(): void {
+    this.bikePolling.offPollComplete(this.bikePollListener);
   }
 
   /**

@@ -5,6 +5,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { createReadStream, createWriteStream } from 'fs';
+import { pipeline } from 'stream/promises';
 
 @Injectable()
 export class FileOperationsService {
@@ -32,18 +33,30 @@ export class FileOperationsService {
     filePath: string,
     timeoutMs = 600000,
     maxBytes?: number,
+    signal?: AbortSignal,
   ): Promise<void> {
     const startTime = Date.now();
+    let abortFromCaller: (() => void) | undefined;
     this.logger.debug(`Downloading file from ${url} to ${filePath}`);
 
     try {
       // Ensure directory exists
       await this.ensureDirectory(path.dirname(filePath));
 
+      const abortController = new AbortController();
+      abortFromCaller = () => {
+        abortController.abort(signal?.reason);
+      };
+      signal?.addEventListener('abort', abortFromCaller, { once: true });
+      if (signal?.aborted) {
+        abortFromCaller();
+      }
+
       const response = await firstValueFrom(
         this.httpService.get(url, {
           responseType: 'stream',
           timeout: timeoutMs,
+          signal: abortController.signal,
           headers: {
             'User-Agent': 'Projeto-Transporte-Metropolitano-Backend/1.0',
           },
@@ -52,25 +65,24 @@ export class FileOperationsService {
 
       const writer = createWriteStream(filePath);
       let downloadedBytes = 0;
+      let sizeLimitError: Error | undefined;
 
       response.data.on('data', (chunk: Buffer) => {
         downloadedBytes += chunk.length;
         if (maxBytes !== undefined && downloadedBytes > maxBytes) {
-          const limitError = new Error(
+          sizeLimitError = new Error(
             `Download exceeded ${maxBytes} byte limit`,
           );
-          writer.destroy(limitError);
-          response.data.destroy(limitError);
+          abortController.abort(sizeLimitError);
         }
       });
 
-      response.data.pipe(writer);
+      await pipeline(response.data, writer, { signal: abortController.signal });
+      signal?.removeEventListener('abort', abortFromCaller);
 
-      await new Promise<void>((resolve, reject) => {
-        writer.on('finish', () => resolve());
-        writer.on('error', reject);
-        response.data.on('error', reject);
-      });
+      if (sizeLimitError) {
+        throw sizeLimitError;
+      }
 
       const downloadTime = Date.now() - startTime;
       const fileSize = await this.getFileSize(filePath);
@@ -90,6 +102,10 @@ export class FileOperationsService {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       throw new Error(`Download failed: ${errorMessage}`);
+    } finally {
+      if (signal && abortFromCaller) {
+        signal.removeEventListener('abort', abortFromCaller);
+      }
     }
   }
 

@@ -6,5 +6,16 @@
   "tags": [
     "type:util",
     "scope:shared"
-  ]
+  ],
+  "targets": {
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+      "options": {
+        "jestConfig": "libs/shared/utils/jest.config.ts",
+        "tsConfig": "libs/shared/utils/tsconfig.spec.json",
+        "passWithNoTests": true
+      }
+    }
+  }
 }

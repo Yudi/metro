@@ -1,33 +1,31 @@
 import { isPlatformBrowser } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Service, inject, PLATFORM_ID, signal, Signal } from '@angular/core';
-import Dexie, { Table, liveQuery } from 'dexie';
+import {
+  OnDestroy,
+  Service,
+  effect,
+  inject,
+  PLATFORM_ID,
+  signal,
+  Signal,
+} from '@angular/core';
+import Dexie, { liveQuery, Table } from 'dexie';
 // eslint-disable-next-line @nx/enforce-module-boundaries
-import { firebaseUser } from '@metro/shared/firebase';
-import { from, map, switchMap, tap } from 'rxjs';
+import { firebaseIdToken, firebaseUser } from '@metro/shared/firebase';
 import {
   FavoriteList,
   FavoriteTypes,
   createEmptyFavorites,
 } from '@metro/shared/utils';
+import { firstValueFrom } from 'rxjs';
 
-interface FavoriteRecord {
-  key: string;
-  type: FavoriteTypes;
-  code: string;
-  updatedAt: number;
-}
-
-interface DashboardSelectionRecord {
-  key: string;
-  values: string[];
-  updatedAt: number;
-}
-
-export interface DashboardFavoriteSelections {
-  railStationLines: Record<string, string[]>;
-  busStopRoutes: Record<string, string[]>;
-}
+// Anonymous data is deliberately retained but is never merged into an
+// authenticated UID automatically. A future explicit "import anonymous
+// favorites" action would have to make that choice visible to the user.
+export const ANONYMOUS_FAVORITES_SCOPE = 'anonymous';
+export const FAVORITE_CODE_MAX_LENGTH = 128;
+const MAX_FAVORITES_PER_SCOPE = 500;
+const FAVORITES_DATABASE_NAME = 'metro-favorites';
 
 const favoriteTypes: FavoriteTypes[] = [
   'bikeStation',
@@ -37,20 +35,181 @@ const favoriteTypes: FavoriteTypes[] = [
   'busRoute',
 ];
 
-const favoriteTypeGraphqlNames: Record<FavoriteTypes, string> = {
-  bikeStation: 'BikeStation',
-  railStation: 'RailStation',
-  railLine: 'RailLine',
-  busStop: 'BusStop',
-  busRoute: 'BusRoute',
-};
+export type FavoriteOperation = 'add' | 'remove' | 'replace';
+
+interface FavoriteRecord {
+  key: string;
+  scope: string;
+  type: FavoriteTypes;
+  code: string;
+  updatedAt: number;
+}
+
+interface LegacyFavoriteRecord {
+  key: string;
+  type: FavoriteTypes;
+  code: string;
+  updatedAt: number;
+  scope?: string;
+}
+
+interface DashboardSelectionRecord {
+  key: string;
+  scope: string;
+  values: string[];
+  updatedAt: number;
+}
+
+interface LegacyDashboardSelectionRecord {
+  key: string;
+  values: string[];
+  updatedAt: number;
+  scope?: string;
+}
+
+export interface FavoriteOutboxRecord {
+  operationId: string;
+  scope: string;
+  operation: FavoriteOperation;
+  type?: FavoriteTypes;
+  code?: string;
+  favorites?: FavoriteList;
+  createdAt: number;
+}
+
+interface GraphqlResponse<T> {
+  data?: T;
+  errors?: readonly unknown[];
+}
+
+interface FavoriteSnapshotResult {
+  revision?: number;
+  favorites?: FavoriteList;
+}
+
+interface FavoriteSyncResult extends FavoriteSnapshotResult {
+  success?: boolean;
+  conflict?: boolean;
+  message?: string;
+}
+
+interface UserFavoritesResult {
+  userFavoritesSnapshot?: FavoriteSnapshotResult;
+}
+
+interface FavoriteMutationResult {
+  syncFavorites?: FavoriteSyncResult;
+}
+
+export interface DashboardFavoriteSelections {
+  railStationLines: Record<string, string[]>;
+  busStopRoutes: Record<string, string[]>;
+}
+
+export function getFavoritesScope(userId: string | null | undefined): string {
+  return userId ? `user:${userId}` : ANONYMOUS_FAVORITES_SCOPE;
+}
+
+function getFavoriteKey(
+  scope: string,
+  type: FavoriteTypes,
+  code: string,
+): string {
+  return `${scope}:${type}:${code}`;
+}
+
+function getDashboardSelectionKey(
+  scope: string,
+  group: keyof DashboardFavoriteSelections,
+  id: string,
+): string {
+  return `${scope}:${group}:${id}`;
+}
+
+function isValidFavoriteCode(code: string): boolean {
+  if (code.length === 0 || code.length > FAVORITE_CODE_MAX_LENGTH) {
+    return false;
+  }
+
+  return Array.from(code).every((character) => {
+    const codePoint = character.codePointAt(0) ?? 0;
+    return codePoint > 0x1f && codePoint !== 0x7f;
+  });
+}
+
+function normalizeFavoriteCodeValue(code: unknown): string | null {
+  if (typeof code !== 'string') {
+    return null;
+  }
+
+  const normalized = code.trim();
+  return isValidFavoriteCode(normalized) ? normalized : null;
+}
+
+function normalizeFavoriteSnapshot(value: unknown): FavoriteList {
+  const favorites = createEmptyFavorites();
+
+  if (!value || typeof value !== 'object') {
+    return favorites;
+  }
+
+  const rawFavorites = value as Partial<Record<FavoriteTypes, unknown>>;
+  let total = 0;
+  for (const type of favoriteTypes) {
+    const codes = rawFavorites[type];
+    if (Array.isArray(codes)) {
+      const normalizedCodes = Array.from(
+        new Set(
+          codes.flatMap((code) => {
+            const normalized = normalizeFavoriteCodeValue(code);
+            return normalized ? [normalized] : [];
+          }),
+        ),
+      );
+      const available = Math.max(0, MAX_FAVORITES_PER_SCOPE - total);
+      favorites[type] = normalizedCodes.slice(0, available);
+      total += favorites[type].length;
+    }
+  }
+
+  return favorites;
+}
+
+export function replayFavoriteOperations(
+  favorites: FavoriteList,
+  operations: FavoriteOutboxRecord[],
+): FavoriteList {
+  return operations.reduce((current, operation) => {
+    if (operation.operation === 'replace') {
+      return operation.favorites
+        ? normalizeFavoriteSnapshot(operation.favorites)
+        : current;
+    }
+    if (!operation.type || !operation.code) {
+      return current;
+    }
+
+    const next = normalizeFavoriteSnapshot(current);
+    if (operation.operation === 'add') {
+      next[operation.type] = Array.from(
+        new Set([...next[operation.type], operation.code]),
+      );
+    } else {
+      next[operation.type] = next[operation.type].filter(
+        (code) => code !== operation.code,
+      );
+    }
+    return next;
+  }, normalizeFavoriteSnapshot(favorites));
+}
 
 class FavoritesDatabase extends Dexie {
   favorites!: Table<FavoriteRecord, string>;
   dashboardSelections!: Table<DashboardSelectionRecord, string>;
+  outbox!: Table<FavoriteOutboxRecord, string>;
 
   constructor() {
-    super('metro-favorites');
+    super(FAVORITES_DATABASE_NAME);
     this.version(1).stores({
       favorites: '&key, type, code, updatedAt',
     });
@@ -58,20 +217,76 @@ class FavoritesDatabase extends Dexie {
       favorites: '&key, type, code, updatedAt',
       dashboardSelections: '&key, updatedAt',
     });
+    this.version(3)
+      .stores({
+        favorites: '&key, [scope+type], scope, type, code, updatedAt',
+        dashboardSelections: '&key, scope, updatedAt',
+        outbox: '&operationId, scope, operation, type, code, createdAt',
+      })
+      .upgrade(async (tx) => {
+        const favoriteTable = tx.table('favorites');
+        const oldFavorites =
+          (await favoriteTable.toArray()) as LegacyFavoriteRecord[];
+        await favoriteTable.clear();
+        if (oldFavorites.length > 0) {
+          await favoriteTable.bulkPut(
+            oldFavorites.map((record) => ({
+              ...record,
+              scope: ANONYMOUS_FAVORITES_SCOPE,
+              key: getFavoriteKey(
+                ANONYMOUS_FAVORITES_SCOPE,
+                record.type,
+                record.code,
+              ),
+            })),
+          );
+        }
+
+        const dashboardTable = tx.table('dashboardSelections');
+        const oldDashboardSelections =
+          (await dashboardTable.toArray()) as LegacyDashboardSelectionRecord[];
+        await dashboardTable.clear();
+        if (oldDashboardSelections.length > 0) {
+          await dashboardTable.bulkPut(
+            oldDashboardSelections.map((record) => {
+              const separatorIndex = record.key.indexOf(':');
+              const group = record.key.slice(
+                0,
+                separatorIndex,
+              ) as keyof DashboardFavoriteSelections;
+              const id = record.key.slice(separatorIndex + 1);
+              const scope = ANONYMOUS_FAVORITES_SCOPE;
+              return {
+                ...record,
+                scope,
+                key: getDashboardSelectionKey(scope, group, id),
+              };
+            }),
+          );
+        }
+      });
   }
 }
 
 @Service()
-export class FavoritesService {
+export class FavoritesService implements OnDestroy {
   private readonly platformId = inject(PLATFORM_ID);
   private readonly firebaseUser = firebaseUser;
+  private readonly firebaseIdToken = firebaseIdToken;
   private readonly http = inject(HttpClient);
   private readonly db = isPlatformBrowser(this.platformId)
     ? new FavoritesDatabase()
     : null;
   private favoritesSubscription?: { unsubscribe(): void };
   private dashboardSelectionsSubscription?: { unsubscribe(): void };
-  private syncInFlight = false;
+  private readonly onlineHandler = () => {
+    this.syncWithServer();
+  };
+  private activeScope = getFavoritesScope(this.firebaseUser()?.uid);
+  private scopeGeneration = 0;
+  private syncInFlight?: Promise<void>;
+  private retryTimer?: ReturnType<typeof setTimeout>;
+  private retryAttempt = 0;
 
   private readonly _favorites = signal<FavoriteList>(createEmptyFavorites());
   readonly favorites: Signal<FavoriteList> = this._favorites.asReadonly();
@@ -82,12 +297,28 @@ export class FavoritesService {
     this._dashboardSelections.asReadonly();
 
   constructor() {
-    if (!isPlatformBrowser(this.platformId)) {
+    if (!isPlatformBrowser(this.platformId) || !this.db) {
       return;
     }
 
-    this.watchFavorites();
-    this.watchDashboardSelections();
+    this.watchFavorites(this.activeScope);
+    this.watchDashboardSelections(this.activeScope);
+    window.addEventListener('online', this.onlineHandler);
+
+    effect(() => {
+      const scope = getFavoritesScope(this.firebaseUser()?.uid);
+      if (scope !== this.activeScope) {
+        this.switchScope(scope);
+      }
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.stopSubscriptions();
+    if (isPlatformBrowser(this.platformId)) {
+      window.removeEventListener('online', this.onlineHandler);
+    }
+    this.clearRetryTimer();
   }
 
   addFavorite(code: string, type: FavoriteTypes): void {
@@ -135,7 +366,9 @@ export class FavoritesService {
       return this.createEmptyFavorites();
     }
 
-    return this.recordsToFavoriteList(await this.db.favorites.toArray());
+    return this.recordsToFavoriteList(
+      await this.db.favorites.where('scope').equals(this.activeScope).toArray(),
+    );
   }
 
   async readDashboardSelectionsSnapshot(): Promise<DashboardFavoriteSelections> {
@@ -144,7 +377,10 @@ export class FavoritesService {
     }
 
     return this.recordsToDashboardSelections(
-      await this.db.dashboardSelections.toArray(),
+      await this.db.dashboardSelections
+        .where('scope')
+        .equals(this.activeScope)
+        .toArray(),
     );
   }
 
@@ -153,8 +389,10 @@ export class FavoritesService {
       return false;
     }
 
-    const favoriteCount = await this.db.favorites.count();
-    return favoriteCount > 0;
+    return (
+      (await this.db.favorites.where('scope').equals(this.activeScope).count()) >
+      0
+    );
   }
 
   isFavorite(code: string, type: FavoriteTypes): boolean {
@@ -162,7 +400,7 @@ export class FavoritesService {
       return false;
     }
 
-    return this._favorites()[type]?.includes(code);
+    return this._favorites()[type]?.includes(code) ?? false;
   }
 
   setDashboardRailStationLines(stationKey: string, lineIds: string[]): void {
@@ -191,82 +429,110 @@ export class FavoritesService {
   }
 
   syncWithServer(): void {
-    if (!this.firebaseUser() || this.syncInFlight) {
+    const user = this.firebaseUser();
+    if (
+      !user ||
+      !this.firebaseIdToken() ||
+      !this.db ||
+      this.activeScope !== getFavoritesScope(user.uid) ||
+      this.syncInFlight
+    ) {
       return;
     }
 
-    this.syncInFlight = true;
-    this.http
-      .post<{ data: { userFavorites: FavoriteList } }>('/api/graphql', {
-        query: `
-          query GetFavorites {
-            userFavorites {
-              bikeStation
-              railStation
-              railLine
-              busStop
-              busRoute
-            }
-          }
-        `,
-      })
-      .pipe(
-        map((result) => result?.data?.userFavorites),
-        switchMap((serverFavorites) =>
-          from(this.mergeServerFavorites(serverFavorites)),
-        ),
-        tap((merged) => {
-          this._favorites.set(merged);
-        }),
-        switchMap((merged) =>
-          this.http.post('/api/graphql', {
-            query: `
-              mutation SyncFavorites($favorites: FavoriteListInput!) {
-                syncFavorites(favorites: $favorites) {
-                  success
-                  message
-                }
-              }
-            `,
-            variables: {
-              favorites: merged,
-            },
-          }),
-        ),
-      )
-      .subscribe({
-        complete: () => {
-          this.syncInFlight = false;
-        },
-        error: () => {
-          this.syncInFlight = false;
-        },
-      });
+    const scope = this.activeScope;
+    const generation = this.scopeGeneration;
+    const request = this.syncScope(scope, generation);
+    this.syncInFlight = request;
+    void request.finally(() => {
+      if (generation === this.scopeGeneration) {
+        this.syncInFlight = undefined;
+      }
+    });
   }
 
-  private watchFavorites(): void {
+  private switchScope(scope: string): void {
+    this.scopeGeneration += 1;
+    this.syncInFlight = undefined;
+    this.clearRetryTimer();
+    this.retryAttempt = 0;
+    this.stopSubscriptions();
+    this.activeScope = scope;
+    this._favorites.set(this.createEmptyFavorites());
+    this._dashboardSelections.set(this.createEmptyDashboardSelections());
+
+    if (!this.db) {
+      return;
+    }
+
+    this.watchFavorites(scope);
+    this.watchDashboardSelections(scope);
+    void this.refreshSignals(scope, this.scopeGeneration);
+  }
+
+  private async refreshSignals(scope: string, generation: number): Promise<void> {
+    if (!this.db) {
+      return;
+    }
+
+    const [favorites, dashboardSelections] = await Promise.all([
+      this.db.favorites.where('scope').equals(scope).toArray(),
+      this.db.dashboardSelections.where('scope').equals(scope).toArray(),
+    ]);
+
+    if (scope !== this.activeScope || generation !== this.scopeGeneration) {
+      return;
+    }
+
+    this._favorites.set(this.recordsToFavoriteList(favorites));
+    this._dashboardSelections.set(
+      this.recordsToDashboardSelections(dashboardSelections),
+    );
+  }
+
+  private watchFavorites(scope: string): void {
     if (!this.db) {
       return;
     }
 
     const db = this.db;
     this.favoritesSubscription = liveQuery(() =>
-      db.favorites.toArray(),
-    ).subscribe((records) => {
-      this._favorites.set(this.recordsToFavoriteList(records));
+      db.favorites.where('scope').equals(scope).toArray(),
+    ).subscribe({
+      next: (records) => {
+        if (scope === this.activeScope) {
+          this._favorites.set(this.recordsToFavoriteList(records));
+        }
+      },
+      error: () => {
+        if (scope === this.activeScope) {
+          this._favorites.set(this.createEmptyFavorites());
+        }
+      },
     });
   }
 
-  private watchDashboardSelections(): void {
+  private watchDashboardSelections(scope: string): void {
     if (!this.db) {
       return;
     }
 
     const db = this.db;
     this.dashboardSelectionsSubscription = liveQuery(() =>
-      db.dashboardSelections.toArray(),
-    ).subscribe((records) => {
-      this._dashboardSelections.set(this.recordsToDashboardSelections(records));
+      db.dashboardSelections.where('scope').equals(scope).toArray(),
+    ).subscribe({
+      next: (records) => {
+        if (scope === this.activeScope) {
+          this._dashboardSelections.set(
+            this.recordsToDashboardSelections(records),
+          );
+        }
+      },
+      error: () => {
+        if (scope === this.activeScope) {
+          this._dashboardSelections.set(this.createEmptyDashboardSelections());
+        }
+      },
     });
   }
 
@@ -274,34 +540,47 @@ export class FavoritesService {
     code: string,
     type: FavoriteTypes,
   ): Promise<void> {
-    if (!this.db || this._favorites()[type].includes(code)) {
+    const normalizedCode = this.normalizeFavoriteCode(code);
+    if (!this.db || !normalizedCode || !favoriteTypes.includes(type)) {
       return;
     }
 
-    await this.db.favorites.put({
-      key: this.getFavoriteKey(type, code),
-      type,
-      code,
-      updatedAt: Date.now(),
-    });
+    const scope = this.activeScope;
+    const current = await this.db.favorites.get(
+      getFavoriteKey(scope, type, normalizedCode),
+    );
+    if (current) {
+      return;
+    }
 
-    if (this.firebaseUser()) {
-      this.http
-        .post('/api/graphql', {
-          query: `
-          mutation AddFavorite($type: FavoriteType!, $code: String!) {
-            addFavorite(type: $type, code: $code) {
-              success
-              message
-            }
-          }
-        `,
-          variables: {
-            type: favoriteTypeGraphqlNames[type],
-            code,
-          },
-        })
-        .subscribe();
+    await this.db.transaction(
+      'rw',
+      this.db.favorites,
+      this.db.outbox,
+      async () => {
+        await this.db?.favorites.put({
+          key: getFavoriteKey(scope, type, normalizedCode),
+          scope,
+          type,
+          code: normalizedCode,
+          updatedAt: Date.now(),
+        });
+
+        if (scope !== ANONYMOUS_FAVORITES_SCOPE) {
+          await this.replacePendingOperation(scope, {
+            operationId: this.createOperationId(),
+            scope,
+            operation: 'add',
+            type,
+            code: normalizedCode,
+            createdAt: Date.now(),
+          });
+        }
+      },
+    );
+
+    if (scope !== ANONYMOUS_FAVORITES_SCOPE) {
+      this.syncWithServer();
     }
   }
 
@@ -309,29 +588,40 @@ export class FavoritesService {
     code: string,
     type: FavoriteTypes,
   ): Promise<void> {
-    if (!this.db || !this._favorites()[type].includes(code)) {
+    const normalizedCode = this.normalizeFavoriteCode(code);
+    if (!this.db || !normalizedCode || !favoriteTypes.includes(type)) {
       return;
     }
 
-    await this.db.favorites.delete(this.getFavoriteKey(type, code));
+    const scope = this.activeScope;
+    const key = getFavoriteKey(scope, type, normalizedCode);
+    const current = await this.db.favorites.get(key);
+    if (!current) {
+      return;
+    }
 
-    if (this.firebaseUser()) {
-      this.http
-        .post('/api/graphql', {
-          query: `
-          mutation RemoveFavorite($type: FavoriteType!, $code: String!) {
-            removeFavorite(type: $type, code: $code) {
-              success
-              message
-            }
-          }
-        `,
-          variables: {
-            type: favoriteTypeGraphqlNames[type],
-            code,
-          },
-        })
-        .subscribe();
+    await this.db.transaction(
+      'rw',
+      this.db.favorites,
+      this.db.outbox,
+      async () => {
+        await this.db?.favorites.delete(key);
+
+        if (scope !== ANONYMOUS_FAVORITES_SCOPE) {
+          await this.replacePendingOperation(scope, {
+            operationId: this.createOperationId(),
+            scope,
+            operation: 'remove',
+            type,
+            code: normalizedCode,
+            createdAt: Date.now(),
+          });
+        }
+      },
+    );
+
+    if (scope !== ANONYMOUS_FAVORITES_SCOPE) {
+      this.syncWithServer();
     }
   }
 
@@ -342,14 +632,47 @@ export class FavoritesService {
       return;
     }
 
-    if (type === 'all') {
-      await this.db.favorites.clear();
-    } else {
-      await this.db.favorites.where('type').equals(type).delete();
+    const scope = this.activeScope;
+    const current = this.recordsToFavoriteList(
+      await this.db.favorites.where('scope').equals(scope).toArray(),
+    );
+    const desired = this.createEmptyFavorites();
+    if (type !== 'all') {
+      for (const favoriteType of favoriteTypes) {
+        desired[favoriteType] =
+          favoriteType === type ? [] : [...current[favoriteType]];
+      }
     }
 
-    if (this.firebaseUser()) {
-      await this.pushLocalFavoritesToServer();
+    await this.db.transaction(
+      'rw',
+      this.db.favorites,
+      this.db.outbox,
+      async () => {
+        if (type === 'all') {
+          await this.db?.favorites.where('scope').equals(scope).delete();
+        } else {
+          await this.db?.favorites
+            .where('[scope+type]')
+            .equals([scope, type])
+            .delete();
+        }
+
+        if (scope !== ANONYMOUS_FAVORITES_SCOPE) {
+          await this.db?.outbox.where('scope').equals(scope).delete();
+          await this.db?.outbox.put({
+            operationId: this.createOperationId(),
+            scope,
+            operation: 'replace',
+            favorites: desired,
+            createdAt: Date.now(),
+          });
+        }
+      },
+    );
+
+    if (scope !== ANONYMOUS_FAVORITES_SCOPE) {
+      this.syncWithServer();
     }
   }
 
@@ -363,46 +686,207 @@ export class FavoritesService {
     }
 
     const normalizedValues = Array.from(
-      new Set(values.filter((value) => value.trim().length > 0)),
+      new Set(
+        values.filter(
+          (value): value is string =>
+            typeof value === 'string' && value.trim().length > 0,
+        ),
+      ),
     );
-    const key = this.getDashboardSelectionKey(group, id);
+    const scope = this.activeScope;
+    const key = getDashboardSelectionKey(scope, group, id);
 
     void this.db.dashboardSelections.put({
       key,
+      scope,
       values: normalizedValues,
       updatedAt: Date.now(),
     });
   }
 
-  private async mergeServerFavorites(
-    serverFavorites: FavoriteList | undefined,
-  ): Promise<FavoriteList> {
-    if (!this.db) {
-      return this.createEmptyFavorites();
+  private async syncScope(scope: string, generation: number): Promise<void> {
+    try {
+      const result = await this.postGraphql<UserFavoritesResult>({
+        query: `
+          query GetFavorites {
+            userFavoritesSnapshot {
+              revision
+              favorites {
+                bikeStation
+                railStation
+                railLine
+                busStop
+                busRoute
+              }
+            }
+          }
+        `,
+      });
+
+      if (scope !== this.activeScope || generation !== this.scopeGeneration) {
+        return;
+      }
+
+      let snapshot = this.requireSnapshot(result.userFavoritesSnapshot);
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        if (scope !== this.activeScope || generation !== this.scopeGeneration) {
+          return;
+        }
+
+        const pending = await this.readOutbox(scope);
+        const effective = this.applyOperations(snapshot.favorites, pending);
+        await this.replaceScopeFavorites(scope, effective);
+
+        if (pending.length === 0) {
+          this.retryAttempt = 0;
+          this.clearRetryTimer();
+          return;
+        }
+
+        const result = await this.postGraphql<FavoriteMutationResult>({
+          query: `
+            mutation SyncFavorites(
+              $favorites: FavoriteListInput!
+              $expectedRevision: Int!
+            ) {
+              syncFavorites(
+                favorites: $favorites
+                expectedRevision: $expectedRevision
+              ) {
+                success
+                conflict
+                message
+                revision
+                favorites {
+                  bikeStation
+                  railStation
+                  railLine
+                  busStop
+                  busRoute
+                }
+              }
+            }
+          `,
+          variables: {
+            favorites: effective,
+            expectedRevision: snapshot.revision,
+          },
+        });
+        const syncResult = result.syncFavorites;
+        snapshot = this.requireSnapshot(syncResult);
+
+        if (syncResult?.conflict) {
+          continue;
+        }
+        if (!syncResult?.success) {
+          throw new Error(syncResult?.message ?? 'Favorite synchronization failed');
+        }
+
+        await this.db?.outbox.bulkDelete(
+          pending.map((operation) => operation.operationId),
+        );
+
+        const remaining = await this.readOutbox(scope);
+        await this.replaceScopeFavorites(
+          scope,
+          this.applyOperations(snapshot.favorites, remaining),
+        );
+        if (remaining.length === 0) {
+          this.retryAttempt = 0;
+          this.clearRetryTimer();
+          return;
+        }
+      }
+
+      throw new Error('Favorite synchronization conflict retry limit reached');
+    } catch {
+      this.scheduleRetry(scope, generation);
     }
-
-    const localFavorites = this.recordsToFavoriteList(
-      await this.db.favorites.toArray(),
-    );
-
-    if (!serverFavorites) {
-      return localFavorites;
-    }
-
-    const merged = this.mergeFavorites(localFavorites, serverFavorites);
-    await this.replaceFavorites(merged);
-    return merged;
   }
 
-  private async replaceFavorites(favorites: FavoriteList): Promise<void> {
+  private async postGraphql<T>(body: unknown): Promise<T> {
+    const response = await firstValueFrom(
+      this.http.post<GraphqlResponse<T>>('/api/graphql', body),
+    );
+    if (response.errors && response.errors.length > 0) {
+      throw new Error('GraphQL request returned errors');
+    }
+    if (!response.data) {
+      throw new Error('GraphQL request returned no data');
+    }
+
+    return response.data;
+  }
+
+
+  private requireSnapshot(value: FavoriteSnapshotResult | undefined): {
+    revision: number;
+    favorites: FavoriteList;
+  } {
+    if (
+      !value ||
+      !Number.isInteger(value.revision) ||
+      (value.revision ?? -1) < 0
+    ) {
+      throw new Error('Favorite synchronization returned an invalid revision');
+    }
+
+    return {
+      revision: value.revision as number,
+      favorites: this.normalizeFavorites(value.favorites),
+    };
+  }
+
+  private async readOutbox(scope: string): Promise<FavoriteOutboxRecord[]> {
+    if (!this.db) {
+      return [];
+    }
+
+    const records = await this.db.outbox.where('scope').equals(scope).toArray();
+    return records.sort(
+      (left, right) =>
+        left.createdAt - right.createdAt ||
+        left.operationId.localeCompare(right.operationId),
+    );
+  }
+
+  private async replacePendingOperation(
+    scope: string,
+    operation: FavoriteOutboxRecord,
+  ): Promise<void> {
+    if (!this.db) {
+      return;
+    }
+
+    const pending = await this.readOutbox(scope);
+    const matching = pending.filter(
+      (item) =>
+        item.operation !== 'replace' &&
+        operation.operation !== 'replace' &&
+        item.type === operation.type &&
+        item.code === operation.code,
+    );
+    if (matching.length > 0) {
+      await this.db.outbox.bulkDelete(
+        matching.map((item) => item.operationId),
+      );
+    }
+    await this.db.outbox.put(operation);
+  }
+
+  private async replaceScopeFavorites(
+    scope: string,
+    favorites: FavoriteList,
+  ): Promise<void> {
     if (!this.db) {
       return;
     }
 
     const now = Date.now();
-    const records = favoriteTypes.flatMap((type) =>
+    const records: FavoriteRecord[] = favoriteTypes.flatMap((type) =>
       favorites[type].map((code) => ({
-        key: this.getFavoriteKey(type, code),
+        key: getFavoriteKey(scope, type, code),
+        scope,
         type,
         code,
         updatedAt: now,
@@ -410,49 +894,66 @@ export class FavoritesService {
     );
 
     await this.db.transaction('rw', this.db.favorites, async () => {
-      await this.db?.favorites.clear();
+      await this.db?.favorites.where('scope').equals(scope).delete();
       if (records.length > 0) {
         await this.db?.favorites.bulkPut(records);
       }
     });
   }
 
-  private async pushLocalFavoritesToServer(): Promise<void> {
-    if (!this.db) {
+  private applyOperations(
+    favorites: FavoriteList,
+    operations: FavoriteOutboxRecord[],
+  ): FavoriteList {
+    return replayFavoriteOperations(favorites, operations);
+  }
+
+  private scheduleRetry(scope: string, generation: number): void {
+    if (
+      this.retryTimer ||
+      scope !== this.activeScope ||
+      generation !== this.scopeGeneration
+    ) {
       return;
     }
 
-    const favorites = this.recordsToFavoriteList(
-      await this.db.favorites.toArray(),
-    );
+    const delay = Math.min(30_000, 500 * 2 ** this.retryAttempt);
+    this.retryAttempt = Math.min(this.retryAttempt + 1, 6);
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = undefined;
+      this.syncWithServer();
+    }, delay);
+  }
 
-    this.http
-      .post('/api/graphql', {
-        query: `
-        mutation SyncFavorites($favorites: FavoriteListInput!) {
-          syncFavorites(favorites: $favorites) {
-            success
-            message
-          }
-        }
-      `,
-        variables: {
-          favorites,
-        },
-      })
-      .subscribe();
+  private clearRetryTimer(): void {
+    if (this.retryTimer) {
+      clearTimeout(this.retryTimer);
+      this.retryTimer = undefined;
+    }
+  }
+
+  private stopSubscriptions(): void {
+    this.favoritesSubscription?.unsubscribe();
+    this.dashboardSelectionsSubscription?.unsubscribe();
+    this.favoritesSubscription = undefined;
+    this.dashboardSelectionsSubscription = undefined;
+  }
+
+  private normalizeFavoriteCode(code: string): string | null {
+    return normalizeFavoriteCodeValue(code);
   }
 
   private recordsToFavoriteList(records: FavoriteRecord[]): FavoriteList {
     const favorites = this.createEmptyFavorites();
 
     for (const record of records) {
-      if (favoriteTypes.includes(record.type)) {
-        favorites[record.type].push(record.code);
+      const code = this.normalizeFavoriteCode(record.code);
+      if (favoriteTypes.includes(record.type) && code) {
+        favorites[record.type].push(code);
       }
     }
 
-    return favorites;
+    return this.normalizeFavorites(favorites);
   }
 
   private recordsToDashboardSelections(
@@ -462,7 +963,6 @@ export class FavoritesService {
 
     for (const record of records) {
       const parsed = this.parseDashboardSelectionKey(record.key);
-
       if (!parsed) {
         continue;
       }
@@ -480,25 +980,7 @@ export class FavoritesService {
   }
 
   private normalizeFavorites(value: unknown): FavoriteList {
-    const favorites = this.createEmptyFavorites();
-
-    if (!value || typeof value !== 'object') {
-      return favorites;
-    }
-
-    const rawFavorites = value as Partial<Record<FavoriteTypes, unknown>>;
-    for (const type of favoriteTypes) {
-      const codes = rawFavorites[type];
-      if (Array.isArray(codes)) {
-        favorites[type] = Array.from(
-          new Set(
-            codes.filter((code): code is string => typeof code === 'string'),
-          ),
-        );
-      }
-    }
-
-    return favorites;
+    return normalizeFavoriteSnapshot(value);
   }
 
   private createEmptyFavorites(): FavoriteList {
@@ -512,37 +994,35 @@ export class FavoritesService {
     };
   }
 
-  private getFavoriteKey(type: FavoriteTypes, code: string): string {
-    return `${type}:${code}`;
-  }
-
-  private getDashboardSelectionKey(
-    group: keyof DashboardFavoriteSelections,
-    id: string,
-  ): string {
-    return `${group}:${id}`;
-  }
-
   private parseDashboardSelectionKey(
     key: string,
   ): { group: keyof DashboardFavoriteSelections; id: string } | null {
-    const separatorIndex = key.indexOf(':');
+    const groups: (keyof DashboardFavoriteSelections)[] = [
+      'railStationLines',
+      'busStopRoutes',
+    ];
+    const match = groups
+      .map((group) => ({
+        group,
+        marker: `:${group}:`,
+      }))
+      .map((candidate) => ({
+        ...candidate,
+        index: key.indexOf(candidate.marker),
+      }))
+      .find((candidate) => candidate.index > 0);
 
-    if (separatorIndex < 1) {
+    if (!match || match.index <= 0) {
       return null;
     }
 
-    const group = key.slice(0, separatorIndex);
-    const id = key.slice(separatorIndex + 1);
-
-    if (
-      (group !== 'railStationLines' && group !== 'busStopRoutes') ||
-      id.length === 0
-    ) {
+    const scope = key.slice(0, match.index);
+    const id = key.slice(match.index + match.marker.length);
+    if (!scope || id.length === 0) {
       return null;
     }
 
-    return { group, id };
+    return { group: match.group, id };
   }
 
   private toggleSelectionValue(current: string[], value: string): string[] {
@@ -553,16 +1033,11 @@ export class FavoritesService {
     return [...current, value];
   }
 
-  private mergeFavorites(
-    local: FavoriteList,
-    server: FavoriteList,
-  ): FavoriteList {
-    const merged = this.createEmptyFavorites();
+  private createOperationId(): string {
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+      return crypto.randomUUID();
+    }
 
-    favoriteTypes.forEach((type) => {
-      merged[type] = Array.from(new Set([...local[type], ...server[type]]));
-    });
-
-    return merged;
+    return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   }
 }

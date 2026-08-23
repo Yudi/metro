@@ -26,24 +26,30 @@ import { LoadersService } from '../shared/graphql/loaders.service';
 import { LoadersModule } from '../shared/graphql/loaders.module';
 import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
 import { ApolloServerPluginLandingPageDisabled } from '@apollo/server/plugin/disabled';
+import { graphqlOperationLimitsRule } from '../common/graphql/graphql-operation-limits.rule';
+import { ObservabilityModule } from '../observability/observability.module';
+import { validatePublicEnvironment } from './public-environment.validation';
+import { RequestContextModule } from '../common/request-context/request-context.module';
 
 const isProduction = process.env.NODE_ENV === 'production';
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      validate: validatePublicEnvironment,
     }),
+    RequestContextModule,
     ThrottlerModule.forRoot({
       throttlers: [
         {
           name: 'default',
           ttl: 60_000,
-          limit: 5_000,
+          limit: 600,
         },
         {
           name: 'strict',
           ttl: 60_000,
-          limit: 2_500,
+          limit: 120,
         },
       ],
     }),
@@ -58,6 +64,7 @@ const isProduction = process.env.NODE_ENV === 'production';
         path: '/api/graphql',
         playground: false,
         introspection: !isProduction,
+        validationRules: isProduction ? [graphqlOperationLimitsRule] : [],
         plugins: [
           isProduction
             ? ApolloServerPluginLandingPageDisabled()
@@ -70,6 +77,7 @@ const isProduction = process.env.NODE_ENV === 'production';
         context: ({ req, res }: { req: Request; res: Response }) => ({
           req,
           res,
+          requestId: req.headers['x-request-id'],
           loaders: loadersService.createLoaders(), // per-request loaders
         }),
       }),
@@ -87,6 +95,7 @@ const isProduction = process.env.NODE_ENV === 'production';
     NextTrainModule,
     UserModule,
     HistoricalModule,
+    ObservabilityModule,
     PrismaModule,
     LoadersModule,
   ],

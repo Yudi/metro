@@ -1,5 +1,7 @@
 import { Field, InputType, Int } from '@nestjs/graphql';
 import {
+  ArrayMaxSize,
+  ArrayUnique,
   IsArray,
   IsBoolean,
   IsDate,
@@ -7,6 +9,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  MaxLength,
 } from 'class-validator';
 import { HistoricalIncidentEventType } from '../entities/historical-data.entity';
 
@@ -34,6 +37,8 @@ export class HistoricalDataFilterInput {
   })
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(20)
+  @ArrayUnique()
   @IsEnum(HistoricalIncidentEventType, { each: true })
   eventTypes?: HistoricalIncidentEventType[];
 
@@ -43,7 +48,10 @@ export class HistoricalDataFilterInput {
   })
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(50)
+  @ArrayUnique()
   @IsString({ each: true })
+  @MaxLength(64, { each: true })
   sources?: string[];
 
   @Field(() => [String], {
@@ -52,7 +60,10 @@ export class HistoricalDataFilterInput {
   })
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(50)
+  @ArrayUnique()
   @IsString({ each: true })
+  @MaxLength(16, { each: true })
   lineCodes?: string[];
 
   @Field(() => [Int], {
@@ -61,6 +72,8 @@ export class HistoricalDataFilterInput {
   })
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(50)
+  @ArrayUnique()
   @IsInt({ each: true })
   lineNumbers?: number[];
 
@@ -70,7 +83,10 @@ export class HistoricalDataFilterInput {
   })
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(100)
+  @ArrayUnique()
   @IsString({ each: true })
+  @MaxLength(128, { each: true })
   stationCodes?: string[];
 
   @Field(() => [String], {
@@ -79,7 +95,10 @@ export class HistoricalDataFilterInput {
   })
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(100)
+  @ArrayUnique()
   @IsString({ each: true })
+  @MaxLength(160, { each: true })
   stationNames?: string[];
 
   @Field(() => [String], {
@@ -88,7 +107,10 @@ export class HistoricalDataFilterInput {
   })
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(50)
+  @ArrayUnique()
   @IsString({ each: true })
+  @MaxLength(128, { each: true })
   directions?: string[];
 
   @Field(() => [String], {
@@ -97,7 +119,10 @@ export class HistoricalDataFilterInput {
   })
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(50)
+  @ArrayUnique()
   @IsString({ each: true })
+  @MaxLength(64, { each: true })
   statusCodes?: string[];
 
   @Field(() => Boolean, {

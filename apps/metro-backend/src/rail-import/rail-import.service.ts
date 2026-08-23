@@ -16,7 +16,7 @@ import {
   ImportStatus,
 } from './types/wfs.types';
 import { SearchService } from '../search/services/search.service';
-import { PrismaService } from '../prisma/prisma.service';
+import { ImportLockService } from '../common/import-lock.service';
 
 /**
  * Service for importing rail (Metro and CPTM) data from GeoSampa WFS layers.
@@ -38,6 +38,8 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
     progress: 0,
     message: 'Ready to import',
   };
+  private currentImportRunId = 0;
+  private statusResetTimer?: ReturnType<typeof setTimeout>;
 
   constructor(
     private readonly wfsProcessingService: WFSProcessingService,
@@ -45,7 +47,7 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
     private readonly railVectorTileService: RailVectorTileService,
     private readonly vectorTilesService: VectorTilesService,
     private readonly searchService: SearchService,
-    private readonly prisma: PrismaService,
+    private readonly importLockService: ImportLockService,
   ) {}
 
   async onModuleInit() {
@@ -111,6 +113,8 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
    * Reset import status to idle (manual override)
    */
   resetStatus(): void {
+    this.currentImportRunId++;
+    this.clearStatusResetTimer();
     this.logger.debug('Manually resetting import status to idle');
     this.updateImportStatus('idle', 0, 'Ready to import');
   }
@@ -133,6 +137,9 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
       throw new Error('Import already in progress');
     }
 
+    const runId = ++this.currentImportRunId;
+    this.clearStatusResetTimer();
+
     this.updateImportStatus(
       'downloading',
       0,
@@ -144,31 +151,22 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
 
       if (result.sourcesProcessed > 0) {
         this.logger.debug('Refreshing rail vector tile views...');
-        this.railVectorTileService.refreshMvtViews().catch((error) => {
-          this.logger.error('Failed to refresh MVT views after import:', error);
-        });
+        await Promise.all([
+          this.railVectorTileService.refreshMvtViews(),
+          this.searchService.indexRailLines(),
+          this.searchService.indexRailStations(),
+        ]);
 
         this.vectorTilesService.clearCache();
-
-        this.searchService.indexRailLines().catch((error) => {
-          this.logger.error('Failed to index rail lines after import:', error);
-        });
-
-        this.searchService.indexRailStations().catch((error) => {
-          this.logger.error(
-            'Failed to index rail stations after import:',
-            error,
-          );
-        });
       }
 
       this.updateImportStatus(
-        result.success ? 'completed' : 'error',
+        'completed',
         100,
         this.getFinalImportMessage(result),
       );
 
-      this.scheduleStatusReset(1000);
+      this.scheduleStatusReset(1000, runId);
 
       return result;
     } catch (error) {
@@ -176,7 +174,7 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
         error instanceof Error ? error.message : 'Unknown error';
       this.updateImportStatus('error', 0, `Import failed: ${errorMessage}`);
 
-      this.scheduleStatusReset(5000);
+      this.scheduleStatusReset(5000, runId);
 
       throw error;
     }
@@ -186,33 +184,32 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
     operation: string,
     action: () => Promise<T>,
   ): Promise<T> {
-    return await this.prisma.$transaction(
-      async (tx) => {
-        const [lockResult] = await tx.$queryRaw<Array<{ locked: boolean }>>`
-          SELECT pg_try_advisory_xact_lock(hashtext(${this.importLockName})) AS locked
-        `;
-
-        if (!lockResult?.locked) {
-          throw new Error(
-            `${operation} already in progress in another process`,
-          );
-        }
-
-        return await action();
-      },
-      {
-        maxWait: 10_000,
-        timeout: WFSConfig.IMPORT_LOCK_TIMEOUT_MS,
-      },
+    return await this.importLockService.withLock(
+      this.importLockName,
+      operation,
+      action,
     );
   }
 
-  private scheduleStatusReset(delayMs: number): void {
-    const timer = setTimeout(() => {
+  private scheduleStatusReset(delayMs: number, runId: number): void {
+    this.clearStatusResetTimer();
+    this.statusResetTimer = setTimeout(() => {
+      this.statusResetTimer = undefined;
+      if (runId !== this.currentImportRunId) {
+        return;
+      }
+
       this.updateImportStatus('idle', 0, 'Ready to import');
     }, delayMs);
 
-    timer.unref?.();
+    this.statusResetTimer.unref?.();
+  }
+
+  private clearStatusResetTimer(): void {
+    if (this.statusResetTimer) {
+      clearTimeout(this.statusResetTimer);
+      this.statusResetTimer = undefined;
+    }
   }
 
   private getFinalImportMessage(result: WFSProcessingResult): string {
@@ -337,6 +334,12 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
    * Clear all GeoSampa WFS data and force complete re-import
    */
   async clearAndReimport(): Promise<WFSProcessingResult> {
+    return this.withImportLock('GeoSampa WFS clear and reimport', () =>
+      this.clearAndReimportLocked(),
+    );
+  }
+
+  private async clearAndReimportLocked(): Promise<WFSProcessingResult> {
     if (
       this.currentImportStatus.status !== 'idle' &&
       this.currentImportStatus.status !== 'completed' &&
@@ -354,7 +357,7 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
       await this.wfsDatabaseService.clearAllRailData();
 
       // Start fresh import
-      return await this.startImport();
+      return await this.startImportLocked();
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';

@@ -1,8 +1,14 @@
 import { test, expect } from '@playwright/test';
 
-test('has title', async ({ page }) => {
+test('navigates from the regional hub to transit search', async ({ page }) => {
   await page.goto('/');
 
-  // Expect h1 to contain a substring.
-  expect(await page.locator('h1').innerText()).toContain('Welcome');
+  await expect(
+    page.getByRole('heading', { name: 'Transporte Metropolitano' }),
+  ).toBeVisible();
+  await page.getByRole('link', { name: 'Próxima chegada' }).click();
+  await expect(page).toHaveURL(/\/sp\/proxima-chegada$/);
+  await expect(
+    page.getByRole('heading', { name: 'Próximo trem ou ônibus' }),
+  ).toBeVisible();
 });

@@ -11,6 +11,7 @@ export class RailService implements OnModuleInit {
 
   private cachedStatus: RailLinesStatus | null = null;
   private lastFetchTime: Date | null = null;
+  private refreshPromise: Promise<RailLinesStatus> | null = null;
   private readonly CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes for fresh data
   private readonly STALE_TTL_MS = 10 * 60 * 1000; // 10 minutes before considering stale
 
@@ -120,7 +121,17 @@ export class RailService implements OnModuleInit {
     * Uses prioritized sources with progressive fallbacks
     * Merges data preferring valid statuses over "DadosIndisponiveis"
    */
-  private async fetchAndCacheStatus(): Promise<RailLinesStatus> {
+  private fetchAndCacheStatus(): Promise<RailLinesStatus> {
+    if (this.refreshPromise) {
+      return this.refreshPromise;
+    }
+    this.refreshPromise = this.performFetchAndCacheStatus().finally(() => {
+      this.refreshPromise = null;
+    });
+    return this.refreshPromise;
+  }
+
+  private async performFetchAndCacheStatus(): Promise<RailLinesStatus> {
     try {
       this.logger.debug('Fetching rail status from external APIs');
 
@@ -130,6 +141,7 @@ export class RailService implements OnModuleInit {
       // Fetch from all configured APIs with intelligent merging
       const fetchResult =
         await this.apiService.fetchMergedStatusWithDiagnostics(cachedLines);
+      this.recordSourceDiagnostics(fetchResult);
       const mergedStatus = fetchResult.status;
 
       // If all APIs failed, fall back to cache
@@ -195,5 +207,26 @@ export class RailService implements OnModuleInit {
       this.logger.warn('No cache available, returning static fallback');
       return this.apiService.createStaticFallback();
     }
+  }
+
+  private recordSourceDiagnostics(
+    result: Awaited<ReturnType<RailApiService['fetchMergedStatusWithDiagnostics']>>,
+  ): void {
+    const event = JSON.stringify({
+      event: 'rail_source_fetch',
+      attemptedAt: result.attemptedAt.toISOString(),
+      statusAvailable: result.status !== null,
+      sources: result.sources.map((source) => ({
+        source: source.name,
+        success: source.success,
+        lineCount: source.lineCount,
+        durationMs: source.durationMs,
+      })),
+    });
+    if (result.sources.some((source) => !source.success)) {
+      this.logger.warn(event);
+      return;
+    }
+    this.logger.log(event);
   }
 }

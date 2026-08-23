@@ -1,4 +1,5 @@
 import { Args, Int, Query, Resolver } from '@nestjs/graphql';
+import { BadRequestException } from '@nestjs/common';
 import { HistoricalDataFilterInput } from './dto/historical-data.input';
 import { HistoricalDataEntity } from './entities/historical-data.entity';
 import { HistoricalService } from './historical.service';
@@ -32,6 +33,17 @@ export class HistoricalResolver {
     })
     offset?: number,
   ): Promise<HistoricalDataEntity> {
+    if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > 500)) {
+      throw new BadRequestException('limit must be an integer between 1 and 500');
+    }
+    if (
+      offset !== undefined &&
+      (!Number.isInteger(offset) || offset < 0 || offset > 10_000)
+    ) {
+      throw new BadRequestException(
+        'offset must be an integer between 0 and 10000',
+      );
+    }
     return this.historicalService.getHistoricalData(filter, limit, offset);
   }
 }

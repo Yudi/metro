@@ -86,6 +86,29 @@ describe('RailIntegrationClientService', () => {
     service.onModuleDestroy();
   });
 
+  it('propagates the current request correlation ID through gRPC metadata', async () => {
+    const getStationCodes = jest.fn(
+      (
+        _request: unknown,
+        metadata: Metadata,
+        _options: unknown,
+        callback: (error: ServiceError | null, response?: unknown) => void,
+      ) => {
+        expect(metadata.get('x-correlation-id')).toEqual(['request-12345678']);
+        callback(null, { stationCodes: ['LUZ'] });
+      },
+    );
+    const service = createServiceWithClient(
+      { getStationCodes },
+      {},
+      { getRequestId: () => 'request-12345678' },
+    );
+
+    await expect(service.getStationCodes('L11')).resolves.toEqual(['LUZ']);
+    expect(getStationCodes).toHaveBeenCalledTimes(1);
+    service.onModuleDestroy();
+  });
+
   it('retries transient failures with bounded attempts', async () => {
     const unavailable = serviceError(
       status.UNAVAILABLE,
@@ -146,13 +169,38 @@ describe('RailIntegrationClientService', () => {
 
     service.onModuleDestroy();
   });
+
+  it('cancels retry backoff during shutdown', async () => {
+    jest.useFakeTimers();
+    const unavailable = serviceError(status.UNAVAILABLE, 'temporarily down');
+    const getStationCodes = jest.fn(unaryFailure(unavailable));
+    const service = createServiceWithClient(
+      { getStationCodes },
+      { RAIL_INTEGRATION_GRPC_RETRY_DELAY_MS: 2_000 },
+    );
+    const request = service.getStationCodes('L11');
+    await Promise.resolve();
+    await Promise.resolve();
+
+    service.onModuleDestroy();
+
+    await expect(request).rejects.toMatchObject({ code: status.UNAVAILABLE });
+    expect(getStationCodes).toHaveBeenCalledTimes(1);
+    jest.advanceTimersByTime(2_000);
+    expect(getStationCodes).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
+  });
 });
 
 function createServiceWithClient(
   methods: Record<string, unknown>,
   values: Record<string, string | number> = {},
+  requestContext?: { getRequestId(): string | undefined },
 ): RailIntegrationClientService {
-  const service = new RailIntegrationClientService(configService(values));
+  const service = new RailIntegrationClientService(
+    configService(values),
+    requestContext as never,
+  );
   clientOf(service).close();
   const client = {
     waitForReady: jest.fn((_deadline, callback) => callback()),
@@ -176,19 +224,23 @@ function clientOf(
 }
 
 function unarySuccess(response: unknown) {
-  return (
-    _request: unknown,
-    _deadline: Date,
-    callback: (error: ServiceError | null, response?: unknown) => void,
-  ) => callback(null, response);
+  return (...args: unknown[]) => {
+    const callback = args[args.length - 1] as (
+      error: ServiceError | null,
+      response?: unknown,
+    ) => void;
+    callback(null, response);
+  };
 }
 
 function unaryFailure(error: ServiceError) {
-  return (
-    _request: unknown,
-    _deadline: Date,
-    callback: (error: ServiceError | null, response?: unknown) => void,
-  ) => callback(error);
+  return (...args: unknown[]) => {
+    const callback = args[args.length - 1] as (
+      error: ServiceError | null,
+      response?: unknown,
+    ) => void;
+    callback(error);
+  };
 }
 
 function serviceError(code: status, details: string): ServiceError {

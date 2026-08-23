@@ -24,6 +24,7 @@ describe('HeadwayPollingService', () => {
     const nextTrainPolling = {
       getCached: jest.fn(() => null),
       onPollComplete: jest.fn(),
+      offPollComplete: jest.fn(),
     };
     const service = new HeadwayPollingService(
       { get: jest.fn() } as never,
@@ -65,7 +66,11 @@ describe('HeadwayPollingService', () => {
       externalRailProvider as never,
       {} as never,
       {} as never,
-      { getCached: jest.fn(), onPollComplete: jest.fn() } as never,
+      {
+        getCached: jest.fn(),
+        onPollComplete: jest.fn(),
+        offPollComplete: jest.fn(),
+      } as never,
       { getLineStatus: jest.fn() } as never,
     );
     (service as unknown as { isRunning: boolean }).isRunning = true;
@@ -110,7 +115,11 @@ describe('HeadwayPollingService', () => {
       externalRailProvider as never,
       {} as never,
       { processObservations: jest.fn(async () => undefined) } as never,
-      { getCached: jest.fn(() => null), onPollComplete: jest.fn() } as never,
+      {
+        getCached: jest.fn(() => null),
+        onPollComplete: jest.fn(),
+        offPollComplete: jest.fn(),
+      } as never,
       { getLineStatus: jest.fn() } as never,
     );
     (service as unknown as { isRunning: boolean }).isRunning = true;
@@ -150,7 +159,11 @@ describe('HeadwayPollingService', () => {
       externalRailProvider as never,
       {} as never,
       { processObservations: jest.fn(async () => undefined) } as never,
-      { getCached: jest.fn(), onPollComplete: jest.fn() } as never,
+      {
+        getCached: jest.fn(),
+        onPollComplete: jest.fn(),
+        offPollComplete: jest.fn(),
+      } as never,
       railService as never,
     );
 
@@ -185,7 +198,11 @@ describe('HeadwayPollingService', () => {
         externalRailProvider as never,
         {} as never,
         { processObservations: jest.fn(async () => undefined) } as never,
-        { getCached: jest.fn(), onPollComplete: jest.fn() } as never,
+        {
+          getCached: jest.fn(),
+          onPollComplete: jest.fn(),
+          offPollComplete: jest.fn(),
+        } as never,
         railService as never,
       );
 
@@ -219,7 +236,11 @@ describe('HeadwayPollingService', () => {
       externalRailProvider as never,
       {} as never,
       { processObservations: jest.fn(async () => undefined) } as never,
-      { getCached: jest.fn(), onPollComplete: jest.fn() } as never,
+      {
+        getCached: jest.fn(),
+        onPollComplete: jest.fn(),
+        offPollComplete: jest.fn(),
+      } as never,
       railService as never,
     );
 
@@ -261,7 +282,11 @@ describe('HeadwayPollingService', () => {
         externalRailProvider as never,
         {} as never,
         {} as never,
-        { getCached: jest.fn(), onPollComplete: jest.fn() } as never,
+        {
+          getCached: jest.fn(),
+          onPollComplete: jest.fn(),
+          offPollComplete: jest.fn(),
+        } as never,
         railService as never,
       );
       const pollStation = (

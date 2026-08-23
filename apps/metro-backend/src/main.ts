@@ -2,8 +2,14 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { initializeFirebase } from './startup/firebase';
+import { NextFunction, Request, Response } from 'express';
+import { randomUUID } from 'node:crypto';
+import { RequestContextService } from './common/request-context/request-context.service';
 
-async function bootstrap() {
+export async function bootstrap() {
+  initializeFirebase();
+
   const isProduction = process.env.NODE_ENV === 'production';
   const logLevels: (
     | 'error'
@@ -13,16 +19,34 @@ async function bootstrap() {
     | 'verbose'
     | 'fatal'
   )[] = isProduction
-    ? ['error', 'warn', 'fatal']
+    ? ['error', 'warn', 'log', 'fatal']
     : ['error', 'warn', 'log', 'debug', /*'verbose',*/ 'fatal'];
 
   const app = await NestFactory.create(AppModule, {
     logger: logLevels,
   });
+  if (isProduction) {
+    const expressApp = app.getHttpAdapter().getInstance() as {
+      set(name: string, value: number): void;
+    };
+    expressApp.set('trust proxy', 1);
+  }
   app.enableShutdownHooks(['SIGINT', 'SIGTERM']);
 
   const globalPrefix = 'api';
   app.setGlobalPrefix(globalPrefix);
+  const requestContext = app.get(RequestContextService);
+
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const suppliedRequestId = req.header('x-request-id')?.trim();
+    const requestId =
+      suppliedRequestId && /^[A-Za-z0-9._-]{8,128}$/.test(suppliedRequestId)
+        ? suppliedRequestId
+        : randomUUID();
+    req.headers['x-request-id'] = requestId;
+    res.setHeader('x-request-id', requestId);
+    requestContext.run(requestId, next);
+  });
 
   // Global ValidationPipe
   app.useGlobalPipes(
@@ -52,7 +76,13 @@ async function bootstrap() {
     origin: allowedOrigins,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'Accept',
+      'X-Request-ID',
+    ],
+    exposedHeaders: ['X-Request-ID'],
   });
 
   const isSwaggerEnabled =
@@ -76,4 +106,8 @@ async function bootstrap() {
   );
 }
 
-bootstrap();
+void bootstrap().catch((error: unknown) => {
+  const message = error instanceof Error ? error.message : 'Unknown error';
+  Logger.fatal(`Backend startup failed: ${message}`);
+  process.exitCode = 1;
+});

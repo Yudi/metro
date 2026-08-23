@@ -1,5 +1,5 @@
-use tokio_postgres::{Client, NoTls};
 use log::error;
+use tokio_postgres::{Client, NoTls};
 
 use crate::gtfs::GtfsError;
 

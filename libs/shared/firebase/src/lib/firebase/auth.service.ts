@@ -8,27 +8,47 @@ import {
   signOut,
 } from 'firebase/auth';
 
+export type AuthOperationResult =
+  | { success: true }
+  | { success: false; reason: 'server' | 'failed'; error?: unknown };
+
 @Service()
 export class AuthService {
   private platformId = inject(PLATFORM_ID);
 
-  loginGoogle() {
-    if (!isPlatformBrowser(this.platformId)) return;
+  async loginGoogle(): Promise<AuthOperationResult> {
+    if (!isPlatformBrowser(this.platformId)) {
+      return { success: false, reason: 'server' };
+    }
 
     const auth = getAuth();
     const provider = new GoogleAuthProvider();
 
-    if (auth.emulatorConfig) {
-      signInWithPopup(auth, provider);
-      return;
-    }
+    try {
+      if (auth.emulatorConfig) {
+        await signInWithPopup(auth, provider);
+      } else {
+        await signInWithRedirect(auth, provider);
+      }
 
-    signInWithRedirect(auth, provider);
+      return { success: true };
+    } catch (error: unknown) {
+      console.error('Firebase Google sign-in failed', error);
+      return { success: false, reason: 'failed', error };
+    }
   }
 
-  logout() {
-    if (!isPlatformBrowser(this.platformId)) return;
+  async logout(): Promise<AuthOperationResult> {
+    if (!isPlatformBrowser(this.platformId)) {
+      return { success: false, reason: 'server' };
+    }
 
-    signOut(getAuth());
+    try {
+      await signOut(getAuth());
+      return { success: true };
+    } catch (error: unknown) {
+      console.error('Firebase logout failed', error);
+      return { success: false, reason: 'failed', error };
+    }
   }
 }

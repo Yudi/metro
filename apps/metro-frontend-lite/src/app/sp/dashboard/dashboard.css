@@ -16,8 +16,28 @@
 }
 
 .page-header {
+  align-items: flex-start;
   justify-content: space-between;
   margin-bottom: 0.75rem;
+}
+
+.page-header > div:first-child {
+  min-width: 0;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.auth-status {
+  max-width: 28ch;
+  color: #475569;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
 }
 
 .page-header h2,
@@ -40,7 +60,8 @@ small {
   text-decoration: underline;
 }
 
-.refresh-button {
+.refresh-button,
+.secondary-button {
   min-height: 40px;
   padding: 0.45rem 0.85rem;
   border: 1px solid #1d4ed8;
@@ -52,9 +73,21 @@ small {
   font-weight: 700;
 }
 
-.refresh-button:disabled {
+.secondary-button {
+  background: white;
+  color: #1d4ed8;
+}
+
+.refresh-button:disabled,
+.secondary-button:disabled {
   cursor: wait;
   opacity: 0.65;
+}
+
+.refresh-button:focus-visible,
+.secondary-button:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 2px;
 }
 
 .alert {
@@ -244,6 +277,15 @@ small {
   .item-row {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .header-actions {
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  .auth-status {
+    max-width: none;
   }
 
   .summary-grid,

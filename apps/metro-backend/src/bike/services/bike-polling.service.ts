@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { BikeApiService } from './bike-api.service';
 import {
   BikeStationDto,
@@ -18,7 +23,7 @@ interface DeltaChanges {
 }
 
 @Injectable()
-export class BikePollingService implements OnModuleInit {
+export class BikePollingService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(BikePollingService.name);
   private latestPayload: BikeStationsPayloadDto | null = null;
   private latestSummary: BikeStationsSummaryPayloadDto | null = null;
@@ -35,6 +40,10 @@ export class BikePollingService implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     this.logger.debug('Initializing bike polling service');
     this.pollingCoordinator.ensurePolling();
+  }
+
+  onModuleDestroy(): void {
+    this.pollingCoordinator.stopPolling();
   }
 
   onPollComplete(listener: () => void): void {

@@ -164,6 +164,11 @@ const BIKE_STATIONS_SCHEMA = {
 export class TypesenseService implements OnModuleInit {
   private readonly logger = new Logger(TypesenseService.name);
   private client: Client;
+  private readonly liveCollectionTargets = new Map<string, string>();
+  private readonly rebuildCollectionTargets = new Map<string, string>();
+  private readonly rebuildExpectedCounts = new Map<string, number>();
+  private previousLiveCollectionTargets = new Map<string, string>();
+  private initialized = false;
 
   constructor(private configService: ConfigService) {
     this.client = new Client({
@@ -206,9 +211,191 @@ export class TypesenseService implements OnModuleInit {
         BIKE_STATIONS_SCHEMA,
       );
 
+      for (const collectionName of this.getBaseCollectionNames()) {
+        try {
+          const alias = await this.client
+            .aliases(`${collectionName}__live`)
+            .retrieve();
+          this.liveCollectionTargets.set(collectionName, alias.collection_name);
+        } catch {
+          this.liveCollectionTargets.set(collectionName, collectionName);
+        }
+      }
+
       this.logger.debug('Typesense collections initialized successfully');
+      this.initialized = true;
     } catch (error) {
+      this.initialized = false;
       this.logger.error('Failed to initialize Typesense collections:', error);
+    }
+  }
+
+  isAvailable(): boolean {
+    return this.initialized;
+  }
+
+  async beginFullRebuild(): Promise<void> {
+    if (this.rebuildCollectionTargets.size > 0) {
+      throw new Error('Typesense full rebuild already in progress');
+    }
+
+    const rebuildId = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    const schemas: Array<[string, unknown]> = [
+      [GTFS_ROUTES_COLLECTION_NAME, GTFS_ROUTES_SCHEMA],
+      [GTFS_STOPS_COLLECTION_NAME, GTFS_STOPS_SCHEMA],
+      [GPKG_LINES_COLLECTION_NAME, GPKG_LINES_SCHEMA],
+      [GPKG_STATIONS_COLLECTION_NAME, GPKG_STATIONS_SCHEMA],
+      [BIKE_STATIONS_COLLECTION_NAME, BIKE_STATIONS_SCHEMA],
+    ];
+
+    const created: string[] = [];
+    try {
+      for (const [baseName, schema] of schemas) {
+        const stagingName = `${baseName}__rebuild_${rebuildId}`;
+        await this.client.collections().create({
+          ...(schema as Record<string, unknown>),
+          name: stagingName,
+        } as never);
+        created.push(stagingName);
+        this.rebuildCollectionTargets.set(baseName, stagingName);
+        this.rebuildExpectedCounts.set(baseName, 0);
+      }
+
+      this.previousLiveCollectionTargets = new Map(this.liveCollectionTargets);
+    } catch (error) {
+      await Promise.all(
+        created.map((collectionName) =>
+          this.client.collections(collectionName).delete().catch(() => undefined),
+        ),
+      );
+      this.rebuildCollectionTargets.clear();
+      this.rebuildExpectedCounts.clear();
+      throw error;
+    }
+  }
+
+  async finishFullRebuild(): Promise<void> {
+    if (this.rebuildCollectionTargets.size === 0) {
+      throw new Error('Typesense full rebuild has not started');
+    }
+
+    const aliasesSwapped: string[] = [];
+    try {
+      for (const [baseName, stagingName] of this.rebuildCollectionTargets) {
+        const expected = this.rebuildExpectedCounts.get(baseName) ?? 0;
+        const collection = await this.client.collections(stagingName).retrieve();
+        if (collection.num_documents !== expected) {
+          throw new Error(
+            `Typesense rebuild count mismatch for ${baseName}: expected ${expected}, got ${collection.num_documents}`,
+          );
+        }
+      }
+
+      for (const [baseName, stagingName] of this.rebuildCollectionTargets) {
+        await this.client.aliases().upsert(`${baseName}__live`, {
+          collection_name: stagingName,
+        });
+        aliasesSwapped.push(baseName);
+      }
+
+      for (const [baseName, stagingName] of this.rebuildCollectionTargets) {
+        this.liveCollectionTargets.set(baseName, stagingName);
+      }
+      this.rebuildCollectionTargets.clear();
+      this.rebuildExpectedCounts.clear();
+    } catch (error) {
+      // Restore aliases already swapped in this attempt.  The previous
+      // physical collections remain untouched and therefore continue serving
+      // search traffic if the rebuild fails.
+      await Promise.all(
+        aliasesSwapped.map((baseName) => {
+          const previous = this.previousLiveCollectionTargets.get(baseName);
+          return previous
+            ? this.client
+                .aliases()
+                .upsert(`${baseName}__live`, { collection_name: previous })
+                .catch(() => undefined)
+            : this.client
+                .aliases(`${baseName}__live`)
+                .delete()
+                .catch(() => undefined);
+        }),
+      );
+      await this.discardFullRebuild();
+      throw error;
+    }
+  }
+
+  async discardFullRebuild(): Promise<void> {
+    const stagingCollections = [...this.rebuildCollectionTargets.values()];
+    this.rebuildCollectionTargets.clear();
+    this.rebuildExpectedCounts.clear();
+    await Promise.all(
+      stagingCollections.map((collectionName) =>
+        this.client.collections(collectionName).delete().catch(() => undefined),
+      ),
+    );
+  }
+
+  private getBaseCollectionNames(): string[] {
+    return [
+      GTFS_ROUTES_COLLECTION_NAME,
+      GTFS_STOPS_COLLECTION_NAME,
+      GPKG_LINES_COLLECTION_NAME,
+      GPKG_STATIONS_COLLECTION_NAME,
+      BIKE_STATIONS_COLLECTION_NAME,
+    ];
+  }
+
+  private getReadCollectionName(baseName: string): string {
+    return this.liveCollectionTargets.get(baseName) ?? baseName;
+  }
+
+  private getWriteCollectionName(baseName: string): string {
+    return (
+      this.rebuildCollectionTargets.get(baseName) ??
+      this.liveCollectionTargets.get(baseName) ??
+      baseName
+    );
+  }
+
+  private async importDocuments(
+    baseName: string,
+    documents: Array<Record<string, unknown>>,
+  ): Promise<void> {
+    if (documents.length === 0) {
+      if (this.rebuildCollectionTargets.has(baseName)) {
+        this.rebuildExpectedCounts.set(baseName, 0);
+      }
+      return;
+    }
+
+    const response = await this.client
+      .collections(this.getWriteCollectionName(baseName))
+      .documents()
+      .import(documents, { action: 'upsert' });
+    const outcomes = Array.isArray(response) ? response : [response];
+    const failures = outcomes.filter(
+      (outcome) => outcome && typeof outcome === 'object' && outcome.success === false,
+    ) as Array<{ id?: string; error?: string }>;
+    if (failures.length > 0) {
+      const details = failures
+        .slice(0, 10)
+        .map((failure) => `${failure.id ?? 'unknown'}: ${failure.error ?? 'unknown error'}`)
+        .join('; ');
+      const message =
+        `Typesense rejected ${failures.length} malformed ${baseName} document(s): ${details}`;
+      if (failures.length === documents.length) {
+        throw new Error(message);
+      }
+      this.logger.warn(message);
+    }
+
+    if (this.rebuildCollectionTargets.has(baseName)) {
+      this.rebuildExpectedCounts.set(
+        baseName,
+        documents.length - failures.length,
+      );
     }
   }
 
@@ -240,8 +427,10 @@ export class TypesenseService implements OnModuleInit {
   private async createCollection(name: string, schema: unknown) {
     try {
       await this.client.collections(name).delete();
-    } catch {
-      // Collection doesn't exist, which is fine
+    } catch (error) {
+      if (!this.isTypesenseNotFoundError(error)) {
+        throw error;
+      }
     }
 
     try {
@@ -260,18 +449,13 @@ export class TypesenseService implements OnModuleInit {
   }
 
   async clearRoutes(): Promise<void> {
-    try {
-      await this.recreateCollection(GTFS_ROUTES_COLLECTION_NAME, GTFS_ROUTES_SCHEMA);
-      this.logger.debug('Recreated routes collection');
-    } catch (error) {
-      this.logger.error('Failed to clear routes:', error);
-      // If the collection doesn't exist, this might fail, which is OK
-    }
+    await this.recreateCollection(GTFS_ROUTES_COLLECTION_NAME, GTFS_ROUTES_SCHEMA);
+    this.logger.debug('Recreated routes collection');
   }
 
   async indexRoutes(routes: RouteDocument[]): Promise<void> {
     try {
-      if (routes.length === 0) {
+      if (routes.length === 0 && !this.rebuildCollectionTargets.has(GTFS_ROUTES_COLLECTION_NAME)) {
         this.logger.debug('Skipping route indexing: no routes provided');
         return;
       }
@@ -288,10 +472,7 @@ export class TypesenseService implements OnModuleInit {
       }));
 
       // Use upsert to replace existing documents or add new ones
-      await this.client
-        .collections(GTFS_ROUTES_COLLECTION_NAME)
-        .documents()
-        .import(documents, { action: 'upsert' });
+      await this.importDocuments(GTFS_ROUTES_COLLECTION_NAME, documents);
       this.logger.debug(`Indexed ${routes.length} routes`);
     } catch (error) {
       this.logger.error('Failed to index routes:', error);
@@ -300,30 +481,8 @@ export class TypesenseService implements OnModuleInit {
   }
 
   async clearStops(): Promise<void> {
-    try {
-      // Delete and recreate the collection to clear all documents
-      await this.client.collections(GTFS_STOPS_COLLECTION_NAME).delete();
-      this.logger.debug('Deleted stops collection');
-
-      // Recreate the stops collection
-      await this.createCollection(GTFS_STOPS_COLLECTION_NAME, {
-        name: GTFS_STOPS_COLLECTION_NAME,
-        fields: [
-          { name: 'stop_id', type: 'string' },
-          { name: 'stop_name', type: 'string' },
-          { name: 'stop_desc', type: 'string', optional: true },
-          { name: 'stop_lat', type: 'float' },
-          { name: 'stop_lon', type: 'float' },
-          { name: 'location', type: 'geopoint' },
-          { name: 'is_subway_station', type: 'bool' },
-        ],
-        default_sorting_field: 'stop_lat',
-      });
-      this.logger.debug('Recreated stops collection');
-    } catch (error) {
-      this.logger.error('Failed to clear stops:', error);
-      // If the collection doesn't exist, this might fail, which is OK
-    }
+    await this.recreateCollection(GTFS_STOPS_COLLECTION_NAME, GTFS_STOPS_SCHEMA);
+    this.logger.debug('Recreated stops collection');
   }
 
   async clearAllData(): Promise<void> {
@@ -350,7 +509,7 @@ export class TypesenseService implements OnModuleInit {
 
   async indexStops(stops: StopDocument[]): Promise<void> {
     try {
-      if (stops.length === 0) {
+      if (stops.length === 0 && !this.rebuildCollectionTargets.has(GTFS_STOPS_COLLECTION_NAME)) {
         this.logger.debug('Skipping stop indexing: no stops provided');
         return;
       }
@@ -367,10 +526,7 @@ export class TypesenseService implements OnModuleInit {
       }));
 
       // Use upsert to replace existing documents or add new ones
-      await this.client
-        .collections(GTFS_STOPS_COLLECTION_NAME)
-        .documents()
-        .import(documents, { action: 'upsert' });
+      await this.importDocuments(GTFS_STOPS_COLLECTION_NAME, documents);
       this.logger.debug(`Indexed ${stops.length} stops`);
     } catch (error) {
       this.logger.error('Failed to index stops:', error);
@@ -393,7 +549,7 @@ export class TypesenseService implements OnModuleInit {
         searches.push({
           type: SearchTypesEnum.RailLine,
           request: {
-            collection: GPKG_LINES_COLLECTION_NAME,
+            collection: this.getReadCollectionName(GPKG_LINES_COLLECTION_NAME),
             q: query,
             query_by: 'line_code,line_fullname,agency',
             query_by_weights: '8,12,1',
@@ -407,7 +563,7 @@ export class TypesenseService implements OnModuleInit {
         searches.push({
           type: SearchTypesEnum.RailStation,
           request: {
-            collection: GPKG_STATIONS_COLLECTION_NAME,
+            collection: this.getReadCollectionName(GPKG_STATIONS_COLLECTION_NAME),
             q: query,
             query_by: 'station_code,station_name,station_aliases',
             query_by_weights: '2,8,4',
@@ -421,7 +577,7 @@ export class TypesenseService implements OnModuleInit {
         searches.push({
           type: SearchTypesEnum.BusRoute,
           request: {
-            collection: GTFS_ROUTES_COLLECTION_NAME,
+            collection: this.getReadCollectionName(GTFS_ROUTES_COLLECTION_NAME),
             q: query,
             query_by: 'route_short_name,route_long_name',
             per_page: limit,
@@ -434,7 +590,7 @@ export class TypesenseService implements OnModuleInit {
         searches.push({
           type: SearchTypesEnum.BusStop,
           request: {
-            collection: GTFS_STOPS_COLLECTION_NAME,
+            collection: this.getReadCollectionName(GTFS_STOPS_COLLECTION_NAME),
             q: query,
             query_by: 'stop_name,stop_desc',
             per_page: limit,
@@ -447,7 +603,7 @@ export class TypesenseService implements OnModuleInit {
         searches.push({
           type: SearchTypesEnum.BikeStation,
           request: {
-            collection: BIKE_STATIONS_COLLECTION_NAME,
+            collection: this.getReadCollectionName(BIKE_STATIONS_COLLECTION_NAME),
             q: query,
             query_by: 'station_id,station_name',
             per_page: limit,
@@ -527,7 +683,7 @@ export class TypesenseService implements OnModuleInit {
         searches.push({
           type: SearchTypesEnum.BusStop,
           request: {
-            collection: GTFS_STOPS_COLLECTION_NAME,
+            collection: this.getReadCollectionName(GTFS_STOPS_COLLECTION_NAME),
             q: '*',
             filter_by: `location:(${lat}, ${lon}, ${radiusKm} km)`,
             sort_by: `location(${lat}, ${lon}):asc`,
@@ -540,7 +696,7 @@ export class TypesenseService implements OnModuleInit {
         searches.push({
           type: SearchTypesEnum.RailStation,
           request: {
-            collection: GPKG_STATIONS_COLLECTION_NAME,
+            collection: this.getReadCollectionName(GPKG_STATIONS_COLLECTION_NAME),
             q: '*',
             filter_by: `location:(${lat}, ${lon}, ${radiusKm} km)`,
             sort_by: `location(${lat}, ${lon}):asc`,
@@ -553,7 +709,7 @@ export class TypesenseService implements OnModuleInit {
         searches.push({
           type: SearchTypesEnum.BikeStation,
           request: {
-            collection: BIKE_STATIONS_COLLECTION_NAME,
+            collection: this.getReadCollectionName(BIKE_STATIONS_COLLECTION_NAME),
             q: '*',
             filter_by: `location:(${lat}, ${lon}, ${radiusKm} km)`,
             sort_by: `location(${lat}, ${lon}):asc`,
@@ -625,7 +781,7 @@ export class TypesenseService implements OnModuleInit {
   async deleteRoute(routeId: string): Promise<void> {
     try {
       await this.client
-        .collections(GTFS_ROUTES_COLLECTION_NAME)
+        .collections(this.getWriteCollectionName(GTFS_ROUTES_COLLECTION_NAME))
         .documents(routeId)
         .delete();
     } catch (error) {
@@ -636,7 +792,7 @@ export class TypesenseService implements OnModuleInit {
   async deleteStop(stopId: string): Promise<void> {
     try {
       await this.client
-        .collections(GTFS_STOPS_COLLECTION_NAME)
+        .collections(this.getWriteCollectionName(GTFS_STOPS_COLLECTION_NAME))
         .documents(stopId)
         .delete();
     } catch (error) {
@@ -646,7 +802,7 @@ export class TypesenseService implements OnModuleInit {
 
   async indexBikeStations(stations: BikeStationDocument[]): Promise<void> {
     try {
-      if (stations.length === 0) {
+      if (stations.length === 0 && !this.rebuildCollectionTargets.has(BIKE_STATIONS_COLLECTION_NAME)) {
         this.logger.debug('Skipping bike station indexing: no stations provided');
         return;
       }
@@ -658,10 +814,7 @@ export class TypesenseService implements OnModuleInit {
         location: station.location,
       }));
 
-      await this.client
-        .collections(BIKE_STATIONS_COLLECTION_NAME)
-        .documents()
-        .import(documents, { action: 'upsert' });
+      await this.importDocuments(BIKE_STATIONS_COLLECTION_NAME, documents);
       this.logger.debug(`Indexed ${stations.length} bike stations`);
     } catch (error) {
       this.logger.error('Failed to index bike stations:', error);
@@ -671,7 +824,7 @@ export class TypesenseService implements OnModuleInit {
 
   async indexRailLines(lines: LineDocument[]): Promise<void> {
     try {
-      if (lines.length === 0) {
+      if (lines.length === 0 && !this.rebuildCollectionTargets.has(GPKG_LINES_COLLECTION_NAME)) {
         this.logger.debug('Skipping rail line indexing: no lines provided');
         return;
       }
@@ -683,10 +836,7 @@ export class TypesenseService implements OnModuleInit {
         agency: line.agency,
       }));
 
-      await this.client
-        .collections(GPKG_LINES_COLLECTION_NAME)
-        .documents()
-        .import(documents, { action: 'upsert' });
+      await this.importDocuments(GPKG_LINES_COLLECTION_NAME, documents);
       this.logger.debug(`Indexed ${lines.length} rail lines`);
     } catch (error) {
       this.logger.error('Failed to index rail lines:', error);
@@ -696,7 +846,7 @@ export class TypesenseService implements OnModuleInit {
 
   async indexRailStations(stations: StationDocument[]): Promise<void> {
     try {
-      if (stations.length === 0) {
+      if (stations.length === 0 && !this.rebuildCollectionTargets.has(GPKG_STATIONS_COLLECTION_NAME)) {
         this.logger.debug('Skipping rail station indexing: no stations provided');
         return;
       }
@@ -716,10 +866,7 @@ export class TypesenseService implements OnModuleInit {
         return document;
       });
 
-      await this.client
-        .collections(GPKG_STATIONS_COLLECTION_NAME)
-        .documents()
-        .import(documents, { action: 'upsert' });
+      await this.importDocuments(GPKG_STATIONS_COLLECTION_NAME, documents);
       this.logger.debug(`Indexed ${stations.length} rail stations`);
     } catch (error) {
       this.logger.error('Failed to index rail stations:', error);
@@ -728,12 +875,8 @@ export class TypesenseService implements OnModuleInit {
   }
 
   async clearIndex(): Promise<void> {
-    try {
-      await this.clearAllData();
-      this.logger.debug('Cleared and recreated all Typesense collections');
-    } catch (error) {
-      this.logger.error('Failed to clear Typesense index:', error);
-    }
+    await this.clearAllData();
+    this.logger.debug('Cleared and recreated all Typesense collections');
   }
 
   private async clearRailLines(): Promise<void> {
@@ -757,8 +900,10 @@ export class TypesenseService implements OnModuleInit {
   private async recreateCollection(name: string, schema: unknown): Promise<void> {
     try {
       await this.client.collections(name).delete();
-    } catch {
-      // Missing collections are recreated below.
+    } catch (error) {
+      if (!this.isTypesenseNotFoundError(error)) {
+        throw error;
+      }
     }
 
     await this.ensureCollectionExists(name, schema);
@@ -771,6 +916,15 @@ export class TypesenseService implements OnModuleInit {
       typeof error === 'object' &&
       error !== null &&
       maybeTypesenseError.httpStatus === 409
+    );
+  }
+
+  private isTypesenseNotFoundError(error: unknown): boolean {
+    const maybeTypesenseError = error as { httpStatus?: unknown };
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      maybeTypesenseError.httpStatus === 404
     );
   }
 }

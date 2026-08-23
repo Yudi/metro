@@ -110,6 +110,22 @@ export class GTFSConfig {
     ];
   }
 
+  static getRequiredFiles(): string[] {
+    return [
+      'agency.txt',
+      'calendar.txt',
+      'routes.txt',
+      'stops.txt',
+      'shapes.txt',
+      'trips.txt',
+      'stop_times.txt',
+    ];
+  }
+
+  static isRequiredFile(fileName: string): boolean {
+    return this.getRequiredFiles().includes(fileName);
+  }
+
   /**
    * Check if file should be processed by Rust tool
    */

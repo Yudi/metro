@@ -3,10 +3,12 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
+  IsNotEmpty,
   IsLatitude,
   IsLongitude,
   IsOptional,
   IsString,
+  MaxLength,
   Max,
   Min,
 } from 'class-validator';
@@ -25,6 +27,8 @@ registerEnumType(SearchTypesEnum, { name: 'SearchType' });
 export class SearchInput {
   @Field()
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(160)
   query!: string;
 
   @Field(() => SearchTypesEnum, { nullable: true })
@@ -44,6 +48,8 @@ export class SearchInput {
 export class SearchFiltersInput {
   @Field()
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(160)
   query!: string;
 
   @Field(() => Boolean, { nullable: true, defaultValue: true })

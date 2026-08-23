@@ -1,37 +1,36 @@
 import { Service, effect, inject, Injector } from '@angular/core';
-import { Apollo, gql } from 'apollo-angular';
-import { firebaseUser } from './auth.signal';
+import {
+  firebaseIdToken,
+  firebaseUser,
+  isAuthenticatedSnapshotReady,
+} from './auth.signal';
 
 @Service()
 export class AuthBackendSyncService {
-  private apollo = inject(Apollo);
   private injector = inject(Injector);
 
   constructor() {
     effect(() => {
       const user = firebaseUser();
-      if (!user) return;
+      const token = firebaseIdToken();
+      if (!isAuthenticatedSnapshotReady(user, token)) return;
 
-      this.apollo
-        .query<true>({
-          query: gql`
-            query {
-              validateToken
-            }
-          `,
-        })
-        .subscribe((result) => {
-          if (result) {
-            void this.syncFavorites();
-          }
-        });
+      void this.syncFavorites(user.uid);
     });
   }
 
-  private async syncFavorites() {
-    // eslint-disable-next-line @nx/enforce-module-boundaries
-    const { FavoritesService } = await import('@metro/shared/api');
-    const favoritesService = this.injector.get(FavoritesService);
-    favoritesService.syncWithServer();
+  private async syncFavorites(userId: string): Promise<void> {
+    try {
+      // eslint-disable-next-line @nx/enforce-module-boundaries
+      const { FavoritesService } = await import('@metro/shared/api');
+      if (firebaseUser()?.uid !== userId) {
+        return;
+      }
+
+      const favoritesService = this.injector.get(FavoritesService);
+      favoritesService.syncWithServer();
+    } catch (error: unknown) {
+      console.error('Failed to synchronize authenticated favorites', error);
+    }
   }
 }

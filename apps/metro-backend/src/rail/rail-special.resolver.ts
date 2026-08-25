@@ -1,6 +1,9 @@
 import { Logger } from '@nestjs/common';
 import { Resolver, Query } from '@nestjs/graphql';
-import { RailStatusSourcePort } from '@metro/rail-integration-contracts';
+import {
+  RailSpecialStatusSourceLine,
+  RailStatusSourcePort,
+} from '@metro/rail-integration-contracts';
 import { SPECIAL_RAIL_LINE_CODES } from '@metro/shared/utils';
 import { RailService } from './rail.service';
 import { SpecialRailLine } from './entities/rail-special-line.entity';
@@ -14,6 +17,12 @@ import { RailHolidayService } from './rail-holiday.service';
 @Resolver(() => SpecialRailLine)
 export class RailSpecialResolver {
   private readonly logger = new Logger(RailSpecialResolver.name);
+  private readonly specialStatusCacheTtlMs = 5 * 60 * 1000;
+  private cachedExpressoAeroportoStatus?: RailSpecialStatusSourceLine;
+  private specialStatusCacheTime?: number;
+  private specialStatusRefreshPromise?: Promise<
+    RailSpecialStatusSourceLine | undefined
+  >;
 
   constructor(
     private readonly railService: RailService,
@@ -43,15 +52,43 @@ export class RailSpecialResolver {
     );
   }
 
-  private async fetchExpressoAeroportoStatus() {
+  private fetchExpressoAeroportoStatus(): Promise<
+    RailSpecialStatusSourceLine | undefined
+  > {
+    if (
+      this.specialStatusCacheTime !== undefined &&
+      Date.now() - this.specialStatusCacheTime < this.specialStatusCacheTtlMs
+    ) {
+      return Promise.resolve(this.cachedExpressoAeroportoStatus);
+    }
+
+    if (!this.specialStatusRefreshPromise) {
+      this.specialStatusRefreshPromise =
+        this.refreshExpressoAeroportoStatus().finally(() => {
+          this.specialStatusRefreshPromise = undefined;
+        });
+    }
+
+    return this.specialStatusRefreshPromise;
+  }
+
+  private async refreshExpressoAeroportoStatus(): Promise<
+    RailSpecialStatusSourceLine | undefined
+  > {
     try {
       const specialLines =
         await this.railStatusSource.fetchSpecialRailStatusLines();
-      return specialLines.get(SPECIAL_RAIL_LINE_CODES.EXPRESSO_AEROPORTO);
+      const status = specialLines.get(
+        SPECIAL_RAIL_LINE_CODES.EXPRESSO_AEROPORTO,
+      );
+      this.cachedExpressoAeroportoStatus = status;
+      this.specialStatusCacheTime = Date.now();
+      return status;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(`Could not load special rail statuses: ${message}`);
-      return undefined;
+      this.specialStatusCacheTime = Date.now();
+      return this.cachedExpressoAeroportoStatus;
     }
   }
 

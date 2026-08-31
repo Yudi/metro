@@ -36,6 +36,7 @@ describe('RailSpecialResolver', () => {
     const firstRequest = resolver.getSpecialLinesStatus();
     const secondRequest = resolver.getSpecialLinesStatus();
 
+    await new Promise<void>((resolve) => setImmediate(resolve));
     expect(fetchSpecialRailStatusLines).toHaveBeenCalledTimes(1);
     releaseFetch(new Map([[status.code, status]]));
     await Promise.all([firstRequest, secondRequest]);

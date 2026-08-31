@@ -81,6 +81,7 @@ export function resolveRailIntegrationProtoPath(
   const candidateRoots = [
     ...additionalProtoRoots,
     join(__dirname, 'assets/grpc'),
+    join(__dirname, '../assets/grpc'),
     join(process.cwd(), 'assets/grpc'),
     join(process.cwd(), 'src/assets/grpc'),
     join(

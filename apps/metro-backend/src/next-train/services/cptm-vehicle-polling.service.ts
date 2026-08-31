@@ -316,10 +316,7 @@ export class CptmVehiclePollingService implements OnModuleDestroy {
     }
 
     // Sort by prefix for comparison
-    const sortByPrefix = (
-      a: RailVehiclePosition,
-      b: RailVehiclePosition,
-    ) =>
+    const sortByPrefix = (a: RailVehiclePosition, b: RailVehiclePosition) =>
       a.prefix.localeCompare(b.prefix);
     const sortedOld = [...oldVehicles].sort(sortByPrefix);
     const sortedNew = [...newVehicles].sort(sortByPrefix);

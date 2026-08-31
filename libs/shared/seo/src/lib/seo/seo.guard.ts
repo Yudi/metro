@@ -10,7 +10,7 @@ export class SeoGuard implements CanActivate {
   private seo = inject(SeoService);
   public canActivate(
     route: ActivatedRouteSnapshot,
-    state: RouterStateSnapshot
+    state: RouterStateSnapshot,
   ): boolean {
     this.seo
       .setTitle(route.data['title'])

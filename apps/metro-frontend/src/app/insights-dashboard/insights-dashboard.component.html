@@ -210,7 +210,9 @@
       </mat-card>
     </div>
 
-    @if (railStatusCodes().length > 0 || specialRailLineFavoriteCodes().length > 0) {
+    @if (
+      railStatusCodes().length > 0 || specialRailLineFavoriteCodes().length > 0
+    ) {
       <section class="status-section">
         <app-line-status-grid
           headerText="Status das linhas favoritas"

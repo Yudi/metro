@@ -33,7 +33,7 @@ export class Contacts implements OnInit {
             ? agency.type
             : 'other';
         this.organizedAgencies[type].push({ agencyKey, ...agency });
-      }
+      },
     );
 
     this.organizedAgencies.rail.sort((a, b) => {

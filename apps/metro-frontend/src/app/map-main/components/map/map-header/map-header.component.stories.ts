@@ -35,14 +35,14 @@ export const Default: Story = {
   play: async ({ canvasElement }) => {
     // Fit-to-all should be enabled
     const fitBtn = canvasElement.querySelector(
-      'button[aria-label="Ajustar para todas as features"]'
+      'button[aria-label="Ajustar para todas as features"]',
     ) as HTMLButtonElement | null;
     if (!fitBtn) throw new Error('Fit button not found');
     if (fitBtn.disabled) throw new Error('Fit button should be enabled');
 
     // Clear button should not be present when no selections
     const clearBtn = canvasElement.querySelector(
-      'button[aria-label="Limpar todas as seleções"]'
+      'button[aria-label="Limpar todas as seleções"]',
     );
     if (clearBtn) throw new Error('Clear button should not be present');
   },
@@ -56,7 +56,7 @@ export const WithSelections: Story = {
   },
   play: async ({ canvasElement }) => {
     const clearBtn = canvasElement.querySelector(
-      'button[aria-label="Limpar todas as seleções"]'
+      'button[aria-label="Limpar todas as seleções"]',
     ) as HTMLButtonElement | null;
     if (!clearBtn) throw new Error('Clear button not found');
     if (clearBtn.disabled) throw new Error('Clear button should be enabled');
@@ -74,7 +74,7 @@ export const NearbyMode: Story = {
   play: async ({ canvasElement }) => {
     // The 'Próximos' toggle should be active
     const nearbyToggle = Array.from(
-      canvasElement.querySelectorAll('button')
+      canvasElement.querySelectorAll('button'),
     ).find((b) => b.textContent?.includes('Próximos')) as
       | HTMLButtonElement
       | undefined;
@@ -94,7 +94,7 @@ export const NoFeatures: Story = {
   play: async ({ canvasElement }) => {
     // Fit-to-all should be disabled when there are no features
     const fitBtn = canvasElement.querySelector(
-      'button[aria-label="Ajustar para todas as features"]'
+      'button[aria-label="Ajustar para todas as features"]',
     ) as HTMLButtonElement | null;
     if (!fitBtn) throw new Error('Fit button not found');
     if (!fitBtn.disabled) throw new Error('Fit button should be disabled');

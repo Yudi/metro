@@ -38,9 +38,7 @@ export class LiteBusStopDetail {
 
   readonly routes = computed(() => this.stop().routes ?? []);
   readonly arrivalLines = computed(() => this.arrivals()?.p?.l ?? []);
-  readonly hasArrivals = computed(
-    () => this.arrivalLines().length > 0,
-  );
+  readonly hasArrivals = computed(() => this.arrivalLines().length > 0);
   readonly connectionMap = computed(() => {
     const map = new Map<string, LiteRouteRailConnection>();
     for (const connection of this.railConnections()) {
@@ -107,7 +105,8 @@ export class LiteBusStopDetail {
 
   getLineRailStations(line: LiteArrivalLine): LiteRouteRailConnectionStation[] {
     const connection =
-      this.connectionMap().get(line.c) ?? this.findConnectionByShortName(line.c);
+      this.connectionMap().get(line.c) ??
+      this.findConnectionByShortName(line.c);
 
     if (!connection) {
       return [];
@@ -135,7 +134,8 @@ export class LiteBusStopDetail {
 
   formatStationMeta(station: LiteRouteRailConnectionStation): string {
     const agencies = station.agencies.join(' + ');
-    const lines = station.lines.length > 0 ? ` · ${station.lines.join(', ')}` : '';
+    const lines =
+      station.lines.length > 0 ? ` · ${station.lines.join(', ')}` : '';
     return `${agencies}${lines}`;
   }
 

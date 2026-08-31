@@ -189,7 +189,9 @@ export class LiteSearchService {
         },
       )
       .pipe(
-        map((response) => this.processGraphQLResults(response.data?.search || [])),
+        map((response) =>
+          this.processGraphQLResults(response.data?.search || []),
+        ),
         switchMap((stops) => this.enrichBikeStations(stops)),
         map((stops) => {
           this.lastResults.set(stops);
@@ -247,7 +249,9 @@ export class LiteSearchService {
       );
   }
 
-  private enrichBikeStations(stops: LiteSearchStop[]): Observable<LiteSearchStop[]> {
+  private enrichBikeStations(
+    stops: LiteSearchStop[],
+  ): Observable<LiteSearchStop[]> {
     const bikeStationIds = stops
       .filter((s) => s.kind === 'bikeStation')
       .map((s) => s.stopId);
@@ -270,7 +274,9 @@ export class LiteSearchService {
     );
   }
 
-  private fetchBikeStationSummaries(): Observable<Map<string, LiteBikeAvailability>> {
+  private fetchBikeStationSummaries(): Observable<
+    Map<string, LiteBikeAvailability>
+  > {
     const query = `
       query LiteBikeStationsSummary {
         bikeStationsSummary {
@@ -296,7 +302,8 @@ export class LiteSearchService {
       .pipe(
         map((response) => {
           const resultMap = new Map<string, LiteBikeAvailability>();
-          for (const station of response.data?.bikeStationsSummary?.stations || []) {
+          for (const station of response.data?.bikeStationsSummary?.stations ||
+            []) {
             resultMap.set(station.stationId, station);
           }
           return resultMap;
@@ -319,7 +326,10 @@ export class LiteSearchService {
         : [];
     });
 
-    return [...findNextTrainStations(stop.name, stop.lineCodes), ...specialStations];
+    return [
+      ...findNextTrainStations(stop.name, stop.lineCodes),
+      ...specialStations,
+    ];
   }
 
   private fetchSpecialRailServices(): Observable<SpecialRailService[]> {
@@ -341,10 +351,9 @@ export class LiteSearchService {
     `;
 
     return this.http
-      .post<GraphQLResponse<{ railSpecialServices: SpecialRailService[] }>>(
-        `${this.baseUrl}/graphql`,
-        { query },
-      )
+      .post<
+        GraphQLResponse<{ railSpecialServices: SpecialRailService[] }>
+      >(`${this.baseUrl}/graphql`, { query })
       .pipe(
         map((response) => response.data?.railSpecialServices ?? []),
         map((services) => {
@@ -444,13 +453,14 @@ export class LiteSearchService {
     `;
 
     return this.http
-      .post<GraphQLResponse<{ routeRailConnectionsForStop: LiteRouteRailConnection[] }>>(
-        `${this.baseUrl}/graphql`,
-        {
-          query,
-          variables: { stopId, routeIds, radiusMeters },
-        },
-      )
+      .post<
+        GraphQLResponse<{
+          routeRailConnectionsForStop: LiteRouteRailConnection[];
+        }>
+      >(`${this.baseUrl}/graphql`, {
+        query,
+        variables: { stopId, routeIds, radiusMeters },
+      })
       .pipe(
         map((response) => response.data?.routeRailConnectionsForStop || []),
         catchError(() => of([])),

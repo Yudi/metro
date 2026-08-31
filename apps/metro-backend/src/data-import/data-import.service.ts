@@ -349,7 +349,9 @@ export class DataImportService implements OnModuleInit {
       extractedFiles.some((f) => f.fileName === fileName),
     );
 
-    const extractedFileNames = new Set(extractedFiles.map((file) => file.fileName));
+    const extractedFileNames = new Set(
+      extractedFiles.map((file) => file.fileName),
+    );
     for (const requiredFile of GTFSConfig.getRequiredFiles()) {
       if (!extractedFileNames.has(requiredFile)) {
         result.success = false;

@@ -97,18 +97,12 @@ type RailIntegrationMethod =
   | 'fetchRailStatusLines'
   | 'fetchSpecialRailStatusLines';
 
-type UnaryCallback = (
-  error: ServiceError | null,
-  response?: unknown,
-) => void;
+type UnaryCallback = (error: ServiceError | null, response?: unknown) => void;
 
 @Injectable()
 export class RailIntegrationClientService
   extends RailRealtimeSourcePort
-  implements
-    RailStatusSourcePort,
-    OnApplicationBootstrap,
-    OnModuleDestroy
+  implements RailStatusSourcePort, OnApplicationBootstrap, OnModuleDestroy
 {
   private readonly logger = new Logger(RailIntegrationClientService.name);
   private readonly target: string;
@@ -303,7 +297,9 @@ export class RailIntegrationClientService
 
     for (let attempt = 1; attempt <= this.maxAttempts; attempt += 1) {
       if (this.shutdownController.signal.aborted) {
-        throw createUnavailableError('Rail integration client is shutting down');
+        throw createUnavailableError(
+          'Rail integration client is shutting down',
+        );
       }
       try {
         await this.ensureReady();
@@ -333,10 +329,12 @@ export class RailIntegrationClientService
   }
 
   private ensureReady(): Promise<void> {
-    this.readinessPromise ??= this.performReadinessHandshake().catch((error) => {
-      this.readinessPromise = undefined;
-      throw error;
-    });
+    this.readinessPromise ??= this.performReadinessHandshake().catch(
+      (error) => {
+        this.readinessPromise = undefined;
+        throw error;
+      },
+    );
     return this.readinessPromise;
   }
 
@@ -369,10 +367,7 @@ export class RailIntegrationClientService
       const unaryCall = this.client[method] as (
         request: Record<string, unknown>,
         deadline: Date,
-        callback: (
-          error: ServiceError | null,
-          response?: unknown,
-        ) => void,
+        callback: (error: ServiceError | null, response?: unknown) => void,
       ) => unknown;
       const callback: UnaryCallback = (error, response) => {
         if (error) {
@@ -447,9 +442,7 @@ function waitForReady(client: Client, deadlineMs: number): Promise<void> {
 
 function isServiceError(error: unknown): error is ServiceError {
   return (
-    error instanceof Error &&
-    'code' in error &&
-    typeof error.code === 'number'
+    error instanceof Error && 'code' in error && typeof error.code === 'number'
   );
 }
 
@@ -476,7 +469,9 @@ function delay(milliseconds: number, signal: AbortSignal): Promise<void> {
     const onAbort = () => {
       clearTimeout(timeoutId);
       signal.removeEventListener('abort', onAbort);
-      reject(createUnavailableError('Rail integration client is shutting down'));
+      reject(
+        createUnavailableError('Rail integration client is shutting down'),
+      );
     };
     signal.addEventListener('abort', onAbort, { once: true });
   });

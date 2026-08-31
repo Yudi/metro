@@ -47,7 +47,9 @@ export class WFSDatabaseService {
       select: { id: true },
     });
 
-    this.logger.debug(`WFS dataset record updated for ${source}: #${dataset.id}`);
+    this.logger.debug(
+      `WFS dataset record updated for ${source}: #${dataset.id}`,
+    );
     return dataset;
   }
 

@@ -1,7 +1,9 @@
 import { Field, ObjectType } from '@nestjs/graphql';
 import type { SpecialRailService as SpecialRailServiceData } from '@metro/shared/utils';
 
-@ObjectType({ description: 'Station served by a runtime-discovered special service' })
+@ObjectType({
+  description: 'Station served by a runtime-discovered special service',
+})
 export class SpecialRailServiceStation {
   @Field()
   stationCode!: string;
@@ -17,7 +19,8 @@ export class SpecialRailServiceStation {
 }
 
 @ObjectType({
-  description: 'Special rail service currently available from the upstream provider',
+  description:
+    'Special rail service currently available from the upstream provider',
 })
 export class SpecialRailService implements SpecialRailServiceData {
   @Field()

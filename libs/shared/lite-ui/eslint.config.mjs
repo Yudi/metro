@@ -1,50 +1,50 @@
-import nx from '@nx/eslint-plugin';
-import baseConfig from '../../../eslint.base.config.mjs';
+import nx from "@nx/eslint-plugin";
+import baseConfig from "../../../eslint.base.config.mjs";
 
 export default [
   ...baseConfig,
   {
-    ignores: ['**/storybook-static/**'],
+    ignores: ["**/storybook-static/**"],
   },
   {
-    files: ['**/*.json'],
+    files: ["**/*.json"],
     rules: {
-      '@nx/dependency-checks': [
-        'error',
+      "@nx/dependency-checks": [
+        "error",
         {
-          ignoredFiles: ['{projectRoot}/eslint.config.{js,cjs,mjs,ts,cts,mts}'],
+          ignoredFiles: ["{projectRoot}/eslint.config.{js,cjs,mjs,ts,cts,mts}"],
         },
       ],
     },
     languageOptions: {
-      parser: await import('jsonc-eslint-parser'),
+      parser: await import("jsonc-eslint-parser"),
     },
   },
-  ...nx.configs['flat/angular'],
-  ...nx.configs['flat/angular-template'],
+  ...nx.configs["flat/angular"],
+  ...nx.configs["flat/angular-template"],
   {
-    files: ['**/*.ts'],
+    files: ["**/*.ts"],
     rules: {
-      '@angular-eslint/directive-selector': [
-        'error',
+      "@angular-eslint/directive-selector": [
+        "error",
         {
-          type: 'attribute',
-          prefix: 'lite',
-          style: 'camelCase',
+          type: "attribute",
+          prefix: "lite",
+          style: "camelCase",
         },
       ],
-      '@angular-eslint/component-selector': [
-        'error',
+      "@angular-eslint/component-selector": [
+        "error",
         {
-          type: 'element',
-          prefix: 'lite',
-          style: 'kebab-case',
+          type: "element",
+          prefix: "lite",
+          style: "kebab-case",
         },
       ],
     },
   },
   {
-    files: ['**/*.html'],
+    files: ["**/*.html"],
     // Override or add rules here
     rules: {},
   },

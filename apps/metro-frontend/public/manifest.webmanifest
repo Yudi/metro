@@ -6,10 +6,7 @@
   "display": "standalone",
   "scope": "/app/",
   "start_url": "/app/",
-  "categories": [
-    "transportation",
-    "utilities"
-  ],
+  "categories": ["transportation", "utilities"],
   "icons": [
     {
       "src": "/app/icons/icon-72x72.png",

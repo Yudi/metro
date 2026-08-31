@@ -63,9 +63,9 @@
             @if (getLineStatus(staticLine.code); as line) {
               @if (
                 line.description &&
-                line.statusCode !== 'OperacaoNormal' &&
-                line.statusCode !== 'OperacaoEncerrada' &&
-                line.statusCode !== 'DadosIndisponiveis'
+                line.statusCode !== "OperacaoNormal" &&
+                line.statusCode !== "OperacaoEncerrada" &&
+                line.statusCode !== "DadosIndisponiveis"
               ) {
                 <div class="line-description">
                   <mat-icon inline>warning</mat-icon>
@@ -84,7 +84,7 @@
 
       @if (lastUpdated()) {
         <p class="last-updated">
-          Atualizado às {{ lastUpdated() | date: 'HH:mm' }}
+          Atualizado às {{ lastUpdated() | date: "HH:mm" }}
         </p>
       }
     } @else if (!loadingStatus()) {

@@ -107,8 +107,7 @@ const MOCK_ROWS: HistoricalHeadwaySnapshot[] = [
 
 let activeArgs: HeadwayHistoryStoryArgs;
 
-function createMockRailGraphqlService(
-): Partial<RailGraphqlService> {
+function createMockRailGraphqlService(): Partial<RailGraphqlService> {
   return {
     fetchHistoricalHeadwaySnapshots: () => createMockFetchResponse(activeArgs),
   };
@@ -144,7 +143,9 @@ function createMockFetchResponse(
   }
 }
 
-function createRows(args: HeadwayHistoryStoryArgs): HistoricalHeadwaySnapshot[] {
+function createRows(
+  args: HeadwayHistoryStoryArgs,
+): HistoricalHeadwaySnapshot[] {
   const sourceRows = args.mockRows?.length > 0 ? args.mockRows : MOCK_ROWS;
 
   return Array.from({ length: args.rowCount }, (_, index) => {

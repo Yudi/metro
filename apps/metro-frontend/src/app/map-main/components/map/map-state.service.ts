@@ -37,7 +37,7 @@ export class MapStateService {
   readonly selectedRoutes = signal<Map<string, SelectedRoute>>(new Map());
   readonly selectedStops = signal<Map<string, SelectedStop>>(new Map());
   readonly selectedBikeStations = signal<Map<string, SelectedBikeStation>>(
-    new Map()
+    new Map(),
   );
 
   // Track routes derived from stop selections (for display only, no real-time)
@@ -69,18 +69,18 @@ export class MapStateService {
     () =>
       this.selectedRoutes().size > 0 ||
       this.selectedStops().size > 0 ||
-      this.selectedBikeStations().size > 0
+      this.selectedBikeStations().size > 0,
   );
 
   // Computed: Get selected route IDs as a Set (for backward compatibility)
   readonly selectedRouteIds = computed(
-    () => new Set(this.selectedRoutes().keys())
+    () => new Set(this.selectedRoutes().keys()),
   );
   readonly selectedStopIds = computed(
-    () => new Set(this.selectedStops().keys())
+    () => new Set(this.selectedStops().keys()),
   );
   readonly selectedBikeStationIds = computed(
-    () => new Set(this.selectedBikeStations().keys())
+    () => new Set(this.selectedBikeStations().keys()),
   );
 
   // Combined stops for display (subway stations + regular stops)
@@ -90,10 +90,10 @@ export class MapStateService {
   ]);
   readonly hasDisplayedData = computed(
     () =>
-      this.displayedRoutes().length > 0 || this.allDisplayedStops().length > 0
+      this.displayedRoutes().length > 0 || this.allDisplayedStops().length > 0,
   );
   readonly totalDisplayedStops = computed(
-    () => this.allDisplayedStops().length
+    () => this.allDisplayedStops().length,
   );
   readonly totalDisplayedRoutes = computed(() => this.displayedRoutes().length);
 
@@ -160,7 +160,7 @@ export class MapStateService {
   addRouteToDisplay(
     route: BusRouteGraphQL,
     sourceSelectionId?: string,
-    derivedFromStop = false
+    derivedFromStop = false,
   ): void {
     const currentRoutes = this.displayedRoutes();
     const exists = currentRoutes.find((r) => r.id === route.id);
@@ -222,7 +222,7 @@ export class MapStateService {
    */
   addShapeToDisplay(
     shape: BusShapeWithRoute,
-    sourceSelectionId?: string
+    sourceSelectionId?: string,
   ): void {
     const currentShapes = this.displayedShapes();
     const exists = currentShapes.find((s) => s.id === shape.id);
@@ -321,7 +321,7 @@ export class MapStateService {
       const stopIdsToRemove = new Set(stopsToRemove);
       const currentStops = this.displayedStops();
       this.displayedStops.set(
-        currentStops.filter((s) => !stopIdsToRemove.has(s.stopId))
+        currentStops.filter((s) => !stopIdsToRemove.has(s.stopId)),
       );
     }
 
@@ -329,7 +329,7 @@ export class MapStateService {
       const shapeIdsToRemove = new Set(shapesToRemove);
       const currentShapes = this.displayedShapes();
       this.displayedShapes.set(
-        currentShapes.filter((s) => !shapeIdsToRemove.has(s.shapeId))
+        currentShapes.filter((s) => !shapeIdsToRemove.has(s.shapeId)),
       );
     }
 
@@ -337,7 +337,7 @@ export class MapStateService {
       const routeIdsToRemove = new Set(routesToRemove);
       const currentRoutes = this.displayedRoutes();
       this.displayedRoutes.set(
-        currentRoutes.filter((r) => !routeIdsToRemove.has(r.routeId))
+        currentRoutes.filter((r) => !routeIdsToRemove.has(r.routeId)),
       );
 
       // Also update derived routes tracking

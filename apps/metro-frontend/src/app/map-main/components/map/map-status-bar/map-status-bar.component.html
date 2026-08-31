@@ -5,7 +5,7 @@
       <mat-icon>hourglass_empty</mat-icon>
       <span>Carregando...</span>
     </div>
-  } @else if (displayMode() === 'selected') {
+  } @else if (displayMode() === "selected") {
     <div class="status-chip">
       <mat-icon>route</mat-icon>
       <span>{{ routeCount() }} rotas</span>
@@ -18,7 +18,7 @@
       <mat-icon>visibility</mat-icon>
       <span>{{ visibleCount() }} visíveis</span>
     </div>
-  } @else if (displayMode() === 'nearby') {
+  } @else if (displayMode() === "nearby") {
     <div class="status-chip">
       <mat-icon>near_me</mat-icon>
       <span>{{ nearbyStopsCount() }} pontos</span>

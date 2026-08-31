@@ -10,7 +10,7 @@ export class DataImportHooksService {
   constructor(
     private readonly searchService: SearchService,
     private readonly subwayStationProcessor: SubwayStationProcessorService,
-    private readonly vectorTilesService: VectorTilesService
+    private readonly vectorTilesService: VectorTilesService,
   ) {}
 
   async onDataImportComplete(): Promise<void> {

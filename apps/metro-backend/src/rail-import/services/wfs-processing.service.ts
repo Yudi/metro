@@ -37,7 +37,10 @@ export class WFSProcessingService {
     const missingColumns = await this.findMissingTargetColumns();
     if (missingColumns.length > 0) {
       const formattedColumns = missingColumns
-        .map((column) => `${WFSConfig.EXTERNAL_SCHEMA}.${column.table_name}.${column.column_name}`)
+        .map(
+          (column) =>
+            `${WFSConfig.EXTERNAL_SCHEMA}.${column.table_name}.${column.column_name}`,
+        )
         .join(', ');
 
       throw new Error(
@@ -130,7 +133,9 @@ export class WFSProcessingService {
     }
 
     if (rows.length === 0) {
-      throw new Error(`GeoSampa WFS returned no usable features for ${source.typeName}`);
+      throw new Error(
+        `GeoSampa WFS returned no usable features for ${source.typeName}`,
+      );
     }
 
     const tempTable = this.quoteIdent(`wfs_${source.tableName}_import`);
@@ -341,25 +346,67 @@ export class WFSProcessingService {
         };
       case 'metro_line':
         return {
-          columns: ['primaryindex', 'lmt_nome', 'lmt_linom', 'lmt_empres', 'lmt_linha', 'geom'],
+          columns: [
+            'primaryindex',
+            'lmt_nome',
+            'lmt_linom',
+            'lmt_empres',
+            'lmt_linha',
+            'geom',
+          ],
           values: [
             primaryIndex,
-            this.optionalText(properties, ['nm_linha_metro_trem', 'lmt_nome', 'nome']),
-            this.optionalText(properties, ['nr_nome_linha', 'lmt_linom', 'nome_linha']),
-            this.optionalText(properties, ['nm_empresa_metro_trem', 'lmt_empres', 'empresa']),
-            this.optionalNumber(properties, ['cd_identificador_linha', 'lmt_linha', 'linha']),
+            this.optionalText(properties, [
+              'nm_linha_metro_trem',
+              'lmt_nome',
+              'nome',
+            ]),
+            this.optionalText(properties, [
+              'nr_nome_linha',
+              'lmt_linom',
+              'nome_linha',
+            ]),
+            this.optionalText(properties, [
+              'nm_empresa_metro_trem',
+              'lmt_empres',
+              'empresa',
+            ]),
+            this.optionalNumber(properties, [
+              'cd_identificador_linha',
+              'lmt_linha',
+              'linha',
+            ]),
             geometry,
             sourceSrid,
           ],
         };
       case 'trem_station':
         return {
-          columns: ['primaryindex', 'estacao', 'nr_linha', 'situacao', 'nm_linha', 'empresa', 'geom'],
+          columns: [
+            'primaryindex',
+            'estacao',
+            'nr_linha',
+            'situacao',
+            'nm_linha',
+            'empresa',
+            'geom',
+          ],
           values: [
             primaryIndex,
-            this.requiredText(properties, ['nm_estacao_metro_trem', 'estacao', 'nome', 'name']),
-            this.optionalNumber(properties, ['cd_identificador_linha', 'nr_linha']),
-            this.optionalText(properties, ['tx_situacao_metro_trem', 'situacao']),
+            this.requiredText(properties, [
+              'nm_estacao_metro_trem',
+              'estacao',
+              'nome',
+              'name',
+            ]),
+            this.optionalNumber(properties, [
+              'cd_identificador_linha',
+              'nr_linha',
+            ]),
+            this.optionalText(properties, [
+              'tx_situacao_metro_trem',
+              'situacao',
+            ]),
             this.optionalText(properties, ['nm_linha_metro_trem', 'nm_linha']),
             this.optionalText(properties, ['nm_empresa_metro_trem', 'empresa']),
             geometry,
@@ -368,13 +415,26 @@ export class WFSProcessingService {
         };
       case 'trem_line':
         return {
-          columns: ['primaryindex', 'nr_linha', 'nm_linha', 'empresa', 'situacao', 'geom'],
+          columns: [
+            'primaryindex',
+            'nr_linha',
+            'nm_linha',
+            'empresa',
+            'situacao',
+            'geom',
+          ],
           values: [
             primaryIndex,
-            this.optionalNumber(properties, ['cd_identificador_linha', 'nr_linha']),
+            this.optionalNumber(properties, [
+              'cd_identificador_linha',
+              'nr_linha',
+            ]),
             this.optionalText(properties, ['nm_linha_metro_trem', 'nm_linha']),
             this.optionalText(properties, ['nm_empresa_metro_trem', 'empresa']),
-            this.optionalText(properties, ['tx_situacao_metro_trem', 'situacao']),
+            this.optionalText(properties, [
+              'tx_situacao_metro_trem',
+              'situacao',
+            ]),
             geometry,
             sourceSrid,
           ],
@@ -454,8 +514,7 @@ export class WFSProcessingService {
 
     const valid =
       (source.geometryKind === 'point' &&
-        ((geometry.type === 'Point' &&
-          this.isPosition(geometry.coordinates)) ||
+        ((geometry.type === 'Point' && this.isPosition(geometry.coordinates)) ||
           (geometry.type === 'MultiPoint' &&
             this.isPositionCollection(geometry.coordinates)))) ||
       (source.geometryKind === 'line' &&

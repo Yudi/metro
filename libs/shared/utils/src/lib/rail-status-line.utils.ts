@@ -61,7 +61,9 @@ export function buildRailStatusLine<
   } as TLine;
 }
 
-export function mergeRailStatusLineByPriority<TLine extends RailStatusLineShape>(
+export function mergeRailStatusLineByPriority<
+  TLine extends RailStatusLineShape,
+>(
   current: TLine,
   candidate: TLine,
   options: RailStatusMergeOptions = {},

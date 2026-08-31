@@ -116,9 +116,7 @@ export class BikeStationsService implements OnDestroy {
   }
 
   getStation(stationId: string): BikeStation | null {
-    return (
-      this.stations().find((item) => item.stationId === stationId) ?? null
-    );
+    return this.stations().find((item) => item.stationId === stationId) ?? null;
   }
 
   upsertStationSummary(summary: {

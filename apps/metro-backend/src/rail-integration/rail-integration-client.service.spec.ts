@@ -159,9 +159,7 @@ describe('RailIntegrationClientService', () => {
       status.INVALID_ARGUMENT,
       'lineCode must be a non-empty string',
     );
-    const getStationCodes = jest.fn(
-      unaryFailure(invalidArgument),
-    );
+    const getStationCodes = jest.fn(unaryFailure(invalidArgument));
     const service = createServiceWithClient({ getStationCodes });
 
     await expect(service.getStationCodes('L11')).rejects.toBe(invalidArgument);

@@ -4,7 +4,10 @@ describe('CsvProcessingService', () => {
   const executeRaw = jest.fn().mockResolvedValue(1);
   const prisma = {
     $transaction: jest.fn((callback: (tx: unknown) => Promise<number>) =>
-      callback({ $executeRawUnsafe: executeRaw, $executeRaw: executeRaw } as never),
+      callback({
+        $executeRawUnsafe: executeRaw,
+        $executeRaw: executeRaw,
+      } as never),
     ),
   };
   let service: CsvProcessingService;
@@ -16,13 +19,15 @@ describe('CsvProcessingService', () => {
 
   it('skips malformed calendar rows while importing usable rows', async () => {
     await expect(
-      (service as never as {
-        importCalendar: (
-          tx: unknown,
-          rows: Record<string, string>[],
-          fileName: string,
-        ) => Promise<number>;
-      }).importCalendar(
+      (
+        service as never as {
+          importCalendar: (
+            tx: unknown,
+            rows: Record<string, string>[],
+            fileName: string,
+          ) => Promise<number>;
+        }
+      ).importCalendar(
         { $executeRawUnsafe: executeRaw, $executeRaw: executeRaw },
         [
           {
@@ -58,13 +63,15 @@ describe('CsvProcessingService', () => {
 
   it('accepts GTFS route fields that are optional or conditionally required', async () => {
     await expect(
-      (service as never as {
-        importRoutes: (
-          tx: unknown,
-          rows: Record<string, string>[],
-          fileName: string,
-        ) => Promise<number>;
-      }).importRoutes(
+      (
+        service as never as {
+          importRoutes: (
+            tx: unknown,
+            rows: Record<string, string>[],
+            fileName: string,
+          ) => Promise<number>;
+        }
+      ).importRoutes(
         { $executeRawUnsafe: executeRaw, $executeRaw: executeRaw },
         [
           {
@@ -85,13 +92,15 @@ describe('CsvProcessingService', () => {
 
   it('skips invalid stop sequences rather than storing zero', async () => {
     await expect(
-      (service as never as {
-        importStopTimes: (
-          tx: unknown,
-          rows: Record<string, string>[],
-          fileName: string,
-        ) => Promise<number>;
-      }).importStopTimes(
+      (
+        service as never as {
+          importStopTimes: (
+            tx: unknown,
+            rows: Record<string, string>[],
+            fileName: string,
+          ) => Promise<number>;
+        }
+      ).importStopTimes(
         { $executeRawUnsafe: executeRaw, $executeRaw: executeRaw },
         [
           {
@@ -109,21 +118,25 @@ describe('CsvProcessingService', () => {
   });
 
   it('keeps a route when only its optional color is malformed', async () => {
-    const count = await (service as never as {
-      importRoutes: (
-        tx: unknown,
-        rows: Record<string, string>[],
-        fileName: string,
-      ) => Promise<number>;
-    }).importRoutes(
+    const count = await (
+      service as never as {
+        importRoutes: (
+          tx: unknown,
+          rows: Record<string, string>[],
+          fileName: string,
+        ) => Promise<number>;
+      }
+    ).importRoutes(
       { $executeRawUnsafe: executeRaw, $executeRaw: executeRaw },
-      [{
-        route_id: 'route',
-        route_short_name: '100',
-        route_long_name: 'Centro',
-        route_type: '3',
-        route_color: 'not-a-color',
-      }],
+      [
+        {
+          route_id: 'route',
+          route_short_name: '100',
+          route_long_name: 'Centro',
+          route_type: '3',
+          route_color: 'not-a-color',
+        },
+      ],
       'routes.txt',
     );
 
@@ -132,8 +145,8 @@ describe('CsvProcessingService', () => {
   });
 
   it('propagates CSV counter errors instead of returning an authoritative zero', async () => {
-    await expect(service.countCsvRecords('/does/not/exist.csv')).rejects.toThrow(
-      'CSV record count failed',
-    );
+    await expect(
+      service.countCsvRecords('/does/not/exist.csv'),
+    ).rejects.toThrow('CSV record count failed');
   });
 });

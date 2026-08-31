@@ -72,13 +72,13 @@ export const SelectedSummary: Story = {
     if (chips.length < 3)
       throw new Error('Expected at least 3 chips for selected mode');
     const routeChip = Array.from(chips).find((c) =>
-      c.textContent?.includes('rotas')
+      c.textContent?.includes('rotas'),
     );
     const stopChip = Array.from(chips).find((c) =>
-      c.textContent?.includes('paradas')
+      c.textContent?.includes('paradas'),
     );
     const visibleChip = Array.from(chips).find((c) =>
-      c.textContent?.includes('visíveis')
+      c.textContent?.includes('visíveis'),
     );
     if (!routeChip || !stopChip || !visibleChip)
       throw new Error('Missing expected chips for selected mode');
@@ -116,10 +116,10 @@ export const NearbySummary: Story = {
   play: async ({ canvasElement }) => {
     const chips = canvasElement.querySelectorAll('.status-chip');
     const nearbyChip = Array.from(chips).find((c) =>
-      c.textContent?.includes('pontos')
+      c.textContent?.includes('pontos'),
     );
     const radiusChip = Array.from(chips).find((c) =>
-      c.textContent?.includes('m')
+      c.textContent?.includes('m'),
     );
     if (!nearbyChip) throw new Error('Nearby points chip missing');
     if (!radiusChip) throw new Error('Nearby radius chip missing');

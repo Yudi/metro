@@ -6,11 +6,7 @@ import { LineTrackingComponent } from '../line-tracking/line-tracking.component'
   selector: 'app-line-9',
   imports: [LineTrackingComponent],
   template: `
-    <app-line-tracking
-      lineCode="L9"
-      assetPrefix="l9"
-      [stations]="stations"
-    />
+    <app-line-tracking lineCode="L9" assetPrefix="l9" [stations]="stations" />
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

@@ -21,7 +21,10 @@ export interface VectorTileLayerConfig {
   tileUrl: string;
 }
 
-export function createInitialLayerVisibility(): Map<VectorTileLayerType, boolean> {
+export function createInitialLayerVisibility(): Map<
+  VectorTileLayerType,
+  boolean
+> {
   return new Map<VectorTileLayerType, boolean>([
     [VectorTileLayerType.RAIL_STATIONS, true],
     [VectorTileLayerType.RAIL_ROUTES, false],

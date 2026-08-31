@@ -42,9 +42,7 @@ export class GTFSDatabaseService {
       return false;
     }
 
-    const [shapeCount] = await this.prisma.$queryRaw<
-      Array<{ count: bigint }>
-    >`
+    const [shapeCount] = await this.prisma.$queryRaw<Array<{ count: bigint }>>`
       SELECT COUNT(*) AS count
       FROM "external_gtfs"."SPTrans_Shape"
       WHERE geom IS NOT NULL
@@ -64,7 +62,7 @@ export class GTFSDatabaseService {
    * Create or update GTFS dataset record (always replace with latest)
    */
   async createOrUpdateDataset(
-    dto: CreateGTFSDatasetDto
+    dto: CreateGTFSDatasetDto,
   ): Promise<GTFSDatasetResponseDto> {
     const dataset = await this.prisma.gTFSDataset.upsert({
       where: { fileHash: dto.fileHash },
@@ -113,7 +111,7 @@ export class GTFSDatabaseService {
    */
   async upsertDatasetFiles(
     datasetId: string,
-    files: GTFSFileInfo[]
+    files: GTFSFileInfo[],
   ): Promise<void> {
     try {
       for (const file of files) {
@@ -141,14 +139,14 @@ export class GTFSDatabaseService {
       }
 
       this.logger.debug(
-        `Upserted ${files.length} file records for dataset ${datasetId}`
+        `Upserted ${files.length} file records for dataset ${datasetId}`,
       );
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
         `Failed to upsert files for dataset ${datasetId}:`,
-        errorMessage
+        errorMessage,
       );
       throw new Error(`Database error: ${errorMessage}`);
     }
@@ -160,7 +158,7 @@ export class GTFSDatabaseService {
   async updateFileRecord(
     datasetId: string,
     fileName: string,
-    recordCount?: number
+    recordCount?: number,
   ): Promise<void> {
     try {
       await this.prisma.gTFSFile.update({
@@ -248,7 +246,7 @@ export class GTFSDatabaseService {
 
       for (const table of GTFSConfig.getRawTables()) {
         await this.prisma.$executeRawUnsafe(
-          `TRUNCATE TABLE "${GTFSConfig.EXTERNAL_SCHEMA}"."${table}" RESTART IDENTITY CASCADE`
+          `TRUNCATE TABLE "${GTFSConfig.EXTERNAL_SCHEMA}"."${table}" RESTART IDENTITY CASCADE`,
         );
         this.logger.debug(`Cleared ${table}`);
       }
@@ -261,5 +259,4 @@ export class GTFSDatabaseService {
       throw new Error(`Clear data failed: ${errorMessage}`);
     }
   }
-
 }

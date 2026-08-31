@@ -1,4 +1,10 @@
-import { Field, Float, Int, ObjectType, registerEnumType } from '@nestjs/graphql';
+import {
+  Field,
+  Float,
+  Int,
+  ObjectType,
+  registerEnumType,
+} from '@nestjs/graphql';
 import { ApiProperty } from '@nestjs/swagger';
 
 /**

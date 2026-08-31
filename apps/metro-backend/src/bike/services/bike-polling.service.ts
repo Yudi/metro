@@ -32,7 +32,7 @@ export class BikePollingService implements OnModuleInit, OnModuleDestroy {
   private readonly pollingCoordinator = new PollingCoordinator(
     this.logger,
     () => this.pollStations(),
-    15_000
+    15_000,
   );
 
   constructor(private readonly bikeApi: BikeApiService) {}
@@ -138,7 +138,7 @@ export class BikePollingService implements OnModuleInit, OnModuleDestroy {
 
     return (
       this.latestPayload.stations.find(
-        (station) => station.stationId === stationId
+        (station) => station.stationId === stationId,
       ) ?? null
     );
   }
@@ -160,17 +160,17 @@ export class BikePollingService implements OnModuleInit, OnModuleDestroy {
 
     // Update previous map for next delta computation
     this.previousSummaryMap = new Map(
-      newSummary.stations.map((s) => [s.stationId, s])
+      newSummary.stations.map((s) => [s.stationId, s]),
     );
 
     this.logger.debug(
       `Bike station data refreshed (${payload.stations.length} stations, ` +
-        `delta: +${this.latestDelta.added.length} ~${this.latestDelta.updated.length} -${this.latestDelta.removed.length})`
+        `delta: +${this.latestDelta.added.length} ~${this.latestDelta.updated.length} -${this.latestDelta.removed.length})`,
     );
   }
 
   private computeDelta(
-    newSummary: BikeStationsSummaryPayloadDto
+    newSummary: BikeStationsSummaryPayloadDto,
   ): DeltaChanges {
     const added: BikeStationSummaryDto[] = [];
     const updated: BikeStationDeltaDto[] = [];
@@ -207,7 +207,7 @@ export class BikePollingService implements OnModuleInit, OnModuleDestroy {
 
   private computeStationDelta(
     previous: BikeStationSummaryDto,
-    current: BikeStationSummaryDto
+    current: BikeStationSummaryDto,
   ): BikeStationDeltaDto | null {
     const delta: BikeStationDeltaDto = { stationId: current.stationId };
     let hasChanges = false;
@@ -244,14 +244,14 @@ export class BikePollingService implements OnModuleInit, OnModuleDestroy {
   }
 
   private buildSummaryPayload(
-    payload: BikeStationsPayloadDto
+    payload: BikeStationsPayloadDto,
   ): BikeStationsSummaryPayloadDto {
     return {
       lastUpdated: payload.lastUpdated,
       ttl: payload.ttl,
       fetchedAt: payload.fetchedAt,
       stations: payload.stations.map((station) =>
-        this.toStationSummary(station)
+        this.toStationSummary(station),
       ),
     };
   }

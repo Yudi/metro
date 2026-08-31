@@ -13,9 +13,11 @@ describe('WFSProcessingService', () => {
     });
 
     await expect(
-      (service as never as {
-        readResponseText: (response: Response) => Promise<string>;
-      }).readResponseText(
+      (
+        service as never as {
+          readResponseText: (response: Response) => Promise<string>;
+        }
+      ).readResponseText(
         new Response(body, { headers: { 'content-type': 'application/json' } }),
       ),
     ).rejects.toThrow('response exceeds');
@@ -25,8 +27,9 @@ describe('WFSProcessingService', () => {
     const executeRawUnsafe = jest.fn().mockResolvedValue(1);
     const tx = { $executeRawUnsafe: executeRawUnsafe };
     const prisma = {
-      $transaction: jest.fn(async (callback: (transaction: typeof tx) => Promise<number>) =>
-        callback(tx),
+      $transaction: jest.fn(
+        async (callback: (transaction: typeof tx) => Promise<number>) =>
+          callback(tx),
       ),
     };
     const service = new WFSProcessingService(prisma as never);
@@ -56,7 +59,9 @@ describe('WFSProcessingService', () => {
 
   it('does not replace a layer when it has no usable features', async () => {
     const transaction = jest.fn();
-    const service = new WFSProcessingService({ $transaction: transaction } as never);
+    const service = new WFSProcessingService({
+      $transaction: transaction,
+    } as never);
 
     await expect(
       service.replaceSourceTable(
@@ -81,8 +86,9 @@ describe('WFSProcessingService', () => {
     const executeRawUnsafe = jest.fn().mockResolvedValue(1);
     const tx = { $executeRawUnsafe: executeRawUnsafe };
     const prisma = {
-      $transaction: jest.fn(async (callback: (transaction: typeof tx) => Promise<number>) =>
-        callback(tx),
+      $transaction: jest.fn(
+        async (callback: (transaction: typeof tx) => Promise<number>) =>
+          callback(tx),
       ),
     };
     const service = new WFSProcessingService(prisma as never);
@@ -115,8 +121,9 @@ describe('WFSProcessingService', () => {
     const executeRawUnsafe = jest.fn().mockResolvedValue(1);
     const tx = { $executeRawUnsafe: executeRawUnsafe };
     const service = new WFSProcessingService({
-      $transaction: jest.fn(async (callback: (transaction: typeof tx) => Promise<number>) =>
-        callback(tx),
+      $transaction: jest.fn(
+        async (callback: (transaction: typeof tx) => Promise<number>) =>
+          callback(tx),
       ),
     } as never);
 
@@ -125,14 +132,19 @@ describe('WFSProcessingService', () => {
         WFSConfig.SOURCES.METRO_LINE,
         {
           type: 'FeatureCollection',
-          features: [{
-            type: 'Feature',
-            geometry: {
-              type: 'LineString',
-              coordinates: [[-46.6, -23.5], [-46.61, -23.51]],
+          features: [
+            {
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: [
+                  [-46.6, -23.5],
+                  [-46.61, -23.51],
+                ],
+              },
+              properties: { cd_identificador_linha: 'unknown' },
             },
-            properties: { cd_identificador_linha: 'unknown' },
-          }],
+          ],
         },
         4326,
       ),
@@ -141,18 +153,22 @@ describe('WFSProcessingService', () => {
 
   it('rejects a one-point line before PostGIS can abort the transaction', async () => {
     const transaction = jest.fn();
-    const service = new WFSProcessingService({ $transaction: transaction } as never);
+    const service = new WFSProcessingService({
+      $transaction: transaction,
+    } as never);
 
     await expect(
       service.replaceSourceTable(
         WFSConfig.SOURCES.METRO_LINE,
         {
           type: 'FeatureCollection',
-          features: [{
-            type: 'Feature',
-            geometry: { type: 'LineString', coordinates: [[-46.6, -23.5]] },
-            properties: {},
-          }],
+          features: [
+            {
+              type: 'Feature',
+              geometry: { type: 'LineString', coordinates: [[-46.6, -23.5]] },
+              properties: {},
+            },
+          ],
         },
         4326,
       ),

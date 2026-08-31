@@ -13,7 +13,10 @@ import {
   DashboardFavoriteSelections,
   FavoritesService,
 } from '@metro/shared/api';
-import { createRailStatusResponse, LINES_WITH_ISSUES } from '@metro/storybook-mocks';
+import {
+  createRailStatusResponse,
+  LINES_WITH_ISSUES,
+} from '@metro/storybook-mocks';
 import { FavoriteList, emptyFavorites } from '@metro/shared/utils';
 import { LiteRealtimeService } from '../../services/lite-realtime.service';
 import { Dashboard } from './dashboard';
@@ -92,14 +95,20 @@ function createRealtimeService(scenario: DashboardScenario) {
   };
 }
 
-function createHttpClient(scenario: DashboardScenario): Pick<HttpClient, 'post'> {
+function createHttpClient(
+  scenario: DashboardScenario,
+): Pick<HttpClient, 'post'> {
   return {
-    post: <T,>(url: string, body: unknown) => {
-      const query = typeof body === 'object' && body && 'query' in body
-        ? String((body as { query?: string }).query)
-        : '';
+    post: <T>(url: string, body: unknown) => {
+      const query =
+        typeof body === 'object' && body && 'query' in body
+          ? String((body as { query?: string }).query)
+          : '';
 
-      if (scenario === 'erroParcial' && query.includes('LiteDashboardBusFavorites')) {
+      if (
+        scenario === 'erroParcial' &&
+        query.includes('LiteDashboardBusFavorites')
+      ) {
         return of(null as T);
       }
 
@@ -249,7 +258,8 @@ const meta: Meta<Dashboard> = {
   tags: ['autodocs'],
   decorators: [
     componentWrapperDecorator(
-      (story) => `<main style="max-width: 960px; margin: 0 auto">${story}</main>`,
+      (story) =>
+        `<main style="max-width: 960px; margin: 0 auto">${story}</main>`,
     ),
   ],
 };

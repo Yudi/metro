@@ -127,57 +127,6 @@ export class RailTileService {
   }
 
   /**
-   * Generate MVT tile for subway stations (LEGACY - from SPTrans GTFS).
-   *
-   * @deprecated Use generateRailStationsTile instead.
-   */
-  async generateSubwayStationsTile(
-    z: number,
-    x: number,
-    y: number,
-  ): Promise<Buffer | null> {
-    const { minX, minY, maxX, maxY } = tileToBounds(z, x, y);
-
-    try {
-      const result = await this.prisma.$queryRaw<[{ mvt: Buffer }]>`
-        WITH bounds AS (
-          SELECT ST_Transform(
-            ST_MakeEnvelope(${minX}::float8, ${minY}::float8, ${maxX}::float8, ${maxY}::float8, 3857),
-            4326
-          ) AS geom
-        ),
-        mvtgeom AS (
-          SELECT
-            s.id,
-            s.stop_id,
-            s.name,
-            s.agencies::text[] as agencies,
-            s.route_short_names::text[] as route_short_names,
-            ST_AsMVTGeom(
-              ST_Transform(s.geom, 3857),
-              ST_MakeEnvelope(${minX}::float8, ${minY}::float8, ${maxX}::float8, ${maxY}::float8, 3857),
-              4096,
-              256,
-              true
-            ) AS geom
-          FROM mvt_subway_stations s, bounds b
-          WHERE ST_Intersects(s.geom, b.geom)
-        )
-        SELECT ST_AsMVT(mvtgeom.*, 'subway-stations', 4096, 'geom') AS mvt
-        FROM mvtgeom
-      `;
-
-      return result[0]?.mvt ?? null;
-    } catch (error) {
-      this.logger.error(
-        `Error generating subway stations tile (${z}/${x}/${y}):`,
-        error,
-      );
-      return null;
-    }
-  }
-
-  /**
    * Generate MVT tile for subway routes.
    */
   async generateSubwayRoutesTile(
@@ -229,8 +178,9 @@ export class RailTileService {
 
   private getRailLineMetadataValues(): Prisma.Sql {
     return Prisma.join(
-      RAIL_LINES.map((line) =>
-        Prisma.sql`(${line.code}::smallint, ${line.colorHex}::text, ${line.agency}::text)`,
+      RAIL_LINES.map(
+        (line) =>
+          Prisma.sql`(${line.code}::smallint, ${line.colorHex}::text, ${line.agency}::text)`,
       ),
     );
   }

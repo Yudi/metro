@@ -27,7 +27,7 @@ export class WsThrottlerGuard extends ThrottlerGuard {
         ttl,
         limit,
         blockDuration,
-        throttlerName
+        throttlerName,
       );
 
     const getThrottlerSuffix = (name: string) =>

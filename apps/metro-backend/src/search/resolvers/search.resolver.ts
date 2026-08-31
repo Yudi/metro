@@ -192,12 +192,7 @@ export class SearchResolver {
       | LineDocument
       | StationDocument
       | BikeStationDocument,
-    type:
-      | 'busStop'
-      | 'busRoute'
-      | 'railStation'
-      | 'railLine'
-      | 'bikeStation',
+    type: 'busStop' | 'busRoute' | 'railStation' | 'railLine' | 'bikeStation',
   ) {
     if (type === 'busRoute') {
       const route = document as RouteDocument;

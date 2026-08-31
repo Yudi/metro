@@ -13,7 +13,10 @@ import {
   LINES_WITH_ISSUES,
   createRailStatusResponse,
 } from '@metro/storybook-mocks';
-import { RailLinesStatusResponse, SpecialRailLineStatus } from '@metro/shared/utils';
+import {
+  RailLinesStatusResponse,
+  SpecialRailLineStatus,
+} from '@metro/shared/utils';
 import { Status } from './status';
 
 const specialServices: SpecialRailLineStatus[] = [
@@ -99,7 +102,8 @@ const meta: Meta<Status> = {
       ],
     }),
     componentWrapperDecorator(
-      (story) => `<main style="max-width: 720px; margin: 0 auto">${story}</main>`,
+      (story) =>
+        `<main style="max-width: 720px; margin: 0 auto">${story}</main>`,
     ),
   ],
 };

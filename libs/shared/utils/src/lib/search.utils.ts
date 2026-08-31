@@ -182,9 +182,7 @@ export function mapTypesenseStopToTransitSearchResult(
 
     return {
       id: stop.stop_id,
-      name: toTitleCase(
-        getCanonicalRailStationName(stop.stop_name, lineCodes),
-      ),
+      name: toTitleCase(getCanonicalRailStationName(stop.stop_name, lineCodes)),
       type: 'subway_station',
       description: stop.stop_desc || undefined,
       routes: lineNames,
@@ -196,7 +194,10 @@ export function mapTypesenseStopToTransitSearchResult(
     };
   }
 
-  if ((options.skipGtfsRailStations ?? true) && stop.is_subway_station === true) {
+  if (
+    (options.skipGtfsRailStations ?? true) &&
+    stop.is_subway_station === true
+  ) {
     return null;
   }
 

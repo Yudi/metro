@@ -41,7 +41,7 @@ export class TripService {
   constructor(
     private prisma: PrismaService,
     private busStopService: BusStopService,
-    private subwayStationService: SubwayStationService
+    private subwayStationService: SubwayStationService,
   ) {}
 
   async getTripsForRoute(routeId: string): Promise<Trip[]> {
@@ -54,7 +54,7 @@ export class TripService {
     }
 
     this.logger.debug(
-      `Using route ${route.route_id} (${route.route_short_name}) for trips`
+      `Using route ${route.route_id} (${route.route_short_name}) for trips`,
     );
 
     const trips = await this.prisma.$queryRaw<GtfsTripRow[]>`
@@ -67,7 +67,7 @@ export class TripService {
     this.logger.debug(
       `Found ${trips.length} trips with shapes: ${trips
         .map((t) => t.shape_id)
-        .join(', ')}`
+        .join(', ')}`,
     );
 
     return trips.map((trip) => ({
@@ -123,12 +123,10 @@ export class TripService {
 
     // Batch check which stops are subway stations for efficiency
     const stopIdList = stops.map((s) => s.stop_id);
-    const subwayStopIds = await this.busStopService.batchCheckSubwayStations(
-      stopIdList
-    );
-    const stopAgencies = await this.busStopService.batchGetStopAgencies(
-      stopIdList
-    );
+    const subwayStopIds =
+      await this.busStopService.batchCheckSubwayStations(stopIdList);
+    const stopAgencies =
+      await this.busStopService.batchGetStopAgencies(stopIdList);
 
     return stops.map((stop) => ({
       id: stop.stop_id,
@@ -168,7 +166,7 @@ export class TripService {
 
       // Filter using flexible matching logic from shared utility
       const matchingStops = allSubwayStops.filter((stop) =>
-        shouldMergeStations(mainStop.name, stop.stop_name)
+        shouldMergeStations(mainStop.name, stop.stop_name),
       );
 
       stopIdsToCheck = matchingStops.map((s) => s.stop_id);
@@ -180,13 +178,13 @@ export class TripService {
           stopIdsToCheck.length
         } matching subway stations: ${matchingStops
           .map((s) => s.stop_name)
-          .join(', ')}`
+          .join(', ')}`,
       );
     } else {
       // For regular bus stops, only check the specific stop (no merging)
       stopIdsToCheck = [stopId];
       this.logger.debug(
-        `getRoutesForStop("${stopId}") - bus stop, checking single stop only`
+        `getRoutesForStop("${stopId}") - bus stop, checking single stop only`,
       );
     }
 
@@ -226,7 +224,7 @@ export class TripService {
     this.logger.debug(
       `Found ${routes.length} routes for stop "${stopId}": ${routes
         .map((r) => r.route_short_name)
-        .join(', ')}`
+        .join(', ')}`,
     );
 
     return routes.map((route) => ({
@@ -251,5 +249,4 @@ export class TripService {
     `;
     return routes[0];
   }
-
 }

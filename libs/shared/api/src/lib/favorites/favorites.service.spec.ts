@@ -58,12 +58,32 @@ describe('favorites persistence contracts', () => {
     server.railLine = ['L4'];
 
     const removed = replayFavoriteOperations(server, [
-      operation({ operation: 'remove', type: 'railLine', code: 'L4', createdAt: 1 }),
-      operation({ operation: 'add', type: 'railLine', code: 'L4', createdAt: 2 }),
+      operation({
+        operation: 'remove',
+        type: 'railLine',
+        code: 'L4',
+        createdAt: 1,
+      }),
+      operation({
+        operation: 'add',
+        type: 'railLine',
+        code: 'L4',
+        createdAt: 2,
+      }),
     ]);
     const added = replayFavoriteOperations(server, [
-      operation({ operation: 'add', type: 'railLine', code: 'L4', createdAt: 1 }),
-      operation({ operation: 'remove', type: 'railLine', code: 'L4', createdAt: 2 }),
+      operation({
+        operation: 'add',
+        type: 'railLine',
+        code: 'L4',
+        createdAt: 1,
+      }),
+      operation({
+        operation: 'remove',
+        type: 'railLine',
+        code: 'L4',
+        createdAt: 2,
+      }),
     ]);
 
     expect(removed.railLine).toEqual(['L4']);

@@ -5,11 +5,7 @@ import {
   Kind,
   SelectionSetNode,
 } from 'graphql';
-import {
-  BadRequestException,
-  UseGuards,
-  ValidationPipe,
-} from '@nestjs/common';
+import { BadRequestException, UseGuards, ValidationPipe } from '@nestjs/common';
 import { GeographyServiceOptimized } from '../services/geography-optimized.service';
 import {
   BusStop,
@@ -206,10 +202,9 @@ export class GeographyResolver {
   async batchRoutesForStops(
     @Args('stopIds', { type: () => [String] }) stopIds: string[],
   ): Promise<StopRoutes[]> {
-    const routeMap =
-      await this.geographyService.getBatchRoutesForStops(
-        validateIdentifiers(stopIds, 'stopIds'),
-      );
+    const routeMap = await this.geographyService.getBatchRoutesForStops(
+      validateIdentifiers(stopIds, 'stopIds'),
+    );
     return Array.from(routeMap.entries()).map(([stopId, routeShortNames]) => ({
       stopId,
       routeShortNames,
@@ -399,11 +394,7 @@ export class GeographyResolver {
 
 function requestsRouteDetails(info: GraphQLResolveInfo): boolean {
   const routeSelectionSets = info.fieldNodes.flatMap((fieldNode) =>
-    findFieldSelectionSets(
-      fieldNode.selectionSet,
-      'routes',
-      info.fragments,
-    ),
+    findFieldSelectionSets(fieldNode.selectionSet, 'routes', info.fragments),
   );
   return routeSelectionSets.some((selectionSet) =>
     selectionSetHasAnyField(

@@ -266,7 +266,9 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
     return this.staticCompositions()
       .filter(
         (composition) =>
-          !visibleDirections.has(hardNormalizeString(composition.directionName)),
+          !visibleDirections.has(
+            hardNormalizeString(composition.directionName),
+          ),
       )
       .map((composition) => ({
         terminal: composition.directionName,

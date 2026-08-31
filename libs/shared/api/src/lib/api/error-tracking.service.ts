@@ -227,7 +227,11 @@ function sanitizeError(error: unknown): {
     'name' in error &&
     'message' in error
   ) {
-    const structured = error as { name: unknown; message: unknown; stack?: unknown };
+    const structured = error as {
+      name: unknown;
+      message: unknown;
+      stack?: unknown;
+    };
     return {
       name: String(structured.name).slice(0, 160),
       message: redactString(String(structured.message), 500),
@@ -241,9 +245,7 @@ function sanitizeError(error: unknown): {
   return {
     name: normalized.name,
     message: redactString(normalized.message, 500),
-    stack: normalized.stack
-      ? redactString(normalized.stack, 8_000)
-      : undefined,
+    stack: normalized.stack ? redactString(normalized.stack, 8_000) : undefined,
   };
 }
 
@@ -278,12 +280,18 @@ function redactString(value: string, maximumLength: number): string {
 }
 
 function createEventId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+  if (
+    typeof crypto !== 'undefined' &&
+    typeof crypto.randomUUID === 'function'
+  ) {
     return crypto.randomUUID();
   }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => {
-    const random = Math.floor(Math.random() * 16);
-    const value = character === 'x' ? random : (random & 0x3) | 0x8;
-    return value.toString(16);
-  });
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(
+    /[xy]/g,
+    (character) => {
+      const random = Math.floor(Math.random() * 16);
+      const value = character === 'x' ? random : (random & 0x3) | 0x8;
+      return value.toString(16);
+    },
+  );
 }

@@ -3,36 +3,35 @@
     <div>
       <h2><a routerLink="/">←</a> Painel</h2>
       <p>
-        Favoritos sincronizados da versão completa quando você entra com o Google.
+        Favoritos sincronizados da versão completa quando você entra com o
+        Google.
       </p>
     </div>
 
     <div class="header-actions">
-      @if (authReady()) {
-        @if (firebaseUser(); as user) {
-          <span class="auth-status">
-            Sincronizado como {{ user.displayName || user.email || "Google" }}
-          </span>
-          <button
-            type="button"
-            class="secondary-button"
-            (click)="logout()"
-            [disabled]="authOperationPending()"
-          >
-            Sair
-          </button>
-        } @else {
-          <button
-            type="button"
-            class="secondary-button"
-            (click)="loginGoogle()"
-            [disabled]="authOperationPending()"
-          >
-            @if (authOperationPending()) { Entrando... } @else { Entrar com Google }
-          </button>
-        }
+      @if (authReady()) { @if (firebaseUser(); as user) {
+      <span class="auth-status">
+        Sincronizado como {{ user.displayName || user.email || "Google" }}
+      </span>
+      <button
+        type="button"
+        class="secondary-button"
+        (click)="logout()"
+        [disabled]="authOperationPending()"
+      >
+        Sair
+      </button>
       } @else {
-        <span class="auth-status">Verificando login...</span>
+      <button
+        type="button"
+        class="secondary-button"
+        (click)="loginGoogle()"
+        [disabled]="authOperationPending()"
+      >
+        @if (authOperationPending()) { Entrando... } @else { Entrar com Google }
+      </button>
+      } } @else {
+      <span class="auth-status">Verificando login...</span>
       }
 
       <button
@@ -48,8 +47,7 @@
 
   @if (authError()) {
   <div class="alert" role="alert">{{ authError() }}</div>
-  }
-  @if (error()) {
+  } @if (error()) {
   <div class="alert">{{ error() }}</div>
   } @if (lastLoadedAt()) {
   <p class="updated">Atualizado às {{ lastLoadedAt() | date: "HH:mm" }}</p>
@@ -67,7 +65,8 @@
       Use a versão completa para salvar pontos, linhas ou estações no painel.
     </p>
   </article>
-  } @else { @if (favoriteRailStatuses().length > 0 || favoriteSpecialRailStatuses().length > 0) {
+  } @else { @if (favoriteRailStatuses().length > 0 ||
+  favoriteSpecialRailStatuses().length > 0) {
   <section class="panel">
     <div class="panel-title">
       <span>🚆</span>
@@ -103,14 +102,12 @@
             !['Operação Normal', 'Operação Encerrada'].includes(statusDescription)
           ) {
           <p>{{ statusDescription }}</p>
-          }
-          @if (item.status?.detail) {
+          } @if (item.status?.detail) {
           <p>{{ item.status.detail }}</p>
           }
         </div>
       </article>
-      }
-      @for (line of favoriteSpecialRailStatuses(); track line.code) {
+      } @for (line of favoriteSpecialRailStatuses(); track line.code) {
       <article class="status-row">
         <span
           class="line-pill"

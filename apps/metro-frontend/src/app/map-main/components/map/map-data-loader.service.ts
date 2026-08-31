@@ -102,7 +102,7 @@ export class MapDataLoaderService {
           if (isSubwayRoute(route)) {
             this.logger.debug(
               'Skipping stop loading for subway route derived from stop',
-              { routeId: route.routeId, shortName: route.shortName }
+              { routeId: route.routeId, shortName: route.shortName },
             );
             continue;
           }
@@ -187,38 +187,14 @@ export class MapDataLoaderService {
     this.triggerDisplayUpdate();
   }
 
-  /**
-   * Load all subway stations automatically
-   * @deprecated Subway stations are now rendered via Vector Tiles (MVT)
-   * This method is kept for backwards compatibility but does nothing
-   */
-  loadSubwayStations(): void {
-    this.logger.debug(
-      'loadSubwayStations() called but subway stations are now rendered via Vector Tiles'
-    );
-    // No-op: Subway stations are now handled by VectorTileLayerService
-    // which renders MVT tiles directly from the backend
-  }
-
-  /**
-   * Load all subway routes and their shapes when subway routes layer is enabled
-   * @deprecated Subway routes are now rendered via Vector Tiles (MVT)
-   * This method is kept for backwards compatibility but does nothing
-   */
-  async loadAllSubwayRoutes(): Promise<void> {
-    this.logger.debug(
-      'loadAllSubwayRoutes() called but subway routes are now rendered via Vector Tiles'
-    );
-    // No-op: Subway routes are now handled by VectorTileLayerService
-    // which renders MVT tiles directly from the backend
-  }
-
   syncVectorTileFilters(): void {
     const selectedRoutes = Array.from(this.mapState.selectedRoutes().keys());
     const displayedRoutes = this.mapState
       .displayedRoutes()
       .map((route) => route.routeId);
-    const routeIds = Array.from(new Set([...selectedRoutes, ...displayedRoutes]));
+    const routeIds = Array.from(
+      new Set([...selectedRoutes, ...displayedRoutes]),
+    );
     const stopIds = Array.from(this.mapState.selectedStops().keys());
     const nearbyCenter = this.mapState.nearbyCenter();
     const nearby =

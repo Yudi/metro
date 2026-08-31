@@ -17,15 +17,19 @@ describe('GTFSDatabaseService', () => {
     service = new GTFSDatabaseService(prisma);
   });
 
-  const completeFiles = (shapeCount: number) => [
-    'agency.txt',
-    'calendar.txt',
-    'routes.txt',
-    'stops.txt',
-    'shapes.txt',
-    'trips.txt',
-    'stop_times.txt',
-  ].map((fileName) => ({ fileName, recordCount: fileName === 'shapes.txt' ? shapeCount : 100 }));
+  const completeFiles = (shapeCount: number) =>
+    [
+      'agency.txt',
+      'calendar.txt',
+      'routes.txt',
+      'stops.txt',
+      'shapes.txt',
+      'trips.txt',
+      'stop_times.txt',
+    ].map((fileName) => ({
+      fileName,
+      recordCount: fileName === 'shapes.txt' ? shapeCount : 100,
+    }));
 
   describe('isCurrentHash', () => {
     it('propagates metadata read failures instead of treating them as a first import', async () => {
@@ -45,33 +49,39 @@ describe('GTFSDatabaseService', () => {
     });
 
     it('returns false when the matching dataset has no shape geometries', async () => {
-      findMany.mockResolvedValue([{
-        id: 'dataset-id',
-        fileHash: 'current-hash',
-        gtfsFiles: completeFiles(100),
-      }]);
+      findMany.mockResolvedValue([
+        {
+          id: 'dataset-id',
+          fileHash: 'current-hash',
+          gtfsFiles: completeFiles(100),
+        },
+      ]);
       queryRaw.mockResolvedValue([{ count: BigInt(0) }]);
 
       await expect(service.isCurrentHash('current-hash')).resolves.toBe(false);
     });
 
     it('returns false when shapes.txt was not imported successfully', async () => {
-      findMany.mockResolvedValue([{
-        id: 'dataset-id',
-        fileHash: 'current-hash',
-        gtfsFiles: completeFiles(0),
-      }]);
+      findMany.mockResolvedValue([
+        {
+          id: 'dataset-id',
+          fileHash: 'current-hash',
+          gtfsFiles: completeFiles(0),
+        },
+      ]);
 
       await expect(service.isCurrentHash('current-hash')).resolves.toBe(false);
       expect(queryRaw).not.toHaveBeenCalled();
     });
 
     it('returns true when the matching dataset has shape geometries', async () => {
-      findMany.mockResolvedValue([{
-        id: 'dataset-id',
-        fileHash: 'current-hash',
-        gtfsFiles: completeFiles(100),
-      }]);
+      findMany.mockResolvedValue([
+        {
+          id: 'dataset-id',
+          fileHash: 'current-hash',
+          gtfsFiles: completeFiles(100),
+        },
+      ]);
       queryRaw.mockResolvedValue([{ count: BigInt(42) }]);
 
       await expect(service.isCurrentHash('current-hash')).resolves.toBe(true);

@@ -15,11 +15,7 @@ import {
   DashboardFavoriteSelections,
   FavoritesService,
 } from '@metro/shared/api';
-import {
-  AuthService,
-  authReady,
-  firebaseUser,
-} from '@metro/shared/firebase';
+import { AuthService, authReady, firebaseUser } from '@metro/shared/firebase';
 import {
   FavoriteRailLineOption,
   ExtendedNextTrainLineCode,
@@ -157,11 +153,15 @@ export class Dashboard {
   readonly error = signal<string | null>(null);
   readonly lastLoadedAt = signal<Date | null>(null);
   readonly favorites = signal<FavoriteList | null>(null);
-  readonly dashboardSelections = signal<DashboardFavoriteSelections | null>(null);
+  readonly dashboardSelections = signal<DashboardFavoriteSelections | null>(
+    null,
+  );
   readonly busRoutesById = signal(new Map<string, BusRouteInsight>());
   readonly busStopsById = signal(new Map<string, BusStopInsight>());
   readonly busRoutesByStopId = signal(new Map<string, BusRouteGraphQL[]>());
-  readonly busArrivalsByStopId = signal(new Map<string, LiteStopArrivalUpdate>());
+  readonly busArrivalsByStopId = signal(
+    new Map<string, LiteStopArrivalUpdate>(),
+  );
   readonly mergedRailStations = signal<MergedRailStationInsight[]>([]);
   readonly railStatus = signal<RailLinesStatusResponse | null>(null);
   readonly nextTrainGroups = signal<RailNextTrainGroup[]>([]);
@@ -709,7 +709,9 @@ export class Dashboard {
     return new Map(
       arrivals
         .filter(
-          (entry): entry is { stopId: string; arrival: LiteStopArrivalUpdate } =>
+          (
+            entry,
+          ): entry is { stopId: string; arrival: LiteStopArrivalUpdate } =>
             entry.arrival !== null,
         )
         .map((entry) => [entry.stopId, entry.arrival]),
@@ -722,8 +724,10 @@ export class Dashboard {
     response: BusFavoritesLookupResponse | null,
   ): void {
     const routesById = new Map(
-      response?.data?.multipleBusRoutes.map((route) => [route.routeId, route]) ??
-        [],
+      response?.data?.multipleBusRoutes.map((route) => [
+        route.routeId,
+        route,
+      ]) ?? [],
     );
     const stopsById = new Map(
       response?.data?.multipleBusStops.map((stop) => [
@@ -784,5 +788,4 @@ export class Dashboard {
     this.railStatus.set(null);
     this.nextTrainGroups.set([]);
   }
-
 }

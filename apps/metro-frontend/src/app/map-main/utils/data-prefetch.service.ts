@@ -15,20 +15,6 @@ export class DataPrefetchService {
   private prefetchComplete = false;
 
   /**
-   * Prefetch critical data that's likely to be needed
-   * Should be called on app initialization
-   * @deprecated Subway data is now served via Vector Tiles (MVT) - no GraphQL prefetch needed
-   */
-  async prefetchCriticalData(): Promise<void> {
-    // Note: Subway stations and routes are now rendered via Vector Tiles (MVT)
-    // No need to prefetch them via GraphQL anymore
-    this.logger.debug(
-      'prefetchCriticalData() - subway data now served via Vector Tiles'
-    );
-    this.prefetchComplete = true;
-  }
-
-  /**
    * Prefetch data for a specific route (useful when user is likely to view it)
    */
   async prefetchRoute(routeId: string): Promise<void> {

@@ -299,8 +299,7 @@ export class StopSearchService {
             if (routeMap.has(result.stopId)) {
               const routes = routeMap.get(result.stopId) || [];
               // Update lineCodes from actual routes if available
-              const extractedLineCodes =
-                extractLineCodesFromRouteNames(routes);
+              const extractedLineCodes = extractLineCodesFromRouteNames(routes);
               const existingLineCodes = result.lineCodes || [];
               const allLineCodes = [
                 ...new Set([...existingLineCodes, ...extractedLineCodes]),

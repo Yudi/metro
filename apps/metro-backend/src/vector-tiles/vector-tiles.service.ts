@@ -97,6 +97,7 @@ export class VectorTilesService implements OnModuleInit, OnModuleDestroy {
   ): Promise<Buffer | null> {
     switch (layer) {
       case VectorTileLayer.RAIL_STATIONS:
+      case VectorTileLayer.SUBWAY_STATIONS:
         return this.railTiles.generateRailStationsTile(z, x, y);
       case VectorTileLayer.RAIL_ROUTES:
         return this.railTiles.generateRailRoutesTile(z, x, y);
@@ -106,8 +107,6 @@ export class VectorTilesService implements OnModuleInit, OnModuleDestroy {
         return this.busTiles.generateBusStopsTile(z, x, y, options);
       case VectorTileLayer.BIKE_STATIONS:
         return this.bikeTiles.generateBikeStationsTile(z, x, y);
-      case VectorTileLayer.SUBWAY_STATIONS:
-        return this.railTiles.generateSubwayStationsTile(z, x, y);
       case VectorTileLayer.SUBWAY_ROUTES:
         return this.railTiles.generateSubwayRoutesTile(z, x, y);
       default:

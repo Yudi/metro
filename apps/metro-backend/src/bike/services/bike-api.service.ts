@@ -31,9 +31,7 @@ export class BikeApiService {
     const fetchedAt = Date.now();
     const [information, statuses, vehicleTypes, pricingPlans] =
       await Promise.all([
-        this.gbfs.fetchFeed<GbfsStationInformationData>(
-          'station_information',
-        ),
+        this.gbfs.fetchFeed<GbfsStationInformationData>('station_information'),
         this.gbfs.fetchFeed<GbfsStationStatusData>('station_status'),
         this.gbfs.fetchFeed<GbfsVehicleTypesData>('vehicle_types'),
         this.gbfs.fetchFeed<GbfsPricingPlansData>('system_pricing_plans'),
@@ -178,9 +176,7 @@ export class BikeApiService {
     };
   }
 
-  private localizedText(
-    values: { text: string; language: string }[],
-  ): string {
+  private localizedText(values: { text: string; language: string }[]): string {
     return (
       values.find((value) => value.language === 'pt')?.text ??
       values.find((value) => value.language === 'en')?.text ??
@@ -195,7 +191,9 @@ export class BikeApiService {
       : 'OUT_OF_SERVICE';
   }
 
-  private toUnixSeconds(timestamp: GbfsResponse<unknown>['last_updated']): number {
+  private toUnixSeconds(
+    timestamp: GbfsResponse<unknown>['last_updated'],
+  ): number {
     const milliseconds = Date.parse(timestamp);
     if (!Number.isFinite(milliseconds)) {
       throw new Error(`Invalid GBFS timestamp: ${timestamp}`);

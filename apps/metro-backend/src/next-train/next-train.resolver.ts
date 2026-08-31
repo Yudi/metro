@@ -190,10 +190,7 @@ export class NextTrainResolver {
     }
 
     const lineCodeStr = `L${lineCode}` as 'L10' | 'L11' | 'L12' | 'L13';
-    const publicStation = findApi1RailStationByName(
-      lineCodeStr,
-      stationName,
-    );
+    const publicStation = findApi1RailStationByName(lineCodeStr, stationName);
 
     if (!publicStation) {
       return null;

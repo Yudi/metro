@@ -61,24 +61,16 @@ describe('NextTrainPollingService', () => {
 
   it('allows Expresso Aeroporto arrivals up to 40 minutes early or late', () => {
     expect(
-      isExpressoAeroportoScheduledAt(
-        new Date('2026-06-05T04:20:00-03:00'),
-      ),
+      isExpressoAeroportoScheduledAt(new Date('2026-06-05T04:20:00-03:00')),
     ).toBe(true);
     expect(
-      isExpressoAeroportoScheduledAt(
-        new Date('2026-06-05T04:19:00-03:00'),
-      ),
+      isExpressoAeroportoScheduledAt(new Date('2026-06-05T04:19:00-03:00')),
     ).toBe(false);
     expect(
-      isExpressoAeroportoScheduledAt(
-        new Date('2026-06-05T00:40:00-03:00'),
-      ),
+      isExpressoAeroportoScheduledAt(new Date('2026-06-05T00:40:00-03:00')),
     ).toBe(true);
     expect(
-      isExpressoAeroportoScheduledAt(
-        new Date('2026-06-05T00:41:00-03:00'),
-      ),
+      isExpressoAeroportoScheduledAt(new Date('2026-06-05T00:41:00-03:00')),
     ).toBe(false);
   });
 
@@ -350,10 +342,7 @@ describe('NextTrainPollingService', () => {
 
     await (
       service as unknown as {
-        fetchAndCacheKey(
-          key: string,
-          timestamp: number,
-        ): Promise<unknown>;
+        fetchAndCacheKey(key: string, timestamp: number): Promise<unknown>;
       }
     ).fetchAndCacheKey(
       'L9:HBR',

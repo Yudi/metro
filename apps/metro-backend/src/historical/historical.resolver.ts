@@ -33,8 +33,13 @@ export class HistoricalResolver {
     })
     offset?: number,
   ): Promise<HistoricalDataEntity> {
-    if (limit !== undefined && (!Number.isInteger(limit) || limit < 1 || limit > 500)) {
-      throw new BadRequestException('limit must be an integer between 1 and 500');
+    if (
+      limit !== undefined &&
+      (!Number.isInteger(limit) || limit < 1 || limit > 500)
+    ) {
+      throw new BadRequestException(
+        'limit must be an integer between 1 and 500',
+      );
     }
     if (
       offset !== undefined &&

@@ -3,11 +3,11 @@
 // components according to the Material 3 design spec.
 // Learn more about theming and how to use it for your application's
 // custom components at https://material.angular.dev/guide/theming
-@use '@angular/material' as mat;
+@use "@angular/material" as mat;
 
-@import 'ol/ol.css';
-@import '@fontsource-variable/inter/index.css';
-@import '@fontsource/material-symbols-outlined/index.css';
+@import "ol/ol.css";
+@import "@fontsource-variable/inter/index.css";
+@import "@fontsource/material-symbols-outlined/index.css";
 
 html {
   @include mat.theme(
@@ -16,7 +16,7 @@ html {
         primary: mat.$azure-palette,
         tertiary: mat.$blue-palette,
       ),
-      typography: 'Inter Variable',
+      typography: "Inter Variable",
       density: 0,
     )
   );
@@ -47,7 +47,7 @@ body {
 }
 
 .material-symbols-outlined {
-  font-family: 'Material Symbols Outlined';
+  font-family: "Material Symbols Outlined";
   font-weight: normal;
   font-style: normal;
   font-size: 24px;

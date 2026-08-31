@@ -414,5 +414,4 @@ export class FavoritesComponent {
         this.mergedRailStations.set(response?.data.mergedRailStations ?? []);
       });
   }
-
 }

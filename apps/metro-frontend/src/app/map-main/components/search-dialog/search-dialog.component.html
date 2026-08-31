@@ -44,7 +44,7 @@
       @if (isRequestingLocation()) {
         <mat-spinner diameter="20"></mat-spinner>
       } @else {
-        <mat-icon>{{ nearbySearch() ? 'near_me' : 'my_location' }}</mat-icon>
+        <mat-icon>{{ nearbySearch() ? "near_me" : "my_location" }}</mat-icon>
       }
     </button>
   </div>
@@ -63,9 +63,9 @@
       <div class="results-list">
         <p class="results-header">
           {{ searchResults().length }} resultado{{
-            searchResults().length === 1 ? '' : 's'
+            searchResults().length === 1 ? "" : "s"
           }}
-          encontrado{{ searchResults().length === 1 ? '' : 's' }}
+          encontrado{{ searchResults().length === 1 ? "" : "s" }}
         </p>
 
         @for (result of searchResults(); track result.id) {

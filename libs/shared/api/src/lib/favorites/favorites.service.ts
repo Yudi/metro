@@ -390,8 +390,10 @@ export class FavoritesService implements OnDestroy {
     }
 
     return (
-      (await this.db.favorites.where('scope').equals(this.activeScope).count()) >
-      0
+      (await this.db.favorites
+        .where('scope')
+        .equals(this.activeScope)
+        .count()) > 0
     );
   }
 
@@ -470,7 +472,10 @@ export class FavoritesService implements OnDestroy {
     void this.refreshSignals(scope, this.scopeGeneration);
   }
 
-  private async refreshSignals(scope: string, generation: number): Promise<void> {
+  private async refreshSignals(
+    scope: string,
+    generation: number,
+  ): Promise<void> {
     if (!this.db) {
       return;
     }
@@ -779,7 +784,9 @@ export class FavoritesService implements OnDestroy {
           continue;
         }
         if (!syncResult?.success) {
-          throw new Error(syncResult?.message ?? 'Favorite synchronization failed');
+          throw new Error(
+            syncResult?.message ?? 'Favorite synchronization failed',
+          );
         }
 
         await this.db?.outbox.bulkDelete(
@@ -817,7 +824,6 @@ export class FavoritesService implements OnDestroy {
 
     return response.data;
   }
-
 
   private requireSnapshot(value: FavoriteSnapshotResult | undefined): {
     revision: number;
@@ -867,9 +873,7 @@ export class FavoritesService implements OnDestroy {
         item.code === operation.code,
     );
     if (matching.length > 0) {
-      await this.db.outbox.bulkDelete(
-        matching.map((item) => item.operationId),
-      );
+      await this.db.outbox.bulkDelete(matching.map((item) => item.operationId));
     }
     await this.db.outbox.put(operation);
   }

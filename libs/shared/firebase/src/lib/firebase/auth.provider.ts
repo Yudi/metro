@@ -63,12 +63,18 @@ export class FirebaseAuthStateCoordinator {
 
     void tokenPromise
       .then((token) => {
-        if (generation === this.tokenRequestGeneration && this.currentUid === uid) {
+        if (
+          generation === this.tokenRequestGeneration &&
+          this.currentUid === uid
+        ) {
           this.setToken(token);
         }
       })
       .catch((error: unknown) => {
-        if (generation === this.tokenRequestGeneration && this.currentUid === uid) {
+        if (
+          generation === this.tokenRequestGeneration &&
+          this.currentUid === uid
+        ) {
           this.setToken(null);
         }
         console.error('Failed to obtain Firebase ID token', error);
@@ -118,15 +124,17 @@ export function provideAuth(config?: FirebaseAuthProviderConfig) {
       authState.handleIdTokenChanged(user);
     });
 
-    getRedirectResult(auth).then((result) => {
-      if (result?.user) {
-        authState.handleIdTokenChanged(result.user);
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          authState.handleIdTokenChanged(result.user);
+          authReady.set(true);
+          return;
+        }
+      })
+      .catch((error: unknown) => {
+        console.error('Failed to resolve Firebase redirect result', error);
         authReady.set(true);
-        return;
-      }
-    }).catch((error: unknown) => {
-      console.error('Failed to resolve Firebase redirect result', error);
-      authReady.set(true);
-    });
+      });
   });
 }

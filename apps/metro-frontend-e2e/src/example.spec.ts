@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 
-test('renders the project information route and navigation shell', async ({ page }) => {
+test('renders the project information route and navigation shell', async ({
+  page,
+}) => {
   await page.goto('/sobre');
 
   await expect(page).toHaveTitle(/Sobre \| Transporte Metropolitano/);

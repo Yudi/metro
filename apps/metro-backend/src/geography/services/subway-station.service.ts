@@ -15,12 +15,12 @@ export class SubwayStationService {
 
   constructor(
     private prisma: PrismaService,
-    private busStopService: BusStopService
+    private busStopService: BusStopService,
   ) {}
 
   async getSubwayStations(): Promise<BusStop[]> {
     this.logger.debug(
-      'getSubwayStations called - using GTFS route relationships'
+      'getSubwayStations called - using GTFS route relationships',
     );
 
     // First, let's see what subway/metro routes exist
@@ -37,7 +37,7 @@ export class SubwayStationService {
       ORDER BY route_short_name
     `;
     this.logger.debug(
-      `Found subway/metro routes: ${JSON.stringify(subwayRoutes)}`
+      `Found subway/metro routes: ${JSON.stringify(subwayRoutes)}`,
     );
 
     // Query for subway/metro stations by finding stops that serve routes with "METRÔ" or "CPTM" prefixes
@@ -62,9 +62,8 @@ export class SubwayStationService {
 
     // Transform the data to match BusStop interface
     const stopIdList = stopData.map((s) => s.stop_id);
-    const stopRouteInfo = await this.busStopService.batchGetStopRouteInfo(
-      stopIdList
-    );
+    const stopRouteInfo =
+      await this.busStopService.batchGetStopRouteInfo(stopIdList);
 
     const rawStations: BusStop[] = stopData.map((stop) => {
       const info = stopRouteInfo.get(stop.stop_id);
@@ -89,7 +88,7 @@ export class SubwayStationService {
     const mergedStations = this.mergeIdenticalStations(
       rawStations,
       SAO_PAULO_CITY_CENTER.latitude,
-      SAO_PAULO_CITY_CENTER.longitude
+      SAO_PAULO_CITY_CENTER.longitude,
     );
 
     return mergedStations;
@@ -98,7 +97,7 @@ export class SubwayStationService {
   private mergeIdenticalStations(
     stations: BusStop[],
     referenceLat: number,
-    referenceLon: number
+    referenceLon: number,
   ): BusStop[] {
     // Group stations by flexible name matching
     const stationGroups = new Map<string, BusStop[]>();
@@ -156,13 +155,13 @@ export class SubwayStationService {
             closest.latitude,
             closest.longitude,
             referenceLat,
-            referenceLon
+            referenceLon,
           );
           const currentDistance = haversineDistanceKm(
             current.latitude,
             current.longitude,
             referenceLat,
-            referenceLon
+            referenceLon,
           );
           return currentDistance < closestDistance ? current : closest;
         });
@@ -180,7 +179,7 @@ export class SubwayStationService {
         group.forEach((station) => {
           if (station.routeShortNames && station.routeShortNames.length > 0) {
             station.routeShortNames.forEach((name) =>
-              allRouteShortNames.add(name)
+              allRouteShortNames.add(name),
             );
           }
         });
@@ -206,5 +205,4 @@ export class SubwayStationService {
   private normalizeStationNameLocal(name: string): string {
     return normalizeStationName(name).toLowerCase();
   }
-
 }

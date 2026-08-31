@@ -43,7 +43,7 @@
       @if (isRequestingLocation()) {
         <mat-spinner diameter="20"></mat-spinner>
       } @else {
-        <mat-icon>{{ nearbyMode() ? 'near_me' : 'my_location' }}</mat-icon>
+        <mat-icon>{{ nearbyMode() ? "near_me" : "my_location" }}</mat-icon>
       }
     </button>
   </div>
@@ -53,7 +53,7 @@
       <div class="loading-container">
         <mat-spinner diameter="40"></mat-spinner>
         <p class="loading-text">
-          {{ nearbyMode() ? 'Buscando paradas próximas...' : 'Buscando...' }}
+          {{ nearbyMode() ? "Buscando paradas próximas..." : "Buscando..." }}
         </p>
       </div>
     } @else if (searchResults().length > 0) {
@@ -61,14 +61,14 @@
         <p class="results-header">
           @if (nearbyMode()) {
             {{ searchResults().length }} parada{{
-              searchResults().length === 1 ? '' : 's'
+              searchResults().length === 1 ? "" : "s"
             }}
-            próxima{{ searchResults().length === 1 ? '' : 's' }}
+            próxima{{ searchResults().length === 1 ? "" : "s" }}
           } @else {
             {{ searchResults().length }} resultado{{
-              searchResults().length === 1 ? '' : 's'
+              searchResults().length === 1 ? "" : "s"
             }}
-            encontrado{{ searchResults().length === 1 ? '' : 's' }}
+            encontrado{{ searchResults().length === 1 ? "" : "s" }}
           }
         </p>
 

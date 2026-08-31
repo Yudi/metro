@@ -1,5 +1,12 @@
 import { inject, Service } from '@angular/core';
-import { interval, map, Observable, shareReplay, startWith, switchMap } from 'rxjs';
+import {
+  interval,
+  map,
+  Observable,
+  shareReplay,
+  startWith,
+  switchMap,
+} from 'rxjs';
 import { RailGraphqlService } from '@metro/shared/api';
 
 @Service()

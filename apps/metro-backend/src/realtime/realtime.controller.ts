@@ -11,6 +11,6 @@ import { RealtimePollingService } from './services/realtime-polling.service';
 export class RealtimeController {
   constructor(
     private olhoVivoApi: OlhoVivoApiService,
-    private pollingService: RealtimePollingService
+    private pollingService: RealtimePollingService,
   ) {}
 }

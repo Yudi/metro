@@ -373,14 +373,11 @@ export class NextTrainPollingService implements OnModuleDestroy {
     ));
     const operationClosed = outOfSchedule
       ? false
-      : await this.shouldCloseOperation(
-          lineCode,
-          cached,
-          timestamp,
-        );
-    const { trains, isApiError } = operationClosed || outOfSchedule
-      ? { trains: [], isApiError: false }
-      : await this.fetchTrains(lineCode, stationCode);
+      : await this.shouldCloseOperation(lineCode, cached, timestamp);
+    const { trains, isApiError } =
+      operationClosed || outOfSchedule
+        ? { trains: [], isApiError: false }
+        : await this.fetchTrains(lineCode, stationCode);
     const newHash = this.computeHash(
       trains,
       isApiError,
@@ -558,8 +555,7 @@ export class NextTrainPollingService implements OnModuleDestroy {
         OFF_HOURS_START_MINUTES +
           OFF_HOURS_REMAINING_TRAINS_TOLERANCE_MINUTES &&
       minutes <
-        OFF_HOURS_END_MINUTES -
-          OFF_HOURS_REMAINING_TRAINS_TOLERANCE_MINUTES
+        OFF_HOURS_END_MINUTES - OFF_HOURS_REMAINING_TRAINS_TOLERANCE_MINUTES
     );
   }
 

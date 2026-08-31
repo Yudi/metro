@@ -137,10 +137,7 @@ export function isExpressoLinha10ScheduledAt(
 ): boolean {
   const { weekday, minutes } = getSaoPauloScheduleTime(now);
 
-  if (
-    EXPRESSO_LINHA_10_SCHEDULE.weekdaysOnly &&
-    !WEEKDAY_NAMES.has(weekday)
-  ) {
+  if (EXPRESSO_LINHA_10_SCHEDULE.weekdaysOnly && !WEEKDAY_NAMES.has(weekday)) {
     return false;
   }
 

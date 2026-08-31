@@ -60,7 +60,7 @@ export class RailService implements OnModuleInit {
     // If cache is stale but valid (< 10 min), return it and refresh in background
     if (this.isCacheStale() && this.cachedStatus) {
       this.logger.debug(
-        'Returning stale cached data, triggering background refresh'
+        'Returning stale cached data, triggering background refresh',
       );
       void this.fetchAndCacheStatus();
       return this.cachedStatus;
@@ -118,8 +118,8 @@ export class RailService implements OnModuleInit {
 
   /**
    * Fetch data from external APIs and cache it
-    * Uses prioritized sources with progressive fallbacks
-    * Merges data preferring valid statuses over "DadosIndisponiveis"
+   * Uses prioritized sources with progressive fallbacks
+   * Merges data preferring valid statuses over "DadosIndisponiveis"
    */
   private fetchAndCacheStatus(): Promise<RailLinesStatus> {
     if (this.refreshPromise) {
@@ -157,7 +157,7 @@ export class RailService implements OnModuleInit {
       this.cachedStatus = mergedStatus;
       this.lastFetchTime = new Date();
       this.logger.debug(
-        `Rail status cached successfully: ${mergedStatus.lines.length} lines`
+        `Rail status cached successfully: ${mergedStatus.lines.length} lines`,
       );
 
       // Save to Redis for persistence across restarts
@@ -184,7 +184,7 @@ export class RailService implements OnModuleInit {
         return {
           ...this.cachedStatus,
           errorMessage: `Status atualizado pela última vez às ${this.cachedStatus.lastUpdated.toLocaleTimeString(
-            'pt-BR'
+            'pt-BR',
           )}`,
         };
       }
@@ -198,7 +198,7 @@ export class RailService implements OnModuleInit {
         return {
           ...redisData,
           errorMessage: `Status atualizado pela última vez às ${redisData.lastUpdated.toLocaleTimeString(
-            'pt-BR'
+            'pt-BR',
           )}`,
         };
       }
@@ -210,7 +210,9 @@ export class RailService implements OnModuleInit {
   }
 
   private recordSourceDiagnostics(
-    result: Awaited<ReturnType<RailApiService['fetchMergedStatusWithDiagnostics']>>,
+    result: Awaited<
+      ReturnType<RailApiService['fetchMergedStatusWithDiagnostics']>
+    >,
   ): void {
     const event = JSON.stringify({
       event: 'rail_source_fetch',

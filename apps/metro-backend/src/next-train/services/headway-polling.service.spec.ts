@@ -46,7 +46,9 @@ describe('HeadwayPollingService', () => {
 
     await jest.advanceTimersByTimeAsync(2_000);
 
-    expect(externalRailProvider.fetchHeadwayObservations).toHaveBeenCalledTimes(1);
+    expect(externalRailProvider.fetchHeadwayObservations).toHaveBeenCalledTimes(
+      1,
+    );
     expect(externalRailProvider.fetchHeadwayObservations).toHaveBeenCalledWith(
       'L11',
       'LUZ',
@@ -132,13 +134,17 @@ describe('HeadwayPollingService', () => {
     await jest.advanceTimersByTimeAsync(1_000);
     await jest.advanceTimersByTimeAsync(10_000);
 
-    expect(externalRailProvider.fetchHeadwayObservations).toHaveBeenCalledTimes(1);
+    expect(externalRailProvider.fetchHeadwayObservations).toHaveBeenCalledTimes(
+      1,
+    );
 
     resolveFirstRequest();
     await Promise.resolve();
     await jest.advanceTimersByTimeAsync(1_000);
 
-    expect(externalRailProvider.fetchHeadwayObservations).toHaveBeenCalledTimes(2);
+    expect(externalRailProvider.fetchHeadwayObservations).toHaveBeenCalledTimes(
+      2,
+    );
 
     service.onModuleDestroy();
   });
@@ -174,7 +180,9 @@ describe('HeadwayPollingService', () => {
     ).pollStation('L11', 'LUZ');
 
     expect(railService.getLineStatus).toHaveBeenCalledWith(11);
-    expect(externalRailProvider.fetchHeadwayObservations).not.toHaveBeenCalled();
+    expect(
+      externalRailProvider.fetchHeadwayObservations,
+    ).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -213,10 +221,9 @@ describe('HeadwayPollingService', () => {
       ).pollStation('L11', 'LUZ');
 
       expect(railService.getLineStatus).toHaveBeenCalledWith(11);
-      expect(externalRailProvider.fetchHeadwayObservations).toHaveBeenCalledWith(
-        'L11',
-        'LUZ',
-      );
+      expect(
+        externalRailProvider.fetchHeadwayObservations,
+      ).toHaveBeenCalledWith('L11', 'LUZ');
     },
   );
 
@@ -304,7 +311,9 @@ describe('HeadwayPollingService', () => {
       await pollStation('L11', 'BAS');
 
       expect(railService.getLineStatus).toHaveBeenCalledTimes(2);
-      expect(externalRailProvider.fetchHeadwayObservations).not.toHaveBeenCalled();
+      expect(
+        externalRailProvider.fetchHeadwayObservations,
+      ).not.toHaveBeenCalled();
     },
   );
 });

@@ -34,7 +34,7 @@ export class PostGISService {
     }
 
     this.logger.debug(
-      `Found geometry for shape ${shapeId} with ${result[0].coordinates.length} coordinate points`
+      `Found geometry for shape ${shapeId} with ${result[0].coordinates.length} coordinate points`,
     );
 
     // Check which routes use this shape (for information only - shapes can be shared between routes)
@@ -55,7 +55,7 @@ export class PostGISService {
     this.logger.debug(
       `Shape ${shapeId} is shared by ${routeCheck.length} route(s): ${routeCheck
         .map((r) => r.route_short_name)
-        .join(', ')}`
+        .join(', ')}`,
     );
 
     return {
@@ -118,7 +118,7 @@ export class PostGISService {
     maxLat: number,
     minLng: number,
     maxLng: number,
-    limit = 100
+    limit = 100,
   ): Promise<
     Array<{
       id: number;
@@ -155,7 +155,7 @@ export class PostGISService {
    */
   async searchStops(
     searchTerm: string,
-    limit = 50
+    limit = 50,
   ): Promise<
     Array<{
       id: number;
@@ -303,7 +303,7 @@ export class PostGISService {
     lng1: number,
     lat1: number,
     lng2: number,
-    lat2: number
+    lat2: number,
   ): Promise<number> {
     const result = await this.prisma.$queryRaw<Array<{ distance: number }>>`
       SELECT ST_Distance(

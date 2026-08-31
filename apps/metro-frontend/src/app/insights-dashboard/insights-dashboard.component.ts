@@ -281,9 +281,9 @@ export class InsightsDashboardComponent {
   }
 
   getSelectedBusRouteKeys(stopId: string): string[] {
-    return this
-      .getSelectedBusRoutes(stopId)
-      .map((route) => this.getBusRouteSelectionKey(route));
+    return this.getSelectedBusRoutes(stopId).map((route) =>
+      this.getBusRouteSelectionKey(route),
+    );
   }
 
   getSelectedRailLines(station: RailStationInsight): FavoriteRailLineOption[] {
@@ -296,9 +296,7 @@ export class InsightsDashboardComponent {
     return station.lines.filter((line) => selectedLineIdSet.has(line.id));
   }
 
-  hasNextTrain(
-    line: FavoriteRailLineOption,
-  ): line is FavoriteRailLineOption & {
+  hasNextTrain(line: FavoriteRailLineOption): line is FavoriteRailLineOption & {
     stationCode: string;
     nextTrainLineCode: ExtendedNextTrainLineCode;
   } {
@@ -434,9 +432,7 @@ export class InsightsDashboardComponent {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((response) => {
-        this.mergedRailStations.set(
-          response?.data.mergedRailStations ?? [],
-        );
+        this.mergedRailStations.set(response?.data.mergedRailStations ?? []);
       });
   }
 
@@ -502,5 +498,4 @@ export class InsightsDashboardComponent {
   private getBusRouteSelectionKey(route: BusRouteGraphQL): string {
     return route.shortName || route.routeId;
   }
-
 }

@@ -14,7 +14,14 @@ class ZonelessTestModule {}
 NgModule({
   providers: [
     provideZonelessChangeDetection(),
-    { provide: ErrorHandler, useValue: { handleError: (error: unknown) => { throw error; } } },
+    {
+      provide: ErrorHandler,
+      useValue: {
+        handleError: (error: unknown) => {
+          throw error;
+        },
+      },
+    },
   ],
 })(ZonelessTestModule);
 
@@ -24,8 +31,8 @@ getTestBed().initTestEnvironment(
     { provide: COMPILER_OPTIONS, useValue: {}, multi: true },
   ]),
   {
-  errorOnUnknownElements: true,
-  errorOnUnknownProperties: true,
+    errorOnUnknownElements: true,
+    errorOnUnknownProperties: true,
   },
 );
 

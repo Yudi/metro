@@ -623,8 +623,7 @@ export class HeadwayPollingService implements OnModuleInit, OnModuleDestroy {
         OFF_HOURS_START_MINUTES +
           OFF_HOURS_REMAINING_TRAINS_TOLERANCE_MINUTES &&
       minutes <
-        OFF_HOURS_END_MINUTES -
-          OFF_HOURS_REMAINING_TRAINS_TOLERANCE_MINUTES
+        OFF_HOURS_END_MINUTES - OFF_HOURS_REMAINING_TRAINS_TOLERANCE_MINUTES
     );
   }
 

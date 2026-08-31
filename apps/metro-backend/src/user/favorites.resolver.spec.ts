@@ -116,10 +116,9 @@ describe('FavoritesResolver', () => {
         railLine: ['L4'],
       },
     });
-    expect(prisma.$transaction).toHaveBeenCalledWith(
-      expect.any(Function),
-      { isolationLevel: 'RepeatableRead' },
-    );
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: 'RepeatableRead',
+    });
   });
 
   it('bootstraps a fresh UID and uses an idempotent create for add', async () => {
@@ -133,11 +132,13 @@ describe('FavoritesResolver', () => {
       create: { id: 'new-user' },
     });
     expect(prisma.favorite.createMany).toHaveBeenCalledWith({
-      data: [{
-        userId: 'new-user',
-        type: FavoriteType.RailLine,
-        code: 'L4',
-      }],
+      data: [
+        {
+          userId: 'new-user',
+          type: FavoriteType.RailLine,
+          code: 'L4',
+        },
+      ],
       skipDuplicates: true,
     });
     expect(prisma.user.update).toHaveBeenCalledWith({

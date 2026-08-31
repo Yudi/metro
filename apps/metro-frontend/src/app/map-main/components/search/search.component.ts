@@ -362,5 +362,4 @@ export class SearchComponent {
         },
       });
   }
-
 }

@@ -62,7 +62,10 @@ function optionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
-function optionalPort(value: unknown, name: string): string | number | undefined {
+function optionalPort(
+  value: unknown,
+  name: string,
+): string | number | undefined {
   if (value === undefined || value === null || value === '') {
     return undefined;
   }

@@ -34,7 +34,11 @@ export const graphqlOperationLimitsRule: ValidationRule = (context) =>
           if (definition.kind !== Kind.OPERATION_DEFINITION) {
             continue;
           }
-          validateOperation(definition, fragments, context.reportError.bind(context));
+          validateOperation(
+            definition,
+            fragments,
+            context.reportError.bind(context),
+          );
         }
       },
     },
@@ -53,7 +57,10 @@ function validateOperation(
     reportError(
       new GraphQLError(
         `GraphQL operation ${operationName} exceeds maximum depth ${MAX_OPERATION_DEPTH}`,
-        { nodes: operation, extensions: { code: 'QUERY_DEPTH_LIMIT_EXCEEDED' } },
+        {
+          nodes: operation,
+          extensions: { code: 'QUERY_DEPTH_LIMIT_EXCEEDED' },
+        },
       ),
     );
   }
@@ -69,7 +76,10 @@ function validateOperation(
     reportError(
       new GraphQLError(
         `GraphQL operation ${operationName} exceeds maximum aliases ${MAX_OPERATION_ALIASES}`,
-        { nodes: operation, extensions: { code: 'QUERY_ALIAS_LIMIT_EXCEEDED' } },
+        {
+          nodes: operation,
+          extensions: { code: 'QUERY_ALIAS_LIMIT_EXCEEDED' },
+        },
       ),
     );
   }

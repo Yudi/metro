@@ -7,7 +7,7 @@ export const routes: Route[] = [
     canActivate: [SeoGuard],
     loadComponent: () =>
       import('./shared/layout/main-layout/main-layout').then(
-        (m) => m.MainLayout
+        (m) => m.MainLayout,
       ),
 
     children: [

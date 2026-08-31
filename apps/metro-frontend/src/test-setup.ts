@@ -19,7 +19,14 @@ class ZonelessTestModule {}
 NgModule({
   providers: [
     provideZonelessChangeDetection(),
-    { provide: ErrorHandler, useValue: { handleError: (error: unknown) => { throw error; } } },
+    {
+      provide: ErrorHandler,
+      useValue: {
+        handleError: (error: unknown) => {
+          throw error;
+        },
+      },
+    },
   ],
 })(ZonelessTestModule);
 

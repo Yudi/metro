@@ -22,7 +22,7 @@ export class FeatureFactoryService {
    */
   createStopFeature(
     stop: BusStopGraphQL,
-    creationSource: FeatureCreationSource = FeatureCreationSource.ROUTE_DISPLAY
+    creationSource: FeatureCreationSource = FeatureCreationSource.ROUTE_DISPLAY,
   ): Feature {
     const geometry = new Point(fromLonLat([stop.longitude, stop.latitude]));
     const feature = new Feature({ geometry });
@@ -46,10 +46,10 @@ export class FeatureFactoryService {
    */
   createShapeFeature(
     shape: BusShapeWithRoute,
-    creationSource: FeatureCreationSource = FeatureCreationSource.ROUTE_DISPLAY
+    creationSource: FeatureCreationSource = FeatureCreationSource.ROUTE_DISPLAY,
   ): Feature {
     const coordinates = shape.geometry.coordinates.map((coord: number[]) =>
-      fromLonLat([coord[0], coord[1]])
+      fromLonLat([coord[0], coord[1]]),
     );
     const geometry = new LineString(coordinates);
     const feature = new Feature({ geometry });
@@ -80,7 +80,7 @@ export class FeatureFactoryService {
    */
   createStopFeatures(
     stops: BusStopGraphQL[],
-    creationSource: FeatureCreationSource = FeatureCreationSource.ROUTE_DISPLAY
+    creationSource: FeatureCreationSource = FeatureCreationSource.ROUTE_DISPLAY,
   ): Feature[] {
     return stops.map((stop) => this.createStopFeature(stop, creationSource));
   }
@@ -90,20 +90,20 @@ export class FeatureFactoryService {
    */
   createShapeFeatures(
     shapes: BusShapeWithRoute[],
-    creationSource: FeatureCreationSource = FeatureCreationSource.ROUTE_DISPLAY
+    creationSource: FeatureCreationSource = FeatureCreationSource.ROUTE_DISPLAY,
   ): Feature[] {
     return shapes.map((shape) =>
-      this.createShapeFeature(shape, creationSource)
+      this.createShapeFeature(shape, creationSource),
     );
   }
 
   createBikeStationFeature(
     station: BikeStation,
     isSelected = false,
-    creationSource: FeatureCreationSource = FeatureCreationSource.BIKE
+    creationSource: FeatureCreationSource = FeatureCreationSource.BIKE,
   ): Feature {
     const geometry = new Point(
-      fromLonLat([station.longitude, station.latitude])
+      fromLonLat([station.longitude, station.latitude]),
     );
     const feature = new Feature({ geometry });
 

@@ -38,7 +38,6 @@ export class BusRouteServiceOptimized {
     return this.queryOptimization.getRoutesById(ids);
   }
 
-
   async getSubwayRoutes(): Promise<BusRoute[]> {
     // Optimized query: Get routes and shapes in one go using JOIN
     const routesWithShapes = await this.prisma.$queryRaw<

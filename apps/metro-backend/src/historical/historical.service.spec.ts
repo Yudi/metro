@@ -83,11 +83,11 @@ describe('HistoricalService public projection', () => {
     });
 
     expect(transaction.$queryRaw).toHaveBeenCalledTimes(1);
-    expect(transaction.historicalIncidentEvent.findFirst).toHaveBeenCalledTimes(1);
+    expect(transaction.historicalIncidentEvent.findFirst).toHaveBeenCalledTimes(
+      1,
+    );
     expect(transaction.historicalIncidentEvent.create).toHaveBeenCalledTimes(1);
-    expect(
-      transaction.$queryRaw.mock.invocationCallOrder[0],
-    ).toBeLessThan(
+    expect(transaction.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
       transaction.historicalIncidentEvent.findFirst.mock.invocationCallOrder[0],
     );
   });

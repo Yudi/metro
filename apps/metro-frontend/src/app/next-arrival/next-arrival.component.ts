@@ -272,5 +272,4 @@ export class NextArrivalComponent implements AfterViewInit {
       },
     });
   }
-
 }

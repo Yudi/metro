@@ -92,17 +92,6 @@ export class PositionResponse {
 }
 
 /**
- * Response from /Posicao/Linha endpoint (returns vehicles directly, not wrapped in lines)
- */
-export class LinePositionResponse {
-  @ApiProperty({ description: 'Reference time' })
-  hr!: string;
-
-  @ApiProperty({ description: 'Vehicle positions', type: [VehiclePosition] })
-  vs!: VehiclePosition[];
-}
-
-/**
  * Stop with arrival predictions
  */
 export class StopWithPredictions {

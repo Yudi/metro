@@ -10,7 +10,7 @@ import { MatButtonModule } from '@angular/material/button';
 function createMockRealtimeService(
   connected: boolean,
   vehicleCount: number,
-  stopCount: number
+  stopCount: number,
 ) {
   const POLL_INTERVAL_MS = 15000;
   const lastUpdateTimestamp = signal(Date.now());
@@ -35,8 +35,8 @@ function createMockRealtimeService(
             l: [],
             cacheTimestamp: Date.now(),
           },
-        ])
-      )
+        ]),
+      ),
     ),
     stopArrivals: signal(
       new Map(
@@ -54,8 +54,8 @@ function createMockRealtimeService(
             },
             cacheTimestamp: Date.now(),
           },
-        ])
-      )
+        ]),
+      ),
     ),
     POLL_INTERVAL_MS,
   };

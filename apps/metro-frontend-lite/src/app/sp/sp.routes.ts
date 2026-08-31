@@ -3,7 +3,8 @@ import { Route } from '@angular/router';
 export const routes: Route[] = [
   {
     path: 'painel',
-    loadComponent: () => import('./dashboard/dashboard').then((m) => m.Dashboard),
+    loadComponent: () =>
+      import('./dashboard/dashboard').then((m) => m.Dashboard),
   },
   {
     path: 'estado',

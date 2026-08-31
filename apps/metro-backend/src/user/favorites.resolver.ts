@@ -45,22 +45,25 @@ export class FavoritesResolver {
   ): Promise<FavoriteSnapshot> {
     await this.ensureUser(userId);
 
-    return this.prisma.$transaction(async (tx) => {
-      const [user, existing] = await Promise.all([
-        tx.user.findUniqueOrThrow({ where: { id: userId } }),
-        tx.favorite.findMany({
-          where: { userId },
-          take: MAX_FAVORITES_PER_USER,
-        }),
-      ]);
+    return this.prisma.$transaction(
+      async (tx) => {
+        const [user, existing] = await Promise.all([
+          tx.user.findUniqueOrThrow({ where: { id: userId } }),
+          tx.favorite.findMany({
+            where: { userId },
+            take: MAX_FAVORITES_PER_USER,
+          }),
+        ]);
 
-      return {
-        revision: user.favoritesRevision,
-        favorites: this.toFavoriteList(existing),
-      };
-    }, {
-      isolationLevel: 'RepeatableRead',
-    });
+        return {
+          revision: user.favoritesRevision,
+          favorites: this.toFavoriteList(existing),
+        };
+      },
+      {
+        isolationLevel: 'RepeatableRead',
+      },
+    );
   }
 
   @Mutation(() => MutationResponse)
@@ -71,34 +74,37 @@ export class FavoritesResolver {
   ): Promise<MutationResponse> {
     const normalizedCode = normalizeFavoriteCode(code);
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.user.upsert({
-        where: { id: userId },
-        update: {},
-        create: { id: userId },
-      });
-
-      const created = await tx.favorite.createMany({
-        data: [{ userId, type, code: normalizedCode }],
-        skipDuplicates: true,
-      });
-
-      const count = await tx.favorite.count({ where: { userId } });
-      if (count > MAX_FAVORITES_PER_USER) {
-        throw new BadRequestException(
-          `A user can have at most ${MAX_FAVORITES_PER_USER} favorites`,
-        );
-      }
-
-      if (created.count > 0) {
-        await tx.user.update({
+    await this.prisma.$transaction(
+      async (tx) => {
+        await tx.user.upsert({
           where: { id: userId },
-          data: { favoritesRevision: { increment: 1 } },
+          update: {},
+          create: { id: userId },
         });
-      }
-    }, {
-      isolationLevel: 'Serializable',
-    });
+
+        const created = await tx.favorite.createMany({
+          data: [{ userId, type, code: normalizedCode }],
+          skipDuplicates: true,
+        });
+
+        const count = await tx.favorite.count({ where: { userId } });
+        if (count > MAX_FAVORITES_PER_USER) {
+          throw new BadRequestException(
+            `A user can have at most ${MAX_FAVORITES_PER_USER} favorites`,
+          );
+        }
+
+        if (created.count > 0) {
+          await tx.user.update({
+            where: { id: userId },
+            data: { favoritesRevision: { increment: 1 } },
+          });
+        }
+      },
+      {
+        isolationLevel: 'Serializable',
+      },
+    );
 
     return { success: true, message: 'Added to favorites' };
   }
@@ -145,13 +151,15 @@ export class FavoritesResolver {
     @CurrentUserId() userId: string,
   ): Promise<FavoriteSyncResponse> {
     if (!Number.isInteger(expectedRevision) || expectedRevision < 0) {
-      throw new BadRequestException('Expected revision must be a non-negative integer');
+      throw new BadRequestException(
+        'Expected revision must be a non-negative integer',
+      );
     }
 
     const normalized = normalizeFavoriteListInput(favorites);
-    const desired = (Object.entries(normalized) as [FavoriteType, string[]][]).flatMap(
-      ([type, codes]) => codes.map((code) => ({ type, code })),
-    );
+    const desired = (
+      Object.entries(normalized) as [FavoriteType, string[]][]
+    ).flatMap(([type, codes]) => codes.map((code) => ({ type, code })));
 
     return this.prisma.$transaction(async (tx) => {
       await tx.user.upsert({

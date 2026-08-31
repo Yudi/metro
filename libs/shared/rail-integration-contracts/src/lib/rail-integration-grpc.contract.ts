@@ -13,13 +13,10 @@ import { loadSync } from '@grpc/proto-loader';
 
 export const RAIL_INTEGRATION_GRPC_PACKAGE =
   'metro.rail.integration.v1' as const;
-export const RAIL_INTEGRATION_GRPC_SERVICE =
-  'RailIntegrationService' as const;
+export const RAIL_INTEGRATION_GRPC_SERVICE = 'RailIntegrationService' as const;
 export const RAIL_INTEGRATION_GRPC_DEFAULT_PORT = 50051;
-export const RAIL_INTEGRATION_GRPC_DEFAULT_BIND_URL =
-  `0.0.0.0:${RAIL_INTEGRATION_GRPC_DEFAULT_PORT}`;
-export const RAIL_INTEGRATION_GRPC_DEFAULT_CLIENT_URL =
-  `localhost:${RAIL_INTEGRATION_GRPC_DEFAULT_PORT}`;
+export const RAIL_INTEGRATION_GRPC_DEFAULT_BIND_URL = `0.0.0.0:${RAIL_INTEGRATION_GRPC_DEFAULT_PORT}`;
+export const RAIL_INTEGRATION_GRPC_DEFAULT_CLIENT_URL = `localhost:${RAIL_INTEGRATION_GRPC_DEFAULT_PORT}`;
 export const RAIL_INTEGRATION_PROTO_FILENAME = 'rail-integration.proto';
 
 export type GrpcUnaryCallback<TResponse> = (

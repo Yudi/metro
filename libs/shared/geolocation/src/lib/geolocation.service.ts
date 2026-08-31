@@ -226,7 +226,7 @@ export class GeolocationService implements OnDestroy {
    * @returns Promise with the user's location, or null if denied/unavailable
    */
   requestLocation(
-    options: GeolocationRequestOptions = {}
+    options: GeolocationRequestOptions = {},
   ): Promise<UserLocation | null> {
     if (!this.isSupported()) {
       this.permission.set('unavailable');
@@ -256,7 +256,7 @@ export class GeolocationService implements OnDestroy {
             timeout: options.timeout,
             maximumAge: options.maximumAge,
           });
-        }
+        },
       );
 
       const userLocation: UserLocation = {
@@ -328,7 +328,7 @@ export class GeolocationService implements OnDestroy {
    * @returns Promise with the user's location
    */
   async getLocation(
-    options: GeolocationRequestOptions = {}
+    options: GeolocationRequestOptions = {},
   ): Promise<UserLocation | null> {
     // If we have a recent cached location, return it
     const maxAge = options.maximumAge ?? DEFAULT_OPTIONS.maximumAge;
@@ -391,7 +391,7 @@ export class GeolocationService implements OnDestroy {
           enableHighAccuracy: mergedOptions.enableHighAccuracy,
           timeout: mergedOptions.timeout,
           maximumAge: mergedOptions.maximumAge,
-        }
+        },
       );
 
       this.isTracking.set(true);
@@ -496,7 +496,7 @@ export class GeolocationService implements OnDestroy {
       window.removeEventListener(
         'deviceorientation',
         this.orientationHandler,
-        true
+        true,
       );
       this.orientationHandler = null;
     }

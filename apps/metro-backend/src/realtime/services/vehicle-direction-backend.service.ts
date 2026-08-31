@@ -28,7 +28,7 @@ export class VehicleDirectionBackendService {
           vehicle.p,
           vehicle.px,
           vehicle.py,
-          vehicle.ta
+          vehicle.ta,
         );
         if (heading !== null) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -46,7 +46,7 @@ export class VehicleDirectionBackendService {
     vehicleId: number,
     longitude: number,
     latitude: number,
-    isoTimestamp: string
+    isoTimestamp: string,
   ): number | null {
     const timestamp = Date.parse(isoTimestamp);
     if (Number.isNaN(timestamp)) return null;

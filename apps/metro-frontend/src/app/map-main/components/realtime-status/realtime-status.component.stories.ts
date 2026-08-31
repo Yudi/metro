@@ -8,11 +8,11 @@ function createMockRealtimeService(
   connected: boolean,
   vehicleCount: number,
   stopCount: number,
-  hasRecentUpdate: boolean
+  hasRecentUpdate: boolean,
 ) {
   const POLL_INTERVAL_MS = 15000;
   const lastUpdateTimestamp = signal(
-    hasRecentUpdate ? Date.now() : Date.now() - 20000
+    hasRecentUpdate ? Date.now() : Date.now() - 20000,
   );
 
   // Simulate polling behavior - reset timestamp every poll interval
@@ -35,8 +35,8 @@ function createMockRealtimeService(
             l: [],
             cacheTimestamp: Date.now(),
           },
-        ])
-      )
+        ]),
+      ),
     ),
     stopArrivals: signal(
       new Map(
@@ -54,8 +54,8 @@ function createMockRealtimeService(
             },
             cacheTimestamp: Date.now(),
           },
-        ])
-      )
+        ]),
+      ),
     ),
     POLL_INTERVAL_MS,
   };
@@ -199,7 +199,7 @@ export const CountdownProgress25: Story = {
                       cacheTimestamp: Date.now(),
                     },
                   ],
-                ])
+                ]),
               ),
               stopArrivals: signal(
                 new Map([
@@ -218,7 +218,7 @@ export const CountdownProgress25: Story = {
                       cacheTimestamp: Date.now(),
                     },
                   ],
-                ])
+                ]),
               ),
               POLL_INTERVAL_MS: 15000,
             };
@@ -259,7 +259,7 @@ export const CountdownProgress50: Story = {
                       cacheTimestamp: Date.now(),
                     },
                   ],
-                ])
+                ]),
               ),
               stopArrivals: signal(
                 new Map([
@@ -278,7 +278,7 @@ export const CountdownProgress50: Story = {
                       cacheTimestamp: Date.now(),
                     },
                   ],
-                ])
+                ]),
               ),
               POLL_INTERVAL_MS: 15000,
             };
@@ -319,7 +319,7 @@ export const CountdownProgress90: Story = {
                       cacheTimestamp: Date.now(),
                     },
                   ],
-                ])
+                ]),
               ),
               stopArrivals: signal(
                 new Map([
@@ -338,7 +338,7 @@ export const CountdownProgress90: Story = {
                       cacheTimestamp: Date.now(),
                     },
                   ],
-                ])
+                ]),
               ),
               POLL_INTERVAL_MS: 15000,
             };

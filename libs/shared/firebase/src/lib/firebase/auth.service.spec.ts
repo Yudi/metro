@@ -24,7 +24,9 @@ describe('AuthService', () => {
     signInWithPopup.mockReset();
     signInWithRedirect.mockReset();
     signOut.mockReset();
-    consoleError = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    consoleError = jest
+      .spyOn(console, 'error')
+      .mockImplementation(() => undefined);
   });
 
   afterEach(() => {

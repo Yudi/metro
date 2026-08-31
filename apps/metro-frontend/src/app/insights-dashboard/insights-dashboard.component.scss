@@ -31,8 +31,8 @@ h1 {
   display: grid;
   grid-template-columns: auto 1fr;
   grid-template-areas:
-    'icon value'
-    'icon label';
+    "icon value"
+    "icon label";
   align-items: center;
   column-gap: 12px;
   min-height: 82px;

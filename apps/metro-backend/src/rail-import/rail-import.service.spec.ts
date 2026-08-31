@@ -42,8 +42,8 @@ describe('RailImportService', () => {
       getAllDatasets: jest.fn().mockResolvedValue([]),
     };
     importLockService = {
-      withLock: jest.fn((_: string, __: string, action: () => Promise<unknown>) =>
-        action(),
+      withLock: jest.fn(
+        (_: string, __: string, action: () => Promise<unknown>) => action(),
       ),
     };
     railVectorTileService = { refreshMvtViews: jest.fn() };

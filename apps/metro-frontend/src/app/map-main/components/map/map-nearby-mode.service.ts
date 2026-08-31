@@ -79,14 +79,6 @@ export class MapNearbyModeService {
     this.dataLoader.refreshDisplayedData();
   }
 
-  toggleNearbyMode(): void {
-    if (this.mapState.displayMode() === 'nearby') {
-      this.deactivateNearbyMode();
-    } else {
-      this.activateNearbyMode();
-    }
-  }
-
   private async showNearbyStops(): Promise<void> {
     if (!this.geolocationService.isSupported()) {
       this.logger.warn('Geolocation not supported');

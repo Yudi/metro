@@ -36,7 +36,7 @@ export class GeographyCacheService {
   getSubwayStations(): Observable<BusStopGraphQL[]> {
     if (!this.subwayStationsCache) {
       this.subwayStationsCache = this.geographyService.getSubwayStations().pipe(
-        shareReplay(1) // Share and replay the last emission
+        shareReplay(1), // Share and replay the last emission
       );
     }
     return this.subwayStationsCache;

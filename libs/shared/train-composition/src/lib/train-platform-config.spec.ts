@@ -264,9 +264,9 @@ describe('train platform configuration', () => {
 
     expect(car2?.featureStacks).toHaveLength(1);
     expect(car2?.featureStacks[0]?.positionRatio).toBe(0.625);
-    expect(car2?.featureStacks[0]?.features.map((feature) => feature.id)).toEqual(
-      ['stairs-car-2-door-2', 'escalator-car-2-door-2'],
-    );
+    expect(
+      car2?.featureStacks[0]?.features.map((feature) => feature.id),
+    ).toEqual(['stairs-car-2-door-2', 'escalator-car-2-door-2']);
   });
 
   it('rejects station codes outside the canonical line station list', () => {

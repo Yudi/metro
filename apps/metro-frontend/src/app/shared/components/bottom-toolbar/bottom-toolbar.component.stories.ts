@@ -62,7 +62,10 @@ const mapItem: ToolbarItem = {
   },
 };
 
-function createItems(preset: ItemPreset, showQueryParams: boolean): ToolbarItem[] {
+function createItems(
+  preset: ItemPreset,
+  showQueryParams: boolean,
+): ToolbarItem[] {
   const itemsByPreset: Record<ItemPreset, ToolbarItem[]> = {
     principal: baseItems,
     mapa: [baseItems[0], baseItems[1], mapItem, baseItems[2], baseItems[4]],

@@ -1,11 +1,7 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { firstValueFrom } from 'rxjs';
-import {
-  GbfsAutoDiscovery,
-  GbfsFeedName,
-  GbfsResponse,
-} from './gbfs-v3.types';
+import { GbfsAutoDiscovery, GbfsFeedName, GbfsResponse } from './gbfs-v3.types';
 
 const GBFS_AUTO_DISCOVERY_URL =
   'https://saopaulo.publicbikesystem.net/customer/gbfs/v3.0/gbfs.json';
@@ -49,8 +45,9 @@ export class GbfsClientService {
   }
 
   private async refreshFeedUrls(): Promise<Map<string, string>> {
-    const response =
-      await this.fetchGbfs<GbfsAutoDiscovery>(GBFS_AUTO_DISCOVERY_URL);
+    const response = await this.fetchGbfs<GbfsAutoDiscovery>(
+      GBFS_AUTO_DISCOVERY_URL,
+    );
     if (!Array.isArray(response.data.feeds)) {
       throw new Error('Invalid GBFS v3 auto-discovery feed list');
     }
@@ -96,10 +93,7 @@ export class GbfsClientService {
     }
   }
 
-  private assertValidResponse<T>(
-    response: GbfsResponse<T>,
-    url: string,
-  ): void {
+  private assertValidResponse<T>(response: GbfsResponse<T>, url: string): void {
     if (
       response?.version !== '3.0' ||
       !response.data ||

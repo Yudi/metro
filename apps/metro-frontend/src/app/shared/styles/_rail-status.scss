@@ -59,8 +59,8 @@ $status-unavailable-border: rgba(255, 152, 0, 0.2);
     }
 
     // OperacaoNormal - Green
-    &[data-status*='OperacaoNormal'],
-    &[data-status*='OperacaoEspecial'] {
+    &[data-status*="OperacaoNormal"],
+    &[data-status*="OperacaoEspecial"] {
       background-color: $status-normal-bg;
       border-color: $status-normal-border;
 
@@ -70,12 +70,12 @@ $status-unavailable-border: rgba(255, 152, 0, 0.2);
     }
 
     // Warning statuses - Yellow
-    &[data-status*='AtividadeProgramada'],
-    &[data-status*='VelocidadeReduzida'],
-    &[data-status*='OperacaoTransitoria'],
-    &[data-status*='OperacaoComImpactoPontual'],
-    &[data-status*='CirculacaoDeTrens'],
-    &[data-status*='OperacaoParcial'] {
+    &[data-status*="AtividadeProgramada"],
+    &[data-status*="VelocidadeReduzida"],
+    &[data-status*="OperacaoTransitoria"],
+    &[data-status*="OperacaoComImpactoPontual"],
+    &[data-status*="CirculacaoDeTrens"],
+    &[data-status*="OperacaoParcial"] {
       background-color: $status-warning-bg;
       border-color: $status-warning-border;
 
@@ -85,7 +85,7 @@ $status-unavailable-border: rgba(255, 152, 0, 0.2);
     }
 
     // Paralisada - Red (Critical)
-    &[data-status*='Paralisada'] {
+    &[data-status*="Paralisada"] {
       background-color: $status-critical-bg;
       border-color: $status-critical-border;
 
@@ -95,7 +95,7 @@ $status-unavailable-border: rgba(255, 152, 0, 0.2);
     }
 
     // OperacaoEncerrada - Gray (Closed)
-    &[data-status*='OperacaoEncerrada'] {
+    &[data-status*="OperacaoEncerrada"] {
       background-color: $status-closed-bg;
       border-color: $status-closed-border;
 
@@ -105,7 +105,7 @@ $status-unavailable-border: rgba(255, 152, 0, 0.2);
     }
 
     // DadosIndisponiveis - Orange (Unavailable data)
-    &[data-status*='DadosIndisponiveis'] {
+    &[data-status*="DadosIndisponiveis"] {
       background-color: $status-unavailable-bg;
       border-color: $status-unavailable-border;
 

@@ -47,7 +47,7 @@
             <mat-spinner diameter="16"></mat-spinner>
           } @else {
             <mat-icon>{{
-              isLocationDisabled() ? 'location_off' : 'my_location'
+              isLocationDisabled() ? "location_off" : "my_location"
             }}</mat-icon>
           }
           Buscar Paradas Próximas
@@ -111,7 +111,7 @@
               [attr.aria-label]="'Select ' + result.type + ': ' + result.title"
             >
               <div class="result-icon">
-                @if (result.type === 'route') {
+                @if (result.type === "route") {
                   <mat-icon color="primary">directions_bus</mat-icon>
                 } @else {
                   <mat-icon color="accent">place</mat-icon>
@@ -126,7 +126,7 @@
                 @if (result.score) {
                   <div class="match-score">
                     <mat-icon class="score-icon">search</mat-icon>
-                    Match: {{ result.score! * 100 | number: '1.0-0' }}%
+                    Match: {{ result.score! * 100 | number: "1.0-0" }}%
                   </div>
                 }
 
@@ -136,7 +136,7 @@
                     class="type-chip"
                     [color]="result.type === 'route' ? 'primary' : 'accent'"
                   >
-                    {{ result.type === 'route' ? 'Route' : 'Stop' }}
+                    {{ result.type === "route" ? "Route" : "Stop" }}
                   </mat-chip>
 
                   @if (hasHighlights(result)) {
@@ -182,7 +182,7 @@
                 <mat-spinner diameter="16"></mat-spinner>
               } @else {
                 <mat-icon>{{
-                  isLocationDisabled() ? 'location_off' : 'my_location'
+                  isLocationDisabled() ? "location_off" : "my_location"
                 }}</mat-icon>
               }
               Buscar Paradas Próximas

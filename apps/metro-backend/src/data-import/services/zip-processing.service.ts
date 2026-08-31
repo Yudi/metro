@@ -30,7 +30,13 @@ export class ZipProcessingService {
 
       const { stdout, stderr } = await execFileAsync(
         'unzip',
-        ['-o', zipFilePath, ...entries.map((entry) => entry.fileName), '-d', extractDir],
+        [
+          '-o',
+          zipFilePath,
+          ...entries.map((entry) => entry.fileName),
+          '-d',
+          extractDir,
+        ],
         { maxBuffer: 1024 * 1024 },
       );
 
@@ -78,7 +84,7 @@ export class ZipProcessingService {
         this.logger.debug(
           `Analyzed ${fileName}: ${(fileSize / 1024).toFixed(
             1,
-          )} KB, hash: ${fileHash.substring(0, 8)}...`
+          )} KB, hash: ${fileHash.substring(0, 8)}...`,
         );
       } catch (error) {
         const errorMessage =
@@ -115,7 +121,9 @@ export class ZipProcessingService {
     }
   }
 
-  private async getValidatedZipEntries(zipFilePath: string): Promise<ZipEntry[]> {
+  private async getValidatedZipEntries(
+    zipFilePath: string,
+  ): Promise<ZipEntry[]> {
     const compressedSize =
       await this.fileOperationsService.getFileSize(zipFilePath);
     if (compressedSize > GTFSConfig.MAX_GTFS_ZIP_BYTES) {
@@ -149,9 +157,7 @@ export class ZipProcessingService {
       }
 
       totalUncompressedSize += entry.uncompressedSize;
-      if (
-        totalUncompressedSize > GTFSConfig.MAX_GTFS_ZIP_UNCOMPRESSED_BYTES
-      ) {
+      if (totalUncompressedSize > GTFSConfig.MAX_GTFS_ZIP_UNCOMPRESSED_BYTES) {
         throw new Error('GTFS ZIP exceeds total uncompressed size limit');
       }
     }
@@ -164,7 +170,7 @@ export class ZipProcessingService {
 
     for (const line of stdout.split('\n')) {
       const match = line.match(
-        /^\s*(\d+)\s+(?:\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})\s+\d{2}:\d{2}\s+(.+)$/
+        /^\s*(\d+)\s+(?:\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4})\s+\d{2}:\d{2}\s+(.+)$/,
       );
       if (!match?.[1] || !match[2]) {
         continue;

@@ -99,11 +99,4 @@ export class MapInteractionService {
   deactivateNearbyMode(): void {
     this.nearbyService.deactivateNearbyMode();
   }
-
-  /**
-   * @deprecated Use activateNearbyMode() or deactivateNearbyMode() instead
-   */
-  toggleNearbyMode(): void {
-    this.nearbyService.toggleNearbyMode();
-  }
 }

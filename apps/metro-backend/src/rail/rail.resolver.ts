@@ -25,7 +25,7 @@ export class RailResolver {
       type: () => Int,
       description: 'Line code (e.g., 1 for L1)',
     })
-    code: number
+    code: number,
   ): Promise<RailLine | null> {
     return this.railService.getLineStatus(code);
   }
@@ -39,7 +39,7 @@ export class RailResolver {
       type: () => [Int],
       description: 'Array of line codes to fetch',
     })
-    codes: number[]
+    codes: number[],
   ): Promise<RailLine[]> {
     return this.railService.getLineStatuses(codes);
   }

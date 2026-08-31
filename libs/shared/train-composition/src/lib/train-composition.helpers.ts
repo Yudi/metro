@@ -43,9 +43,10 @@ export function getBetweenDoorsPositionRatio(
   doorCount: number,
 ): number {
   return (
-    getDoorPositionRatio(fromDoorPosition, doorCount) +
-    getDoorPositionRatio(toDoorPosition, doorCount)
-  ) / 2;
+    (getDoorPositionRatio(fromDoorPosition, doorCount) +
+      getDoorPositionRatio(toDoorPosition, doorCount)) /
+    2
+  );
 }
 
 export function getFeatureIcon(type: TrainPlatformFeatureType): string {

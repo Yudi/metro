@@ -16,8 +16,8 @@ describe('DataImportService', () => {
   beforeEach(async () => {
     hooks = { onDataImportComplete: jest.fn().mockResolvedValue(undefined) };
     importLock = {
-      withLock: jest.fn((_: string, __: string, action: () => Promise<unknown>) =>
-        action(),
+      withLock: jest.fn(
+        (_: string, __: string, action: () => Promise<unknown>) => action(),
       ),
     };
     const module: TestingModule = await Test.createTestingModule({
@@ -68,15 +68,13 @@ describe('DataImportService', () => {
 
   it('fails the run and skips post-import hooks when a required file fails', async () => {
     jest.useFakeTimers();
-    jest
-      .spyOn(service as never, 'performImport' as never)
-      .mockResolvedValue({
-        success: false,
-        filesProcessed: 1,
-        recordsImported: 1,
-        skippedFiles: [],
-        errors: ['routes.txt: parse failed'],
-      } as never);
+    jest.spyOn(service as never, 'performImport' as never).mockResolvedValue({
+      success: false,
+      filesProcessed: 1,
+      recordsImported: 1,
+      skippedFiles: [],
+      errors: ['routes.txt: parse failed'],
+    } as never);
 
     await expect(service.startImport()).rejects.toThrow(
       'GTFS import failed: routes.txt: parse failed',
@@ -91,13 +89,15 @@ describe('DataImportService', () => {
     jest.useFakeTimers();
     const signalState: { signal?: AbortSignal } = {};
     let resolveOperation: (() => void) | undefined;
-    const pending = (service as never as {
-      withTimeout: (
-        operation: (signal: AbortSignal) => Promise<void>,
-        timeoutMs: number,
-        message: string,
-      ) => Promise<void>;
-    }).withTimeout(
+    const pending = (
+      service as never as {
+        withTimeout: (
+          operation: (signal: AbortSignal) => Promise<void>,
+          timeoutMs: number,
+          message: string,
+        ) => Promise<void>;
+      }
+    ).withTimeout(
       (signal) => {
         signalState.signal = signal;
         return new Promise<void>((resolve) => {
@@ -114,13 +114,15 @@ describe('DataImportService', () => {
     resolveOperation?.();
 
     await expect(
-      (service as never as {
-        withTimeout: (
-          operation: (signal: AbortSignal) => Promise<void>,
-          timeoutMs: number,
-          message: string,
-        ) => Promise<void>;
-      }).withTimeout(async () => undefined, 100, 'unused'),
+      (
+        service as never as {
+          withTimeout: (
+            operation: (signal: AbortSignal) => Promise<void>,
+            timeoutMs: number,
+            message: string,
+          ) => Promise<void>;
+        }
+      ).withTimeout(async () => undefined, 100, 'unused'),
     ).resolves.toBeUndefined();
     jest.advanceTimersByTime(100);
     expect(jest.getTimerCount()).toBe(0);
@@ -128,13 +130,19 @@ describe('DataImportService', () => {
   });
 
   it('reports missing required GTFS files instead of treating a partial archive as valid', async () => {
-    const result = await (service as never as {
-      processGTFSFiles: (
-        datasetId: string,
-        extractDir: string,
-        files: Array<{ fileName: string; fileHash: string; fileSize: number }>,
-      ) => Promise<{ success: boolean; errors: string[] }>;
-    }).processGTFSFiles('dataset', '/tmp', [
+    const result = await (
+      service as never as {
+        processGTFSFiles: (
+          datasetId: string,
+          extractDir: string,
+          files: Array<{
+            fileName: string;
+            fileHash: string;
+            fileSize: number;
+          }>,
+        ) => Promise<{ success: boolean; errors: string[] }>;
+      }
+    ).processGTFSFiles('dataset', '/tmp', [
       { fileName: 'agency.txt', fileHash: 'hash', fileSize: 1 },
     ]);
 
@@ -145,9 +153,11 @@ describe('DataImportService', () => {
   });
 
   it('removes only Prisma schema metadata before invoking the Rust importer', () => {
-    const cleanUrl = (service as never as {
-      getRustDatabaseUrl: (databaseUrl: string) => string;
-    }).getRustDatabaseUrl(
+    const cleanUrl = (
+      service as never as {
+        getRustDatabaseUrl: (databaseUrl: string) => string;
+      }
+    ).getRustDatabaseUrl(
       'postgresql://user:p%40ss@db:5432/metro?schema=public&sslmode=require&application_name=gtfs',
     );
 
@@ -161,7 +171,8 @@ describe('DataImportService', () => {
     jest.useFakeTimers();
     let resolveFirst: ((result: unknown) => void) | undefined;
     let resolveSecond: ((result: unknown) => void) | undefined;
-    const performImport = jest.fn()
+    const performImport = jest
+      .fn()
       .mockImplementationOnce(
         () =>
           new Promise((resolve) => {

@@ -22,7 +22,11 @@ import { MapDataLoaderService } from './map-data-loader.service';
 import { MapDisplayService } from './map-display.service';
 import { MapInteractionService } from './map-interaction.service';
 import { LayerSettingsDialogComponent } from './layer-settings-dialog/layer-settings-dialog.component';
-import { FavoritesService, LoggerService, RailGraphqlService } from '@metro/shared/api';
+import {
+  FavoritesService,
+  LoggerService,
+  RailGraphqlService,
+} from '@metro/shared/api';
 import { RealtimeWebsocketService } from '../../services/realtime-websocket.service';
 import { RealtimeVehicleLayerService } from '../../services/realtime-vehicle-layer.service';
 import { CptmVehicleLayerService } from '../../services/cptm-vehicle-layer.service';
@@ -88,7 +92,8 @@ export class MapComponent implements AfterViewInit, OnDestroy {
   private readonly persistenceReady = signal(false);
   private isApplyingSavedState = false;
   private appliedSavedStateForNavigation = false;
-  private lastDefaultStateRequest = this.mapViewStateStorage.defaultStateRequests();
+  private lastDefaultStateRequest =
+    this.mapViewStateStorage.defaultStateRequests();
   private initializationTimer: ReturnType<typeof setTimeout> | null = null;
   private initialDataTimer: ReturnType<typeof setTimeout> | null = null;
   private destroyed = false;
@@ -363,8 +368,9 @@ export class MapComponent implements AfterViewInit, OnDestroy {
         [LayerType.BIKE]: layerService.isLayerVisible(LayerType.BIKE),
       },
       vectorLayers: {
-        [VectorTileLayerType.RAIL_STATIONS]:
-          vectorTileService.isLayerVisible(VectorTileLayerType.RAIL_STATIONS),
+        [VectorTileLayerType.RAIL_STATIONS]: vectorTileService.isLayerVisible(
+          VectorTileLayerType.RAIL_STATIONS,
+        ),
         [VectorTileLayerType.RAIL_ROUTES]: vectorTileService.isLayerVisible(
           VectorTileLayerType.RAIL_ROUTES,
         ),
@@ -471,7 +477,6 @@ export class MapComponent implements AfterViewInit, OnDestroy {
     } finally {
       this.isApplyingSavedState = false;
     }
-
   }
 
   private async restoreRouteSelection(routeId: string): Promise<void> {

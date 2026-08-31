@@ -20,7 +20,7 @@ export class MapSelectionsPanelComponent {
   readonly selectedRoutes = input.required<Map<string, SelectedRoute>>();
   readonly selectedStops = input.required<Map<string, SelectedStop>>();
   readonly selectedBikeStations = input<Map<string, SelectedBikeStation>>(
-    new Map()
+    new Map(),
   );
 
   readonly removeRoute = output<string>();

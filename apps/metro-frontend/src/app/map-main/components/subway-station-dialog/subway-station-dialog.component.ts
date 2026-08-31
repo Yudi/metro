@@ -145,8 +145,10 @@ export class SubwayStationDialogComponent implements OnInit {
     return this.pendingNextTrainStations().filter(
       (
         station,
-      ): station is { lineCode: ExtendedNextTrainLineCode; stationCode: string } =>
-        station.stationCode !== '',
+      ): station is {
+        lineCode: ExtendedNextTrainLineCode;
+        stationCode: string;
+      } => station.stationCode !== '',
     );
   });
 

@@ -8,9 +8,8 @@
   "targets": {
     "build": {
       "executor": "@angular/build:application",
-      "outputs": [
-        "{options.outputPath}"
-      ],
+      "outputs": ["{options.outputPath}"],
+      "defaultConfiguration": "production",
       "options": {
         "baseHref": "/lite/",
         "outputPath": "dist/apps/metro-frontend-lite",
@@ -28,18 +27,14 @@
             "output": "public/shared"
           }
         ],
-        "styles": [
-          "apps/metro-frontend-lite/src/styles.scss"
-        ],
+        "styles": ["apps/metro-frontend-lite/src/styles.scss"],
         "server": "apps/metro-frontend-lite/src/main.server.ts",
         "ssr": {
           "entry": "apps/metro-frontend-lite/src/server.ts"
         },
         "outputMode": "server",
         "security": {
-          "allowedHosts": [
-            "metro.yudi.com.br"
-          ]
+          "allowedHosts": ["metro.yudi.com.br"]
         }
       },
       "configurations": {
@@ -71,8 +66,7 @@
           "extractLicenses": false,
           "sourceMap": true
         }
-      },
-      "defaultConfiguration": "production"
+      }
     },
     "build-e2e": {
       "executor": "@angular/build:application",
@@ -102,6 +96,8 @@
     "serve": {
       "continuous": true,
       "executor": "@angular/build:dev-server",
+      "defaultConfiguration": "development",
+      "dependsOn": ["metro-backend:serve"],
       "configurations": {
         "production": {
           "buildTarget": "metro-frontend-lite:build:production"
@@ -109,11 +105,7 @@
         "development": {
           "buildTarget": "metro-frontend-lite:build:development"
         }
-      },
-      "defaultConfiguration": "development",
-      "dependsOn": [
-        "metro-backend:serve"
-      ]
+      }
     },
     "extract-i18n": {
       "executor": "@angular/build:extract-i18n",
@@ -125,13 +117,14 @@
       "executor": "@nx/eslint:lint"
     },
     "test": {
-      "executor": "@nx/jest:jest",
-      "outputs": [
-        "{workspaceRoot}/coverage/{projectRoot}"
-      ],
       "options": {
-        "jestConfig": "apps/metro-frontend-lite/jest.config.ts",
-        "tsConfig": "apps/metro-frontend-lite/tsconfig.spec.json"
+        "passWithNoTests": true
+      },
+      "configurations": {
+        "ci": {
+          "ci": true,
+          "coverage": true
+        }
       }
     },
     "serve-static": {
@@ -163,9 +156,7 @@
           "-d",
           "./apps/metro-frontend-lite/.storybook/compodoc"
         ],
-        "styles": [
-          "apps/metro-frontend-lite/src/styles.scss"
-        ]
+        "styles": ["apps/metro-frontend-lite/src/styles.scss"]
       },
       "configurations": {
         "ci": {
@@ -175,9 +166,7 @@
     },
     "build-storybook": {
       "executor": "@storybook/angular:build-storybook",
-      "outputs": [
-        "{options.outputDir}"
-      ],
+      "outputs": ["{options.outputDir}"],
       "options": {
         "outputDir": "dist/storybook/metro-frontend-lite",
         "configDir": "apps/metro-frontend-lite/.storybook",
@@ -204,9 +193,7 @@
     },
     "static-storybook": {
       "executor": "@nx/web:file-server",
-      "dependsOn": [
-        "build-storybook"
-      ],
+      "dependsOn": ["build-storybook"],
       "options": {
         "buildTarget": "metro-frontend-lite:build-storybook",
         "staticFilePath": "dist/storybook/metro-frontend-lite",

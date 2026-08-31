@@ -26,12 +26,16 @@
   <!-- Desktop -->
   <nav class="desktop-nav">
     @for (item of items; track item.label) {
-      @if (item.route === '/mapa') {
+      @if (item.route === "/mapa") {
         <button mat-button type="button" (click)="navigateToItem($event, item)">
           {{ item.label }}
         </button>
       } @else {
-        <a mat-button [routerLink]="item.route" [queryParams]="item.queryParams">
+        <a
+          mat-button
+          [routerLink]="item.route"
+          [queryParams]="item.queryParams"
+        >
           {{ item.label }}
         </a>
       }

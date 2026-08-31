@@ -47,9 +47,7 @@ export class CsvProcessingService {
   ): string {
     const value = record[field]?.trim() || '';
     if (!value && !record[alternativeField]?.trim()) {
-      throw new Error(
-        'route_short_name or route_long_name must be provided',
-      );
+      throw new Error('route_short_name or route_long_name must be provided');
     }
     return value;
   }
@@ -206,9 +204,7 @@ export class CsvProcessingService {
   /**
    * Read CSV file in bounded batches.
    */
-  private async *readCsvBatches(
-    filePath: string,
-  ): AsyncGenerator<CsvRecord[]> {
+  private async *readCsvBatches(filePath: string): AsyncGenerator<CsvRecord[]> {
     const input = createReadStream(filePath);
     const parser = input.pipe(csv());
     // csv-parser does not always forward an input stream open/read error to
@@ -295,7 +291,7 @@ export class CsvProcessingService {
     }
   }
 
-   /**
+  /**
    * Import records within transaction
    */
   private async importRecordsBatch(
@@ -350,15 +346,20 @@ export class CsvProcessingService {
       record.agency_phone?.trim() || null,
       record.agency_fare_url?.trim() || null,
     ]);
-    await this.insertRows(tx, 'SPTrans_Agency', [
-      'agency_id',
-      'agency_name',
-      'agency_url',
-      'agency_timezone',
-      'agency_lang',
-      'agency_phone',
-      'agency_fare_url',
-    ], rows);
+    await this.insertRows(
+      tx,
+      'SPTrans_Agency',
+      [
+        'agency_id',
+        'agency_name',
+        'agency_url',
+        'agency_timezone',
+        'agency_lang',
+        'agency_phone',
+        'agency_fare_url',
+      ],
+      rows,
+    );
 
     return rows.length;
   }
@@ -383,18 +384,23 @@ export class CsvProcessingService {
       this.strictDate(record, 'start_date'),
       this.strictDate(record, 'end_date'),
     ]);
-    await this.insertRows(tx, 'SPTrans_Calendar', [
-      'service_id',
-      'monday',
-      'tuesday',
-      'wednesday',
-      'thursday',
-      'friday',
-      'saturday',
-      'sunday',
-      'start_date',
-      'end_date',
-    ], rows);
+    await this.insertRows(
+      tx,
+      'SPTrans_Calendar',
+      [
+        'service_id',
+        'monday',
+        'tuesday',
+        'wednesday',
+        'thursday',
+        'friday',
+        'saturday',
+        'sunday',
+        'start_date',
+        'end_date',
+      ],
+      rows,
+    );
 
     return rows.length;
   }
@@ -416,15 +422,20 @@ export class CsvProcessingService {
       this.optionalColor(record, 'route_color'),
       this.optionalColor(record, 'route_text_color'),
     ]);
-    await this.insertRows(tx, 'SPTrans_Route', [
-      'route_id',
-      'agency_id',
-      'route_short_name',
-      'route_long_name',
-      'route_type',
-      'route_color',
-      'route_text_color',
-    ], rows);
+    await this.insertRows(
+      tx,
+      'SPTrans_Route',
+      [
+        'route_id',
+        'agency_id',
+        'route_short_name',
+        'route_long_name',
+        'route_type',
+        'route_color',
+        'route_text_color',
+      ],
+      rows,
+    );
 
     return rows.length;
   }
@@ -448,19 +459,18 @@ export class CsvProcessingService {
     }
 
     // Step 2: Import CSV data using raw SQL into the external GTFS schema
-    await this.insertRows(tx, 'SPTrans_Stop', [
-      'stop_id',
-      'stop_name',
-      'stop_desc',
-      'stop_lat',
-      'stop_lon',
-    ], validationResult.valid.map((record: StopRecord) => [
+    await this.insertRows(
+      tx,
+      'SPTrans_Stop',
+      ['stop_id', 'stop_name', 'stop_desc', 'stop_lat', 'stop_lon'],
+      validationResult.valid.map((record: StopRecord) => [
         record.stop_id,
         record.stop_name,
         record.stop_desc || null,
         record.stop_lat,
         record.stop_lon,
-      ]));
+      ]),
+    );
 
     return validationResult.valid.length;
   }
@@ -492,12 +502,16 @@ export class CsvProcessingService {
       try {
         lat = this.strictFloat(record, 'stop_lat', { min: -90, max: 90 });
       } catch (error) {
-        errors.push(error instanceof Error ? error.message : 'invalid stop_lat');
+        errors.push(
+          error instanceof Error ? error.message : 'invalid stop_lat',
+        );
       }
       try {
         lon = this.strictFloat(record, 'stop_lon', { min: -180, max: 180 });
       } catch (error) {
-        errors.push(error instanceof Error ? error.message : 'invalid stop_lon');
+        errors.push(
+          error instanceof Error ? error.message : 'invalid stop_lon',
+        );
       }
 
       if (errors.length > 0) {
@@ -545,14 +559,19 @@ export class CsvProcessingService {
         : 0,
       record.shape_id?.trim() || '',
     ]);
-    await this.insertRows(tx, 'SPTrans_Trip', [
-      'route_id',
-      'service_id',
-      'trip_id',
-      'trip_headsign',
-      'direction_id',
-      'shape_id',
-    ], rows);
+    await this.insertRows(
+      tx,
+      'SPTrans_Trip',
+      [
+        'route_id',
+        'service_id',
+        'trip_id',
+        'trip_headsign',
+        'direction_id',
+        'shape_id',
+      ],
+      rows,
+    );
 
     return rows.length;
   }
@@ -572,13 +591,12 @@ export class CsvProcessingService {
       this.requiredText(record, 'stop_id'),
       this.strictInt(record, 'stop_sequence', { min: 1 }),
     ]);
-    await this.insertRows(tx, 'SPTrans_StopTime', [
-      'trip_id',
-      'arrival_time',
-      'departure_time',
-      'stop_id',
-      'stop_sequence',
-    ], rows);
+    await this.insertRows(
+      tx,
+      'SPTrans_StopTime',
+      ['trip_id', 'arrival_time', 'departure_time', 'stop_id', 'stop_sequence'],
+      rows,
+    );
 
     return rows.length;
   }
@@ -597,12 +615,12 @@ export class CsvProcessingService {
       this.strictTime(record, 'end_time'),
       this.strictInt(record, 'headway_secs', { min: 1 }),
     ]);
-    await this.insertRows(tx, 'SPTrans_Frequency', [
-      'trip_id',
-      'start_time',
-      'end_time',
-      'headway_secs',
-    ], rows);
+    await this.insertRows(
+      tx,
+      'SPTrans_Frequency',
+      ['trip_id', 'start_time', 'end_time', 'headway_secs'],
+      rows,
+    );
 
     return rows.length;
   }
@@ -625,14 +643,19 @@ export class CsvProcessingService {
         ? this.strictInt(record, 'transfer_duration', { min: 0 })
         : null,
     ]);
-    await this.insertRows(tx, 'SPTrans_FareAttribute', [
-      'fare_id',
-      'price',
-      'currency_type',
-      'payment_method',
-      'transfers',
-      'transfer_duration',
-    ], rows);
+    await this.insertRows(
+      tx,
+      'SPTrans_FareAttribute',
+      [
+        'fare_id',
+        'price',
+        'currency_type',
+        'payment_method',
+        'transfers',
+        'transfer_duration',
+      ],
+      rows,
+    );
 
     return rows.length;
   }
@@ -652,13 +675,12 @@ export class CsvProcessingService {
       record.destination_id?.trim() || null,
       record.contains_id?.trim() || null,
     ]);
-    await this.insertRows(tx, 'SPTrans_FareRule', [
-      'fare_id',
-      'route_id',
-      'origin_id',
-      'destination_id',
-      'contains_id',
-    ], rows);
+    await this.insertRows(
+      tx,
+      'SPTrans_FareRule',
+      ['fare_id', 'route_id', 'origin_id', 'destination_id', 'contains_id'],
+      rows,
+    );
 
     return rows.length;
   }
@@ -675,7 +697,9 @@ export class CsvProcessingService {
 
     const qualifiedTable = this.getQualifiedGtfsTable(tableName);
     const insertColumns = columns.includes('id') ? columns : ['id', ...columns];
-    const quotedColumns = insertColumns.map((column) => this.quoteIdent(column));
+    const quotedColumns = insertColumns.map((column) =>
+      this.quoteIdent(column),
+    );
     const chunkSize = Math.max(1, Math.floor(5000 / insertColumns.length));
 
     for (let offset = 0; offset < rows.length; offset += chunkSize) {
@@ -732,8 +756,9 @@ export class CsvProcessingService {
       this.logger.error(`Failed to count records in ${filePath}:`, error);
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(`CSV record count failed for ${filePath}: ${errorMessage}`);
+      throw new Error(
+        `CSV record count failed for ${filePath}: ${errorMessage}`,
+      );
     }
   }
-
 }

@@ -3,10 +3,7 @@ import { Feature } from 'ol';
 import { Point } from 'ol/geom';
 import { MapService } from '../../services/map.service';
 import { LayerType } from '../../services/map-layer.service';
-import {
-  GeographyGraphQLService,
-  BusRouteGraphQL,
-} from '../../services/geography-graphql.service';
+import { GeographyGraphQLService } from '../../services/geography-graphql.service';
 import { MapStateService } from './map-state.service';
 import { BusShapeWithRoute, FeatureCreationSource } from './map.types';
 import { FeatureFactoryService } from '../../utils/feature-factory.service';
@@ -443,9 +440,9 @@ export class MapDisplayService {
       const stationId = feature.getProperties()['stationId'] as
         | string
         | undefined;
-      const creationSource = feature.getProperties()[
-        'creationSource'
-      ] as FeatureCreationSource | undefined;
+      const creationSource = feature.getProperties()['creationSource'] as
+        | FeatureCreationSource
+        | undefined;
 
       // Check if this feature should still be selected
       if (creationSource === FeatureCreationSource.EXPLORE) {
@@ -626,28 +623,6 @@ export class MapDisplayService {
     const id1 = f1.getProperties()['id'];
     const id2 = f2.getProperties()['id'];
     return id1 && id2 && id1 === id2;
-  }
-
-  /**
-   * Check if a shape represents a subway route (SPTrans data - should be excluded)
-   * @deprecated Rail data now comes from GPKG vector tiles
-   */
-  private isSubwayShape(shape: BusShapeWithRoute): boolean {
-    if (!shape.routeInfo) return false;
-    return this.isSubwayRoute(shape.routeInfo);
-  }
-
-  /**
-   * Check if a route is a subway route (SPTrans data - should be excluded)
-   * Rail data (Metro/CPTM) is now sourced from GPKG and delivered via vector tiles,
-   * so we exclude SPTrans rail routes from the map display
-   */
-  private isSubwayRoute(route: BusRouteGraphQL): boolean {
-    // Check if this is a subway/metro route based on route ID patterns
-    // This is more reliable than routeType for São Paulo GTFS data
-    return (
-      route.routeId.startsWith('METRÔ') || route.routeId.startsWith('CPTM')
-    );
   }
 
   /**

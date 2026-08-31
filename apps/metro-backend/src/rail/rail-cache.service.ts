@@ -22,7 +22,7 @@ export class RailCacheService implements OnModuleInit, OnModuleDestroy {
   async onModuleInit(): Promise<void> {
     const redisUrl = this.configService.get<string>(
       'REDIS_URL',
-      'redis://localhost:6379'
+      'redis://localhost:6379',
     );
 
     try {
@@ -37,7 +37,7 @@ export class RailCacheService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       this.logger.warn(
         'Redis connection failed, using in-memory cache only',
-        error
+        error,
       );
       this.redis = null;
     }
@@ -95,7 +95,7 @@ export class RailCacheService implements OnModuleInit, OnModuleDestroy {
       await this.redis.setex(
         REDIS_KEY,
         REDIS_TTL_SECONDS,
-        JSON.stringify(sanitizedStatus)
+        JSON.stringify(sanitizedStatus),
       );
       this.logger.debug('Saved rail status to Redis cache');
     } catch (error) {

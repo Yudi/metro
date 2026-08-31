@@ -235,9 +235,7 @@ export function getApi1RailStationName(
   return getApi1RailStationByCode(lineCode, stationCode)?.name;
 }
 
-export function getApi1RailStationCodes(
-  lineCode: Api1RailLineCode,
-): string[] {
+export function getApi1RailStationCodes(lineCode: Api1RailLineCode): string[] {
   return Array.from(
     new Set(getApi1RailPublicStations(lineCode).map((station) => station.code)),
   );

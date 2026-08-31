@@ -25,28 +25,28 @@ export class RustGtfsService {
       // Development paths
       path.join(
         process.cwd(),
-        '../../dataset-handling/target/debug/metro-dataset-handling'
+        '../../dataset-handling/target/debug/metro-dataset-handling',
       ),
       path.join(
         process.cwd(),
-        '../dataset-handling/target/debug/metro-dataset-handling'
+        '../dataset-handling/target/debug/metro-dataset-handling',
       ),
       path.join(
         process.cwd(),
-        'dataset-handling/target/debug/metro-dataset-handling'
+        'dataset-handling/target/debug/metro-dataset-handling',
       ),
       // Release build paths
       path.join(
         process.cwd(),
-        '../../dataset-handling/target/release/metro-dataset-handling'
+        '../../dataset-handling/target/release/metro-dataset-handling',
       ),
       path.join(
         process.cwd(),
-        '../dataset-handling/target/release/metro-dataset-handling'
+        '../dataset-handling/target/release/metro-dataset-handling',
       ),
       path.join(
         process.cwd(),
-        'dataset-handling/target/release/metro-dataset-handling'
+        'dataset-handling/target/release/metro-dataset-handling',
       ),
     ];
 
@@ -63,7 +63,7 @@ export class RustGtfsService {
 
     // Default to production path if none found
     this.logger.warn(
-      'Rust tool not found in any expected location, using production path'
+      'Rust tool not found in any expected location, using production path',
     );
     return '/usr/local/bin/gtfs-processor';
   }
@@ -74,11 +74,11 @@ export class RustGtfsService {
   async processShapes(
     shapesFilePath: string,
     dbUrl: string,
-    srid = 4326
+    srid = 4326,
   ): Promise<void> {
     try {
       this.logger.debug(
-        `Processing shapes.txt using Rust tool: ${shapesFilePath}`
+        `Processing shapes.txt using Rust tool: ${shapesFilePath}`,
       );
 
       const { stdout, stderr } = await execFileAsync(
@@ -113,7 +113,7 @@ export class RustGtfsService {
         error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
         `Failed to process shapes with Rust tool:`,
-        errorMessage
+        errorMessage,
       );
       throw new Error(`Rust shapes processing failed: ${errorMessage}`);
     }

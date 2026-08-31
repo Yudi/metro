@@ -20,7 +20,7 @@ export class RouteStopMappingService {
 
   constructor(
     private prisma: PrismaService,
-    private olhoVivoApi: OlhoVivoApiService
+    private olhoVivoApi: OlhoVivoApiService,
   ) {}
 
   /**
@@ -51,7 +51,7 @@ export class RouteStopMappingService {
       const lineNumber = routeShortName.split('-')[0];
 
       this.logger.debug(
-        `Searching SPTrans API for line: ${lineNumber} (from route ${routeShortName})`
+        `Searching SPTrans API for line: ${lineNumber} (from route ${routeShortName})`,
       );
 
       // Search the SPTrans API for this line
@@ -59,7 +59,7 @@ export class RouteStopMappingService {
 
       if (!searchResults || searchResults.length === 0) {
         this.logger.warn(
-          `No results found for line ${lineNumber} (route ${routeShortName})`
+          `No results found for line ${lineNumber} (route ${routeShortName})`,
         );
         this.routeCodeCache.set(routeShortName, null);
         return null;
@@ -71,7 +71,7 @@ export class RouteStopMappingService {
       this.logger.debug(
         `Found ${
           lineCodes.length
-        } line codes for ${lineNumber}: ${lineCodes.join(', ')}`
+        } line codes for ${lineNumber}: ${lineCodes.join(', ')}`,
       );
 
       // Log direction details
@@ -81,7 +81,7 @@ export class RouteStopMappingService {
             ? 'Dir 1 (Principal→Secundário)'
             : 'Dir 2 (Secundário→Principal)';
         this.logger.debug(
-          `   cl=${result.cl} - ${direction} - ${result.tp} → ${result.ts}`
+          `   cl=${result.cl} - ${direction} - ${result.tp} → ${result.ts}`,
         );
       });
 
@@ -90,7 +90,7 @@ export class RouteStopMappingService {
     } catch (error) {
       this.logger.error(
         `Error getting API codes for route ${routeShortName}:`,
-        error
+        error,
       );
       this.routeCodeCache.set(routeShortName, null);
       return null;
@@ -167,7 +167,7 @@ export class RouteStopMappingService {
       `;
 
       const isSubwayOnly = routes.every(
-        (r) => r.route_id.startsWith('METRÔ') || r.route_id.startsWith('CPTM')
+        (r) => r.route_id.startsWith('METRÔ') || r.route_id.startsWith('CPTM'),
       );
 
       if (isSubwayOnly) {
@@ -189,7 +189,7 @@ export class RouteStopMappingService {
           apiStopCode = parseInt(numericPart[0], 10);
         } else {
           this.logger.warn(
-            `Cannot map non-numeric stop ID ${stopId} to API code`
+            `Cannot map non-numeric stop ID ${stopId} to API code`,
           );
           this.stopCodeCache.set(stopId, null);
           return null;

@@ -15,7 +15,7 @@
     @if (isLoading()) {
       <div class="loading-state">
         <mat-spinner [diameter]="compact() ? 24 : 40"></mat-spinner>
-        <p>{{ compact() ? 'Carregando...' : 'Carregando previsões...' }}</p>
+        <p>{{ compact() ? "Carregando..." : "Carregando previsões..." }}</p>
       </div>
     } @else if (hasArrivals()) {
       <div class="arrivals-list">
@@ -44,7 +44,7 @@
                 <div class="vehicle-arrival">
                   <div class="vehicle-info">
                     <span class="vehicle-id">
-                      {{ compact() ? vehicle.p : 'Veículo ' + vehicle.p }}
+                      {{ compact() ? vehicle.p : "Veículo " + vehicle.p }}
                     </span>
                     @if (vehicle.a) {
                       <mat-icon class="accessible-icon" title="Acessível">
@@ -74,11 +74,11 @@
                 (click)="toggleArrivalLineVehicles(line)"
               >
                 <mat-icon>{{
-                  isArrivalLineExpanded(line) ? 'expand_less' : 'expand_more'
+                  isArrivalLineExpanded(line) ? "expand_less" : "expand_more"
                 }}</mat-icon>
                 {{
                   isArrivalLineExpanded(line)
-                    ? 'Mostrar menos veículos'
+                    ? "Mostrar menos veículos"
                     : getHiddenVehiclesLabel(line)
                 }}
               </button>
@@ -115,8 +115,8 @@
         <p>
           {{
             compact()
-              ? 'Sem previsão para esta linha no momento'
-              : 'Nenhuma previsão disponível no momento'
+              ? "Sem previsão para esta linha no momento"
+              : "Nenhuma previsão disponível no momento"
           }}
         </p>
         @if (!compact()) {
@@ -168,7 +168,7 @@
                 }
 
                 <mat-icon class="expand-icon">{{
-                  isRouteExpanded(route) ? 'expand_less' : 'expand_more'
+                  isRouteExpanded(route) ? "expand_less" : "expand_more"
                 }}</mat-icon>
               </button>
 
@@ -239,8 +239,8 @@
                         <mat-icon>map</mat-icon>
                         {{
                           isRouteSelected(route)
-                            ? 'Exibida no mapa'
-                            : 'Exibir no mapa'
+                            ? "Exibida no mapa"
+                            : "Exibir no mapa"
                         }}
                       </button>
                     </div>

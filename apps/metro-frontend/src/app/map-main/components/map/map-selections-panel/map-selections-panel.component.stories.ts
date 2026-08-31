@@ -134,10 +134,10 @@ export const WithStopsAndBikes: Story = {
       throw new Error('Total selections should be 3');
 
     const categories = Array.from(
-      canvasElement.querySelectorAll('.category-section')
+      canvasElement.querySelectorAll('.category-section'),
     );
     const labels = categories.map((c) =>
-      c.querySelector('.category-label')?.textContent?.trim()
+      c.querySelector('.category-label')?.textContent?.trim(),
     );
     if (!labels.includes('Paradas')) throw new Error('Stops category missing');
     if (!labels.includes('Estações de Bicicleta'))
@@ -145,7 +145,7 @@ export const WithStopsAndBikes: Story = {
 
     // Click a bike station remove button
     const bikeSection = categories.find((c) =>
-      c.querySelector('.category-label')?.textContent?.includes('Bicicleta')
+      c.querySelector('.category-label')?.textContent?.includes('Bicicleta'),
     );
     const bikeRemove = bikeSection?.querySelector('button[matChipRemove]');
     if (!bikeRemove) throw new Error('Bike remove button not found');

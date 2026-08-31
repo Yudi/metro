@@ -6,12 +6,7 @@ import {
   registerEnumType,
 } from '@nestjs/graphql';
 import { BadRequestException } from '@nestjs/common';
-import {
-  ArrayMaxSize,
-  IsArray,
-  Length,
-  Matches,
-} from 'class-validator';
+import { ArrayMaxSize, IsArray, Length, Matches } from 'class-validator';
 import {
   FavoriteList as FavoriteListType,
   FavoriteType,
@@ -152,7 +147,9 @@ export function normalizeFavoriteListInput(
       );
     }
 
-    const codes = Array.from(new Set(values.map((code) => normalizeFavoriteCode(code))));
+    const codes = Array.from(
+      new Set(values.map((code) => normalizeFavoriteCode(code))),
+    );
     total += codes.length;
     if (total > MAX_FAVORITES_PER_USER) {
       throw new BadRequestException(

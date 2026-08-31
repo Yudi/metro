@@ -94,12 +94,8 @@ describe('Trivia Trens agency', () => {
       expect(getRailLineByCode(lineCode)?.agency).toBe(
         TransitAgency.TRIVIATRENS,
       );
-      expect(getRouteAgency(`L${lineCode}`)).toBe(
-        TransitAgency.TRIVIATRENS,
-      );
-      expect(LINE_AGENCY_MAPPING[lineCode]).toBe(
-        TransitAgency.TRIVIATRENS,
-      );
+      expect(getRouteAgency(`L${lineCode}`)).toBe(TransitAgency.TRIVIATRENS);
+      expect(LINE_AGENCY_MAPPING[lineCode]).toBe(TransitAgency.TRIVIATRENS);
       expect(getAgencyLogoForRoute(`L${lineCode}`)).toBe(
         '/app/shared/agencies/triviatrens.svg',
       );

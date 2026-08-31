@@ -20,26 +20,28 @@ describe('GeographyServiceOptimized stop full data', () => {
     const service = createService(17);
     let active = 0;
     let maximumActive = 0;
-    jest.spyOn(service, 'getRouteFullData').mockImplementation(async (routeId) => {
-      active += 1;
-      maximumActive = Math.max(maximumActive, active);
-      await Promise.resolve();
-      active -= 1;
-      return {
-        route: {
-          id: routeId,
-          routeId,
-          shortName: routeId,
-          longName: routeId,
-          routeType: 3,
-          color: '',
-          textColor: '',
-        },
-        trips: [],
-        shapes: [],
-        stops: [],
-      };
-    });
+    jest
+      .spyOn(service, 'getRouteFullData')
+      .mockImplementation(async (routeId) => {
+        active += 1;
+        maximumActive = Math.max(maximumActive, active);
+        await Promise.resolve();
+        active -= 1;
+        return {
+          route: {
+            id: routeId,
+            routeId,
+            shortName: routeId,
+            longName: routeId,
+            routeType: 3,
+            color: '',
+            textColor: '',
+          },
+          trips: [],
+          shapes: [],
+          stops: [],
+        };
+      });
 
     const result = await service.getStopFullData('stop-1', true);
 

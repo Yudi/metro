@@ -64,7 +64,9 @@ interface SearchGraphQLResultBase {
   highlights?: SearchHighlightResult[] | null;
 }
 
-interface SearchGraphQLBusRoute extends SearchGraphQLResultBase, TypesenseRoute {
+interface SearchGraphQLBusRoute
+  extends SearchGraphQLResultBase,
+    TypesenseRoute {
   __typename: 'SearchBusRoute';
 }
 
@@ -169,7 +171,9 @@ export class TypesenseSearchService {
         },
       })
       .pipe(
-        map((response) => this.mapSearchResponse(query, response.data?.search || [])),
+        map((response) =>
+          this.mapSearchResponse(query, response.data?.search || []),
+        ),
         catchError((error) => {
           this.logger.error('Search error', error);
           return of({
@@ -335,7 +339,10 @@ export class TypesenseSearchService {
     }
 
     return highlights.reduce<Record<string, string[]>>((acc, highlight) => {
-      acc[highlight.field] = [...(acc[highlight.field] || []), highlight.snippet];
+      acc[highlight.field] = [
+        ...(acc[highlight.field] || []),
+        highlight.snippet,
+      ];
       return acc;
     }, {});
   }

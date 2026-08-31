@@ -36,9 +36,7 @@ export interface RailStatusFetchResult {
 export class RailApiService {
   private readonly logger = new Logger(RailApiService.name);
 
-  constructor(
-    private readonly railStatusSource: RailStatusSourcePort,
-  ) {}
+  constructor(private readonly railStatusSource: RailStatusSourcePort) {}
 
   private getStatusSources(): RailStatusSource[] {
     return [
@@ -151,9 +149,7 @@ export class RailApiService {
         success: true,
       },
       attemptedAt,
-      sources: sourceResults.map((source) =>
-        this.toSourceDiagnostics(source),
-      ),
+      sources: sourceResults.map((source) => this.toSourceDiagnostics(source)),
     };
   }
 
@@ -200,7 +196,9 @@ export class RailApiService {
     };
   }
 
-  private filterKnownLines(lines: Map<number, RailLine>): Map<number, RailLine> {
+  private filterKnownLines(
+    lines: Map<number, RailLine>,
+  ): Map<number, RailLine> {
     return new Map(
       Array.from(lines).filter(
         ([code, line]) => code === line.code && isKnownRailLineCode(line.code),

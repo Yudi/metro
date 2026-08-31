@@ -1,11 +1,5 @@
 import { isPlatformBrowser } from '@angular/common';
-import {
-  Service,
-  OnDestroy,
-  PLATFORM_ID,
-  inject,
-  signal,
-} from '@angular/core';
+import { Service, OnDestroy, PLATFORM_ID, inject, signal } from '@angular/core';
 import { API_BASE_URL } from '@metro/shared/api';
 import { io, Socket } from 'socket.io-client';
 
@@ -58,7 +52,9 @@ export class LiteRealtimeService implements OnDestroy {
   readonly connected = signal(false);
   readonly stopArrivals = signal<Map<string, LiteStopArrivalUpdate>>(new Map());
 
-  fetchStopArrivalOnce(stopCode: string): Promise<LiteStopArrivalUpdate | null> {
+  fetchStopArrivalOnce(
+    stopCode: string,
+  ): Promise<LiteStopArrivalUpdate | null> {
     if (!this.isBrowser || !stopCode) {
       return Promise.resolve(null);
     }
@@ -164,17 +160,12 @@ export class LiteRealtimeService implements OnDestroy {
       this.settlePendingRequests();
     });
 
-    this.socket.on(
-      ARRIVAL_PREDICTIONS_EVENT,
-      (payload: unknown) => {
-        this.handleArrivalPredictions(payload);
-      },
-    );
+    this.socket.on(ARRIVAL_PREDICTIONS_EVENT, (payload: unknown) => {
+      this.handleArrivalPredictions(payload);
+    });
   }
 
-  private handleArrivalPredictions(
-    payload: unknown,
-  ): void {
+  private handleArrivalPredictions(payload: unknown): void {
     const update = this.readArrivalUpdate(payload);
     if (!update) {
       return;
@@ -185,9 +176,7 @@ export class LiteRealtimeService implements OnDestroy {
     this.stopArrivals.set(arrivals);
   }
 
-  private readArrivalUpdate(
-    payload: unknown,
-  ): LiteStopArrivalUpdate | null {
+  private readArrivalUpdate(payload: unknown): LiteStopArrivalUpdate | null {
     if (!isRecord(payload) || !isRecord(payload['data'])) {
       return null;
     }

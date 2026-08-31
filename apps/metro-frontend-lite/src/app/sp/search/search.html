@@ -76,8 +76,7 @@
           <p class="stop-type">{{ getStopType(stop) }}</p>
           @if (stop.kind === 'bikeStation') {
           <p class="stop-type">{{ getBikeSummary(stop) }}</p>
-          }
-          @if (stop.lineCodes.length > 0) {
+          } @if (stop.lineCodes.length > 0) {
           <div class="stop-lines">
             @for (code of stop.lineCodes; track code) {
             <lite-chip
@@ -143,17 +142,13 @@
         }
       </div>
     </section>
-    }
-
-    @if (stop.kind === 'railStation' && hasNextTrainData(stop)) {
+    } @if (stop.kind === 'railStation' && hasNextTrainData(stop)) {
     <app-lite-rail-next-trains
       [groups]="nextTrainGroups()"
       [loading]="trainsLoading()"
       [error]="trainsError()"
     />
-    }
-
-    @if (stop.kind === 'busStop') {
+    } @if (stop.kind === 'busStop') {
     <app-lite-bus-stop-detail
       [stop]="stop"
       [arrivals]="busArrivals()"
@@ -162,9 +157,7 @@
       [railConnectionsLoading]="railConnectionsLoading()"
       [railConnectionsError]="railConnectionsError()"
     />
-    }
-
-    @if (stop.kind === 'bikeStation') {
+    } @if (stop.kind === 'bikeStation') {
     <app-lite-bike-availability [station]="stop" />
     }
   </div>

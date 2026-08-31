@@ -81,7 +81,9 @@ describe('RailService', () => {
 
     const reads = Array.from({ length: 20 }, () => service.getLinesStatus());
     const cron = service.handleCronFetch();
-    expect(apiService.fetchMergedStatusWithDiagnostics).toHaveBeenCalledTimes(1);
+    expect(apiService.fetchMergedStatusWithDiagnostics).toHaveBeenCalledTimes(
+      1,
+    );
 
     finishFetch?.({
       status: { lines: [], lastUpdated: new Date(), success: true },
@@ -97,8 +99,12 @@ describe('RailService', () => {
     });
     await Promise.all([...reads, cron]);
 
-    expect(apiService.fetchMergedStatusWithDiagnostics).toHaveBeenCalledTimes(1);
+    expect(apiService.fetchMergedStatusWithDiagnostics).toHaveBeenCalledTimes(
+      1,
+    );
     expect(cacheService.saveToRedis).toHaveBeenCalledTimes(1);
-    expect(historicalService.recordRailStatusObservations).toHaveBeenCalledTimes(1);
+    expect(
+      historicalService.recordRailStatusObservations,
+    ).toHaveBeenCalledTimes(1);
   });
 });

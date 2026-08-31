@@ -13,7 +13,7 @@ export class PollingCoordinator {
   constructor(
     private readonly logger: Logger,
     private readonly pollFn: () => Promise<void>,
-    private readonly pollIntervalMs: number
+    private readonly pollIntervalMs: number,
   ) {}
 
   /**
@@ -25,7 +25,7 @@ export class PollingCoordinator {
     }
 
     this.logger.debug(
-      `Starting polling loop (every ${this.pollIntervalMs / 1000} seconds)`
+      `Starting polling loop (every ${this.pollIntervalMs / 1000} seconds)`,
     );
 
     // Kick off the recurring interval

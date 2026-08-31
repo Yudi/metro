@@ -34,7 +34,7 @@ export class VehicleDirectionService {
     vehicleId: number,
     longitude: number,
     latitude: number,
-    isoTimestamp: string
+    isoTimestamp: string,
   ): VehicleDirectionResult {
     const timestamp = this.parseTimestamp(isoTimestamp);
     const projected = fromLonLat([longitude, latitude]);

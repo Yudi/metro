@@ -57,9 +57,7 @@ export function getNextTrainLineCode(
     : null;
 }
 
-export function getRailLineCodeFromFavorite(
-  id: string,
-): number | undefined {
+export function getRailLineCodeFromFavorite(id: string): number | undefined {
   const line = id.startsWith('L')
     ? getRailLineById(id)
     : getRailLineByCode(parseInt(id, 10));

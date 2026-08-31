@@ -530,8 +530,7 @@ export class RailGraphqlService {
       })
       .pipe(
         map(
-          (response) =>
-            response.data?.historicalData?.headwaySnapshots ?? [],
+          (response) => response.data?.historicalData?.headwaySnapshots ?? [],
         ),
       );
   }

@@ -138,9 +138,7 @@ describe('MapComponent', () => {
     const mapService = TestBed.inject(MapService);
     const initializeMap = jest.spyOn(mapService, 'initializeMap');
 
-    (
-      component as unknown as { initializeMap(): void }
-    ).initializeMap();
+    (component as unknown as { initializeMap(): void }).initializeMap();
     component.ngOnDestroy();
     jest.advanceTimersByTime(1_100);
 
@@ -150,9 +148,9 @@ describe('MapComponent', () => {
 
   it('applies ?bike=true to show the bike layer', () => {
     const mapService = TestBed.inject(MapService);
-    expect(
-      mapService.getLayerService().isLayerVisible(LayerType.BIKE),
-    ).toBe(true);
+    expect(mapService.getLayerService().isLayerVisible(LayerType.BIKE)).toBe(
+      true,
+    );
   });
 
   it('applies lat/lon/zoom query params to center the map', () => {
@@ -220,16 +218,16 @@ describe('MapComponent', () => {
             },
           },
           {
-          provide: RealtimeWebsocketService,
-          useValue: {
-            connected: signal(false).asReadonly(),
-            lastUpdateTimestamp: signal<number | null>(null).asReadonly(),
-            vehiclePositions: signal(new Map()).asReadonly(),
-            stopArrivals: signal(new Map()).asReadonly(),
-            POLL_INTERVAL_MS: 30_000,
-            subscribeToRoute: jest.fn(),
+            provide: RealtimeWebsocketService,
+            useValue: {
+              connected: signal(false).asReadonly(),
+              lastUpdateTimestamp: signal<number | null>(null).asReadonly(),
+              vehiclePositions: signal(new Map()).asReadonly(),
+              stopArrivals: signal(new Map()).asReadonly(),
+              POLL_INTERVAL_MS: 30_000,
+              subscribeToRoute: jest.fn(),
+            },
           },
-        },
           {
             provide: RealtimeVehicleLayerService,
             useValue: {

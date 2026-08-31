@@ -35,7 +35,7 @@ export function isSubwayStation(stop: BusStopGraphQL): boolean {
  */
 export function getRouteColor(
   route: BusRouteGraphQL,
-  fallback = '1976d2'
+  fallback = '1976d2',
 ): string {
   return route.color && route.color !== '' ? route.color : fallback;
 }
@@ -53,7 +53,7 @@ export function getRouteDisplayName(route: BusRouteGraphQL): string {
  * Filter subway stations from a list of stops
  */
 export function filterSubwayStations(
-  stops: BusStopGraphQL[]
+  stops: BusStopGraphQL[],
 ): BusStopGraphQL[] {
   return stops.filter((stop) => isSubwayStation(stop));
 }
@@ -90,7 +90,7 @@ export function deduplicateStops(stops: BusStopGraphQL[]): BusStopGraphQL[] {
  * Remove duplicate routes by ID
  */
 export function deduplicateRoutes(
-  routes: BusRouteGraphQL[]
+  routes: BusRouteGraphQL[],
 ): BusRouteGraphQL[] {
   const seen = new Set<string>();
   return routes.filter((route) => {

@@ -322,7 +322,7 @@ export class SearchService {
   search(
     query: string,
     type?: 'route' | 'stop',
-    limit = 10
+    limit = 10,
   ): Observable<SearchResults> {
     return this.apollo
       .query<SearchResponse>({
@@ -341,9 +341,10 @@ export class SearchService {
       })
       .pipe(
         map((result) => {
-          const searchData = (result.data?.search || []) as SearchGraphQLResult[];
+          const searchData = (result.data?.search ||
+            []) as SearchGraphQLResult[];
           return this.mapSearchResults(searchData);
-        })
+        }),
       );
   }
 
@@ -394,7 +395,7 @@ export class SearchService {
     latitude: number,
     longitude: number,
     radiusMeters = 1000,
-    limit = 20
+    limit = 20,
   ): Observable<Stop[]> {
     return this.apollo
       .query<NearbyStopsResponse>({
@@ -412,7 +413,7 @@ export class SearchService {
         map((result) => {
           const stopsData = result.data?.nearbyStops;
           return stopsData ? (stopsData as Stop[]) : [];
-        })
+        }),
       );
   }
 
@@ -426,7 +427,7 @@ export class SearchService {
         map((result) => {
           const routeData = result.data?.routeDetails;
           return routeData ? (routeData as RouteDetails) : null;
-        })
+        }),
       );
   }
 
@@ -440,7 +441,7 @@ export class SearchService {
         map((result) => {
           const stopData = result.data?.stopDetails;
           return stopData ? (stopData as StopDetails) : null;
-        })
+        }),
       );
   }
 
@@ -454,7 +455,7 @@ export class SearchService {
         map((result) => {
           const shapeData = result.data?.routeShape;
           return shapeData ? (shapeData as RouteShape[]) : [];
-        })
+        }),
       );
   }
 

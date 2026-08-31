@@ -21,7 +21,10 @@ import type {
   VehiclePositionUpdate,
 } from '../dto/realtime.dto';
 
-type PositionCacheEntry = [string, { data: PositionResponse; timestamp: number }];
+type PositionCacheEntry = [
+  string,
+  { data: PositionResponse; timestamp: number },
+];
 type StopArrivalCacheEntry = { data: StopArrivalResponse; timestamp: number };
 
 /**
@@ -101,14 +104,20 @@ export class RealtimeGateway
   ): Promise<void> {
     const routeShortName = data.routeShortName?.trim();
     if (!routeShortName) {
-      this.emitSubscriptionError(client, 'Route subscription is missing routeShortName');
+      this.emitSubscriptionError(
+        client,
+        'Route subscription is missing routeShortName',
+      );
       return;
     }
 
     const isKnownRoute =
       await this.routeStopMapping.isKnownRealtimeRoute(routeShortName);
     if (!isKnownRoute) {
-      this.emitSubscriptionError(client, 'Route is not available for realtime bus polling');
+      this.emitSubscriptionError(
+        client,
+        'Route is not available for realtime bus polling',
+      );
       return;
     }
 
@@ -119,12 +128,14 @@ export class RealtimeGateway
     // Track this client's subscription
     const subscriptions = this.clientSubscriptions.get(client.id);
     if (!subscriptions) {
-      this.emitSubscriptionError(client, 'Client is not connected to realtime subscriptions');
+      this.emitSubscriptionError(
+        client,
+        'Client is not connected to realtime subscriptions',
+      );
       return;
     }
 
-    const alreadySubscribed =
-      subscriptions.routes.has(routeShortName);
+    const alreadySubscribed = subscriptions.routes.has(routeShortName);
     if (!alreadySubscribed) {
       if (subscriptions.routes.size >= this.maxRoutesPerClient) {
         this.emitSubscriptionError(client, 'Route subscription limit exceeded');
@@ -132,7 +143,10 @@ export class RealtimeGateway
       }
 
       if (!this.pollingService.subscribeToRoute(routeShortName)) {
-        this.emitSubscriptionError(client, 'Global route subscription limit exceeded');
+        this.emitSubscriptionError(
+          client,
+          'Global route subscription limit exceeded',
+        );
         return;
       }
 
@@ -165,10 +179,7 @@ export class RealtimeGateway
 
       client.emit(
         RealtimeMessageType.VEHICLE_POSITIONS,
-        this.buildVehiclePositionsMessage(
-          routeShortName,
-          routeCacheEntries,
-        ),
+        this.buildVehiclePositionsMessage(routeShortName, routeCacheEntries),
       );
     } else {
       // No cached data - trigger immediate poll
@@ -202,10 +213,7 @@ export class RealtimeGateway
 
         client.emit(
           RealtimeMessageType.VEHICLE_POSITIONS,
-          this.buildVehiclePositionsMessage(
-            routeShortName,
-            freshCacheEntries,
-          ),
+          this.buildVehiclePositionsMessage(routeShortName, freshCacheEntries),
         );
       } else {
         this.logger.warn(
@@ -231,8 +239,7 @@ export class RealtimeGateway
     );
 
     const subscriptions = this.clientSubscriptions.get(client.id);
-    const wasSubscribed =
-      subscriptions?.routes.has(routeShortName) ?? false;
+    const wasSubscribed = subscriptions?.routes.has(routeShortName) ?? false;
     if (subscriptions) {
       subscriptions.routes.delete(routeShortName);
     }
@@ -249,23 +256,31 @@ export class RealtimeGateway
   ): Promise<void> {
     const stopCode = data.stopCode?.trim();
     if (!stopCode) {
-      this.emitSubscriptionError(client, 'Stop subscription is missing stopCode');
+      this.emitSubscriptionError(
+        client,
+        'Stop subscription is missing stopCode',
+      );
       return;
     }
 
-    const isKnownStop = await this.routeStopMapping.isKnownRealtimeStop(stopCode);
+    const isKnownStop =
+      await this.routeStopMapping.isKnownRealtimeStop(stopCode);
     if (!isKnownStop) {
-      this.emitSubscriptionError(client, 'Stop is not available for realtime bus polling');
+      this.emitSubscriptionError(
+        client,
+        'Stop is not available for realtime bus polling',
+      );
       return;
     }
 
-    this.logger.debug(
-      `Client ${client.id} subscribing to stop: ${stopCode}`,
-    );
+    this.logger.debug(`Client ${client.id} subscribing to stop: ${stopCode}`);
 
     const subscriptions = this.clientSubscriptions.get(client.id);
     if (!subscriptions) {
-      this.emitSubscriptionError(client, 'Client is not connected to realtime subscriptions');
+      this.emitSubscriptionError(
+        client,
+        'Client is not connected to realtime subscriptions',
+      );
       return;
     }
 
@@ -277,7 +292,10 @@ export class RealtimeGateway
       }
 
       if (!this.pollingService.subscribeToStop(stopCode)) {
-        this.emitSubscriptionError(client, 'Global stop subscription limit exceeded');
+        this.emitSubscriptionError(
+          client,
+          'Global stop subscription limit exceeded',
+        );
         return;
       }
 

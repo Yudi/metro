@@ -64,12 +64,11 @@ describe('RailApiService', () => {
     expect(result.status?.lines.map((line) => line.code)).toEqual(
       RAIL_LINES.map((line) => line.code),
     );
-    expect(result.status?.lines.find((line) => line.code === 1)?.statusCode).toBe(
-      'OperacaoNormal',
-    );
-    expect(result.status?.lines.find((line) => line.code === 2)?.statusCode).toBe(
-      'VelocidadeReduzida',
-    );
+    expect(
+      result.status?.lines.find((line) => line.code === 1)?.statusCode,
+    ).toBe('OperacaoNormal');
+    expect(
+      result.status?.lines.find((line) => line.code === 2)?.statusCode,
+    ).toBe('VelocidadeReduzida');
   });
-
 });

@@ -611,10 +611,7 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
   }
 
   private sanitizeHeadwayMetadata(value: Prisma.JsonValue | null): unknown {
-    return this.pickPublicJsonFields(value, [
-      'updatedAt',
-      'minSamples',
-    ]);
+    return this.pickPublicJsonFields(value, ['updatedAt', 'minSamples']);
   }
 
   private sanitizeHeadwayErrors(value: Prisma.JsonValue | null): unknown {
@@ -672,7 +669,11 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async withHeadwayStationNames<
-    T extends { lineCode: string; stationCode: string; stationName?: string | null },
+    T extends {
+      lineCode: string;
+      stationCode: string;
+      stationName?: string | null;
+    },
   >(snapshots: T[]): Promise<T[]> {
     const missingStationNames = new Map<string, T>();
 
@@ -739,7 +740,9 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
     return isActualCptmLine(lineCode) || isSpecialCptmLine(lineCode);
   }
 
-  private isStaticNextTrainLine(lineCode: string): lineCode is NextTrainLineCode {
+  private isStaticNextTrainLine(
+    lineCode: string,
+  ): lineCode is NextTrainLineCode {
     return lineCode === 'L4' || lineCode === 'L8' || lineCode === 'L9';
   }
 

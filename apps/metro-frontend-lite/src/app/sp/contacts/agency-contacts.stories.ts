@@ -75,11 +75,7 @@ const meta: Meta<AgencyStoryArgs> = {
   },
   render: ({ agencyKey, contactMode, showAdditionalInformation }) => ({
     props: {
-      agency: createAgency(
-        agencyKey,
-        contactMode,
-        showAdditionalInformation,
-      ),
+      agency: createAgency(agencyKey, contactMode, showAdditionalInformation),
     },
     template: '<app-agency-contacts [agency]="agency" />',
   }),

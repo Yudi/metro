@@ -10,11 +10,7 @@ import { SearchModule } from '../search/search.module';
 @Module({
   imports: [PrismaModule, VectorTilesModule, SearchModule],
   controllers: [RailImportController],
-  providers: [
-    RailImportService,
-    WFSProcessingService,
-    WFSDatabaseService,
-  ],
+  providers: [RailImportService, WFSProcessingService, WFSDatabaseService],
   exports: [RailImportService],
 })
 export class RailImportModule {}

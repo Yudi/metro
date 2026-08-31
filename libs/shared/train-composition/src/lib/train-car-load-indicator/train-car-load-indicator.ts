@@ -4,10 +4,7 @@ import {
   computed,
   input,
 } from '@angular/core';
-import {
-  TrainCarLoadStatus,
-  TrainCarMode,
-} from '../train-composition.models';
+import { TrainCarLoadStatus, TrainCarMode } from '../train-composition.models';
 import { TrainCarLoadLevel } from '@metro/shared/utils';
 
 interface LoadBand {

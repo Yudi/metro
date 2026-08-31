@@ -4,7 +4,6 @@ import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import {
   PositionResponse,
-  LinePositionResponse,
   StopArrivalResponse,
   LineArrivalResponse,
   LineSearchResult,
@@ -233,94 +232,6 @@ export class OlhoVivoApiService implements OnModuleInit {
       }
 
       this.logger.error('Error fetching all positions:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get vehicle positions for a specific line
-   * @param codigoLinha - SPTrans line code (cl field from API, not our database ID)
-   * @deprecated Use getAllPositions instead for better efficiency
-   */
-  async getLinePositions(codigoLinha: number): Promise<LinePositionResponse> {
-    await this.ensureAuthenticated();
-
-    try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      };
-
-      // Add authentication cookie if available
-      if (this.cookieJar) {
-        headers['Cookie'] = this.cookieJar;
-      }
-
-      this.logger.debug(
-        `Will call ${this.sptransApiUrl}/Posicao/Linha?codigoLinha=${codigoLinha}`,
-      );
-
-      const response = await firstValueFrom(
-        this.httpService.get<LinePositionResponse>(
-          `${this.sptransApiUrl}/Posicao/Linha?codigoLinha=${codigoLinha}`,
-          { headers },
-        ),
-      );
-
-      this.throwIfNullResponse(
-        response.data,
-        `Posicao/Linha?codigoLinha=${codigoLinha}`,
-      );
-
-      // Log response
-
-      this.logger.debug(
-        `API Response for line ${codigoLinha}: ${JSON.stringify(response.data)}`,
-      );
-
-      this.logger.debug(
-        `Fetched positions for line ${codigoLinha}: ${
-          response.data.vs?.length ?? 0
-        } vehicles`,
-      );
-      return response.data;
-    } catch (error) {
-      // If authentication expired, retry once
-      if (this.isAuthenticationError(error)) {
-        this.logger.warn(
-          `Auth error on line ${codigoLinha}, re-authenticating...`,
-        );
-        this.isAuthenticated = false;
-        this.cookieJar = null;
-        await this.ensureAuthenticated();
-
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        };
-        if (this.cookieJar) {
-          headers['Cookie'] = this.cookieJar;
-        }
-
-        const response = await firstValueFrom(
-          this.httpService.get<LinePositionResponse>(
-            `${this.sptransApiUrl}/Posicao/Linha?codigoLinha=${codigoLinha}`,
-            { headers },
-          ),
-        );
-
-        this.throwIfNullResponse(
-          response.data,
-          `Posicao/Linha?codigoLinha=${codigoLinha}`,
-        );
-
-        return response.data;
-      }
-
-      this.logger.error(
-        `Error fetching positions for line ${codigoLinha}:`,
-        error,
-      );
       throw error;
     }
   }

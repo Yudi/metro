@@ -95,9 +95,7 @@ export class BikePricingService {
     const activationFee = this.findActivationEntry(
       electricPlan.per_min_pricing,
     );
-    const perMinute = this.findPerMinuteEntry(
-      electricPlan.per_min_pricing,
-    );
+    const perMinute = this.findPerMinuteEntry(electricPlan.per_min_pricing);
     if (!activationFee || !perMinute) {
       return null;
     }

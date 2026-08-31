@@ -17,7 +17,10 @@ interface GtfsRouteRow {
 export class BusRouteService {
   private readonly logger = new Logger(BusRouteService.name);
 
-  constructor(private prisma: PrismaService, private postGIS: PostGISService) {}
+  constructor(
+    private prisma: PrismaService,
+    private postGIS: PostGISService,
+  ) {}
 
   async getAllBusRoutes(): Promise<BusRoute[]> {
     const routes = await this.postGIS.getAllRoutes();
@@ -44,7 +47,7 @@ export class BusRouteService {
 
   async getSubwayRoutes(): Promise<BusRoute[]> {
     this.logger.debug(
-      'Backend: getSubwayRoutes called - filtering for METRÔ and CPTM routes'
+      'Backend: getSubwayRoutes called - filtering for METRÔ and CPTM routes',
     );
 
     // Query only routes that start with 'METRÔ' or 'CPTM' in their route_id
@@ -75,7 +78,7 @@ export class BusRouteService {
     }
 
     this.logger.debug(
-      `Backend: Returning ${results.length} subway routes with geometry`
+      `Backend: Returning ${results.length} subway routes with geometry`,
     );
     return results;
   }

@@ -15,12 +15,14 @@ describe('TypesenseService', () => {
     };
 
     await expect(
-      (service as never as {
-        importDocuments: (
-          baseName: string,
-          documents: Array<Record<string, unknown>>,
-        ) => Promise<void>;
-      }).importDocuments('metro-sptrans-gtfs-routes', [
+      (
+        service as never as {
+          importDocuments: (
+            baseName: string,
+            documents: Array<Record<string, unknown>>,
+          ) => Promise<void>;
+        }
+      ).importDocuments('metro-sptrans-gtfs-routes', [
         { id: 'ok' },
         { id: 'bad' },
       ]),
@@ -36,20 +38,24 @@ describe('TypesenseService', () => {
     (service as never as { client: unknown }).client = {
       collections: jest.fn().mockReturnValue({
         documents: jest.fn().mockReturnValue({
-          import: jest.fn().mockResolvedValue([
-            { success: false, id: 'bad', error: 'invalid document' },
-          ]),
+          import: jest
+            .fn()
+            .mockResolvedValue([
+              { success: false, id: 'bad', error: 'invalid document' },
+            ]),
         }),
       }),
     };
 
     await expect(
-      (service as never as {
-        importDocuments: (
-          baseName: string,
-          documents: Array<Record<string, unknown>>,
-        ) => Promise<void>;
-      }).importDocuments('metro-sptrans-gtfs-routes', [{ id: 'bad' }]),
+      (
+        service as never as {
+          importDocuments: (
+            baseName: string,
+            documents: Array<Record<string, unknown>>,
+          ) => Promise<void>;
+        }
+      ).importDocuments('metro-sptrans-gtfs-routes', [{ id: 'bad' }]),
     ).rejects.toThrow('rejected 1 malformed');
   });
 });

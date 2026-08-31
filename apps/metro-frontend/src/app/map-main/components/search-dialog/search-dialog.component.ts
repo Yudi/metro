@@ -306,7 +306,10 @@ export class SearchDialogComponent implements AfterViewInit {
     response: TypesenseSearchResponse,
     specialServices: SpecialRailService[] = [],
   ): void {
-    if ((!response.results || response.results.length === 0) && specialServices.length === 0) {
+    if (
+      (!response.results || response.results.length === 0) &&
+      specialServices.length === 0
+    ) {
       this.searchResults.set([]);
       return;
     }
@@ -322,7 +325,9 @@ export class SearchDialogComponent implements AfterViewInit {
             id: route.id,
             name: isRailLine ? route.route_long_name : route.route_short_name,
             type: 'route' as SearchResultType,
-            description: isRailLine ? route.route_short_name : route.route_long_name,
+            description: isRailLine
+              ? route.route_short_name
+              : route.route_long_name,
             routeData: route,
             latitude: undefined,
             longitude: undefined,

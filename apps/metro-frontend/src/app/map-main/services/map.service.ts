@@ -3,12 +3,7 @@ import { Map, View } from 'ol';
 import TileLayer from 'ol/layer/Tile';
 import { fromLonLat, toLonLat } from 'ol/proj';
 import { createEmpty, extend, isEmpty } from 'ol/extent';
-import {
-  Style,
-  Fill,
-  Stroke,
-  Circle as CircleStyle,
-} from 'ol/style';
+import { Style, Fill, Stroke, Circle as CircleStyle } from 'ol/style';
 import { Feature } from 'ol';
 import { FeatureLike } from 'ol/Feature';
 import { Point, LineString, Polygon, Circle } from 'ol/geom';
@@ -127,8 +122,8 @@ export class MapService {
     }
 
     const baseTileUrl = isDarkMode
-      ? 'https://{a-c}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
-      : 'https://{a-c}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
+      ? 'https://{a-c}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png?key=cb1_2lkv_1_27d7ef4f354ced672732050a'
+      : 'https://{a-c}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png?key=cb1_2lkv_1_27d7ef4f354ced672732050a';
 
     // Create base tile layer (CartoDB light/dark)
     const tileLayer = new TileLayer({
@@ -152,8 +147,8 @@ export class MapService {
             ? event.matches
             : (event as MediaQueryList).matches;
         const url = matches
-          ? 'https://{a-c}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
-          : 'https://{a-c}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png';
+          ? 'https://{a-c}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png?key=cb1_2lkv_1_27d7ef4f354ced672732050a'
+          : 'https://{a-c}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png?key=cb1_2lkv_1_27d7ef4f354ced672732050a';
         this.baseTileLayer?.setSource(
           new XYZ({
             url,
@@ -212,10 +207,9 @@ export class MapService {
 
     // Initialize zoom level signal
     this.zoomLevel.set(map.getView().getZoom() || null);
-    this.center.set(toLonLat(map.getView().getCenter() ?? [0, 0]) as [
-      number,
-      number,
-    ]);
+    this.center.set(
+      toLonLat(map.getView().getCenter() ?? [0, 0]) as [number, number],
+    );
 
     // Listen for zoom changes and refresh layers to update labels
     map.getView().on('change:resolution', () => {

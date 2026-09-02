@@ -69,23 +69,24 @@ export class TripServiceOptimized {
       return [];
     }
 
-    // Batch operations to avoid N+1 queries
     const stopIdList = stops.map((s) => s.stop_id);
-    const [subwayStopIds, stopAgencies] = await Promise.all([
-      this.queryOptimization.batchCheckSubwayStations(stopIdList),
-      this.queryOptimization.batchGetStopAgencies(stopIdList),
-    ]);
+    const serviceInfo =
+      await this.queryOptimization.batchGetStopServiceInfo(stopIdList);
 
-    return stops.map((stop) => ({
-      id: stop.stop_id,
-      stopId: stop.stop_id,
-      name: stop.stop_name,
-      description: stop.stop_desc || undefined,
-      latitude: stop.stop_lat,
-      longitude: stop.stop_lon,
-      isSubwayStation: subwayStopIds.has(stop.stop_id),
-      agencies: stopAgencies.get(stop.stop_id),
-    }));
+    return stops.map((stop) => {
+      const info = serviceInfo.get(stop.stop_id);
+      return {
+        id: stop.stop_id,
+        stopId: stop.stop_id,
+        name: stop.stop_name,
+        description: stop.stop_desc || undefined,
+        latitude: stop.stop_lat,
+        longitude: stop.stop_lon,
+        isSubwayStation: info?.servesRail ?? false,
+        agencies: info?.agencies,
+        routeShortNames: info?.railRouteShortNames,
+      };
+    });
   }
 
   async getRoutesForStop(stopId: string): Promise<BusRoute[]> {

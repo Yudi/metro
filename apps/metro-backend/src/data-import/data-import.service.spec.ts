@@ -66,6 +66,46 @@ describe('DataImportService', () => {
     expect(service).toBeDefined();
   });
 
+  it('waits for the shared lock during scheduled imports instead of dropping the run', async () => {
+    jest.useFakeTimers();
+    const performImport = jest.fn().mockResolvedValue({
+      success: true,
+      filesProcessed: 0,
+      recordsImported: 0,
+      skippedFiles: [],
+      errors: [],
+    });
+    Object.defineProperty(service, 'performImport', { value: performImport });
+
+    let releaseLock!: () => void;
+    const lockAvailable = new Promise<void>((resolve) => {
+      releaseLock = resolve;
+    });
+    importLock.withLock.mockImplementationOnce(
+      async (
+        _lockName: string,
+        _operation: string,
+        action: () => Promise<unknown>,
+        options: { waitForLock?: boolean },
+      ) => {
+        expect(options).toEqual({ waitForLock: true });
+        await lockAvailable;
+        return action();
+      },
+    );
+
+    const scheduledImport = service.scheduledImport();
+    await Promise.resolve();
+    expect(performImport).not.toHaveBeenCalled();
+
+    releaseLock();
+    await scheduledImport;
+
+    expect(performImport).toHaveBeenCalledTimes(1);
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
+  });
+
   it('fails the run and skips post-import hooks when a required file fails', async () => {
     jest.useFakeTimers();
     jest.spyOn(service as never, 'performImport' as never).mockResolvedValue({

@@ -38,33 +38,33 @@ export class BusStopServiceOptimized {
     // Batch operations to avoid N+1 queries
     const stopIdList = stops.map((s) => s.stop_id);
 
-    // Get rail-only stops to exclude them (they're now in GeoSampa data)
-    const railOnlyStopIds =
-      await this.queryOptimization.getRailOnlyStops(stopIdList);
+    const serviceInfo =
+      await this.queryOptimization.batchGetStopServiceInfo(stopIdList);
 
     // Filter out rail-only stops
-    const busStops = stops.filter((stop) => !railOnlyStopIds.has(stop.stop_id));
+    const busStops = stops.filter((stop) => {
+      const info = serviceInfo.get(stop.stop_id);
+      return !(info?.servesRail && !info.servesBus);
+    });
 
-    const busStopIds = busStops.map((s) => s.stop_id);
-    const [subwayStopIds, stopAgencies] = await Promise.all([
-      this.queryOptimization.batchCheckSubwayStations(busStopIds),
-      this.queryOptimization.batchGetStopAgencies(busStopIds),
-    ]);
-
-    return busStops.map((stop) => ({
-      id: stop.stop_id,
-      stopId: stop.stop_id,
-      name: stop.stop_name,
-      description: stop.stop_desc || undefined,
-      latitude: stop.stop_lat,
-      longitude: stop.stop_lon,
-      isSubwayStation: subwayStopIds.has(stop.stop_id),
-      agencies: stopAgencies.get(stop.stop_id),
-      geometry: {
-        type: 'Point',
-        coordinates: [[stop.stop_lon, stop.stop_lat]],
-      },
-    }));
+    return busStops.map((stop) => {
+      const info = serviceInfo.get(stop.stop_id);
+      return {
+        id: stop.stop_id,
+        stopId: stop.stop_id,
+        name: stop.stop_name,
+        description: stop.stop_desc || undefined,
+        latitude: stop.stop_lat,
+        longitude: stop.stop_lon,
+        isSubwayStation: info?.servesRail ?? false,
+        agencies: info?.agencies,
+        routeShortNames: info?.railRouteShortNames,
+        geometry: {
+          type: 'Point',
+          coordinates: [[stop.stop_lon, stop.stop_lat]],
+        },
+      };
+    });
   }
 
   async getBusStop(id: string): Promise<BusStop | null> {
@@ -74,14 +74,10 @@ export class BusStopServiceOptimized {
       return null;
     }
 
-    // Single batched operation instead of multiple queries
-    const [subwayStopIds, stopAgencies] = await Promise.all([
-      this.queryOptimization.batchCheckSubwayStations([stop.stop_id]),
-      this.queryOptimization.batchGetStopAgencies([stop.stop_id]),
+    const serviceInfo = await this.queryOptimization.batchGetStopServiceInfo([
+      stop.stop_id,
     ]);
-
-    const isSubwayStation = subwayStopIds.has(stop.stop_id);
-    const agencies = stopAgencies.get(stop.stop_id);
+    const info = serviceInfo.get(stop.stop_id);
 
     return {
       id: stop.stop_id,
@@ -90,8 +86,9 @@ export class BusStopServiceOptimized {
       description: stop.stop_desc || undefined,
       latitude: stop.stop_lat,
       longitude: stop.stop_lon,
-      isSubwayStation,
-      agencies,
+      isSubwayStation: info?.servesRail ?? false,
+      agencies: info?.agencies,
+      routeShortNames: info?.railRouteShortNames,
       geometry: {
         type: 'Point',
         coordinates: [[stop.stop_lon, stop.stop_lat]],

@@ -1,6 +1,17 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { Pool } from 'pg';
 
+export const TRANSIT_CATALOG_IMPORT_LOCK =
+  'metro-dev:transit-catalog-import';
+
+export interface ImportLockOptions {
+  /**
+   * Wait until the lock is released instead of rejecting on contention.
+   * Background imports use this so startup ordering cannot drop a run.
+   */
+  readonly waitForLock?: boolean;
+}
+
 @Injectable()
 export class ImportLockService implements OnModuleDestroy {
   private readonly logger = new Logger(ImportLockService.name);
@@ -23,19 +34,32 @@ export class ImportLockService implements OnModuleDestroy {
     lockName: string,
     operation: string,
     action: () => Promise<T>,
+    options?: ImportLockOptions,
   ): Promise<T> {
     const client = await this.pool.connect();
     let lockAcquired = false;
 
     try {
-      const result = await client.query<{ locked: boolean }>(
-        'SELECT pg_try_advisory_lock(hashtext($1)) AS locked',
-        [lockName],
-      );
+      if (options?.waitForLock) {
+        // A blocking advisory lock is atomic with respect to other processes,
+        // so a background import remains queued until the current owner
+        // releases the shared catalog lock.
+        await client.query('SELECT pg_advisory_lock(hashtext($1))', [
+          lockName,
+        ]);
+        lockAcquired = true;
+      } else {
+        const result = await client.query<{ locked: boolean }>(
+          'SELECT pg_try_advisory_lock(hashtext($1)) AS locked',
+          [lockName],
+        );
 
-      lockAcquired = result.rows[0]?.locked === true;
-      if (!lockAcquired) {
-        throw new Error(`${operation} already in progress in another process`);
+        lockAcquired = result.rows[0]?.locked === true;
+        if (!lockAcquired) {
+          throw new Error(
+            `${operation} already in progress in another process`,
+          );
+        }
       }
 
       return await action();

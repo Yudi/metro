@@ -3,6 +3,13 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { getUniqueAgencies } from '@metro/shared/utils';
 import { BusRoute, BusStop } from '../entities/geography.entity';
 
+export interface StopServiceInfo {
+  servesRail: boolean;
+  servesBus: boolean;
+  agencies: string[];
+  railRouteShortNames: string[];
+}
+
 /**
  * Optimized query service for common database operations
  * Implements batching and efficient query patterns
@@ -17,20 +24,12 @@ export class QueryOptimizationService {
    * Batch check which stops are subway stations (single query)
    */
   async batchCheckSubwayStations(stopIds: string[]): Promise<Set<string>> {
-    if (stopIds.length === 0) {
-      return new Set();
-    }
-
-    const subwayStops = await this.prisma.$queryRaw<Array<{ stop_id: string }>>`
-      SELECT DISTINCT st.stop_id
-      FROM "SPTrans_StopTime" st
-      INNER JOIN "SPTrans_Trip" t ON st.trip_id = t.trip_id
-      INNER JOIN "SPTrans_Route" r ON t.route_id = r.route_id
-      WHERE st.stop_id = ANY(${stopIds}::text[])
-      AND (r.route_id LIKE 'METRÔ%' OR r.route_id LIKE 'CPTM%')
-    `;
-
-    return new Set(subwayStops.map((s) => s.stop_id));
+    const serviceInfo = await this.batchGetStopServiceInfo(stopIds);
+    return new Set(
+      Array.from(serviceInfo.entries())
+        .filter(([, info]) => info.servesRail)
+        .map(([stopId]) => stopId),
+    );
   }
 
   /**
@@ -38,42 +37,12 @@ export class QueryOptimizationService {
    * These stops should be excluded from bus queries since we use GeoSampa for rail
    */
   async getRailOnlyStops(stopIds: string[]): Promise<Set<string>> {
-    if (stopIds.length === 0) {
-      return new Set();
-    }
-
-    // Get all stops that serve at least one non-rail route
-    const busStops = await this.prisma.$queryRaw<Array<{ stop_id: string }>>`
-      SELECT DISTINCT st.stop_id
-      FROM "SPTrans_StopTime" st
-      INNER JOIN "SPTrans_Trip" t ON st.trip_id = t.trip_id
-      INNER JOIN "SPTrans_Route" r ON t.route_id = r.route_id
-      WHERE st.stop_id = ANY(${stopIds}::text[])
-      AND r.route_id NOT LIKE 'METRÔ%'
-      AND r.route_id NOT LIKE 'CPTM%'
-    `;
-
-    const busStopIdSet = new Set(busStops.map((s) => s.stop_id));
-
-    // Get all stops that serve rail routes
-    const railStops = await this.prisma.$queryRaw<Array<{ stop_id: string }>>`
-      SELECT DISTINCT st.stop_id
-      FROM "SPTrans_StopTime" st
-      INNER JOIN "SPTrans_Trip" t ON st.trip_id = t.trip_id
-      INNER JOIN "SPTrans_Route" r ON t.route_id = r.route_id
-      WHERE st.stop_id = ANY(${stopIds}::text[])
-      AND (r.route_id LIKE 'METRÔ%' OR r.route_id LIKE 'CPTM%')
-    `;
-
-    // Rail-only stops are those that serve rail but NOT bus
-    const railOnlyStops = new Set<string>();
-    for (const stop of railStops) {
-      if (!busStopIdSet.has(stop.stop_id)) {
-        railOnlyStops.add(stop.stop_id);
-      }
-    }
-
-    return railOnlyStops;
+    const serviceInfo = await this.batchGetStopServiceInfo(stopIds);
+    return new Set(
+      Array.from(serviceInfo.entries())
+        .filter(([, info]) => info.servesRail && !info.servesBus)
+        .map(([stopId]) => stopId),
+    );
   }
 
   /**
@@ -82,36 +51,58 @@ export class QueryOptimizationService {
   async batchGetStopAgencies(
     stopIds: string[],
   ): Promise<Map<string, string[]>> {
+    const serviceInfo = await this.batchGetStopServiceInfo(stopIds);
+    return new Map(
+      Array.from(serviceInfo.entries())
+        .filter(([, info]) => info.servesRail)
+        .map(([stopId, info]) => [stopId, info.agencies]),
+    );
+  }
+
+  async batchGetStopServiceInfo(
+    stopIds: string[],
+  ): Promise<Map<string, StopServiceInfo>> {
     if (stopIds.length === 0) {
       return new Map();
     }
 
-    const stopRoutes = await this.prisma.$queryRaw<
-      Array<{ stop_id: string; route_short_name: string }>
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        stop_id: string;
+        serves_rail: boolean;
+        serves_bus: boolean;
+        rail_route_short_names: string[];
+      }>
     >`
-      SELECT DISTINCT st.stop_id, r.route_short_name
-      FROM "SPTrans_StopTime" st
-      INNER JOIN "SPTrans_Trip" t ON st.trip_id = t.trip_id
-      INNER JOIN "SPTrans_Route" r ON t.route_id = r.route_id
-      WHERE st.stop_id = ANY(${stopIds}::text[])
-      AND (r.route_id LIKE 'METRÔ%' OR r.route_id LIKE 'CPTM%')
+      SELECT
+        summary.stop_id,
+        summary.serves_rail,
+        summary.serves_bus,
+        summary.rail_route_short_names
+      FROM "public"."gtfs_stop_service_summary" summary
+      WHERE summary.stop_id = ANY(${stopIds}::TEXT[])
     `;
 
-    // Group routes by stop
-    const stopAgenciesMap = new Map<string, string[]>();
-
+    const result = new Map<string, StopServiceInfo>();
     for (const stopId of stopIds) {
-      const routesForStop = stopRoutes
-        .filter((r) => r.stop_id === stopId)
-        .map((r) => r.route_short_name);
-
-      if (routesForStop.length > 0) {
-        const agencies = getUniqueAgencies(routesForStop);
-        stopAgenciesMap.set(stopId, agencies);
-      }
+      result.set(stopId, {
+        servesRail: false,
+        servesBus: false,
+        agencies: [],
+        railRouteShortNames: [],
+      });
     }
 
-    return stopAgenciesMap;
+    for (const row of rows) {
+      result.set(row.stop_id, {
+        servesRail: row.serves_rail,
+        servesBus: row.serves_bus,
+        agencies: getUniqueAgencies(row.rail_route_short_names),
+        railRouteShortNames: row.rail_route_short_names,
+      });
+    }
+
+    return result;
   }
 
   /**
@@ -384,15 +375,28 @@ export class QueryOptimizationService {
       ORDER BY s.stop_name
     `;
 
-    return stops.map((stop) => ({
-      id: stop.stop_id,
-      stopId: stop.stop_id,
-      name: stop.stop_name,
-      description: stop.stop_desc || undefined,
-      latitude: stop.stop_lat,
-      longitude: stop.stop_lon,
-      isSubwayStation: false,
-    }));
+    const serviceInfo = await this.batchGetStopServiceInfo(
+      stops.map((stop) => stop.stop_id),
+    );
+
+    return stops.map((stop) => {
+      const info = serviceInfo.get(stop.stop_id);
+      return {
+        id: stop.stop_id,
+        stopId: stop.stop_id,
+        name: stop.stop_name,
+        description: stop.stop_desc || undefined,
+        latitude: stop.stop_lat,
+        longitude: stop.stop_lon,
+        isSubwayStation: info?.servesRail ?? false,
+        agencies: info?.agencies,
+        routeShortNames: info?.railRouteShortNames,
+        geometry: {
+          type: 'Point',
+          coordinates: [[stop.stop_lon, stop.stop_lat]],
+        },
+      };
+    });
   }
 
   /**

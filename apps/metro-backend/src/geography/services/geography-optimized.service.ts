@@ -24,8 +24,6 @@ const MAX_BATCH_IDS = 500;
 const MAX_ROUTE_RAIL_CONNECTION_ROUTES = 100;
 const MAX_STOP_FULL_DATA_ROUTES = 100;
 const STOP_FULL_DATA_CONCURRENCY = 8;
-const MIN_ROUTE_RAIL_CONNECTION_RADIUS_METERS = 50;
-const MAX_ROUTE_RAIL_CONNECTION_RADIUS_METERS = 5_000;
 
 /**
  * Optimized Geography Service
@@ -267,43 +265,19 @@ export class GeographyServiceOptimized {
   async getRouteRailConnectionsForStop(
     stopId: string,
     routeIds: string[],
-    radiusMeters = 150,
   ): Promise<RouteRailConnection[]> {
     const uniqueRouteIds = Array.from(
       new Set(routeIds.map((routeId) => routeId.trim()).filter(Boolean)),
-    ).slice(0, MAX_ROUTE_RAIL_CONNECTION_ROUTES);
-    const safeRadiusMeters = this.clampLimit(
-      radiusMeters,
-      MAX_ROUTE_RAIL_CONNECTION_RADIUS_METERS,
-      MIN_ROUTE_RAIL_CONNECTION_RADIUS_METERS,
-    );
+    )
+      .sort()
+      .slice(0, MAX_ROUTE_RAIL_CONNECTION_ROUTES);
+    const normalizedStopId = stopId.trim();
 
-    if (!stopId || uniqueRouteIds.length === 0) {
+    if (!normalizedStopId || uniqueRouteIds.length === 0) {
       return [];
     }
 
-    const routes = await this.prisma.$queryRaw<
-      Array<{
-        route_id: string;
-        route_short_name: string;
-        route_long_name: string;
-      }>
-    >`
-      SELECT DISTINCT
-        r.route_id,
-        r.route_short_name,
-        r.route_long_name
-      FROM "SPTrans_Route" r
-      WHERE r.route_id = ANY(${uniqueRouteIds}::text[])
-      ORDER BY r.route_short_name
-    `;
-
-    if (routes.length === 0) {
-      return [];
-    }
-
-    const routeIdsForQuery = routes.map((route) => route.route_id);
-    const stationRows = await this.prisma.$queryRaw<
+    const rows = await this.prisma.$queryRaw<
       Array<{
         route_id: string;
         route_short_name: string;
@@ -320,96 +294,42 @@ export class GeographyServiceOptimized {
         distance_meters: number;
       }>
     >`
-      WITH trip_current AS (
-        SELECT
-          t.route_id,
-          t.direction_id,
-          t.trip_headsign,
-          t.trip_id,
-          st.stop_sequence,
-          ROW_NUMBER() OVER (
-            PARTITION BY t.route_id, t.direction_id, t.trip_headsign
-            ORDER BY t.trip_id
-          ) AS trip_rank
-        FROM "SPTrans_Trip" t
-        INNER JOIN "SPTrans_StopTime" st ON st.trip_id = t.trip_id
-        WHERE t.route_id = ANY(${routeIdsForQuery}::text[])
-          AND st.stop_id = ${stopId}
-      ),
-      next_stops AS (
-        SELECT
-          tc.route_id,
-          tc.direction_id,
-          tc.trip_headsign,
-          ns.stop_id,
-          ns.stop_sequence,
-          s.stop_name,
-          s.stop_lat,
-          s.stop_lon
-        FROM trip_current tc
-        INNER JOIN "SPTrans_StopTime" ns ON ns.trip_id = tc.trip_id
-        INNER JOIN "SPTrans_Stop" s ON s.stop_id = ns.stop_id
-        WHERE tc.trip_rank = 1
-          AND ns.stop_sequence > tc.stop_sequence
-      ),
-      station_hits AS (
-        SELECT DISTINCT ON (
-	          ns.route_id,
-	          ns.direction_id,
-	          ns.trip_headsign,
-	          station."primaryId"
-	        )
-          ns.route_id,
-          r.route_short_name,
-          r.route_long_name,
-          ns.direction_id,
-          ns.trip_headsign,
-          ns.stop_id,
-          ns.stop_name,
-          ns.stop_sequence,
-	          station."primaryId" AS station_id,
-          station.name AS station_name,
-          station.agencies,
-          station.lines,
-          ST_Distance(
-            ST_SetSRID(ST_MakePoint(ns.stop_lon, ns.stop_lat), 4326)::geography,
-            ST_SetSRID(ST_MakePoint(station.longitude, station.latitude), 4326)::geography
-          )::double precision AS distance_meters
-        FROM next_stops ns
-        INNER JOIN "SPTrans_Route" r ON r.route_id = ns.route_id
-        INNER JOIN merged_rail_stations station ON ST_DWithin(
-	          ST_SetSRID(ST_MakePoint(ns.stop_lon, ns.stop_lat), 4326)::geography,
-	          ST_SetSRID(ST_MakePoint(station.longitude, station.latitude), 4326)::geography,
-	          ${safeRadiusMeters}
-	        )
-        ORDER BY
-	          ns.route_id,
-	          ns.direction_id,
-	          ns.trip_headsign,
-	          station."primaryId",
-          ns.stop_sequence,
-          distance_meters
-      )
-      SELECT *
-      FROM station_hits
-      ORDER BY route_short_name, direction_id, trip_headsign, stop_sequence
+      SELECT
+        hit.route_id,
+        hit.route_short_name,
+        hit.route_long_name,
+        hit.direction_id,
+        hit.trip_headsign,
+        hit.near_stop_id AS stop_id,
+        hit.near_stop_name AS stop_name,
+        hit.near_stop_sequence AS stop_sequence,
+        hit.station_id,
+        hit.station_name,
+        hit.agencies,
+        hit.lines,
+        hit.distance_meters
+      FROM "public"."route_rail_connection_hits" hit
+      WHERE hit.from_stop_id = ${normalizedStopId}
+        AND hit.route_id = ANY(${uniqueRouteIds}::TEXT[])
+      ORDER BY
+        hit.route_short_name,
+        hit.direction_id,
+        hit.trip_headsign,
+        hit.near_stop_sequence
     `;
 
     const connections = new Map<string, RouteRailConnection>();
 
-    for (const route of routes) {
-      connections.set(route.route_id, {
-        routeId: route.route_id,
-        routeShortName: route.route_short_name,
-        routeLongName: route.route_long_name,
-        directions: [],
-      });
-    }
-
-    for (const row of stationRows) {
-      const connection = connections.get(row.route_id);
+    for (const row of rows) {
+      let connection = connections.get(row.route_id);
       if (!connection) {
-        continue;
+        connection = {
+          routeId: row.route_id,
+          routeShortName: row.route_short_name,
+          routeLongName: row.route_long_name,
+          directions: [],
+        };
+        connections.set(row.route_id, connection);
       }
 
       let direction = connection.directions.find(

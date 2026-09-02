@@ -10,9 +10,10 @@ import { RailTileService } from './services/rail-tile.service';
 import { VectorTileCacheService } from './services/vector-tile-cache.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { BikeModule } from '../bike/bike.module';
+import { TransitDataModule } from '../transit-data/transit-data.module';
 
 @Module({
-  imports: [PrismaModule, BikeModule],
+  imports: [PrismaModule, BikeModule, TransitDataModule],
   controllers: [VectorTilesController],
   providers: [
     VectorTilesService,

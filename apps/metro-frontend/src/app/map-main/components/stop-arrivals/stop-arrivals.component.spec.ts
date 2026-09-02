@@ -104,6 +104,43 @@ describe('StopArrivalsComponent', () => {
         .map((station) => station.name),
     ).toEqual(['Vila Madalena']);
   });
+
+  it('renders the station distance while preserving agency and line metadata', () => {
+    const station = fixture.nativeElement.querySelector(
+      '.rail-service .rail-station',
+    ) as HTMLElement;
+
+    expect(
+      station.querySelector('.rail-station-meta')?.textContent?.trim(),
+    ).toBe('metro · Verde');
+    expect(
+      station.querySelector('.rail-station-distance')?.textContent?.trim(),
+    ).toBe('Parada da linha a 131 m da estação');
+  });
+
+  it('does not format invalid station distances', () => {
+    for (const distanceMeters of [
+      -1,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+    ]) {
+      expect(
+        fixture.componentInstance.formatStationDistance({
+          ...createStation('invalid', 'Invalid'),
+          distanceMeters,
+        }),
+      ).toBeNull();
+    }
+  });
+
+  it('formats zero as a valid station distance', () => {
+    expect(
+      fixture.componentInstance.formatStationDistance({
+        ...createStation('zero', 'Zero'),
+        distanceMeters: 0,
+      }),
+    ).toBe('Parada da linha a 0 m da estação');
+  });
 });
 
 function createArrivals(line: LineWithVehicles): StopArrivalUpdate {

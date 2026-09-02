@@ -58,6 +58,88 @@ describe('GeographyServiceOptimized stop full data', () => {
   });
 });
 
+describe('GeographyServiceOptimized precomputed rail connections', () => {
+  it('hydrates indexed GeoSampa station hits with one database query', async () => {
+    const prisma = {
+      $queryRaw: jest.fn().mockResolvedValue([
+        {
+          route_id: '477A-10',
+          route_short_name: '477A-10',
+          route_long_name: 'Terminal - Estação',
+          direction_id: 0,
+          trip_headsign: 'Estação',
+          stop_id: 'near-stop',
+          stop_name: 'Parada da estação',
+          stop_sequence: 12,
+          station_id: 42,
+          station_name: 'Estação Central',
+          agencies: ['METRO'],
+          lines: ['Azul'],
+          distance_meters: 84.6,
+        },
+      ]),
+    };
+    const service = new GeographyServiceOptimized(
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(
+      service.getRouteRailConnectionsForStop(' stop-1 ', ['477A-10']),
+    ).resolves.toEqual([
+      {
+        routeId: '477A-10',
+        routeShortName: '477A-10',
+        routeLongName: 'Terminal - Estação',
+        directions: [
+          {
+            directionId: 0,
+            headsign: 'Estação',
+            stations: [
+              {
+                id: '42',
+                name: 'Estação Central',
+                agencies: ['METRO'],
+                lines: ['Azul'],
+                distanceMeters: 85,
+                nearStopId: 'near-stop',
+                nearStopName: 'Parada da estação',
+                stopSequence: 12,
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(
+      (prisma.$queryRaw.mock.calls[0][0] as TemplateStringsArray).join(' '),
+    ).toContain('route_rail_connection_hits');
+  });
+
+  it('omits routes without a positive precomputed rail connection', async () => {
+    const prisma = {
+      $queryRaw: jest.fn().mockResolvedValue([]),
+    };
+    const service = new GeographyServiceOptimized(
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(
+      service.getRouteRailConnectionsForStop('stop-1', ['775A-10']),
+    ).resolves.toEqual([]);
+  });
+});
+
 function createService(routeCount: number): GeographyServiceOptimized {
   const busStopService = {
     getBusStop: jest.fn().mockResolvedValue({

@@ -134,19 +134,14 @@ export class SearchService {
       `;
 
       const stopIds = stops.map((s) => s.stop_id);
-
-      // Get stops that serve ONLY rail routes (to exclude them)
-      const railOnlyStopIds =
-        await this.queryOptimization.getRailOnlyStops(stopIds);
-
-      // Batch check which stops are subway stations (for remaining stops)
-      const subwayStopIds =
-        await this.queryOptimization.batchCheckSubwayStations(stopIds);
+      const serviceInfo =
+        await this.queryOptimization.batchGetStopServiceInfo(stopIds);
 
       // Filter out rail-only stops from indexing
-      const stopsToIndex = stops.filter(
-        (stop) => !railOnlyStopIds.has(stop.stop_id),
-      );
+      const stopsToIndex = stops.filter((stop) => {
+        const info = serviceInfo.get(stop.stop_id);
+        return !(info?.servesRail && !info.servesBus);
+      });
 
       const stopDocuments: StopDocument[] = stopsToIndex.map((stop) => ({
         id: stop.stop_id,
@@ -155,12 +150,13 @@ export class SearchService {
         stop_desc: stop.stop_desc || undefined,
         stop_lat: stop.stop_lat,
         stop_lon: stop.stop_lon,
-        is_subway_station: subwayStopIds.has(stop.stop_id),
+        is_subway_station:
+          serviceInfo.get(stop.stop_id)?.servesRail ?? false,
       }));
 
       await this.typesenseService.indexStops(stopDocuments);
       this.logger.debug(
-        `Indexed ${stopDocuments.length} stops (excluded ${railOnlyStopIds.size} rail-only stops)`,
+        `Indexed ${stopDocuments.length} stops (excluded ${stops.length - stopsToIndex.length} rail-only stops)`,
       );
     } catch (error) {
       this.logger.error('Failed to index stops:', error);

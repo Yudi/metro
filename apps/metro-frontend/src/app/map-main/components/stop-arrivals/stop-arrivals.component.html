@@ -101,6 +101,11 @@
                       <span class="rail-station-meta">{{
                         formatStationMeta(station)
                       }}</span>
+                      @if (formatStationDistance(station); as distanceText) {
+                        <span class="rail-station-meta rail-station-distance">{{
+                          distanceText
+                        }}</span>
+                      }
                     </div>
                   }
                 </div>
@@ -213,6 +218,15 @@
                               <span class="rail-station-meta">{{
                                 formatStationMeta(station)
                               }}</span>
+                              @if (
+                                formatStationDistance(station);
+                                as distanceText
+                              ) {
+                                <span
+                                  class="rail-station-meta rail-station-distance"
+                                  >{{ distanceText }}</span
+                                >
+                              }
                             </div>
                           }
                         </div>

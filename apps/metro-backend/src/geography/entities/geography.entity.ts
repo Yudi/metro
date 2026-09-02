@@ -223,7 +223,10 @@ export class RouteRailConnectionStation {
   @Field(() => [String])
   lines!: string[];
 
-  @Field(() => Number)
+  @Field(() => Number, {
+    description:
+      'Straight-line distance in metres between the downstream bus stop and the GeoSampa rail station',
+  })
   distanceMeters!: number;
 
   @Field()

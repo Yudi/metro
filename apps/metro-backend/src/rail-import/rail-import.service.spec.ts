@@ -18,8 +18,9 @@ describe('RailImportService', () => {
   let importLockService: {
     withLock: jest.Mock;
   };
-  let railVectorTileService: { refreshMvtViews: jest.Mock };
+  let railVectorTileService: { refreshMvtViewsWithinImport: jest.Mock };
   let vectorTilesService: { clearCache: jest.Mock };
+  let searchService: { indexRailLines: jest.Mock; indexRailStations: jest.Mock };
 
   beforeEach(() => {
     jest.useFakeTimers();
@@ -46,15 +47,19 @@ describe('RailImportService', () => {
         (_: string, __: string, action: () => Promise<unknown>) => action(),
       ),
     };
-    railVectorTileService = { refreshMvtViews: jest.fn() };
+    railVectorTileService = { refreshMvtViewsWithinImport: jest.fn() };
     vectorTilesService = { clearCache: jest.fn() };
+    searchService = {
+      indexRailLines: jest.fn(),
+      indexRailStations: jest.fn(),
+    };
 
     service = new RailImportService(
       wfsProcessingService as never,
       wfsDatabaseService as never,
       railVectorTileService as never,
       vectorTilesService as never,
-      { indexRailLines: jest.fn(), indexRailStations: jest.fn() } as never,
+      searchService as never,
       importLockService as never,
     );
   });
@@ -74,7 +79,7 @@ describe('RailImportService', () => {
     });
 
     expect(importLockService.withLock).toHaveBeenCalledWith(
-      'metro-dev:wfs-import',
+      'metro-dev:transit-catalog-import',
       'GeoSampa WFS import',
       expect.any(Function),
     );
@@ -96,6 +101,44 @@ describe('RailImportService', () => {
     expect(wfsProcessingService.downloadLayer).not.toHaveBeenCalled();
   });
 
+  it('waits for the shared lock during scheduled imports instead of dropping the run', async () => {
+    const performImport = jest.fn().mockResolvedValue({
+      success: true,
+      sourcesProcessed: 0,
+      recordsImported: 0,
+      skippedSources: [],
+      errors: [],
+    });
+    Object.defineProperty(service, 'performImport', {
+      value: performImport,
+    });
+    let releaseLock!: () => void;
+    const lockAvailable = new Promise<void>((resolve) => {
+      releaseLock = resolve;
+    });
+    importLockService.withLock.mockImplementationOnce(
+      async (
+        _lockName: string,
+        _operation: string,
+        action: () => Promise<unknown>,
+        options: { waitForLock?: boolean },
+      ) => {
+        expect(options).toEqual({ waitForLock: true });
+        await lockAvailable;
+        return action();
+      },
+    );
+
+    const scheduledImport = service.scheduledImport();
+    await Promise.resolve();
+    expect(performImport).not.toHaveBeenCalled();
+
+    releaseLock();
+    await scheduledImport;
+
+    expect(performImport).toHaveBeenCalledTimes(1);
+  });
+
   it('does not report rail import completion before required post-processing succeeds', async () => {
     Object.defineProperty(service, 'performImport', {
       value: jest.fn().mockResolvedValue({
@@ -106,13 +149,38 @@ describe('RailImportService', () => {
         errors: [],
       }),
     });
-    railVectorTileService.refreshMvtViews.mockRejectedValue(
+    railVectorTileService.refreshMvtViewsWithinImport.mockRejectedValue(
       new Error('MVT refresh failed'),
     );
 
     await expect(service.startImport()).rejects.toThrow('MVT refresh failed');
     expect(service.getImportStatus().status).toBe('error');
     expect(vectorTilesService.clearCache).not.toHaveBeenCalled();
+  });
+
+  it('finishes GeoSampa-derived views before rebuilding rail search indexes', async () => {
+    Object.defineProperty(service, 'performImport', {
+      value: jest.fn().mockResolvedValue({
+        success: true,
+        sourcesProcessed: 1,
+        recordsImported: 1,
+        skippedSources: [],
+        errors: [],
+      }),
+    });
+
+    await service.startImport();
+
+    const viewRefreshOrder =
+      railVectorTileService.refreshMvtViewsWithinImport.mock
+        .invocationCallOrder[0];
+    expect(viewRefreshOrder).toBeLessThan(
+      searchService.indexRailLines.mock.invocationCallOrder[0],
+    );
+    expect(viewRefreshOrder).toBeLessThan(
+      searchService.indexRailStations.mock.invocationCallOrder[0],
+    );
+    expect(vectorTilesService.clearCache).toHaveBeenCalledTimes(1);
   });
 
   it('returns partial results when one external source fails', async () => {
@@ -140,7 +208,7 @@ describe('RailImportService', () => {
     await service.clearAndReimport();
 
     expect(importLockService.withLock).toHaveBeenCalledWith(
-      'metro-dev:wfs-import',
+      'metro-dev:transit-catalog-import',
       'GeoSampa WFS clear and reimport',
       expect.any(Function),
     );

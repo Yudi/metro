@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RailStationProcessorService } from './rail-station-processor.service';
+import {
+  ImportLockService,
+  TRANSIT_CATALOG_IMPORT_LOCK,
+} from '../../common/import-lock.service';
 
 /**
  * Service responsible for refreshing rail data MVT materialized views.
@@ -15,6 +19,7 @@ export class RailVectorTileService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly railStationProcessor: RailStationProcessorService,
+    private readonly importLockService: ImportLockService,
   ) {}
 
   /**
@@ -22,6 +27,14 @@ export class RailVectorTileService {
    * Call this after GeoSampa WFS data import
    */
   async refreshMvtViews(): Promise<void> {
+    await this.importLockService.withLock(
+      TRANSIT_CATALOG_IMPORT_LOCK,
+      'GeoSampa rail materialized-view refresh',
+      () => this.refreshMvtViewsWithinImport(),
+    );
+  }
+
+  async refreshMvtViewsWithinImport(): Promise<void> {
     this.logger.debug('Refreshing rail MVT views...');
 
     try {
@@ -35,7 +48,7 @@ export class RailVectorTileService {
 
       // First, process and merge stations
       this.logger.debug('Processing and merging rail stations...');
-      await this.railStationProcessor.refreshMergedStations();
+      await this.railStationProcessor.refreshMergedStationsWithinImport();
 
       await this.refreshExistingMvtViews();
 

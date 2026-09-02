@@ -290,22 +290,15 @@ export class GeographyResolver {
 
   @Query(() => [RouteRailConnection], {
     description:
-      'Find rail stations within 150m of future stops for routes serving a bus stop',
+      'Find GeoSampa rail stations within 200m of future stops for bus routes serving a stop',
   })
   async routeRailConnectionsForStop(
     @Args('stopId', { type: () => String }) stopId: string,
     @Args('routeIds', { type: () => [String] }) routeIds: string[],
-    @Args('radiusMeters', {
-      type: () => Number,
-      nullable: true,
-      defaultValue: 150,
-    })
-    radiusMeters?: number,
   ): Promise<RouteRailConnection[]> {
     return this.geographyService.getRouteRailConnectionsForStop(
       stopId,
       validateIdentifiers(routeIds, 'routeIds'),
-      radiusMeters,
     );
   }
 

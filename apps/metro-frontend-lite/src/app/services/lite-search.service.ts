@@ -414,7 +414,6 @@ export class LiteSearchService {
   getRouteRailConnectionsForStop(
     stopId: string,
     routeIds: string[],
-    radiusMeters = 150,
   ): Observable<LiteRouteRailConnection[]> {
     if (routeIds.length === 0) {
       return of([]);
@@ -424,12 +423,10 @@ export class LiteSearchService {
       query LiteRouteRailConnectionsForStop(
         $stopId: String!
         $routeIds: [String!]!
-        $radiusMeters: Float
       ) {
         routeRailConnectionsForStop(
           stopId: $stopId
           routeIds: $routeIds
-          radiusMeters: $radiusMeters
         ) {
           routeId
           routeShortName
@@ -459,7 +456,7 @@ export class LiteSearchService {
         }>
       >(`${this.baseUrl}/graphql`, {
         query,
-        variables: { stopId, routeIds, radiusMeters },
+        variables: { stopId, routeIds },
       })
       .pipe(
         map((response) => response.data?.routeRailConnectionsForStop || []),

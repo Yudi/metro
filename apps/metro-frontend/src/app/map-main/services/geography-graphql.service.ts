@@ -493,7 +493,6 @@ export class GeographyGraphQLService {
   getRouteRailConnectionsForStop(
     stopId: string,
     routeIds: string[],
-    radiusMeters = 150,
   ): Observable<RouteRailConnectionGraphQL[]> {
     if (routeIds.length === 0) {
       return of([]);
@@ -503,12 +502,10 @@ export class GeographyGraphQLService {
       query GetRouteRailConnectionsForStop(
         $stopId: String!
         $routeIds: [String!]!
-        $radiusMeters: Float
       ) {
         routeRailConnectionsForStop(
           stopId: $stopId
           routeIds: $routeIds
-          radiusMeters: $radiusMeters
         ) {
           routeId
           routeShortName
@@ -536,7 +533,6 @@ export class GeographyGraphQLService {
     }>(query, {
       stopId,
       routeIds,
-      radiusMeters,
     }).pipe(map((data) => data?.routeRailConnectionsForStop || []));
   }
 

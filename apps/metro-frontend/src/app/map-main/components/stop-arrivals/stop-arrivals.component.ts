@@ -156,7 +156,7 @@ export class StopArrivalsComponent {
       this.railConnectionsError.set(false);
 
       const subscription = this.geographyService
-        .getRouteRailConnectionsForStop(stop.stopId, routeIds, 200)
+        .getRouteRailConnectionsForStop(stop.stopId, routeIds)
         .subscribe({
           next: (connections) => {
             const connectionMap = new Map<string, RouteRailConnectionGraphQL>();
@@ -380,6 +380,22 @@ export class StopArrivalsComponent {
     const lines =
       station.lines.length > 0 ? ` · ${station.lines.join(', ')}` : '';
     return `${agencies}${lines}`;
+  }
+
+  formatStationDistance(
+    station: RouteRailConnectionStationGraphQL,
+  ): string | null {
+    const { distanceMeters } = station;
+
+    if (
+      typeof distanceMeters !== 'number' ||
+      !Number.isFinite(distanceMeters) ||
+      distanceMeters < 0
+    ) {
+      return null;
+    }
+
+    return `Parada da linha a ${distanceMeters} m da estação`;
   }
 
   private getDirectionForLine(

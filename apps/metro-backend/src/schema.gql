@@ -535,6 +535,9 @@ type Query {
   Get complete route data (route info, trips, shapes, stops) in a single request
   """
   routeFullData(routeId: String!): RouteFullData
+
+  """Find GeoSampa rail stations within 200m of future stops for bus routes serving a stop"""
+  routeRailConnectionsForStop(routeIds: [String!]!, stopId: String!): [RouteRailConnection!]!
   routeShape(routeId: String!): [RouteShape!]!
   routesForStop(stopId: String!): [BusRoute!]!
   search(input: SearchFiltersInput!): SearchResults!
@@ -663,6 +666,32 @@ type RouteFullData {
 
   """All trips for this route"""
   trips: [Trip!]!
+}
+
+type RouteRailConnection {
+  directions: [RouteRailConnectionDirection!]!
+  routeId: String!
+  routeLongName: String!
+  routeShortName: String!
+}
+
+type RouteRailConnectionDirection {
+  directionId: Int!
+  headsign: String!
+  stations: [RouteRailConnectionStation!]!
+}
+
+type RouteRailConnectionStation {
+  agencies: [String!]!
+
+  """Straight-line distance in metres between the downstream bus stop and the GeoSampa rail station"""
+  distanceMeters: Float!
+  id: ID!
+  lines: [String!]!
+  name: String!
+  nearStopId: String!
+  nearStopName: String!
+  stopSequence: Int!
 }
 
 type RouteSearchResult {

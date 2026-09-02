@@ -11,6 +11,11 @@ import {
   parseRailLineCode,
   SAO_PAULO_CITY_CENTER,
 } from '@metro/shared/utils';
+import { TransitDataPrecomputeService } from '../../transit-data/transit-data-precompute.service';
+import {
+  ImportLockService,
+  TRANSIT_CATALOG_IMPORT_LOCK,
+} from '../../common/import-lock.service';
 
 /**
  * Raw station data from the local GeoSampa rail tables.
@@ -65,7 +70,11 @@ interface ProcessedRailStation {
 export class RailStationProcessorService implements OnModuleInit {
   private readonly logger = new Logger(RailStationProcessorService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly transitDataPrecompute: TransitDataPrecomputeService,
+    private readonly importLockService: ImportLockService,
+  ) {}
 
   /**
    * Initialize on module startup - check if data exists
@@ -110,6 +119,14 @@ export class RailStationProcessorService implements OnModuleInit {
    * This should be called after GeoSampa WFS data import.
    */
   async refreshMergedStations(): Promise<void> {
+    await this.importLockService.withLock(
+      TRANSIT_CATALOG_IMPORT_LOCK,
+      'GeoSampa rail station refresh',
+      () => this.refreshMergedStationsWithinImport(),
+    );
+  }
+
+  async refreshMergedStationsWithinImport(): Promise<void> {
     this.logger.debug('Starting rail station processing...');
 
     try {
@@ -126,8 +143,17 @@ export class RailStationProcessorService implements OnModuleInit {
       const mergedStations = this.mergeStations(rawStations);
       this.logger.debug(`Merged into ${mergedStations.length} unique stations`);
 
-      // Step 3: Persist to database (replace existing data)
-      await this.persistMergedStations(mergedStations);
+      // Step 3: Persist only when GeoSampa-derived station data changed.
+      const existingStations = await this.getAllStations();
+      if (!this.haveSameStations(existingStations, mergedStations)) {
+        await this.persistMergedStations(mergedStations);
+      } else {
+        this.logger.debug('Merged rail stations are unchanged');
+      }
+
+      // Refreshing is signature-gated, so this is also a cheap recovery check
+      // after a previous post-processing failure.
+      await this.transitDataPrecompute.refreshRouteRailConnections();
 
       this.logger.debug('Rail station processing completed successfully');
     } catch (error) {
@@ -366,6 +392,50 @@ export class RailStationProcessorService implements OnModuleInit {
     this.logger.debug(
       `Persisted ${stations.length} merged stations to database`,
     );
+  }
+
+  private haveSameStations(
+    existing: ProcessedRailStation[],
+    next: ProcessedRailStation[],
+  ): boolean {
+    if (existing.length !== next.length) {
+      return false;
+    }
+
+    const existingByPrimaryId = new Map(
+      existing.map((station) => [station.primaryId, station]),
+    );
+
+    return next.every((station) => {
+      const current = existingByPrimaryId.get(station.primaryId);
+      return (
+        current !== undefined &&
+        current.name === station.name &&
+        current.originalName === station.originalName &&
+        current.latitude === station.latitude &&
+        current.longitude === station.longitude &&
+        this.haveSameArrayValues(current.mergedIds, station.mergedIds) &&
+        this.haveSameArrayValues(current.agencies, station.agencies) &&
+        this.haveSameArrayValues(current.lines, station.lines)
+      );
+    });
+  }
+
+  private haveSameArrayValues<T extends string | number>(
+    current: T[],
+    next: T[],
+  ): boolean {
+    if (current.length !== next.length) {
+      return false;
+    }
+
+    const sortedCurrent = [...current].sort((a, b) =>
+      String(a).localeCompare(String(b)),
+    );
+    const sortedNext = [...next].sort((a, b) =>
+      String(a).localeCompare(String(b)),
+    );
+    return sortedCurrent.every((value, index) => value === sortedNext[index]);
   }
 
   /**

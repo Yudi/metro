@@ -16,7 +16,11 @@ import {
   ImportStatus,
 } from './types/wfs.types';
 import { SearchService } from '../search/services/search.service';
-import { ImportLockService } from '../common/import-lock.service';
+import {
+  ImportLockService,
+  TRANSIT_CATALOG_IMPORT_LOCK,
+} from '../common/import-lock.service';
+import type { ImportLockOptions } from '../common/import-lock.service';
 
 /**
  * Service for importing rail (Metro and CPTM) data from GeoSampa WFS layers.
@@ -31,7 +35,7 @@ import { ImportLockService } from '../common/import-lock.service';
 @Injectable()
 export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
   private readonly logger = new Logger(RailImportService.name);
-  private readonly importLockName = 'metro-dev:wfs-import';
+  private readonly importLockName = TRANSIT_CATALOG_IMPORT_LOCK;
   private canRunStartupImport = false;
   private currentImportStatus: ImportProgress = {
     status: 'idle',
@@ -75,7 +79,7 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
         this.logger.debug(
           'Starting initial GeoSampa WFS import on backend startup...',
         );
-        await this.startImport();
+        await this.startImportInBackground();
       } catch (error) {
         this.logger.error('Initial GeoSampa WFS import failed:', error);
       }
@@ -128,6 +132,14 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
     );
   }
 
+  private async startImportInBackground(): Promise<WFSProcessingResult> {
+    return this.withImportLock(
+      'GeoSampa WFS import',
+      () => this.startImportLocked(),
+      { waitForLock: true },
+    );
+  }
+
   private async startImportLocked(): Promise<WFSProcessingResult> {
     if (
       this.currentImportStatus.status !== 'idle' &&
@@ -151,8 +163,8 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
 
       if (result.sourcesProcessed > 0) {
         this.logger.debug('Refreshing rail vector tile views...');
+        await this.railVectorTileService.refreshMvtViewsWithinImport();
         await Promise.all([
-          this.railVectorTileService.refreshMvtViews(),
           this.searchService.indexRailLines(),
           this.searchService.indexRailStations(),
         ]);
@@ -183,7 +195,17 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
   private async withImportLock<T>(
     operation: string,
     action: () => Promise<T>,
+    options?: ImportLockOptions,
   ): Promise<T> {
+    if (options) {
+      return await this.importLockService.withLock(
+        this.importLockName,
+        operation,
+        action,
+        options,
+      );
+    }
+
     return await this.importLockService.withLock(
       this.importLockName,
       operation,
@@ -230,7 +252,7 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
     this.logger.debug('Starting scheduled GeoSampa WFS import...');
 
     try {
-      await this.startImport();
+      await this.startImportInBackground();
       this.logger.debug('Scheduled GeoSampa WFS import completed successfully');
     } catch (error) {
       this.logger.error('Scheduled GeoSampa WFS import failed:', error);

@@ -279,7 +279,7 @@ export class Search {
     this.railConnectionsError.set(false);
 
     this.searchService
-      .getRouteRailConnectionsForStop(stop.stopId, routeIds, 200)
+      .getRouteRailConnectionsForStop(stop.stopId, routeIds)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (connections) => {

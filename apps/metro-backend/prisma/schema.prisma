@@ -42,6 +42,14 @@ model GTFSFile {
   @@map("gtfs_files")
 }
 
+model TransitPrecomputeState {
+  key             String   @id @db.Text
+  sourceSignature String   @db.Text
+  updatedAt       DateTime @default(now()) @db.Timestamptz
+
+  @@map("transit_precompute_state")
+}
+
 // ============================================
 // Processed/Merged Subway Stations Table (Legacy - from SPTrans GTFS)
 // ============================================

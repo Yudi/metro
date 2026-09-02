@@ -10,7 +10,11 @@ import { DataImportHooksService } from './services/data-import-hooks.service';
 import { GTFSConfig } from './config/gtfs.config';
 import { ImportProgress, GTFSProcessingResult } from './types/gtfs.types';
 import { ImportStatusDto } from './dto/gtfs-dataset.dto';
-import { ImportLockService } from '../common/import-lock.service';
+import {
+  ImportLockService,
+  TRANSIT_CATALOG_IMPORT_LOCK,
+} from '../common/import-lock.service';
+import type { ImportLockOptions } from '../common/import-lock.service';
 
 class ImportFailureError extends Error {
   constructor(readonly result: GTFSProcessingResult) {
@@ -23,7 +27,7 @@ class ImportFailureError extends Error {
 export class DataImportService implements OnModuleInit {
   private readonly logger = new Logger(DataImportService.name);
   private readonly tempDir = path.join(process.cwd(), GTFSConfig.TEMP_DIR);
-  private readonly importLockName = 'metro-dev:gtfs-import';
+  private readonly importLockName = TRANSIT_CATALOG_IMPORT_LOCK;
   private currentImportStatus: ImportProgress = {
     status: 'idle',
     progress: 0,
@@ -58,7 +62,7 @@ export class DataImportService implements OnModuleInit {
 
     // Start initial import on startup
     this.logger.debug('Starting initial GTFS import on startup...');
-    this.startImport().catch((error) => {
+    this.startImportInBackground().catch((error) => {
       this.logger.error('Initial import failed:', error);
     });
   }
@@ -137,6 +141,14 @@ export class DataImportService implements OnModuleInit {
     return this.withImportLock('GTFS import', () => this.startImportLocked());
   }
 
+  private async startImportInBackground(): Promise<GTFSProcessingResult> {
+    return this.withImportLock(
+      'GTFS import',
+      () => this.startImportLocked(),
+      { waitForLock: true },
+    );
+  }
+
   private async startImportLocked(): Promise<GTFSProcessingResult> {
     if (
       this.currentImportStatus.status !== 'idle' &&
@@ -185,7 +197,17 @@ export class DataImportService implements OnModuleInit {
   private async withImportLock<T>(
     operation: string,
     action: () => Promise<T>,
+    options?: ImportLockOptions,
   ): Promise<T> {
+    if (options) {
+      return await this.importLockService.withLock(
+        this.importLockName,
+        operation,
+        action,
+        options,
+      );
+    }
+
     return await this.importLockService.withLock(
       this.importLockName,
       operation,
@@ -220,7 +242,7 @@ export class DataImportService implements OnModuleInit {
     this.logger.debug('Starting scheduled GTFS import...');
 
     try {
-      await this.startImport();
+      await this.startImportInBackground();
       this.logger.debug('Scheduled import completed successfully');
     } catch (error) {
       this.logger.error('Scheduled import failed:', error);

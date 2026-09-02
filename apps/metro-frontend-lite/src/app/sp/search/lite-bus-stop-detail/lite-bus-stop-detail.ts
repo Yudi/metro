@@ -147,6 +147,22 @@ export class LiteBusStopDetail {
     return `${agencies}${lines}`;
   }
 
+  formatStationDistance(
+    station: LiteRouteRailConnectionStation,
+  ): string | null {
+    const { distanceMeters } = station;
+
+    if (
+      typeof distanceMeters !== 'number' ||
+      !Number.isFinite(distanceMeters) ||
+      distanceMeters < 0
+    ) {
+      return null;
+    }
+
+    return `Parada da linha a ${distanceMeters} m da estação`;
+  }
+
   private getDirectionForLine(
     connection: LiteRouteRailConnection,
     line: LiteArrivalLine,

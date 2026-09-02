@@ -11,6 +11,7 @@ import { RustGtfsService } from './services/rust-gtfs.service';
 import { DataImportHooksService } from './services/data-import-hooks.service';
 import { SearchModule } from '../search/search.module';
 import { VectorTilesModule } from '../vector-tiles/vector-tiles.module';
+import { TransitDataModule } from '../transit-data/transit-data.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { VectorTilesModule } from '../vector-tiles/vector-tiles.module';
     ScheduleModule.forRoot(),
     SearchModule,
     VectorTilesModule,
+    TransitDataModule,
   ],
   controllers: [DataImportController],
   providers: [

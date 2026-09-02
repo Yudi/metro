@@ -31,8 +31,7 @@ export class VehicleDirectionBackendService {
           vehicle.ta,
         );
         if (heading !== null) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (vehicle as any).heading = heading;
+          vehicle.heading = heading;
         }
       }
     }

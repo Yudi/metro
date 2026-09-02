@@ -10,6 +10,10 @@ import {
 } from './realtime-websocket.service';
 import { fromLonLat } from 'ol/proj';
 import { LoggerService } from '@metro/shared/api';
+import {
+  getOlhoVivoDestination,
+  getOlhoVivoOrigin,
+} from '@metro/shared/utils';
 import { MapStateService } from '../components/map/map-state.service';
 
 /**
@@ -85,7 +89,6 @@ export class RealtimeVehicleLayerService {
     });
 
     // Add destination and line labels under the icon.
-    // Based on sl field: sl=1 shows lt0 (secondary terminal), sl=2 shows lt1 (main terminal)
     let directionTextStyle: Style | null = null;
     if (destination || routeShortName) {
       // Truncate long destination names to avoid overlap
@@ -177,10 +180,7 @@ export class RealtimeVehicleLayerService {
           // Convert lat/lon to map coordinates
           const coordinates = fromLonLat([vehicle.px, vehicle.py]);
 
-          // Determine destination based on direction (sl field)
-          // sl = 1: going to secondary terminal (lt0)
-          // sl = 2: going to main terminal (lt1)
-          const destination = line.sl === 1 ? line.lt0 : line.lt1;
+          const destination = getOlhoVivoDestination(line);
           const routeColor = this.getRouteColor(routeShortName, line.c);
 
           const feature = new Feature({
@@ -192,7 +192,7 @@ export class RealtimeVehicleLayerService {
             timestamp: vehicle.ta,
             destination,
             routeColor,
-            origin: line.lt1,
+            origin: getOlhoVivoOrigin(line),
             direction: line.sl,
             latitude: vehicle.py,
             longitude: vehicle.px,

@@ -8,11 +8,11 @@
   </div>
   } @else if (hasArrivals()) {
   <div class="arrivals-list">
-    @for (line of arrivalLines(); track line.c + line.sl) {
+    @for (line of arrivalLines(); track line.cl || line.c + line.sl) {
     <article class="arrival-line">
       <div class="arrival-line-header">
         <span class="route-code">{{ line.c }}</span>
-        <span class="route-destination">→ {{ line.lt0 }}</span>
+        <span class="route-destination">→ {{ getLineDestination(line) }}</span>
         @if (line.qv > 0) {
         <span class="vehicle-count">{{ line.qv }} veículo(s)</span>
         }

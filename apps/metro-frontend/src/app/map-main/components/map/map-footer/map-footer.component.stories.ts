@@ -5,6 +5,7 @@ import { RealtimeStatusComponent } from '../../realtime-status/realtime-status.c
 import { RealtimeWebsocketService } from '../../../services/realtime-websocket.service';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
+import { OLHOVIVO_POLL_INTERVAL_MS } from '@metro/shared/utils';
 
 // Mock service factory
 function createMockRealtimeService(
@@ -12,14 +13,13 @@ function createMockRealtimeService(
   vehicleCount: number,
   stopCount: number,
 ) {
-  const POLL_INTERVAL_MS = 15000;
   const lastUpdateTimestamp = signal(Date.now());
 
   // Simulate polling behavior - reset timestamp every poll interval
   if (connected) {
     setInterval(() => {
       lastUpdateTimestamp.set(Date.now());
-    }, POLL_INTERVAL_MS);
+    }, OLHOVIVO_POLL_INTERVAL_MS);
   }
 
   return {
@@ -57,7 +57,7 @@ function createMockRealtimeService(
         ]),
       ),
     ),
-    POLL_INTERVAL_MS,
+    POLL_INTERVAL_MS: OLHOVIVO_POLL_INTERVAL_MS,
   };
 }
 

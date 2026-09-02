@@ -24,6 +24,7 @@ import {
   RailLinesStatusResponse,
   createFavoriteRailLineOptions,
   formatTransitTime,
+  getOlhoVivoDestination,
   getTransitTimeDifferenceMinutes,
   getContrastColor,
   getRailLineFavorites,
@@ -406,6 +407,10 @@ export class Dashboard {
 
   getBusArrivalLines(stopId: string): LiteArrivalLine[] {
     return this.busArrivalsByStopId().get(stopId)?.p?.l ?? [];
+  }
+
+  getBusDestination(line: LiteArrivalLine): string {
+    return getOlhoVivoDestination(line);
   }
 
   getMinutesUntilArrival(arrivalTime: string): string {

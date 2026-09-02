@@ -2,6 +2,7 @@ import { Service, signal, OnDestroy, inject } from '@angular/core';
 import { io, Socket } from 'socket.io-client';
 import { environment } from '../../../environments/environment';
 import { LoggerService } from '@metro/shared/api';
+import { OLHOVIVO_POLL_INTERVAL_MS } from '@metro/shared/utils';
 
 export interface VehiclePosition {
   p: number; // Vehicle prefix
@@ -16,9 +17,9 @@ export interface VehiclePosition {
 export interface LineWithVehicles {
   c: string; // Full route code
   cl: number; // Line API code
-  sl: number; // Direction (1 or 2)
-  lt0: string; // Destination
-  lt1: string; // Origin
+  sl: number; // Direction: 1 selects lt0; 2 selects lt1
+  lt0: string; // Destination label for direction 1
+  lt1: string; // Destination label for direction 2
   qv: number; // Number of vehicles
   vs: VehiclePosition[]; // Vehicle positions
 }
@@ -65,7 +66,7 @@ export class RealtimeWebsocketService implements OnDestroy {
   private readonly logger = inject(LoggerService);
 
   /** Backend poll interval in milliseconds - matches POLL_INTERVAL in realtime-polling.service.ts */
-  readonly POLL_INTERVAL_MS = 30_000; // 15 seconds
+  readonly POLL_INTERVAL_MS = OLHOVIVO_POLL_INTERVAL_MS;
 
   // Signals for reactive data
   readonly connected = signal(false);

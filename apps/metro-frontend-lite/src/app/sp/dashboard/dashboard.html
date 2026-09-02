@@ -175,9 +175,9 @@
             (arrivalLines.length > 0) {
             <div class="arrival-box">
               <strong>Próximas chegadas</strong>
-              @for (line of arrivalLines.slice(0, 3); track line.c + line.sl) {
+              @for (line of arrivalLines.slice(0, 3); track line.cl || line.c + line.sl) {
               <div class="arrival-row">
-                <span>{{ line.c }} → {{ line.lt0 }} </span>
+                <span>{{ line.c }} → {{ getBusDestination(line) }} </span>
                 @if (line.vs.length > 0 && line.vs[0].t) {
                 <b>{{ getMinutesUntilArrival(line.vs[0].t) }} </b>
                 <time>{{ line.vs[0].t }}</time>

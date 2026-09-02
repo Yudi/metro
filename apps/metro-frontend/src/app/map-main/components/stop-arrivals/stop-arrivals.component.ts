@@ -27,6 +27,10 @@ import {
   type StopArrivalUpdate,
   type VehiclePosition,
 } from '../../services/realtime-websocket.service';
+import {
+  findOlhoVivoGtfsDirection,
+  getOlhoVivoDestination,
+} from '@metro/shared/utils';
 
 const VISIBLE_VEHICLE_COUNT = 2;
 
@@ -367,6 +371,10 @@ export class StopArrivalsComponent {
     return this.getDirectionForLine(connection, line)?.stations ?? [];
   }
 
+  getLineDestination(line: LineWithVehicles): string {
+    return getOlhoVivoDestination(line);
+  }
+
   formatStationMeta(station: RouteRailConnectionStationGraphQL): string {
     const agencies = station.agencies.join(' + ');
     const lines =
@@ -378,27 +386,7 @@ export class StopArrivalsComponent {
     connection: RouteRailConnectionGraphQL,
     line: LineWithVehicles,
   ): RouteRailConnectionDirectionGraphQL | undefined {
-    const destination = this.normalizeName(line.lt0);
-    const exactDestination = connection.directions.find(
-      (direction) => this.normalizeName(direction.headsign) === destination,
-    );
-
-    if (exactDestination) {
-      return exactDestination;
-    }
-
-    const looseDestination = connection.directions.find((direction) => {
-      const headsign = this.normalizeName(direction.headsign);
-      return headsign.includes(destination) || destination.includes(headsign);
-    });
-
-    if (looseDestination) {
-      return looseDestination;
-    }
-
-    return connection.directions.find(
-      (direction) => direction.directionId === line.sl - 1,
-    );
+    return findOlhoVivoGtfsDirection(line, connection.directions);
   }
 
   private findConnectionByShortName(
@@ -426,9 +414,13 @@ export class StopArrivalsComponent {
     return routeCode.trim().toUpperCase();
   }
 
-  private getArrivalLineKey(line: LineWithVehicles): string {
+  getArrivalLineKey(line: LineWithVehicles): string {
+    if (Number.isFinite(line.cl) && line.cl !== 0) {
+      return line.cl.toString();
+    }
+
     return `${this.normalizeRouteCode(line.c)}:${line.sl}:${this.normalizeName(
-      line.lt0,
+      getOlhoVivoDestination(line),
     )}`;
   }
 

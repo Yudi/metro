@@ -81,7 +81,9 @@ export class RouteStopMappingService {
             ? 'Dir 1 (Principal→Secundário)'
             : 'Dir 2 (Secundário→Principal)';
         this.logger.debug(
-          `   cl=${result.cl} - ${direction} - ${result.tp} → ${result.ts}`,
+          `   cl=${result.cl} - ${direction} - destination=${
+            result.sl === 1 ? result.tp : result.ts
+          }`,
         );
       });
 

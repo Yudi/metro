@@ -26,6 +26,15 @@ const routes: LiteBusRoute[] = [
     color: '16a34a',
     textColor: 'ffffff',
   },
+  {
+    id: 'route-847p',
+    routeId: '847P-10',
+    shortName: '847P-10',
+    longName: 'Term. Pirituba - Vl. Olímpia',
+    routeType: 3,
+    color: '006341',
+    textColor: 'ffffff',
+  },
 ];
 
 const stop: LiteSearchStop = {
@@ -76,6 +85,24 @@ const arrivals: LiteStopArrivalUpdate = {
           },
         ],
       },
+      {
+        c: '847P-10',
+        cl: 33191,
+        sl: 2,
+        lt0: 'VL. OLÍMPIA',
+        lt1: 'TERM. PIRITUBA',
+        qv: 1,
+        vs: [
+          {
+            p: 11879,
+            a: true,
+            ta: new Date().toISOString(),
+            py: -23.5542,
+            px: -46.6913,
+            t: '14:40',
+          },
+        ],
+      },
     ],
   },
 };
@@ -99,6 +126,34 @@ const railConnections: LiteRouteRailConnection[] = [
             nearStopId: '701441',
             nearStopName: 'Parada Cardeal Arcoverde',
             stopSequence: 4,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    routeId: '847P-10',
+    routeShortName: '847P-10',
+    routeLongName: 'Term. Pirituba - Vl. Olímpia',
+    directions: [
+      {
+        directionId: 0,
+        headsign: 'Vl. Olímpia',
+        stations: [],
+      },
+      {
+        directionId: 1,
+        headsign: 'Term. Pirituba',
+        stations: [
+          {
+            id: 'vila-madalena-l2',
+            name: 'Vila Madalena',
+            agencies: ['Metrô'],
+            lines: ['Verde'],
+            distanceMeters: 131,
+            nearStopId: '6311025',
+            nearStopName: 'R. Cristovão de Burgos, 54',
+            stopSequence: 26,
           },
         ],
       },

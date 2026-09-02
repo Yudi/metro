@@ -1,0 +1,1 @@
+export const OLHOVIVO_POLL_INTERVAL_MS = 30_000;

@@ -23,3 +23,5 @@ export * from './lib/route-path.utils';
 export * from './lib/geo.constants';
 export * from './lib/train-composition.types';
 export * from './lib/incident-history.types';
+export * from './lib/olhovivo-direction.utils';
+export * from './lib/olhovivo.constants';

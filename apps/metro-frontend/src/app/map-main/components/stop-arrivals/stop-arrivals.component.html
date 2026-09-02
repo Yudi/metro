@@ -19,7 +19,7 @@
       </div>
     } @else if (hasArrivals()) {
       <div class="arrivals-list">
-        @for (line of arrivalLines(); track line.c + line.sl + line.lt0) {
+        @for (line of arrivalLines(); track getArrivalLineKey(line)) {
           <div class="arrival-line">
             <div class="line-header">
               <div class="line-info">
@@ -31,7 +31,7 @@
                 >
                 <span class="line-destination">
                   <mat-icon class="small-icon">arrow_forward</mat-icon>
-                  {{ line.lt0 }}
+                  {{ getLineDestination(line) }}
                 </span>
               </div>
               @if (!compact() && line.qv > 0) {
@@ -120,7 +120,7 @@
           }}
         </p>
         @if (!compact()) {
-          <p class="hint">Os dados são atualizados a cada 15 segundos</p>
+          <p class="hint">Os dados são atualizados a cada 30 segundos</p>
         }
       </div>
     }

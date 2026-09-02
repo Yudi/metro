@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { OLHOVIVO_POLL_INTERVAL_MS } from '@metro/shared/utils';
 import { OlhoVivoApiService } from './olhovivo-api.service';
 import { RouteStopMappingService } from './route-stop-mapping.service';
 import { VehicleDirectionBackendService } from './vehicle-direction-backend.service';
@@ -16,7 +17,7 @@ import { PollingCoordinator } from '../../common/polling/polling-coordinator';
 @Injectable()
 export class RealtimePollingService implements OnModuleDestroy {
   private readonly logger = new Logger(RealtimePollingService.name);
-  private readonly POLL_INTERVAL = 30_000;
+  private readonly POLL_INTERVAL = OLHOVIVO_POLL_INTERVAL_MS;
   private readonly MAX_ACTIVE_ROUTES = 200;
   private readonly MAX_ACTIVE_STOPS = 500;
   private readonly pollingCoordinator = new PollingCoordinator(

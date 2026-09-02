@@ -48,14 +48,14 @@ export class LineWithVehicles {
 
   @ApiProperty({
     description:
-      'Direction: 1 = Main Terminal to Secondary, 2 = Secondary to Main',
+      'Direction: 1 selects lt0 as destination; 2 selects lt1 as destination',
   })
   sl!: number;
 
-  @ApiProperty({ description: 'Destination terminal' })
+  @ApiProperty({ description: 'Destination terminal label for direction 1' })
   lt0!: string;
 
-  @ApiProperty({ description: 'Origin terminal' })
+  @ApiProperty({ description: 'Destination terminal label for direction 2' })
   lt1!: string;
 
   @ApiProperty({ description: 'Number of vehicles' })
@@ -76,8 +76,9 @@ export interface LineSearchResult {
   lc: boolean; // Circular (linha circular)
   lt: string; // Line sign (letreiro)
   sl: number; // Direction (sentido): 1 or 2
-  tp: string; // Type (tipo de linha)
-  ts: string; // Description (descrição)
+  tl: number; // Numeric sign suffix / service type
+  tp: string; // Destination headsign for direction 1
+  ts: string; // Destination headsign for direction 2
 }
 
 /**

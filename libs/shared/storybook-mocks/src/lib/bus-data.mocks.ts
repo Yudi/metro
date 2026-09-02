@@ -6,6 +6,7 @@ import type {
   BikePricingPlan,
   BikeVehicleAvailability,
 } from '@metro/shared/bike-contracts';
+import { OLHOVIVO_POLL_INTERVAL_MS } from '@metro/shared/utils';
 
 export type { BikePricingPlan, BikeVehicleAvailability };
 
@@ -280,7 +281,7 @@ export const MOCK_ROUTE_RAIL_CONNECTIONS: RouteRailConnectionGraphQL[] = [
     routeLongName: ROUTE_177H.longName,
     directions: [
       {
-        directionId: 1,
+        directionId: 0,
         headsign: 'Lapa',
         stations: [
           {
@@ -296,7 +297,7 @@ export const MOCK_ROUTE_RAIL_CONNECTIONS: RouteRailConnectionGraphQL[] = [
         ],
       },
       {
-        directionId: 0,
+        directionId: 1,
         headsign: 'Metrô Butantã',
         stations: [
           {
@@ -691,7 +692,7 @@ export function createMockRealtimeService(opts: MockRealtimeServiceOptions) {
     unsubscribeFromRoute: (routeId: string) => {
       console.debug('[mock] unsubscribeFromRoute', routeId);
     },
-    POLL_INTERVAL_MS: 15000,
+    POLL_INTERVAL_MS: OLHOVIVO_POLL_INTERVAL_MS,
   };
 }
 

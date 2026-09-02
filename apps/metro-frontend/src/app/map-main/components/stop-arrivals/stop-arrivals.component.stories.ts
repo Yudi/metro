@@ -24,6 +24,7 @@ import {
   createEmptyArrivals,
 } from '@metro/storybook-mocks';
 import { signal } from '@angular/core';
+import { OLHOVIVO_POLL_INTERVAL_MS } from '@metro/shared/utils';
 import { of } from 'rxjs';
 
 // Mock Service with Dynamic Arrivals
@@ -62,7 +63,7 @@ function createProviders(opts: StopArrivalsProviderOptions) {
         unsubscribeFromStop: (stopId: string) => {
           console.debug('[story] unsubscribeFromStop', stopId);
         },
-        POLL_INTERVAL_MS: 15000,
+        POLL_INTERVAL_MS: OLHOVIVO_POLL_INTERVAL_MS,
       },
     },
   ];
@@ -95,7 +96,7 @@ It shows:
 - Vehicle ID, accessibility info, and estimated arrival time
 - Time until arrival (e.g., "Em 3 min", "Chegando")
 
-This component subscribes to WebSocket updates and refreshes every 15 seconds.
+This component subscribes to WebSocket updates and refreshes every 30 seconds.
         `,
       },
     },

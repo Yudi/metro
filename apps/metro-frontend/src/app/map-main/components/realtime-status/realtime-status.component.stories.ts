@@ -2,6 +2,7 @@ import { Meta, StoryObj, applicationConfig } from '@storybook/angular';
 import { signal } from '@angular/core';
 import { RealtimeStatusComponent } from './realtime-status.component';
 import { RealtimeWebsocketService } from '../../services/realtime-websocket.service';
+import { OLHOVIVO_POLL_INTERVAL_MS } from '@metro/shared/utils';
 
 // Mock service factory
 function createMockRealtimeService(
@@ -10,16 +11,17 @@ function createMockRealtimeService(
   stopCount: number,
   hasRecentUpdate: boolean,
 ) {
-  const POLL_INTERVAL_MS = 15000;
   const lastUpdateTimestamp = signal(
-    hasRecentUpdate ? Date.now() : Date.now() - 20000,
+    hasRecentUpdate
+      ? Date.now()
+      : Date.now() - OLHOVIVO_POLL_INTERVAL_MS * 2,
   );
 
   // Simulate polling behavior - reset timestamp every poll interval
   if (connected && hasRecentUpdate) {
     setInterval(() => {
       lastUpdateTimestamp.set(Date.now());
-    }, POLL_INTERVAL_MS);
+    }, OLHOVIVO_POLL_INTERVAL_MS);
   }
 
   return {
@@ -57,7 +59,7 @@ function createMockRealtimeService(
         ]),
       ),
     ),
-    POLL_INTERVAL_MS,
+    POLL_INTERVAL_MS: OLHOVIVO_POLL_INTERVAL_MS,
   };
 }
 
@@ -180,7 +182,9 @@ export const CountdownProgress25: Story = {
         {
           provide: RealtimeWebsocketService,
           useValue: (() => {
-            const lastUpdateTimestamp = signal(Date.now() - 3750); // 25% of 15 seconds
+            const lastUpdateTimestamp = signal(
+              Date.now() - OLHOVIVO_POLL_INTERVAL_MS * 0.25,
+            );
             // Keep the offset constant by continuously updating
             setInterval(() => {
               lastUpdateTimestamp.set(Date.now() - 3750);
@@ -220,7 +224,7 @@ export const CountdownProgress25: Story = {
                   ],
                 ]),
               ),
-              POLL_INTERVAL_MS: 15000,
+              POLL_INTERVAL_MS: OLHOVIVO_POLL_INTERVAL_MS,
             };
           })(),
         },
@@ -240,10 +244,14 @@ export const CountdownProgress50: Story = {
         {
           provide: RealtimeWebsocketService,
           useValue: (() => {
-            const lastUpdateTimestamp = signal(Date.now() - 7500); // 50% of 15 seconds
+            const lastUpdateTimestamp = signal(
+              Date.now() - OLHOVIVO_POLL_INTERVAL_MS * 0.5,
+            );
             // Keep the offset constant by continuously updating
             setInterval(() => {
-              lastUpdateTimestamp.set(Date.now() - 7500);
+              lastUpdateTimestamp.set(
+                Date.now() - OLHOVIVO_POLL_INTERVAL_MS * 0.5,
+              );
             }, 100);
             return {
               connected: signal(true),
@@ -280,7 +288,7 @@ export const CountdownProgress50: Story = {
                   ],
                 ]),
               ),
-              POLL_INTERVAL_MS: 15000,
+              POLL_INTERVAL_MS: OLHOVIVO_POLL_INTERVAL_MS,
             };
           })(),
         },
@@ -300,10 +308,14 @@ export const CountdownProgress90: Story = {
         {
           provide: RealtimeWebsocketService,
           useValue: (() => {
-            const lastUpdateTimestamp = signal(Date.now() - 13500); // 90% of 15 seconds
+            const lastUpdateTimestamp = signal(
+              Date.now() - OLHOVIVO_POLL_INTERVAL_MS * 0.9,
+            );
             // Keep the offset constant by continuously updating
             setInterval(() => {
-              lastUpdateTimestamp.set(Date.now() - 13500);
+              lastUpdateTimestamp.set(
+                Date.now() - OLHOVIVO_POLL_INTERVAL_MS * 0.9,
+              );
             }, 100);
             return {
               connected: signal(true),
@@ -340,7 +352,7 @@ export const CountdownProgress90: Story = {
                   ],
                 ]),
               ),
-              POLL_INTERVAL_MS: 15000,
+              POLL_INTERVAL_MS: OLHOVIVO_POLL_INTERVAL_MS,
             };
           })(),
         },

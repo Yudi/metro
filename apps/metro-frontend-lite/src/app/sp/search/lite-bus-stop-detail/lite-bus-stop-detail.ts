@@ -17,7 +17,11 @@ import {
   LiteStopArrivalUpdate,
 } from '../../../services/lite-realtime.service';
 import { LiteChip, LiteSpinner } from '@metro/shared/lite-ui';
-import { getTransitTimeDifferenceMinutes } from '@metro/shared/utils';
+import {
+  findOlhoVivoGtfsDirection,
+  getOlhoVivoDestination,
+  getTransitTimeDifferenceMinutes,
+} from '@metro/shared/utils';
 
 @Component({
   selector: 'app-lite-bus-stop-detail',
@@ -115,6 +119,10 @@ export class LiteBusStopDetail {
     return this.getDirectionForLine(connection, line)?.stations ?? [];
   }
 
+  getLineDestination(line: LiteArrivalLine): string {
+    return getOlhoVivoDestination(line);
+  }
+
   getMinutesUntilArrival(arrivalTime: string): string {
     const diffMins = getTransitTimeDifferenceMinutes(arrivalTime);
     if (diffMins === null) {
@@ -143,27 +151,7 @@ export class LiteBusStopDetail {
     connection: LiteRouteRailConnection,
     line: LiteArrivalLine,
   ): LiteRouteRailConnectionDirection | undefined {
-    const destination = this.normalizeName(line.lt0);
-    const exactDestination = connection.directions.find(
-      (direction) => this.normalizeName(direction.headsign) === destination,
-    );
-
-    if (exactDestination) {
-      return exactDestination;
-    }
-
-    const looseDestination = connection.directions.find((direction) => {
-      const headsign = this.normalizeName(direction.headsign);
-      return headsign.includes(destination) || destination.includes(headsign);
-    });
-
-    if (looseDestination) {
-      return looseDestination;
-    }
-
-    return connection.directions.find(
-      (direction) => direction.directionId === line.sl - 1,
-    );
+    return findOlhoVivoGtfsDirection(line, connection.directions);
   }
 
   private findConnectionByShortName(
@@ -180,12 +168,4 @@ export class LiteBusStopDetail {
     return routeCode.trim().toUpperCase();
   }
 
-  private normalizeName(name: string): string {
-    return name
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^\p{L}\p{N}]+/gu, ' ')
-      .trim()
-      .toUpperCase();
-  }
 }

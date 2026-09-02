@@ -7,6 +7,7 @@ import {
   StopArrivalResponse,
   LineArrivalResponse,
   LineSearchResult,
+  VehiclePosition,
 } from '../dto/realtime.dto';
 
 /**
@@ -89,7 +90,9 @@ export class OlhoVivoApiService implements OnModuleInit {
       // Extract cookies from response
       const setCookieHeader = response.headers['set-cookie'];
       if (setCookieHeader && setCookieHeader.length > 0) {
-        this.cookieJar = setCookieHeader.join('; ');
+        this.cookieJar = setCookieHeader
+          .map((cookie) => cookie.split(';', 1)[0])
+          .join('; ');
         this.logger.debug(
           `Cookies received: ${this.cookieJar.substring(0, 50)}...`,
         );
@@ -156,6 +159,14 @@ export class OlhoVivoApiService implements OnModuleInit {
     }
   }
 
+  private getRequestHeaders(): Record<string, string> {
+    return {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...(this.cookieJar ? { Cookie: this.cookieJar } : {}),
+    };
+  }
+
   /**
    * Get vehicle positions for ALL lines in the system
    * Much more efficient than querying each line individually
@@ -164,23 +175,13 @@ export class OlhoVivoApiService implements OnModuleInit {
     await this.ensureAuthenticated();
 
     try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      };
-
-      // Add authentication cookie if available
-      if (this.cookieJar) {
-        headers['Cookie'] = this.cookieJar;
-      }
-
       this.logger.debug('Fetching ALL vehicle positions from SPTrans API...');
 
       const response = await firstValueFrom(
         this.httpService.get<PositionResponse>(
           `${this.sptransApiUrl}/Posicao`,
           {
-            headers,
+            headers: this.getRequestHeaders(),
           },
         ),
       );
@@ -198,7 +199,7 @@ export class OlhoVivoApiService implements OnModuleInit {
         `Fetched positions for ${totalLines} lines, ${totalVehicles} vehicles total`,
       );
 
-      return response.data;
+      return this.normalizePositionResponse(response.data);
     } catch (error) {
       // If authentication expired, retry once
       if (this.isAuthenticationError(error)) {
@@ -209,26 +210,18 @@ export class OlhoVivoApiService implements OnModuleInit {
         this.cookieJar = null;
         await this.ensureAuthenticated();
 
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        };
-        if (this.cookieJar) {
-          headers['Cookie'] = this.cookieJar;
-        }
-
         const response = await firstValueFrom(
           this.httpService.get<PositionResponse>(
             `${this.sptransApiUrl}/Posicao`,
             {
-              headers,
+              headers: this.getRequestHeaders(),
             },
           ),
         );
 
         this.throwIfNullResponse(response.data, 'Posicao');
 
-        return response.data;
+        return this.normalizePositionResponse(response.data);
       }
 
       this.logger.error('Error fetching all positions:', error);
@@ -244,19 +237,10 @@ export class OlhoVivoApiService implements OnModuleInit {
     await this.ensureAuthenticated();
 
     try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      };
-
-      if (this.cookieJar) {
-        headers['Cookie'] = this.cookieJar;
-      }
-
       const response = await firstValueFrom(
         this.httpService.get<StopArrivalResponse>(
           `${this.sptransApiUrl}/Previsao/Parada?codigoParada=${codigoParada}`,
-          { headers },
+          { headers: this.getRequestHeaders() },
         ),
       );
 
@@ -265,7 +249,7 @@ export class OlhoVivoApiService implements OnModuleInit {
         `Previsao/Parada?codigoParada=${codigoParada}`,
       );
 
-      return response.data;
+      return this.normalizeStopArrivalResponse(response.data);
     } catch (error) {
       // If authentication expired, retry once
       if (this.isAuthenticationError(error)) {
@@ -276,18 +260,10 @@ export class OlhoVivoApiService implements OnModuleInit {
         this.cookieJar = null;
         await this.ensureAuthenticated();
 
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        };
-        if (this.cookieJar) {
-          headers['Cookie'] = this.cookieJar;
-        }
-
         const response = await firstValueFrom(
           this.httpService.get<StopArrivalResponse>(
             `${this.sptransApiUrl}/Previsao/Parada?codigoParada=${codigoParada}`,
-            { headers },
+            { headers: this.getRequestHeaders() },
           ),
         );
 
@@ -296,7 +272,7 @@ export class OlhoVivoApiService implements OnModuleInit {
           `Previsao/Parada?codigoParada=${codigoParada}`,
         );
 
-        return response.data;
+        return this.normalizeStopArrivalResponse(response.data);
       }
 
       this.logger.error(
@@ -318,6 +294,7 @@ export class OlhoVivoApiService implements OnModuleInit {
       const response = await firstValueFrom(
         this.httpService.get<LineArrivalResponse>(
           `${this.sptransApiUrl}/Previsao/Linha?codigoLinha=${codigoLinha}`,
+          { headers: this.getRequestHeaders() },
         ),
       );
 
@@ -326,16 +303,18 @@ export class OlhoVivoApiService implements OnModuleInit {
         `Previsao/Linha?codigoLinha=${codigoLinha}`,
       );
 
-      return response.data;
+      return this.normalizeLineArrivalResponse(response.data);
     } catch (error) {
       // If authentication expired, retry once
       if (this.isAuthenticationError(error)) {
         this.isAuthenticated = false;
+        this.cookieJar = null;
         await this.ensureAuthenticated();
 
         const response = await firstValueFrom(
           this.httpService.get<LineArrivalResponse>(
             `${this.sptransApiUrl}/Previsao/Linha?codigoLinha=${codigoLinha}`,
+            { headers: this.getRequestHeaders() },
           ),
         );
 
@@ -344,7 +323,7 @@ export class OlhoVivoApiService implements OnModuleInit {
           `Previsao/Linha?codigoLinha=${codigoLinha}`,
         );
 
-        return response.data;
+        return this.normalizeLineArrivalResponse(response.data);
       }
 
       this.logger.error(
@@ -368,6 +347,7 @@ export class OlhoVivoApiService implements OnModuleInit {
       const response = await firstValueFrom(
         this.httpService.get<StopArrivalResponse>(
           `${this.sptransApiUrl}/Previsao?codigoParada=${codigoParada}&codigoLinha=${codigoLinha}`,
+          { headers: this.getRequestHeaders() },
         ),
       );
 
@@ -376,16 +356,18 @@ export class OlhoVivoApiService implements OnModuleInit {
         `Previsao?codigoParada=${codigoParada}&codigoLinha=${codigoLinha}`,
       );
 
-      return response.data;
+      return this.normalizeStopArrivalResponse(response.data);
     } catch (error) {
       // If authentication expired, retry once
       if (this.isAuthenticationError(error)) {
         this.isAuthenticated = false;
+        this.cookieJar = null;
         await this.ensureAuthenticated();
 
         const response = await firstValueFrom(
           this.httpService.get<StopArrivalResponse>(
             `${this.sptransApiUrl}/Previsao?codigoParada=${codigoParada}&codigoLinha=${codigoLinha}`,
+            { headers: this.getRequestHeaders() },
           ),
         );
 
@@ -394,7 +376,7 @@ export class OlhoVivoApiService implements OnModuleInit {
           `Previsao?codigoParada=${codigoParada}&codigoLinha=${codigoLinha}`,
         );
 
-        return response.data;
+        return this.normalizeStopArrivalResponse(response.data);
       }
 
       this.logger.error(
@@ -415,23 +397,13 @@ export class OlhoVivoApiService implements OnModuleInit {
     await this.ensureAuthenticated();
 
     try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      };
-
-      // Add authentication cookie if available
-      if (this.cookieJar) {
-        headers['Cookie'] = this.cookieJar;
-      }
-
       const encodedTerm = encodeURIComponent(termosBusca);
       this.logger.debug(`Searching for line: "${termosBusca}"`);
 
       const response = await firstValueFrom(
         this.httpService.get<LineSearchResult[]>(
           `${this.sptransApiUrl}/Linha/Buscar?termosBusca=${encodedTerm}`,
-          { headers },
+          { headers: this.getRequestHeaders() },
         ),
       );
 
@@ -451,7 +423,9 @@ export class OlhoVivoApiService implements OnModuleInit {
             ? 'Terminal Principal → Terminal Secundário'
             : 'Terminal Secundário → Terminal Principal';
         this.logger.debug(`  Line ${line.lt} (cl: ${line.cl}) - ${direction}`);
-        this.logger.debug(`     ${line.tp} → ${line.ts}`);
+        this.logger.debug(
+          `     Destination: ${line.sl === 1 ? line.tp : line.ts}`,
+        );
       });
 
       return response.data;
@@ -465,19 +439,11 @@ export class OlhoVivoApiService implements OnModuleInit {
         this.cookieJar = null;
         await this.ensureAuthenticated();
 
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        };
-        if (this.cookieJar) {
-          headers['Cookie'] = this.cookieJar;
-        }
-
         const encodedTerm = encodeURIComponent(termosBusca);
         const response = await firstValueFrom(
           this.httpService.get<LineSearchResult[]>(
             `${this.sptransApiUrl}/Linha/Buscar?termosBusca=${encodedTerm}`,
-            { headers },
+            { headers: this.getRequestHeaders() },
           ),
         );
 
@@ -503,6 +469,73 @@ export class OlhoVivoApiService implements OnModuleInit {
       this.logger.error(`OlhoVivo API returned null response for ${context}`);
       throw new Error(`OlhoVivo API returned null response for ${context}`);
     }
+  }
+
+  private normalizePositionResponse(
+    response: PositionResponse,
+  ): PositionResponse {
+    return {
+      ...response,
+      l: (response.l ?? []).map((line) => {
+        const vehicles = this.normalizeVehiclePositions(line.vs);
+        return { ...line, qv: vehicles.length, vs: vehicles };
+      }),
+    };
+  }
+
+  private normalizeStopArrivalResponse(
+    response: StopArrivalResponse,
+  ): StopArrivalResponse {
+    if (!response.p) {
+      return response;
+    }
+
+    return {
+      ...response,
+      p: {
+        ...response.p,
+        l: (response.p.l ?? []).map((line) => {
+          const vehicles = this.normalizeVehiclePositions(line.vs);
+          return { ...line, qv: vehicles.length, vs: vehicles };
+        }),
+      },
+    };
+  }
+
+  private normalizeLineArrivalResponse(
+    response: LineArrivalResponse,
+  ): LineArrivalResponse {
+    return {
+      ...response,
+      ps: (response.ps ?? []).map((stop) => ({
+        ...stop,
+        vs: this.normalizeVehiclePositions(stop.vs),
+      })),
+    };
+  }
+
+  private normalizeVehiclePositions(
+    vehicles: VehiclePosition[] | undefined,
+  ): VehiclePosition[] {
+    return (vehicles ?? []).flatMap((vehicle) => {
+      const rawPrefix = (vehicle as { p: unknown }).p;
+      if (
+        typeof rawPrefix !== 'number' &&
+        (typeof rawPrefix !== 'string' || !rawPrefix.trim())
+      ) {
+        this.logger.warn('Ignoring OlhoVivo vehicle with an invalid prefix');
+        return [];
+      }
+
+      const prefix = Number(rawPrefix);
+
+      if (!Number.isSafeInteger(prefix) || prefix <= 0) {
+        this.logger.warn('Ignoring OlhoVivo vehicle with an invalid prefix');
+        return [];
+      }
+
+      return [{ ...vehicle, p: prefix }];
+    });
   }
 
   /**

@@ -773,7 +773,7 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
     callback: (transaction: Prisma.TransactionClient) => Promise<T>,
   ): Promise<T> {
     return this.prisma.$transaction(async (transaction) => {
-      await transaction.$queryRaw`
+      await transaction.$executeRaw`
         SELECT pg_advisory_xact_lock(hashtext(${key}))
       `;
       return callback(transaction);

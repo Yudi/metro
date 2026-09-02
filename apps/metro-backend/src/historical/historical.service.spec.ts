@@ -63,7 +63,7 @@ describe('HistoricalService public projection', () => {
 
   it('serializes open-incident creation with a database advisory lock', async () => {
     const transaction = {
-      $queryRaw: jest.fn().mockResolvedValue([{ pg_advisory_xact_lock: null }]),
+      $executeRaw: jest.fn().mockResolvedValue(1),
       historicalIncidentEvent: {
         findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue({ id: 'incident-1' }),
@@ -82,12 +82,12 @@ describe('HistoricalService public projection', () => {
       attemptedAt: new Date('2026-08-23T12:00:00Z'),
     });
 
-    expect(transaction.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(transaction.$executeRaw).toHaveBeenCalledTimes(1);
     expect(transaction.historicalIncidentEvent.findFirst).toHaveBeenCalledTimes(
       1,
     );
     expect(transaction.historicalIncidentEvent.create).toHaveBeenCalledTimes(1);
-    expect(transaction.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(transaction.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
       transaction.historicalIncidentEvent.findFirst.mock.invocationCallOrder[0],
     );
   });

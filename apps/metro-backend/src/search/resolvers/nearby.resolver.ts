@@ -5,7 +5,11 @@ import {
   NearbySearchDocument,
   TypesenseService,
 } from '../services/typesense.service';
-import { Logger } from '@nestjs/common';
+import {
+  InternalServerErrorException,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { StopsAndStations } from '@metro/shared/utils';
 
 @Resolver()
@@ -30,8 +34,11 @@ export class NearbyResolver {
 
       return hits.map((hit) => this.formatNearbyDocument(hit.document));
     } catch (error) {
-      this.logger.error('Nearby stops search failed:', error);
-      throw new Error('Nearby stops search failed');
+      if (error instanceof ServiceUnavailableException) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException('Nearby stops search failed');
     }
   }
 

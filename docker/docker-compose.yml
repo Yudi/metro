@@ -74,6 +74,9 @@ services:
     environment:
       NODE_ENV: production
       RAIL_INTEGRATION_GRPC_URL: ${RAIL_INTEGRATION_GRPC_URL:-metro-core-private-grpc:50051}
+      TYPESENSE_HOST: ${TYPESENSE_INTERNAL_HOST:-typesense}
+      TYPESENSE_PORT: ${TYPESENSE_INTERNAL_PORT:-8108}
+      TYPESENSE_PROTOCOL: ${TYPESENSE_INTERNAL_PROTOCOL:-http}
     labels:
       - "traefik.enable=true"
       - "traefik.scope=public"
@@ -198,6 +201,24 @@ services:
     image: postgis/postgis:17-3.5
     #    ports:
     #      - 5432:5432
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - work_mem=8MB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - checkpoint_timeout=15min
+      - -c
+      - min_wal_size=256MB
+      - -c
+      - max_wal_size=2GB
+      - -c
+      - wal_compression=on
+      - -c
+      - effective_io_concurrency=2
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres

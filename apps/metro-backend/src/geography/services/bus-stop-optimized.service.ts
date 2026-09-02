@@ -4,6 +4,15 @@ import { QueryOptimizationService } from './query-optimization.service';
 import { BusStop } from '../entities/geography.entity';
 import { StopSearchInput } from '../dto/geography.input';
 
+interface GtfsStopRow {
+  id: number;
+  stop_id: string;
+  stop_name: string;
+  stop_desc: string | null;
+  stop_lat: number;
+  stop_lon: number;
+}
+
 /**
  * Optimized Bus Stop Service
  * Reduces N+1 queries and implements efficient batching
@@ -32,7 +41,7 @@ export class BusStopServiceOptimized {
         limit,
       );
     } else {
-      stops = await this.findStopsInBounds(-90, 90, -180, 180, limit);
+      stops = await this.findAllStops(limit);
     }
 
     // Batch operations to avoid N+1 queries
@@ -100,27 +109,35 @@ export class BusStopServiceOptimized {
     return this.queryOptimization.getStopsById(ids);
   }
 
+  private async findAllStops(limit: number): Promise<GtfsStopRow[]> {
+    return this.prisma.$queryRaw<GtfsStopRow[]>`
+      SELECT id, stop_id, stop_name, stop_desc, stop_lat, stop_lon
+      FROM "SPTrans_Stop"
+      ORDER BY stop_name
+      LIMIT ${limit}
+    `;
+  }
+
   private async findStopsInBounds(
     minLat: number,
     maxLat: number,
     minLng: number,
     maxLng: number,
     limit: number,
-  ) {
-    return this.prisma.$queryRaw<
-      Array<{
-        id: number;
-        stop_id: string;
-        stop_name: string;
-        stop_desc: string | null;
-        stop_lat: number;
-        stop_lon: number;
-      }>
-    >`
+  ): Promise<GtfsStopRow[]> {
+    return this.prisma.$queryRaw<GtfsStopRow[]>`
       SELECT id, stop_id, stop_name, stop_desc, stop_lat, stop_lon
       FROM "SPTrans_Stop"
-      WHERE stop_lat BETWEEN ${minLat} AND ${maxLat}
-      AND stop_lon BETWEEN ${minLng} AND ${maxLng}
+      WHERE location IS NOT NULL
+        AND location && ST_MakeEnvelope(
+          ${minLng},
+          ${minLat},
+          ${maxLng},
+          ${maxLat},
+          4326
+        )::geography
+        AND stop_lat BETWEEN ${minLat} AND ${maxLat}
+        AND stop_lon BETWEEN ${minLng} AND ${maxLng}
       ORDER BY stop_name
       LIMIT ${limit}
     `;

@@ -269,8 +269,16 @@ export class GeographyResolver {
   })
   async routeFullData(
     @Args('routeId', { type: () => String }) routeId: string,
+    @Info() info?: GraphQLResolveInfo,
   ): Promise<RouteFullData | null> {
-    return this.geographyService.getRouteFullData(routeId);
+    if (!info) {
+      return this.geographyService.getRouteFullData(routeId);
+    }
+
+    return this.geographyService.getRouteFullData(
+      routeId,
+      requestedRouteFullDataOptions(info),
+    );
   }
 
   @Query(() => StopFullData, {
@@ -385,6 +393,40 @@ export class GeographyResolver {
   }
 }
 
+interface RouteFullDataSelection {
+  includeTrips: boolean;
+  includeShapes: boolean;
+  includeStops: boolean;
+}
+
+function requestedRouteFullDataOptions(
+  info: GraphQLResolveInfo,
+): RouteFullDataSelection {
+  return {
+    includeTrips: info.fieldNodes.some((fieldNode) =>
+      selectionSetHasAnyField(
+        fieldNode.selectionSet,
+        new Set(['trips']),
+        info.fragments,
+      ),
+    ),
+    includeShapes: info.fieldNodes.some((fieldNode) =>
+      selectionSetHasAnyField(
+        fieldNode.selectionSet,
+        new Set(['shapes']),
+        info.fragments,
+      ),
+    ),
+    includeStops: info.fieldNodes.some((fieldNode) =>
+      selectionSetHasAnyField(
+        fieldNode.selectionSet,
+        new Set(['stops']),
+        info.fragments,
+      ),
+    ),
+  };
+}
+
 function requestsRouteDetails(info: GraphQLResolveInfo): boolean {
   const routeSelectionSets = info.fieldNodes.flatMap((fieldNode) =>
     findFieldSelectionSets(fieldNode.selectionSet, 'routes', info.fragments),
@@ -429,6 +471,7 @@ function findFieldSelectionSets(
   selectionSet: SelectionSetNode | undefined,
   fieldName: string,
   fragments: Record<string, FragmentDefinitionNode>,
+  visitedFragments = new Set<string>(),
 ): SelectionSetNode[] {
   if (!selectionSet) {
     return [];
@@ -442,32 +485,84 @@ function findFieldSelectionSets(
       }
       continue;
     }
-    const nestedSelectionSet =
-      selection.kind === Kind.INLINE_FRAGMENT
-        ? selection.selectionSet
-        : fragments[selection.name.value]?.selectionSet;
+    if (selection.kind === Kind.FRAGMENT_SPREAD) {
+      if (visitedFragments.has(selection.name.value)) {
+        continue;
+      }
+
+      const fragment = fragments[selection.name.value];
+      if (!fragment) {
+        continue;
+      }
+
+      const fragmentVisited = new Set(visitedFragments).add(
+        selection.name.value,
+      );
+      matches.push(
+        ...findFieldSelectionSets(
+          fragment.selectionSet,
+          fieldName,
+          fragments,
+          fragmentVisited,
+        ),
+      );
+      continue;
+    }
+
+    const nestedSelectionSet = selection.selectionSet;
     matches.push(
-      ...findFieldSelectionSets(nestedSelectionSet, fieldName, fragments),
+      ...findFieldSelectionSets(
+        nestedSelectionSet,
+        fieldName,
+        fragments,
+        visitedFragments,
+      ),
     );
   }
   return matches;
 }
 
 function selectionSetHasAnyField(
-  selectionSet: SelectionSetNode,
+  selectionSet: SelectionSetNode | undefined,
   fieldNames: Set<string>,
   fragments: Record<string, FragmentDefinitionNode>,
+  visitedFragments = new Set<string>(),
 ): boolean {
+  if (!selectionSet) {
+    return false;
+  }
+
   return selectionSet.selections.some((selection) => {
     if (selection.kind === Kind.FIELD) {
       return fieldNames.has(selection.name.value);
     }
-    const nestedSelectionSet =
-      selection.kind === Kind.INLINE_FRAGMENT
-        ? selection.selectionSet
-        : fragments[selection.name.value]?.selectionSet;
-    return nestedSelectionSet
-      ? selectionSetHasAnyField(nestedSelectionSet, fieldNames, fragments)
-      : false;
+
+    if (selection.kind === Kind.FRAGMENT_SPREAD) {
+      if (visitedFragments.has(selection.name.value)) {
+        return false;
+      }
+
+      const fragment = fragments[selection.name.value];
+      if (!fragment) {
+        return false;
+      }
+
+      const fragmentVisited = new Set(visitedFragments).add(
+        selection.name.value,
+      );
+      return selectionSetHasAnyField(
+        fragment.selectionSet,
+        fieldNames,
+        fragments,
+        fragmentVisited,
+      );
+    }
+
+    return selectionSetHasAnyField(
+      selection.selectionSet,
+      fieldNames,
+      fragments,
+      visitedFragments,
+    );
   });
 }

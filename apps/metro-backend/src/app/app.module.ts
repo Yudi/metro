@@ -30,6 +30,7 @@ import { graphqlOperationLimitsRule } from '../common/graphql/graphql-operation-
 import { ObservabilityModule } from '../observability/observability.module';
 import { validatePublicEnvironment } from './public-environment.validation';
 import { RequestContextModule } from '../common/request-context/request-context.module';
+import { createGraphQLTimingPlugin } from '../observability/graphql-timing.plugin';
 
 const isProduction = process.env.NODE_ENV === 'production';
 @Module({
@@ -72,6 +73,7 @@ const isProduction = process.env.NODE_ENV === 'production';
                 embed: false,
                 includeCookies: true,
               }),
+          createGraphQLTimingPlugin(),
         ] as unknown as ApolloDriverConfig['plugins'],
 
         context: ({ req, res }: { req: Request; res: Response }) => ({

@@ -63,7 +63,7 @@ export class DataImportService implements OnModuleInit {
     // Start initial import on startup
     this.logger.debug('Starting initial GTFS import on startup...');
     this.startImportInBackground().catch((error) => {
-      this.logger.error('Initial import failed:', error);
+      this.logger.error(`Initial import failed: ${errorMessage(error)}`);
     });
   }
 
@@ -171,7 +171,10 @@ export class DataImportService implements OnModuleInit {
 
       // Post-import work is part of readiness.  A successful data import must
       // not be reported as complete while search/vector views are stale.
-      await this.dataImportHooksService.onDataImportComplete();
+      await this.dataImportHooksService.onDataImportComplete({
+        dataChanged: result.dataChanged,
+        sourceSignature: result.sourceSignature,
+      });
       this.updateImportStatus(
         'completed',
         100,
@@ -245,7 +248,7 @@ export class DataImportService implements OnModuleInit {
       await this.startImportInBackground();
       this.logger.debug('Scheduled import completed successfully');
     } catch (error) {
-      this.logger.error('Scheduled import failed:', error);
+      this.logger.error(`Scheduled import failed: ${errorMessage(error)}`);
     }
   }
 
@@ -299,6 +302,8 @@ export class DataImportService implements OnModuleInit {
           recordsImported: 0,
           skippedFiles: ['All files (no changes detected)'],
           errors: [],
+          dataChanged: false,
+          sourceSignature: fileHash,
         };
       }
 
@@ -331,6 +336,9 @@ export class DataImportService implements OnModuleInit {
         extractDir,
         extractedFiles,
       );
+
+      result.dataChanged = true;
+      result.sourceSignature = fileHash;
 
       // Step 7: Cleanup
       this.updateImportStatus(
@@ -562,4 +570,8 @@ export class DataImportService implements OnModuleInit {
       return databaseUrl;
     }
   }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message.slice(0, 500) : 'Unknown error';
 }

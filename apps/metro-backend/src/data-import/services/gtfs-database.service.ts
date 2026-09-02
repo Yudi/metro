@@ -183,6 +183,19 @@ export class GTFSDatabaseService {
     }
   }
 
+  /** Refresh planner statistics after replacing GTFS tables and before rebuilds. */
+  async analyzeImportedTables(): Promise<void> {
+    for (const table of GTFSConfig.getAnalyzeTables()) {
+      await this.prisma.$executeRawUnsafe(
+        `ANALYZE "${GTFSConfig.EXTERNAL_SCHEMA}"."${table}"`,
+      );
+    }
+
+    this.logger.debug(
+      `Analyzed ${GTFSConfig.getAnalyzeTables().length} large GTFS tables`,
+    );
+  }
+
   private async findLatestCompleteDataset() {
     const datasets = await this.prisma.gTFSDataset.findMany({
       include: { gtfsFiles: true },

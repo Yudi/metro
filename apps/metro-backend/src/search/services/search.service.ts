@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
+  formatTypesenseError,
   TypesenseService,
   BikeStationDocument,
   RouteDocument,
@@ -89,7 +90,9 @@ export class SearchService {
       this.logger.debug('Full data indexing completed successfully');
     } catch (error) {
       await this.typesenseService.discardFullRebuild();
-      this.logger.error('Full data indexing failed:', error);
+      this.logger.error(
+        `Full data indexing failed: ${formatTypesenseError(error)}`,
+      );
       throw error;
     }
   }
@@ -121,7 +124,9 @@ export class SearchService {
         `Indexed ${routeDocuments.length} bus routes (excluded GTFS rail)`,
       );
     } catch (error) {
-      this.logger.error('Failed to index routes:', error);
+      this.logger.error(
+        `Failed to index routes: ${formatTypesenseError(error)}`,
+      );
       throw error;
     }
   }
@@ -159,7 +164,9 @@ export class SearchService {
         `Indexed ${stopDocuments.length} stops (excluded ${stops.length - stopsToIndex.length} rail-only stops)`,
       );
     } catch (error) {
-      this.logger.error('Failed to index stops:', error);
+      this.logger.error(
+        `Failed to index stops: ${formatTypesenseError(error)}`,
+      );
       throw error;
     }
   }
@@ -179,7 +186,9 @@ export class SearchService {
       await this.typesenseService.indexBikeStations(stationDocuments);
       this.logger.debug(`Indexed ${stationDocuments.length} bike stations`);
     } catch (error) {
-      this.logger.error('Failed to index bike stations:', error);
+      this.logger.error(
+        `Failed to index bike stations: ${formatTypesenseError(error)}`,
+      );
       throw error;
     }
   }
@@ -233,7 +242,9 @@ export class SearchService {
         totalTrips: trips.length,
       };
     } catch (error) {
-      this.logger.error(`Failed to get route details for ${routeId}:`, error);
+      this.logger.error(
+        `Failed to get route details for ${routeId}: ${formatTypesenseError(error)}`,
+      );
       throw error;
     }
   }
@@ -294,7 +305,9 @@ export class SearchService {
         stopTimes: stopTimes.slice(0, 20), // Limit displayed stop times
       };
     } catch (error) {
-      this.logger.error(`Failed to get stop details for ${stopId}:`, error);
+      this.logger.error(
+        `Failed to get stop details for ${stopId}: ${formatTypesenseError(error)}`,
+      );
       throw error;
     }
   }
@@ -325,7 +338,9 @@ export class SearchService {
         geometry: JSON.parse(shape.geojson),
       }));
     } catch (error) {
-      this.logger.error(`Failed to get route shape for ${routeId}:`, error);
+      this.logger.error(
+        `Failed to get route shape for ${routeId}: ${formatTypesenseError(error)}`,
+      );
       throw error;
     }
   }
@@ -340,7 +355,9 @@ export class SearchService {
         limit,
       );
     } catch (error) {
-      this.logger.error(`Failed to search rail stations:`, error);
+      this.logger.error(
+        `Failed to search rail stations: ${formatTypesenseError(error)}`,
+      );
       return [];
     }
   }
@@ -363,7 +380,9 @@ export class SearchService {
         );
       });
     } catch (error) {
-      this.logger.error(`Failed to search rail lines:`, error);
+      this.logger.error(
+        `Failed to search rail lines: ${formatTypesenseError(error)}`,
+      );
       return [];
     }
   }
@@ -385,7 +404,9 @@ export class SearchService {
         limit,
       );
     } catch (error) {
-      this.logger.error(`Failed to search nearby rail stations:`, error);
+      this.logger.error(
+        `Failed to search nearby rail stations: ${formatTypesenseError(error)}`,
+      );
       return [];
     }
   }
@@ -465,7 +486,9 @@ export class SearchService {
       await this.typesenseService.indexRailLines(lineDocuments);
       this.logger.debug(`Indexed ${lineDocuments.length} rail lines`);
     } catch (error) {
-      this.logger.error('Failed to index rail lines:', error);
+      this.logger.error(
+        `Failed to index rail lines: ${formatTypesenseError(error)}`,
+      );
     }
   }
 
@@ -582,7 +605,9 @@ export class SearchService {
       await this.typesenseService.indexRailStations(stationDocuments);
       this.logger.debug(`Indexed ${stationDocuments.length} rail stations`);
     } catch (error) {
-      this.logger.error('Failed to index rail stations:', error);
+      this.logger.error(
+        `Failed to index rail stations: ${formatTypesenseError(error)}`,
+      );
     }
   }
 

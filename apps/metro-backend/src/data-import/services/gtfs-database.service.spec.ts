@@ -5,9 +5,11 @@ describe('GTFSDatabaseService', () => {
   const findMany = jest.fn();
   const upsert = jest.fn();
   const queryRaw = jest.fn();
+  const executeRawUnsafe = jest.fn();
   const prisma = {
     gTFSDataset: { findMany, upsert },
     $queryRaw: queryRaw,
+    $executeRawUnsafe: executeRawUnsafe,
   } as unknown as PrismaService;
 
   let service: GTFSDatabaseService;
@@ -107,5 +109,17 @@ describe('GTFSDatabaseService', () => {
     expect(upsert).toHaveBeenCalledWith(
       expect.objectContaining({ where: { fileHash: 'new-hash' } }),
     );
+  });
+
+  it('analyzes large GTFS tables after replacement', async () => {
+    await service.analyzeImportedTables();
+
+    expect(executeRawUnsafe.mock.calls).toEqual([
+      ['ANALYZE "external_gtfs"."SPTrans_Route"'],
+      ['ANALYZE "external_gtfs"."SPTrans_Stop"'],
+      ['ANALYZE "external_gtfs"."SPTrans_Trip"'],
+      ['ANALYZE "external_gtfs"."SPTrans_StopTime"'],
+      ['ANALYZE "external_gtfs"."SPTrans_Shape"'],
+    ]);
   });
 });

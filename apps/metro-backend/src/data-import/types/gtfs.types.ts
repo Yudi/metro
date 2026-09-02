@@ -28,6 +28,8 @@ export interface GTFSProcessingResult {
   recordsImported: number;
   skippedFiles: string[];
   errors: string[];
+  dataChanged?: boolean;
+  sourceSignature?: string;
 }
 
 export type GTFSFileType =

@@ -6,8 +6,14 @@ import {
   ResolveField,
   Parent,
 } from '@nestjs/graphql';
-import { Logger, UseGuards } from '@nestjs/common';
 import {
+  InternalServerErrorException,
+  Logger,
+  ServiceUnavailableException,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  formatTypesenseError,
   TypesenseService,
   RouteDocument,
   StopDocument,
@@ -97,8 +103,11 @@ export class SearchResolver {
         highlights: this.formatHighlights(hit.highlights || {}),
       }));
     } catch (error) {
-      this.logger.error('Search failed:', error);
-      throw new Error('Search failed');
+      if (error instanceof ServiceUnavailableException) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException('Search failed');
     }
   }
 
@@ -124,8 +133,12 @@ export class SearchResolver {
       await this.searchService.indexAllData();
       return true;
     } catch (error) {
-      this.logger.error('Reindexing failed:', error);
-      throw new Error('Reindexing failed');
+      this.logger.error(`Reindexing failed: ${formatTypesenseError(error)}`);
+      if (error instanceof ServiceUnavailableException) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException('Reindexing failed');
     }
   }
 
@@ -137,8 +150,12 @@ export class SearchResolver {
       await this.searchService.clearIndex();
       return true;
     } catch (error) {
-      this.logger.error('Clearing index failed:', error);
-      throw new Error('Clearing index failed');
+      this.logger.error(`Clearing index failed: ${formatTypesenseError(error)}`);
+      if (error instanceof ServiceUnavailableException) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException('Clearing index failed');
     }
   }
 

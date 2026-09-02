@@ -8,6 +8,9 @@ const GTFS_STOP_SUMMARY_STATE_KEY = 'gtfs-stop-service-summary';
 const GTFS_STOP_SUMMARY_VERSION = 1;
 const ROUTE_RAIL_CONNECTION_STATE_KEY = 'route-rail-connections';
 const ROUTE_RAIL_CONNECTION_VERSION = 1;
+const GTFS_POST_PROCESSING_STATE_KEY = 'gtfs-post-processing';
+const GTFS_POST_PROCESSING_COMPLETE_PREFIX = 'complete:';
+const GTFS_POST_PROCESSING_PENDING_PREFIX = 'pending:';
 const ROUTE_RAIL_GTFS_FILES = [
   'routes.txt',
   'stops.txt',
@@ -24,6 +27,34 @@ export class TransitDataPrecomputeService {
   private readonly logger = new Logger(TransitDataPrecomputeService.name);
 
   constructor(private readonly prisma: PrismaService) {}
+
+  /** Skip hooks only after the full GTFS post-processing chain completes. */
+  async isGtfsPostProcessingCurrent(sourceSignature: string): Promise<boolean> {
+    const storedSignature = await this.getStoredSignature(
+      GTFS_POST_PROCESSING_STATE_KEY,
+    );
+
+    return (
+      storedSignature ===
+      `${GTFS_POST_PROCESSING_COMPLETE_PREFIX}${sourceSignature}`
+    );
+  }
+
+  async markGtfsPostProcessingPending(sourceSignature: string): Promise<void> {
+    await this.storeSignature(
+      GTFS_POST_PROCESSING_STATE_KEY,
+      `${GTFS_POST_PROCESSING_PENDING_PREFIX}${sourceSignature}`,
+    );
+  }
+
+  async markGtfsPostProcessingComplete(
+    sourceSignature: string,
+  ): Promise<void> {
+    await this.storeSignature(
+      GTFS_POST_PROCESSING_STATE_KEY,
+      `${GTFS_POST_PROCESSING_COMPLETE_PREFIX}${sourceSignature}`,
+    );
+  }
 
   async refreshAfterGtfsImport(): Promise<void> {
     const gtfsSignature = await this.getCompleteGtfsSignature();
@@ -165,7 +196,7 @@ export class TransitDataPrecomputeService {
 
   private async getStoredSignature(stateKey: string): Promise<string | null> {
     const states = await this.prisma.$queryRaw<
-      Array<{ source_signature: string }>
+      Array<{ source_signature: string | null }>
     >`
       SELECT state."sourceSignature" AS source_signature
       FROM "public"."transit_precompute_state" state

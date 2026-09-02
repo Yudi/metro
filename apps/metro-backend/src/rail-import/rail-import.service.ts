@@ -59,7 +59,9 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
       await this.ensureTargetTables();
       this.canRunStartupImport = true;
     } catch (error) {
-      this.logger.error('GeoSampa WFS import initialization failed:', error);
+      this.logger.error(
+        `GeoSampa WFS import initialization failed: ${errorMessage(error)}`,
+      );
     }
   }
 
@@ -81,7 +83,9 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
         );
         await this.startImportInBackground();
       } catch (error) {
-        this.logger.error('Initial GeoSampa WFS import failed:', error);
+        this.logger.error(
+          `Initial GeoSampa WFS import failed: ${errorMessage(error)}`,
+        );
       }
     });
   }
@@ -255,7 +259,9 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
       await this.startImportInBackground();
       this.logger.debug('Scheduled GeoSampa WFS import completed successfully');
     } catch (error) {
-      this.logger.error('Scheduled GeoSampa WFS import failed:', error);
+      this.logger.error(
+        `Scheduled GeoSampa WFS import failed: ${errorMessage(error)}`,
+      );
     }
   }
 
@@ -394,4 +400,8 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
   async getAllDatasets() {
     return await this.wfsDatabaseService.getAllDatasets();
   }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message.slice(0, 500) : 'Unknown error';
 }

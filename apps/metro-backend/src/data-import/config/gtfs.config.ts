@@ -88,6 +88,17 @@ export class GTFSConfig {
     ];
   }
 
+  /** Tables that need fresh planner statistics before derived-data rebuilds. */
+  static getAnalyzeTables(): string[] {
+    return [
+      'SPTrans_Route',
+      'SPTrans_Stop',
+      'SPTrans_Trip',
+      'SPTrans_StopTime',
+      'SPTrans_Shape',
+    ];
+  }
+
   /**
    * Get processing order for GTFS files (dependencies first)
    */

@@ -46,7 +46,7 @@ describe('GeographyServiceOptimized stop full data', () => {
     const result = await service.getStopFullData('stop-1', true);
 
     expect(result?.routes).toHaveLength(17);
-    expect(maximumActive).toBeLessThanOrEqual(8);
+    expect(maximumActive).toBeLessThanOrEqual(2);
   });
 
   it('rejects pathological route fan-out', async () => {
@@ -55,6 +55,53 @@ describe('GeographyServiceOptimized stop full data', () => {
     await expect(service.getStopFullData('stop-1')).rejects.toMatchObject({
       status: 413,
     });
+  });
+});
+
+describe('GeographyServiceOptimized route full data', () => {
+  it('does not load omitted related collections', async () => {
+    const { service, tripService } = createRouteDataService();
+    const getTripsForRoute = jest.spyOn(service, 'getTripsForRoute');
+    const getStopsForRoute = jest.spyOn(service, 'getStopsForRoute');
+
+    await service.getRouteFullData('route-1', {
+      includeTrips: false,
+      includeShapes: false,
+      includeStops: false,
+    });
+
+    expect(getTripsForRoute).not.toHaveBeenCalled();
+    expect(getStopsForRoute).not.toHaveBeenCalled();
+    expect(tripService.getTripsForRoute).not.toHaveBeenCalled();
+    expect(tripService.getStopsForRoute).not.toHaveBeenCalled();
+  });
+
+  it('loads only the related collections requested by the caller', async () => {
+    const { service, tripService } = createRouteDataService();
+    const getTripsForRoute = jest.spyOn(service, 'getTripsForRoute');
+    const getStopsForRoute = jest.spyOn(service, 'getStopsForRoute');
+
+    await service.getRouteFullData('route-1', {
+      includeTrips: true,
+      includeShapes: false,
+      includeStops: false,
+    });
+
+    expect(getTripsForRoute).toHaveBeenCalledWith('route-1');
+    expect(getStopsForRoute).not.toHaveBeenCalled();
+    expect(tripService.getTripsForRoute).toHaveBeenCalledWith('route-1');
+    expect(tripService.getStopsForRoute).not.toHaveBeenCalled();
+  });
+
+  it('keeps full-data loading for callers without options', async () => {
+    const { service } = createRouteDataService();
+    const getTripsForRoute = jest.spyOn(service, 'getTripsForRoute');
+    const getStopsForRoute = jest.spyOn(service, 'getStopsForRoute');
+
+    await service.getRouteFullData('route-1');
+
+    expect(getTripsForRoute).toHaveBeenCalledWith('route-1');
+    expect(getStopsForRoute).toHaveBeenCalledWith('route-1');
   });
 });
 
@@ -170,4 +217,40 @@ function createService(routeCount: number): GeographyServiceOptimized {
     {} as never,
     tripService as never,
   );
+}
+
+function createRouteDataService(): {
+  service: GeographyServiceOptimized;
+  tripService: {
+    getTripsForRoute: jest.Mock;
+    getStopsForRoute: jest.Mock;
+  };
+} {
+  const tripService = {
+    getTripsForRoute: jest.fn().mockResolvedValue([]),
+    getStopsForRoute: jest.fn().mockResolvedValue([]),
+  };
+  const busRouteService = {
+    getBusRoute: jest.fn().mockResolvedValue({
+      id: 'route-1',
+      routeId: 'route-1',
+      shortName: '1',
+      longName: 'Route 1',
+      routeType: 3,
+      color: '',
+      textColor: '',
+    }),
+  };
+
+  return {
+    service: new GeographyServiceOptimized(
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      busRouteService as never,
+      tripService as never,
+    ),
+    tripService,
+  };
 }

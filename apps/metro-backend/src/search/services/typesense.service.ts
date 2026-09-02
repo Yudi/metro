@@ -1,4 +1,10 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Client } from 'typesense';
 import type { MultiSearchRequestSchema } from 'typesense/lib/Typesense/Types';
@@ -160,8 +166,67 @@ const BIKE_STATIONS_SCHEMA = {
   default_sorting_field: 'station_id',
 };
 
+const DEFAULT_CONNECTION_TIMEOUT_SECONDS = 1;
+const DEFAULT_RECOVERY_INTERVAL_MS = 15_000;
+
+/**
+ * Keep third-party client errors out of logs. Axios/Typesense errors contain
+ * the request config, which includes the Typesense API key and can also carry
+ * user-supplied request data.
+ */
+export function formatTypesenseError(error: unknown): string {
+  const record = isRecord(error) ? error : undefined;
+  const response = isRecord(record?.response) ? record.response : undefined;
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof record?.message === 'string'
+        ? record.message
+        : typeof error === 'string'
+          ? error
+          : 'Unknown error';
+  const status = firstDefined(
+    record?.httpStatus,
+    record?.status,
+    response?.status,
+  );
+  const code = record?.code;
+
+  return [
+    `status=${formatErrorValue(status, 'unknown')}`,
+    `code=${formatErrorValue(code, 'unknown')}`,
+    `message=${redactErrorMessage(message)}`,
+  ].join(' ');
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function firstDefined(...values: unknown[]): unknown {
+  return values.find((value) => value !== undefined && value !== null);
+}
+
+function formatErrorValue(value: unknown, fallback: string): string {
+  if (typeof value === 'number' || typeof value === 'string') {
+    return String(value).slice(0, 32);
+  }
+
+  return fallback;
+}
+
+function redactErrorMessage(message: string): string {
+  return message
+    .replace(/Bearer\s+\S+/gi, 'Bearer [REDACTED]')
+    .replace(
+      /((?:["']?x-typesense-api-key["']?|["']?api[_-]?key["']?|["']?token["']?|["']?secret["']?|["']?password["']?)\s*[:=]\s*)["']?[^\s,}]+["']?/gi,
+      '$1[REDACTED]',
+    )
+    .slice(0, 256);
+}
+
 @Injectable()
-export class TypesenseService implements OnModuleInit {
+export class TypesenseService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TypesenseService.name);
   private client: Client;
   private readonly liveCollectionTargets = new Map<string, string>();
@@ -169,8 +234,25 @@ export class TypesenseService implements OnModuleInit {
   private readonly rebuildExpectedCounts = new Map<string, number>();
   private previousLiveCollectionTargets = new Map<string, string>();
   private initialized = false;
+  private recoveryTimer: NodeJS.Timeout | undefined;
+  private recoveryInFlight = false;
+  private shuttingDown = false;
+  private readonly recoveryIntervalMs: number;
 
   constructor(private configService: ConfigService) {
+    const connectionTimeoutSeconds = this.getConfiguredNumber(
+      'TYPESENSE_CONNECTION_TIMEOUT_SECONDS',
+      DEFAULT_CONNECTION_TIMEOUT_SECONDS,
+      0.1,
+      5,
+    );
+    this.recoveryIntervalMs = this.getConfiguredNumber(
+      'TYPESENSE_RECOVERY_INTERVAL_MS',
+      DEFAULT_RECOVERY_INTERVAL_MS,
+      1_000,
+      300_000,
+    );
+
     this.client = new Client({
       nodes: [
         {
@@ -180,16 +262,32 @@ export class TypesenseService implements OnModuleInit {
         },
       ],
       apiKey: this.configService.get('TYPESENSE_API_KEY', 'typesense-api-key'),
-      connectionTimeoutSeconds: 10,
+      connectionTimeoutSeconds,
+      numRetries: 0,
+      retryIntervalSeconds: 0,
+      healthcheckIntervalSeconds: Math.max(
+        1,
+        Math.ceil(this.recoveryIntervalMs / 1_000),
+      ),
     });
   }
 
-  async onModuleInit() {
+  async onModuleInit(): Promise<void> {
     await this.initializeCollections();
   }
 
-  private async initializeCollections() {
+  onModuleDestroy(): void {
+    this.shuttingDown = true;
+    this.clearRecoveryProbe();
+  }
+
+  private async initializeCollections(): Promise<void> {
     try {
+      const health = await this.client.health.retrieve();
+      if (!health?.ok) {
+        throw new Error('Typesense health check returned not ok');
+      }
+
       await this.ensureCollectionExists(
         GTFS_ROUTES_COLLECTION_NAME,
         GTFS_ROUTES_SCHEMA,
@@ -217,21 +315,134 @@ export class TypesenseService implements OnModuleInit {
             .aliases(`${collectionName}__live`)
             .retrieve();
           this.liveCollectionTargets.set(collectionName, alias.collection_name);
-        } catch {
+        } catch (error) {
+          if (!this.isTypesenseNotFoundError(error)) {
+            throw error;
+          }
+
           this.liveCollectionTargets.set(collectionName, collectionName);
         }
       }
 
       this.logger.debug('Typesense collections initialized successfully');
       this.initialized = true;
+      this.clearRecoveryProbe();
     } catch (error) {
       this.initialized = false;
-      this.logger.error('Failed to initialize Typesense collections:', error);
+      this.logger.error(
+        `Failed to initialize Typesense collections: ${formatTypesenseError(error)}`,
+      );
+      this.scheduleRecoveryProbe();
     }
   }
 
   isAvailable(): boolean {
     return this.initialized;
+  }
+
+  private getConfiguredNumber(
+    key: string,
+    fallback: number,
+    minimum: number,
+    maximum: number,
+  ): number {
+    const configured = Number(this.configService.get(key));
+    return Number.isFinite(configured) && configured >= minimum && configured <= maximum
+      ? configured
+      : fallback;
+  }
+
+  private scheduleRecoveryProbe(): void {
+    if (
+      this.initialized ||
+      this.recoveryTimer ||
+      this.recoveryInFlight ||
+      this.shuttingDown
+    ) {
+      return;
+    }
+
+    this.recoveryTimer = setTimeout(() => {
+      this.recoveryTimer = undefined;
+      this.recoveryInFlight = true;
+      void this.initializeCollections().finally(() => {
+        this.recoveryInFlight = false;
+        this.scheduleRecoveryProbe();
+      });
+    }, this.recoveryIntervalMs);
+    this.recoveryTimer.unref?.();
+  }
+
+  private clearRecoveryProbe(): void {
+    if (!this.recoveryTimer) {
+      return;
+    }
+
+    clearTimeout(this.recoveryTimer);
+    this.recoveryTimer = undefined;
+  }
+
+  private assertAvailable(): void {
+    if (this.initialized) {
+      return;
+    }
+
+    // Fail immediately while a background probe handles recovery.
+    this.scheduleRecoveryProbe();
+    throw new ServiceUnavailableException(
+      'Search service is temporarily unavailable',
+    );
+  }
+
+  private markUnavailable(error: unknown): void {
+    if (!this.isAvailabilityError(error)) {
+      return;
+    }
+
+    this.initialized = false;
+    this.scheduleRecoveryProbe();
+  }
+
+  private isAvailabilityError(error: unknown): boolean {
+    const record = isRecord(error) ? error : undefined;
+    const response = isRecord(record?.response) ? record.response : undefined;
+    const status = firstDefined(record?.httpStatus, record?.status, response?.status);
+    const code = typeof record?.code === 'string' ? record.code : '';
+    const message =
+      error instanceof Error
+        ? error.message
+        : typeof record?.message === 'string'
+          ? record.message
+          : '';
+
+    if (typeof status === 'number' && (status === 0 || status >= 500)) {
+      return true;
+    }
+
+    if (
+      /^(ECONNABORTED|ECONNREFUSED|ECONNRESET|ENOTFOUND|EAI_AGAIN|ETIMEDOUT)$/i.test(
+        code,
+      )
+    ) {
+      return true;
+    }
+
+    return /timed? ?out|network|socket|connect(?:ion)? refused|unavailable/i.test(
+      message,
+    );
+  }
+
+  private throwSearchFailure(operation: string, error: unknown): never {
+    this.markUnavailable(error);
+    this.logger.error(`${operation}: ${formatTypesenseError(error)}`);
+
+    if (this.isAvailabilityError(error)) {
+      throw new ServiceUnavailableException(
+        'Search service is temporarily unavailable',
+      );
+    }
+
+    throw error;
   }
 
   async beginFullRebuild(): Promise<void> {
@@ -415,7 +626,11 @@ export class TypesenseService implements OnModuleInit {
       // Try to retrieve the collection to check if it exists
       await this.client.collections(name).retrieve();
       this.logger.debug(`Typesense collection '${name}' already exists`);
-    } catch {
+    } catch (error) {
+      if (!this.isTypesenseNotFoundError(error)) {
+        throw error;
+      }
+
       // Collection doesn't exist, create it
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -429,7 +644,9 @@ export class TypesenseService implements OnModuleInit {
           return;
         }
 
-        this.logger.error(`Failed to create collection ${name}:`, createError);
+        this.logger.error(
+          `Failed to create collection ${name}: ${formatTypesenseError(createError)}`,
+        );
         throw createError;
       }
     }
@@ -454,7 +671,9 @@ export class TypesenseService implements OnModuleInit {
         return;
       }
 
-      this.logger.error(`Failed to create collection ${name}:`, error);
+      this.logger.error(
+        `Failed to create collection ${name}: ${formatTypesenseError(error)}`,
+      );
       throw error;
     }
   }
@@ -492,7 +711,9 @@ export class TypesenseService implements OnModuleInit {
       await this.importDocuments(GTFS_ROUTES_COLLECTION_NAME, documents);
       this.logger.debug(`Indexed ${routes.length} routes`);
     } catch (error) {
-      this.logger.error('Failed to index routes:', error);
+      this.logger.error(
+        `Failed to index routes: ${formatTypesenseError(error)}`,
+      );
       throw error;
     }
   }
@@ -552,7 +773,9 @@ export class TypesenseService implements OnModuleInit {
       await this.importDocuments(GTFS_STOPS_COLLECTION_NAME, documents);
       this.logger.debug(`Indexed ${stops.length} stops`);
     } catch (error) {
-      this.logger.error('Failed to index stops:', error);
+      this.logger.error(
+        `Failed to index stops: ${formatTypesenseError(error)}`,
+      );
       throw error;
     }
   }
@@ -562,87 +785,85 @@ export class TypesenseService implements OnModuleInit {
     types: SearchTypes[],
     limit = 10,
   ): Promise<SearchResult[]> {
+    const searches: Array<{
+      type: SearchTypes;
+      request: SearchRequest;
+    }> = [];
+
+    if (types.includes('railLine')) {
+      searches.push({
+        type: SearchTypesEnum.RailLine,
+        request: {
+          collection: this.getReadCollectionName(GPKG_LINES_COLLECTION_NAME),
+          q: query,
+          query_by: 'line_code,line_fullname,agency',
+          query_by_weights: '8,12,1',
+          per_page: limit,
+          typo_tokens_threshold: 2,
+        },
+      });
+    }
+
+    if (types.includes('railStation')) {
+      searches.push({
+        type: SearchTypesEnum.RailStation,
+        request: {
+          collection: this.getReadCollectionName(GPKG_STATIONS_COLLECTION_NAME),
+          q: query,
+          query_by: 'station_code,station_name,station_aliases',
+          query_by_weights: '2,8,4',
+          per_page: limit,
+          typo_tokens_threshold: 2,
+        },
+      });
+    }
+
+    if (types.includes('busRoute')) {
+      searches.push({
+        type: SearchTypesEnum.BusRoute,
+        request: {
+          collection: this.getReadCollectionName(GTFS_ROUTES_COLLECTION_NAME),
+          q: query,
+          query_by: 'route_short_name,route_long_name',
+          per_page: limit,
+          typo_tokens_threshold: 2,
+        },
+      });
+    }
+
+    if (types.includes('busStop')) {
+      searches.push({
+        type: SearchTypesEnum.BusStop,
+        request: {
+          collection: this.getReadCollectionName(GTFS_STOPS_COLLECTION_NAME),
+          q: query,
+          query_by: 'stop_name,stop_desc',
+          per_page: limit,
+          typo_tokens_threshold: 2,
+        },
+      });
+    }
+
+    if (types.includes('bikeStation')) {
+      searches.push({
+        type: SearchTypesEnum.BikeStation,
+        request: {
+          collection: this.getReadCollectionName(BIKE_STATIONS_COLLECTION_NAME),
+          q: query,
+          query_by: 'station_id,station_name',
+          per_page: limit,
+          typo_tokens_threshold: 2,
+        },
+      });
+    }
+
+    if (searches.length === 0) {
+      return [];
+    }
+
+    this.assertAvailable();
+
     try {
-      const searches: Array<{
-        type: SearchTypes;
-        request: SearchRequest;
-      }> = [];
-
-      if (types.includes('railLine')) {
-        searches.push({
-          type: SearchTypesEnum.RailLine,
-          request: {
-            collection: this.getReadCollectionName(GPKG_LINES_COLLECTION_NAME),
-            q: query,
-            query_by: 'line_code,line_fullname,agency',
-            query_by_weights: '8,12,1',
-            per_page: limit,
-            typo_tokens_threshold: 2,
-          },
-        });
-      }
-
-      if (types.includes('railStation')) {
-        searches.push({
-          type: SearchTypesEnum.RailStation,
-          request: {
-            collection: this.getReadCollectionName(
-              GPKG_STATIONS_COLLECTION_NAME,
-            ),
-            q: query,
-            query_by: 'station_code,station_name,station_aliases',
-            query_by_weights: '2,8,4',
-            per_page: limit,
-            typo_tokens_threshold: 2,
-          },
-        });
-      }
-
-      if (types.includes('busRoute')) {
-        searches.push({
-          type: SearchTypesEnum.BusRoute,
-          request: {
-            collection: this.getReadCollectionName(GTFS_ROUTES_COLLECTION_NAME),
-            q: query,
-            query_by: 'route_short_name,route_long_name',
-            per_page: limit,
-            typo_tokens_threshold: 2,
-          },
-        });
-      }
-
-      if (types.includes('busStop')) {
-        searches.push({
-          type: SearchTypesEnum.BusStop,
-          request: {
-            collection: this.getReadCollectionName(GTFS_STOPS_COLLECTION_NAME),
-            q: query,
-            query_by: 'stop_name,stop_desc',
-            per_page: limit,
-            typo_tokens_threshold: 2,
-          },
-        });
-      }
-
-      if (types.includes('bikeStation')) {
-        searches.push({
-          type: SearchTypesEnum.BikeStation,
-          request: {
-            collection: this.getReadCollectionName(
-              BIKE_STATIONS_COLLECTION_NAME,
-            ),
-            q: query,
-            query_by: 'station_id,station_name',
-            per_page: limit,
-            typo_tokens_threshold: 2,
-          },
-        });
-      }
-
-      if (searches.length === 0) {
-        return [];
-      }
-
       const results = await this.client.multiSearch.perform<
         SearchDocument[],
         string
@@ -663,8 +884,7 @@ export class TypesenseService implements OnModuleInit {
           .filter((hit) => !this.isGtfsRailSearchResult(hit)),
       );
     } catch (error) {
-      this.logger.error('Search failed:', error);
-      throw error;
+      return this.throwSearchFailure('Search failed', error);
     }
   }
 
@@ -697,62 +917,60 @@ export class TypesenseService implements OnModuleInit {
     ],
     limit = 20,
   ): Promise<SearchResponseHit<NearbySearchDocument>[]> {
+    const searches: Array<{
+      type: StopsAndStations;
+      request: NearbySearchRequest;
+    }> = [];
+
+    // Convert meters to kilometers (Typesense only accepts km or mi)
+    const radiusKm = radiusMeters / 1000;
+
+    if (types.includes(SearchTypesEnum.BusStop)) {
+      searches.push({
+        type: SearchTypesEnum.BusStop,
+        request: {
+          collection: this.getReadCollectionName(GTFS_STOPS_COLLECTION_NAME),
+          q: '*',
+          filter_by: `location:(${lat}, ${lon}, ${radiusKm} km)`,
+          sort_by: `location(${lat}, ${lon}):asc`,
+          per_page: limit,
+        },
+      });
+    }
+
+    if (types.includes(SearchTypesEnum.RailStation)) {
+      searches.push({
+        type: SearchTypesEnum.RailStation,
+        request: {
+          collection: this.getReadCollectionName(GPKG_STATIONS_COLLECTION_NAME),
+          q: '*',
+          filter_by: `location:(${lat}, ${lon}, ${radiusKm} km)`,
+          sort_by: `location(${lat}, ${lon}):asc`,
+          per_page: limit,
+        },
+      });
+    }
+
+    if (types.includes(SearchTypesEnum.BikeStation)) {
+      searches.push({
+        type: SearchTypesEnum.BikeStation,
+        request: {
+          collection: this.getReadCollectionName(BIKE_STATIONS_COLLECTION_NAME),
+          q: '*',
+          filter_by: `location:(${lat}, ${lon}, ${radiusKm} km)`,
+          sort_by: `location(${lat}, ${lon}):asc`,
+          per_page: limit,
+        },
+      });
+    }
+
+    if (searches.length === 0) {
+      return [];
+    }
+
+    this.assertAvailable();
+
     try {
-      // Convert meters to kilometers (Typesense only accepts km or mi)
-      const radiusKm = radiusMeters / 1000;
-
-      const searches: Array<{
-        type: StopsAndStations;
-        request: NearbySearchRequest;
-      }> = [];
-
-      if (types.includes(SearchTypesEnum.BusStop)) {
-        searches.push({
-          type: SearchTypesEnum.BusStop,
-          request: {
-            collection: this.getReadCollectionName(GTFS_STOPS_COLLECTION_NAME),
-            q: '*',
-            filter_by: `location:(${lat}, ${lon}, ${radiusKm} km)`,
-            sort_by: `location(${lat}, ${lon}):asc`,
-            per_page: limit,
-          },
-        });
-      }
-
-      if (types.includes(SearchTypesEnum.RailStation)) {
-        searches.push({
-          type: SearchTypesEnum.RailStation,
-          request: {
-            collection: this.getReadCollectionName(
-              GPKG_STATIONS_COLLECTION_NAME,
-            ),
-            q: '*',
-            filter_by: `location:(${lat}, ${lon}, ${radiusKm} km)`,
-            sort_by: `location(${lat}, ${lon}):asc`,
-            per_page: limit,
-          },
-        });
-      }
-
-      if (types.includes(SearchTypesEnum.BikeStation)) {
-        searches.push({
-          type: SearchTypesEnum.BikeStation,
-          request: {
-            collection: this.getReadCollectionName(
-              BIKE_STATIONS_COLLECTION_NAME,
-            ),
-            q: '*',
-            filter_by: `location:(${lat}, ${lon}, ${radiusKm} km)`,
-            sort_by: `location(${lat}, ${lon}):asc`,
-            per_page: limit,
-          },
-        });
-      }
-
-      if (searches.length === 0) {
-        return [];
-      }
-
       const results = await this.client.multiSearch.perform<
         NearbySearchDocument[],
         string
@@ -804,8 +1022,7 @@ export class TypesenseService implements OnModuleInit {
 
       return closest;
     } catch (error) {
-      this.logger.error('Nearby stops search failed:', error);
-      throw error;
+      return this.throwSearchFailure('Nearby stops search failed', error);
     }
   }
 
@@ -816,7 +1033,9 @@ export class TypesenseService implements OnModuleInit {
         .documents(routeId)
         .delete();
     } catch (error) {
-      this.logger.error(`Failed to delete route ${routeId}:`, error);
+      this.logger.error(
+        `Failed to delete route ${routeId}: ${formatTypesenseError(error)}`,
+      );
     }
   }
 
@@ -827,7 +1046,9 @@ export class TypesenseService implements OnModuleInit {
         .documents(stopId)
         .delete();
     } catch (error) {
-      this.logger.error(`Failed to delete stop ${stopId}:`, error);
+      this.logger.error(
+        `Failed to delete stop ${stopId}: ${formatTypesenseError(error)}`,
+      );
     }
   }
 
@@ -853,7 +1074,9 @@ export class TypesenseService implements OnModuleInit {
       await this.importDocuments(BIKE_STATIONS_COLLECTION_NAME, documents);
       this.logger.debug(`Indexed ${stations.length} bike stations`);
     } catch (error) {
-      this.logger.error('Failed to index bike stations:', error);
+      this.logger.error(
+        `Failed to index bike stations: ${formatTypesenseError(error)}`,
+      );
       throw error;
     }
   }
@@ -878,7 +1101,9 @@ export class TypesenseService implements OnModuleInit {
       await this.importDocuments(GPKG_LINES_COLLECTION_NAME, documents);
       this.logger.debug(`Indexed ${lines.length} rail lines`);
     } catch (error) {
-      this.logger.error('Failed to index rail lines:', error);
+      this.logger.error(
+        `Failed to index rail lines: ${formatTypesenseError(error)}`,
+      );
       throw error;
     }
   }
@@ -913,7 +1138,9 @@ export class TypesenseService implements OnModuleInit {
       await this.importDocuments(GPKG_STATIONS_COLLECTION_NAME, documents);
       this.logger.debug(`Indexed ${stations.length} rail stations`);
     } catch (error) {
-      this.logger.error('Failed to index rail stations:', error);
+      this.logger.error(
+        `Failed to index rail stations: ${formatTypesenseError(error)}`,
+      );
       throw error;
     }
   }

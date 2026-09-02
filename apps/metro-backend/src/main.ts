@@ -6,6 +6,7 @@ import { initializeFirebase } from './startup/firebase';
 import { NextFunction, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { RequestContextService } from './common/request-context/request-context.service';
+import { createRequestTimingMiddleware } from './observability/request-timing.middleware';
 
 export async function bootstrap() {
   initializeFirebase();
@@ -47,6 +48,7 @@ export async function bootstrap() {
     res.setHeader('x-request-id', requestId);
     requestContext.run(requestId, next);
   });
+  app.use(createRequestTimingMiddleware());
 
   // Global ValidationPipe
   app.useGlobalPipes(

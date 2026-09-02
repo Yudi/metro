@@ -23,7 +23,14 @@ const MAX_BUS_SHAPE_LIMIT = 500;
 const MAX_BATCH_IDS = 500;
 const MAX_ROUTE_RAIL_CONNECTION_ROUTES = 100;
 const MAX_STOP_FULL_DATA_ROUTES = 100;
-const STOP_FULL_DATA_CONCURRENCY = 8;
+// Limit nested route expansions to avoid exhausting the database pool.
+const STOP_FULL_DATA_CONCURRENCY = 2;
+
+export interface RouteFullDataOptions {
+  includeTrips?: boolean;
+  includeShapes?: boolean;
+  includeStops?: boolean;
+}
 
 /**
  * Optimized Geography Service
@@ -169,11 +176,10 @@ export class GeographyServiceOptimized {
     return this.tripService.getBatchRoutesForStops(stopIds);
   }
 
-  /**
-   * Get complete route data in a single request.
-   * Fetches route info, trips, shapes, and stops all at once.
-   */
-  async getRouteFullData(routeId: string): Promise<RouteFullData | null> {
+  async getRouteFullData(
+    routeId: string,
+    options: RouteFullDataOptions = {},
+  ): Promise<RouteFullData | null> {
     this.logger.debug(`Getting full data for route: ${routeId}`);
 
     // Get route info first
@@ -182,11 +188,16 @@ export class GeographyServiceOptimized {
       return null;
     }
 
-    // Fetch trips, and stops in parallel
-    const [trips, stops] = await Promise.all([
-      this.getTripsForRoute(routeId),
-      this.getStopsForRoute(routeId),
-    ]);
+    const includeTrips = options.includeTrips ?? true;
+    const includeStops = options.includeStops ?? true;
+
+    const tripsPromise = includeTrips
+      ? this.getTripsForRoute(routeId)
+      : Promise.resolve<Trip[]>([]);
+    const stopsPromise = includeStops
+      ? this.getStopsForRoute(routeId)
+      : Promise.resolve<BusStop[]>([]);
+    const [trips, stops] = await Promise.all([tripsPromise, stopsPromise]);
 
     this.logger.debug(
       `Route ${routeId}: ${trips.length} trips, ${stops.length} stops`,

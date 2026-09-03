@@ -19,6 +19,7 @@ import {
 import {
   API_BASE_URL,
   ErrorTrackingService,
+  graphqlQueryTimeoutInterceptor,
   TelemetryErrorHandler,
 } from '@metro/shared/api';
 import { environment } from '../environments/environment';
@@ -38,7 +39,13 @@ export const appConfig: ApplicationConfig = {
     provideZonelessChangeDetection(),
     provideRouter(routes),
     provideFirebase(environment.firebase),
-    provideHttpClient(withFetch(), withInterceptors([firebaseAuthInterceptor])),
+    provideHttpClient(
+      withFetch(),
+      withInterceptors([
+        firebaseAuthInterceptor,
+        graphqlQueryTimeoutInterceptor,
+      ]),
+    ),
     { provide: API_BASE_URL, useValue: environment.apiUrl },
     provideServiceWorker('ngsw-worker.js', {
       enabled: !isDevMode(),

@@ -27,7 +27,10 @@ export class MapDataLoaderService {
     }
   }
 
-  async loadRouteData(routeId: string): Promise<void> {
+  async loadRouteData(
+    routeId: string,
+    shouldDisplaySnackbar = true,
+  ): Promise<void> {
     this.mapState.isLoading.set(true);
     this.logger.debug('loadRouteData called', { routeId });
 
@@ -55,15 +58,22 @@ export class MapDataLoaderService {
       this.triggerDisplayUpdate();
     } catch (error) {
       this.logger.error('Error loading route data', error);
-      this.snackBar.open('Error loading route data', 'Close', {
-        duration: 3000,
-      });
+      if (shouldDisplaySnackbar) {
+        this.snackBar.open(
+          'Não foi possível carregar os dados da rota',
+          'Fechar',
+          { duration: 3000 },
+        );
+      }
     } finally {
       this.mapState.isLoading.set(false);
     }
   }
 
-  async loadStopData(stopId: string): Promise<void> {
+  async loadStopData(
+    stopId: string,
+    shouldDisplaySnackbar = true,
+  ): Promise<void> {
     this.mapState.isLoading.set(true);
 
     try {
@@ -117,9 +127,13 @@ export class MapDataLoaderService {
       }
     } catch (error) {
       this.logger.error('Error loading stop data', error);
-      this.snackBar.open('Error loading stop data', 'Close', {
-        duration: 3000,
-      });
+      if (shouldDisplaySnackbar) {
+        this.snackBar.open(
+          'Não foi possível carregar os dados da parada',
+          'Fechar',
+          { duration: 3000 },
+        );
+      }
     } finally {
       this.mapState.isLoading.set(false);
     }

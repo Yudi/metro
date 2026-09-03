@@ -1,6 +1,14 @@
 import { Service, inject, computed, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, map, catchError, of, tap, shareReplay } from 'rxjs';
+import {
+  Observable,
+  map,
+  catchError,
+  finalize,
+  of,
+  tap,
+  shareReplay,
+} from 'rxjs';
 import {
   RailLineStatus,
   RailStatusCode,
@@ -188,10 +196,11 @@ export class RailGraphqlService {
     this._error.set(null);
 
     this.fetchInProgress$ = this.doFetchLineStatus().pipe(
-      tap(() => {
+      finalize(() => {
         this.fetchInProgress$ = null;
+        this._loading.set(false);
       }),
-      shareReplay(1),
+      shareReplay({ bufferSize: 1, refCount: true }),
     );
 
     return this.fetchInProgress$;

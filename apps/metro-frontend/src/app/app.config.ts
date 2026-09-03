@@ -24,6 +24,7 @@ import { HttpLink } from 'apollo-angular/http';
 import {
   API_BASE_URL,
   ErrorTrackingService,
+  graphqlQueryTimeoutInterceptor,
   TelemetryErrorHandler,
 } from '@metro/shared/api';
 import { environment } from '../environments/environment';
@@ -47,7 +48,13 @@ export const appConfig: ApplicationConfig = {
     provideFirebase(environment.firebase),
     provideRouter(routes),
     provideClientHydration(withEventReplay()),
-    provideHttpClient(withFetch(), withInterceptors([firebaseAuthInterceptor])),
+    provideHttpClient(
+      withFetch(),
+      withInterceptors([
+        firebaseAuthInterceptor,
+        graphqlQueryTimeoutInterceptor,
+      ]),
+    ),
     provideApollo(() => {
       const httpLink = inject(HttpLink);
 

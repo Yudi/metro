@@ -39,10 +39,30 @@ export class MapSelectionService {
   ): Promise<void> {
     this.logger.debug('Adding route to selection', { routeId });
 
-    const route = await firstValueFrom(this.cache.getRoute(routeId));
+    const routeResult = await firstValueFrom(this.cache.getRoute(routeId)).then(
+      (route) => ({ success: true as const, route }),
+      (error: unknown) => {
+        this.logger.error('Failed to load route selection', error);
+        if (shouldDisplaySnackbar) {
+          this.snackBar.open('Não foi possível carregar a rota', 'Fechar', {
+            duration: 3000,
+          });
+        }
+        return { success: false as const };
+      },
+    );
+    if (!routeResult.success) {
+      return;
+    }
+
+    const { route } = routeResult;
     if (!route) {
       this.logger.warn('Route not found', { routeId });
-      this.snackBar.open('Route not found', 'Close', { duration: 2000 });
+      if (shouldDisplaySnackbar) {
+        this.snackBar.open('Rota não encontrada', 'Fechar', {
+          duration: 2000,
+        });
+      }
       return;
     }
 
@@ -59,7 +79,8 @@ export class MapSelectionService {
       selectedRoutes: Array.from(this.mapState.selectedRoutes().keys()),
     });
 
-    this.dataLoader.loadRouteData(routeId);
+    this.dataLoader.syncVectorTileFilters();
+    void this.dataLoader.loadRouteData(routeId, shouldDisplaySnackbar);
     this.subscribeToRouteRealtime(route.shortName);
 
     if (shouldDisplaySnackbar) {
@@ -157,11 +178,29 @@ export class MapSelectionService {
     stopId: string,
     shouldDisplaySnackbar = true,
   ): Promise<void> {
-    const stop = await this.cache.getStop(stopId).toPromise();
+    const stopResult = await firstValueFrom(this.cache.getStop(stopId)).then(
+      (stop) => ({ success: true as const, stop }),
+      (error: unknown) => {
+        this.logger.error('Failed to load stop selection', error);
+        if (shouldDisplaySnackbar) {
+          this.snackBar.open('Não foi possível carregar a parada', 'Fechar', {
+            duration: 3000,
+          });
+        }
+        return { success: false as const };
+      },
+    );
+    if (!stopResult.success) {
+      return;
+    }
+
+    const { stop } = stopResult;
     if (!stop) {
       this.logger.warn('Stop not found', { stopId });
       if (shouldDisplaySnackbar) {
-        this.snackBar.open('Stop not found', 'Close', { duration: 2000 });
+        this.snackBar.open('Parada não encontrada', 'Fechar', {
+          duration: 2000,
+        });
       }
       return;
     }
@@ -174,7 +213,8 @@ export class MapSelectionService {
       isSubwayStation: stop.isSubwayStation,
     };
     this.mapState.addStopToSelection(selectedStop);
-    this.dataLoader.loadStopData(stopId);
+    this.dataLoader.syncVectorTileFilters();
+    void this.dataLoader.loadStopData(stopId, shouldDisplaySnackbar);
 
     if (shouldDisplaySnackbar) {
       this.snackBar.open(`Parada adicionada`, 'Fechar', { duration: 2000 });

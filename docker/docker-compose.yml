@@ -31,6 +31,14 @@ services:
       - "traefik.http.routers.metro-frontend-root.service=metro-frontend-svc"
       - "traefik.http.routers.metro-frontend-root.tls=true"
       - "traefik.http.routers.metro-frontend-root.tls.certResolver=letsencrypt"
+      # Firebase Authentication requires its redirect helper at the domain root.
+      - "traefik.http.routers.metro-firebase-auth.rule=Host(`metro.yudi.com.br`) && PathPrefix(`/__/auth/`)"
+      - "traefik.http.routers.metro-firebase-auth.entrypoints=web, websecure"
+      - "traefik.http.routers.metro-firebase-auth.service=metro-firebase-auth-svc"
+      - "traefik.http.routers.metro-firebase-auth.tls=true"
+      - "traefik.http.routers.metro-firebase-auth.tls.certResolver=letsencrypt"
+      - "traefik.http.services.metro-firebase-auth-svc.loadbalancer.server.url=https://br-com-yudi-metro.firebaseapp.com"
+      - "traefik.http.services.metro-firebase-auth-svc.loadbalancer.passhostheader=false"
 
     depends_on:
       - backend

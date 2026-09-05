@@ -5,6 +5,7 @@ export * from './lib/date-time.utils';
 export * from './lib/rail-line.utils';
 export { getStaticRailStationsByLine } from './lib/rail-stations.entity';
 export type { StaticRailStation } from './lib/rail-stations.entity';
+export * from './lib/rail-station-bathrooms';
 export * from './lib/rail-station-favorite.utils';
 export * from './lib/rail-favorite-view.utils';
 export * from './lib/rail-special-lines.config';

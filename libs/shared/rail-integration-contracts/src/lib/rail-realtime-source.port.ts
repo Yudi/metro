@@ -1,6 +1,6 @@
 import {
   ActualCptmLineCode,
-  CptmLineCode,
+  TrackedRailLineCode,
   ExtendedNextTrainLineCode,
   SpecialRailService,
   TrainCarOccupancy,
@@ -52,7 +52,21 @@ export interface RailVehiclePosition {
   averageSpeed: number;
   stopSequence: number;
   destination?: string;
+  estimated?: boolean;
+  validUntil?: number;
 }
+
+/** Public network reference data supplied to the rail integration service. */
+export interface RailVehicleMapContext {
+  stations: Array<{ code: string; lat: number; lng: number }>;
+  paths: Array<{ points: Array<{ lat: number; lng: number }> }>;
+}
+
+export const RAIL_MAP_CONTEXT_LIMITS = {
+  stations: 500,
+  paths: 2_000,
+  points: 100_000,
+} as const;
 
 export interface RailHeadwayObservation {
   trainKey: string;
@@ -83,7 +97,8 @@ export abstract class RailRealtimeSourcePort {
   ): Promise<RailStationLookupResult | undefined>;
 
   abstract getVehiclesForLine(
-    lineCode: CptmLineCode,
+    lineCode: TrackedRailLineCode,
+    mapContext?: RailVehicleMapContext,
   ): Promise<RailVehiclePosition[]>;
 
   abstract fetchHeadwayObservations(

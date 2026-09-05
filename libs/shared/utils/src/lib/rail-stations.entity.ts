@@ -226,6 +226,47 @@ export const L5_STATIONS: StaticRailStation[] = [
   },
 ];
 
+export const L6_STATIONS: StaticRailStation[] = [
+  { code: 'BRA', name: 'Brasilândia' },
+  {
+    code: 'MTL',
+    name: 'Maristela',
+    alternativeNames: ['Vila Cardoso'],
+  },
+  {
+    code: 'IHP',
+    name: 'Itaberaba-Hospital Vila Penteado',
+    alternativeNames: ['Itaberaba'],
+  },
+  { code: 'JOP', name: 'João Paulo I' },
+  { code: 'FGO', name: 'Freguesia do Ó' },
+  { code: 'STM', name: 'Santa Marina' },
+  { code: 'AGB', name: 'Água Branca' },
+  {
+    code: 'SEP',
+    name: 'Sesc-Pompeia',
+  },
+  { code: 'PDZ', name: 'Perdizes' },
+  {
+    code: 'PUC',
+    name: 'PUC-Cardoso de Almeida',
+  },
+  {
+    code: 'FAAP',
+    name: 'FAAP-Pacaembu',
+  },
+  {
+    code: 'HMK',
+    name: 'Higienópolis-Mackenzie',
+  },
+  {
+    code: 'BIS',
+    name: '14 Bis-Saracura',
+  },
+  { code: 'BVT', name: 'Bela Vista' },
+  { code: 'JQM', name: 'São Joaquim' },
+];
+
 export const L7_STATIONS: StaticRailStation[] = [
   {
     code: 'BFU',
@@ -843,6 +884,7 @@ const STATIC_RAIL_STATIONS_BY_LINE: Readonly<
   L3: L3_STATIONS,
   L4: L4_STATIONS,
   L5: L5_STATIONS,
+  L6: L6_STATIONS,
   L7: L7_STATIONS,
   L8: L8_STATIONS,
   L9: L9_STATIONS,

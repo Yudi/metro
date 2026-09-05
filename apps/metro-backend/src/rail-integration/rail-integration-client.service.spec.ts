@@ -111,6 +111,16 @@ describe('RailIntegrationClientService', () => {
     service.onModuleDestroy();
   });
 
+  it('preserves generic vehicle display metadata across transport', async () => {
+    const vehicle = { id: 'opaque-id', prefix: '', lat: -23.5, lng: -46.7,
+      bearing: 0, lastUpdate: 1_789_000_000_000, estimated: true, validUntil: 1_789_000_060_000 };
+    const service = createServiceWithClient({
+      getVehiclesForLine: unarySuccess({ vehicles: [vehicle] }),
+    });
+    await expect(service.getVehiclesForLine('L9')).resolves.toEqual([vehicle]);
+    service.onModuleDestroy();
+  });
+
   it('retries transient failures with bounded attempts', async () => {
     const unavailable = serviceError(
       status.UNAVAILABLE,

@@ -7,7 +7,10 @@ import {
 } from './headway-cache.service';
 import { HeadwayTrackingService } from './headway-tracking.service';
 import { RailHeadwayObservation } from '@metro/rail-integration-contracts';
-import { ActualCptmLineCode } from '@metro/shared/utils';
+import {
+  ActualCptmLineCode,
+  isHeadwayOffHoursSuppressionWindow,
+} from '@metro/shared/utils';
 
 /**
  * When a train's prediction drops to this value or below, it is
@@ -64,6 +67,13 @@ export class CptmHeadwayTrackingService {
     observations: RailHeadwayObservation[],
     fetchedAt: number,
   ): Promise<void> {
+    // Do not retain state or record passages in the central overnight
+    // suppression window. This prevents an off-hours prediction from becoming
+    // a passage at opening while preserving the first and final train hours.
+    if (isHeadwayOffHoursSuppressionWindow(fetchedAt)) {
+      return;
+    }
+
     // Load current tracking state from Redis (or start fresh)
     const stored = await this.cache.getCptmTrackingState(lineCode, stationCode);
     const trains = new Map<string, SerializedTrackedTrain>(

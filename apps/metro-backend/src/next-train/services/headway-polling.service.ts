@@ -17,6 +17,7 @@ import {
   ActualCptmLineCode,
   HEADWAY_DEFAULT_ENABLED_LINES,
   getHeadwayBucket,
+  isHeadwayOffHoursSuppressionWindow,
   type RailStatusCode,
 } from '@metro/shared/utils';
 import { RailService } from '../../rail/rail.service';
@@ -57,9 +58,6 @@ const STATION_STAGGER_MS = 500;
 
 /** How often to recheck a non-operating line during off-hours (00:00-04:00) */
 const OFF_HOURS_STATUS_RECHECK_INTERVAL = 300_000; // 5 minutes
-const OFF_HOURS_START_MINUTES = 0;
-const OFF_HOURS_END_MINUTES = 4 * 60;
-const OFF_HOURS_REMAINING_TRAINS_TOLERANCE_MINUTES = 60;
 
 /** Minimum interval between polls for a single station during normal hours */
 const NORMAL_HOURS_POLL_INTERVAL = 20_000; // 20 seconds
@@ -558,6 +556,10 @@ export class HeadwayPollingService implements OnModuleInit, OnModuleDestroy {
       observedAt: Date;
     },
   ): Promise<void> {
+    if (isHeadwayOffHoursSuppressionWindow(params.observedAt.getTime())) {
+      return;
+    }
+
     await this.historicalService?.recordHeadwayError({
       lineCode,
       stationCode,
@@ -581,7 +583,7 @@ export class HeadwayPollingService implements OnModuleInit, OnModuleDestroy {
       return false;
     }
 
-    return this.isOffHoursSuppressionWindow(now);
+    return isHeadwayOffHoursSuppressionWindow(now);
   }
 
   private async getLineOperationStatusCode(
@@ -614,25 +616,6 @@ export class HeadwayPollingService implements OnModuleInit, OnModuleDestroy {
       });
       return null;
     }
-  }
-
-  private isOffHoursSuppressionWindow(timestamp: number): boolean {
-    const minutes = this.getSaoPauloMinutesFromMidnight(timestamp);
-    return (
-      minutes >=
-        OFF_HOURS_START_MINUTES +
-          OFF_HOURS_REMAINING_TRAINS_TOLERANCE_MINUTES &&
-      minutes <
-        OFF_HOURS_END_MINUTES - OFF_HOURS_REMAINING_TRAINS_TOLERANCE_MINUTES
-    );
-  }
-
-  private getSaoPauloMinutesFromMidnight(timestamp: number): number {
-    const date = new Date(timestamp);
-    const saoPauloTime = new Date(
-      date.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }),
-    );
-    return saoPauloTime.getHours() * 60 + saoPauloTime.getMinutes();
   }
 
   private async fetchTrains(

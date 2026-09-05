@@ -1,0 +1,148 @@
+.useful-phones-page {
+  display: grid;
+  gap: 32px;
+  margin: 0 auto;
+  max-width: 840px;
+  padding: 24px;
+}
+
+.page-header {
+  max-width: 70ch;
+
+  h1 {
+    font-size: clamp(1.75rem, 3vw, 2.5rem);
+    font-weight: 750;
+    line-height: 1.1;
+    margin: 0 0 12px;
+  }
+
+  p {
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 1rem;
+    margin: 0;
+  }
+}
+
+.agency-group {
+  display: grid;
+  gap: 12px;
+
+  > h2 {
+    align-items: center;
+    display: flex;
+    font-size: 1.25rem;
+    gap: 10px;
+    margin: 0;
+
+    mat-icon {
+      color: var(--mat-sys-primary);
+    }
+  }
+}
+
+.agency-list {
+  border-block: 1px solid var(--mat-sys-outline-variant);
+}
+
+.agency {
+  padding: 20px 0;
+
+  & + & {
+    border-top: 1px solid var(--mat-sys-outline-variant);
+  }
+}
+
+.agency-header {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+}
+
+.agency-logo {
+  height: 36px;
+  object-fit: contain;
+  width: 36px;
+}
+
+.agency-name {
+  min-width: 0;
+
+  h3 {
+    font-size: 1rem;
+    margin: 0;
+  }
+
+  span {
+    color: var(--mat-sys-on-surface-variant);
+    display: block;
+    font-size: 0.85rem;
+    margin-top: 2px;
+  }
+}
+
+.additional-information {
+  color: var(--mat-sys-on-surface-variant);
+  margin: 12px 48px 0;
+  max-width: 70ch;
+}
+
+.contact-list {
+  display: grid;
+  gap: 4px;
+  list-style: none;
+  margin: 12px 0 0 48px;
+  padding: 0;
+
+  li {
+    align-items: center;
+    display: grid;
+    gap: 16px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: 48px;
+  }
+}
+
+.contact-copy {
+  display: grid;
+  gap: 2px;
+
+  strong {
+    font-size: 0.92rem;
+  }
+
+  span {
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 0.82rem;
+    white-space: pre-line;
+  }
+}
+
+.phone-action {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .useful-phones-page {
+    gap: 28px;
+    padding: 20px 16px 32px;
+  }
+
+  .additional-information,
+  .contact-list {
+    margin-left: 0;
+  }
+
+  .contact-list li {
+    align-items: start;
+    gap: 4px;
+    grid-template-columns: 1fr;
+    padding: 6px 0;
+  }
+
+  .phone-action {
+    justify-self: start;
+    margin-left: -12px;
+  }
+}

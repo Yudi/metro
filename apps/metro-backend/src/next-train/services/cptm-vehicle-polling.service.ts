@@ -4,16 +4,19 @@ import {
   RailVehiclePosition,
 } from '@metro/rail-integration-contracts';
 import {
-  CptmLineCode,
+  TrackedRailLineCode,
   CPTM_LINE_CONFIG,
   hasExternalRailVehicles,
+  isCptmLine,
+  getRailLineById,
 } from '@metro/shared/utils';
+import { RailMapContextService } from './rail-map-context.service';
 
 /**
  * Vehicle position update for a privately sourced rail line.
  */
 export interface CptmVehicleUpdate {
-  lineCode: CptmLineCode;
+  lineCode: TrackedRailLineCode;
   lineName: string;
   bgcolor: string;
   fgcolor: string;
@@ -25,7 +28,7 @@ export interface CptmVehicleUpdate {
  * Delta update for vehicle positions
  */
 export interface CptmVehicleDelta {
-  lineCode: CptmLineCode;
+  lineCode: TrackedRailLineCode;
   vehicles: RailVehiclePosition[];
   timestamp: number;
 }
@@ -47,10 +50,10 @@ export class CptmVehiclePollingService implements OnModuleDestroy {
   private readonly logger = new Logger(CptmVehiclePollingService.name);
 
   // Line subscriptions: Map<"L4"|"L11"|..., Set<clientId>>
-  private readonly subscriptions = new Map<CptmLineCode, Set<string>>();
+  private readonly subscriptions = new Map<TrackedRailLineCode, Set<string>>();
 
   // Cache: Map<"L4"|"L11"|..., CptmVehicleUpdate>
-  private readonly cache = new Map<CptmLineCode, CptmVehicleUpdate>();
+  private readonly cache = new Map<TrackedRailLineCode, CptmVehicleUpdate>();
 
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private activePoll: Promise<void> | null = null;
@@ -59,7 +62,10 @@ export class CptmVehiclePollingService implements OnModuleDestroy {
 
   private readonly pollCompleteListeners: Set<PollCompleteListener> = new Set();
 
-  constructor(private readonly externalRailProvider: RailRealtimeSourcePort) {}
+  constructor(
+    private readonly externalRailProvider: RailRealtimeSourcePort,
+    private readonly mapContext: RailMapContextService,
+  ) {}
 
   async onModuleDestroy(): Promise<void> {
     this.stopPolling();
@@ -72,7 +78,7 @@ export class CptmVehiclePollingService implements OnModuleDestroy {
    */
   subscribe(
     clientId: string,
-    lineCode: CptmLineCode,
+    lineCode: TrackedRailLineCode,
   ): CptmVehicleUpdate | null {
     if (!hasExternalRailVehicles(lineCode)) {
       this.logger.warn(`Invalid line code for private vehicles: ${lineCode}`);
@@ -90,7 +96,16 @@ export class CptmVehiclePollingService implements OnModuleDestroy {
       `Client ${clientId} subscribed to ${lineCode} vehicles (${clients.size} subscriber(s))`,
     );
 
+    const alreadyPolling = this.pollTimer !== null;
     this.ensurePolling();
+    if (alreadyPolling && !this.cache.has(lineCode)) {
+      void this.poll().then(() => {
+        if (this.subscriptions.has(lineCode) && !this.cache.has(lineCode)) {
+          return this.poll();
+        }
+        return undefined;
+      });
+    }
 
     // Return cached data if available
     return this.cache.get(lineCode) ?? null;
@@ -99,7 +114,7 @@ export class CptmVehiclePollingService implements OnModuleDestroy {
   /**
    * Unsubscribe a client from vehicle positions for a line
    */
-  unsubscribe(clientId: string, lineCode: CptmLineCode): void {
+  unsubscribe(clientId: string, lineCode: TrackedRailLineCode): void {
     const clients = this.subscriptions.get(lineCode);
 
     if (clients) {
@@ -141,7 +156,7 @@ export class CptmVehiclePollingService implements OnModuleDestroy {
   /**
    * Get cached vehicle positions for a line
    */
-  getCached(lineCode: CptmLineCode): CptmVehicleUpdate | null {
+  getCached(lineCode: TrackedRailLineCode): CptmVehicleUpdate | null {
     return this.cache.get(lineCode) ?? null;
   }
 
@@ -162,14 +177,14 @@ export class CptmVehiclePollingService implements OnModuleDestroy {
   /**
    * Get subscribers for a specific line
    */
-  getSubscribers(lineCode: CptmLineCode): Set<string> {
+  getSubscribers(lineCode: TrackedRailLineCode): Set<string> {
     return this.subscriptions.get(lineCode) ?? new Set();
   }
 
   /**
    * Get all subscribed line codes
    */
-  getSubscribedLines(): CptmLineCode[] {
+  getSubscribedLines(): TrackedRailLineCode[] {
     return Array.from(this.subscriptions.keys());
   }
 
@@ -249,7 +264,10 @@ export class CptmVehiclePollingService implements OnModuleDestroy {
         lineCodes.map(async (lineCode) => {
           try {
             const vehicles =
-              await this.externalRailProvider.getVehiclesForLine(lineCode);
+              await this.externalRailProvider.getVehiclesForLine(
+                lineCode,
+                await this.mapContext.getContext(lineCode),
+              );
             return { lineCode, vehicles, error: false };
           } catch (error) {
             this.logger.error(`Error fetching vehicles for ${lineCode}`, error);
@@ -259,12 +277,19 @@ export class CptmVehiclePollingService implements OnModuleDestroy {
       );
 
       for (const { lineCode, vehicles, error } of results) {
+        if (!this.subscriptions.has(lineCode)) {
+          continue;
+        }
         if (error) {
           anyError = true;
           continue;
         }
 
-        const config = CPTM_LINE_CONFIG[lineCode];
+        const config = isCptmLine(lineCode) ? CPTM_LINE_CONFIG[lineCode] : {
+          name: getRailLineById(lineCode)?.colorName ?? lineCode,
+          bgcolor: getRailLineById(lineCode)?.colorHex.replace('#', '') ?? '000000',
+          fgcolor: 'FFFFFF',
+        };
         const cached = this.cache.get(lineCode);
 
         // Check if vehicles changed
@@ -326,11 +351,11 @@ export class CptmVehiclePollingService implements OnModuleDestroy {
       return true;
     }
 
-    // Sort by prefix for comparison
-    const sortByPrefix = (a: RailVehiclePosition, b: RailVehiclePosition) =>
-      a.prefix.localeCompare(b.prefix);
-    const sortedOld = [...oldVehicles].sort(sortByPrefix);
-    const sortedNew = [...newVehicles].sort(sortByPrefix);
+    // Sort by stable vehicle identity for comparison
+    const sortByIdentity = (a: RailVehiclePosition, b: RailVehiclePosition) =>
+      (a.id || a.prefix).localeCompare(b.id || b.prefix);
+    const sortedOld = [...oldVehicles].sort(sortByIdentity);
+    const sortedNew = [...newVehicles].sort(sortByIdentity);
 
     for (let i = 0; i < sortedOld.length; i++) {
       const oldV = sortedOld[i];
@@ -338,7 +363,10 @@ export class CptmVehiclePollingService implements OnModuleDestroy {
 
       // Check if position or bearing changed significantly
       if (
+        oldV.id !== newV.id ||
         oldV.prefix !== newV.prefix ||
+        oldV.estimated !== newV.estimated ||
+        oldV.validUntil !== newV.validUntil ||
         Math.abs(oldV.lat - newV.lat) > 0.0001 ||
         Math.abs(oldV.lng - newV.lng) > 0.0001 ||
         oldV.bearing !== newV.bearing

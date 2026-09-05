@@ -4,10 +4,10 @@ import { environment } from '../../../environments/environment';
 import { LoggerService } from '@metro/shared/api';
 import {
   ExtendedNextTrainLineCode,
-  CptmLineCode,
   hasExternalRailVehicles,
   hasNextTrainIntegration,
   TrackedRailVehicle,
+  TrackedRailLineCode,
   DirectionHeadway,
   TrainCarOccupancy,
 } from '@metro/shared/utils';
@@ -98,7 +98,7 @@ const CPTM_VEHICLE_UPDATE_EVENT = 'cptm_vehicle_update';
  */
 export interface CptmVehicleUpdate {
   type: 'full' | 'delta';
-  lineCode: CptmLineCode;
+  lineCode: TrackedRailLineCode;
   vehicles: TrackedRailVehicle[];
   timestamp: number;
 }
@@ -123,9 +123,9 @@ export class NextTrainWebsocketService implements OnDestroy {
     Map<SubscriptionKey, StationTrainData>
   >(new Map());
 
-  // CPTM vehicle data: Map<"L10", TrackedRailVehicle[]>
+  // Tracked rail vehicle data: Map<TrackedRailLineCode, TrackedRailVehicle[]>
   private readonly _cptmVehicles = signal<
-    Map<CptmLineCode, TrackedRailVehicle[]>
+    Map<TrackedRailLineCode, TrackedRailVehicle[]>
   >(new Map());
 
   // Track owners rather than only keys. Multiple cards can render the same
@@ -134,13 +134,19 @@ export class NextTrainWebsocketService implements OnDestroy {
   private readonly activeSubscriptions = new Map<SubscriptionKey, number>();
 
   // Track CPTM vehicle subscriptions
-  private readonly cptmVehicleSubscriptions = new Map<CptmLineCode, number>();
+  private readonly cptmVehicleSubscriptions = new Map<
+    TrackedRailLineCode,
+    number
+  >();
 
   private readonly latestStationUpdateTimestamps = new Map<
     SubscriptionKey,
     number
   >();
-  private readonly latestVehicleUpdateTimestamps = new Map<CptmLineCode, number>();
+  private readonly latestVehicleUpdateTimestamps = new Map<
+    TrackedRailLineCode,
+    number
+  >();
 
   constructor() {
     // Don't auto-connect, let components trigger connection on demand
@@ -244,9 +250,11 @@ export class NextTrainWebsocketService implements OnDestroy {
   }
 
   /**
-   * Subscribe to vehicle positions for private-tracked lines (L4, L10-L13)
+   * Subscribe to vehicle positions for tracked rail lines (L4, L8-L13, EA, 10X)
    */
-  subscribeToCptmVehicles(lineCode: CptmLineCode): NextTrainSubscriptionRelease {
+  subscribeToCptmVehicles(
+    lineCode: TrackedRailLineCode,
+  ): NextTrainSubscriptionRelease {
     if (!hasExternalRailVehicles(lineCode)) {
       this.logger.warn(`Invalid line code for private vehicles: ${lineCode}`);
       return () => undefined;
@@ -271,9 +279,9 @@ export class NextTrainWebsocketService implements OnDestroy {
   }
 
   /**
-   * Unsubscribe from CPTM vehicle positions for a line
+   * Unsubscribe from tracked rail vehicle positions for a line
    */
-  unsubscribeFromCptmVehicles(lineCode: CptmLineCode): void {
+  unsubscribeFromCptmVehicles(lineCode: TrackedRailLineCode): void {
     const owners = this.cptmVehicleSubscriptions.get(lineCode);
     if (!owners) {
       return;
@@ -310,7 +318,7 @@ export class NextTrainWebsocketService implements OnDestroy {
   /**
    * Get CPTM vehicles for a line
    */
-  getCptmVehicles(lineCode: CptmLineCode): TrackedRailVehicle[] {
+  getCptmVehicles(lineCode: TrackedRailLineCode): TrackedRailVehicle[] {
     return this._cptmVehicles().get(lineCode) ?? [];
   }
 

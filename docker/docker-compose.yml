@@ -82,8 +82,6 @@ services:
     environment:
       NODE_ENV: production
       RAIL_INTEGRATION_GRPC_URL: ${RAIL_INTEGRATION_GRPC_URL:-metro-core-private-grpc:50051}
-      # Typesense is an external deployment dependency; keep its host
-      # contract aligned with docker/.env rather than silently ignoring it.
       TYPESENSE_HOST: ${TYPESENSE_HOST:-typesense}
       TYPESENSE_PORT: ${TYPESENSE_PORT:-8108}
       TYPESENSE_PROTOCOL: ${TYPESENSE_PROTOCOL:-http}

@@ -53,6 +53,7 @@ export class ToolbarComponent {
     '/mapa',
     '/historico/ocorrencias',
     '/historico/intervalos',
+    '/telefones',
     '/sobre',
     '/menu',
     '/favoritos',

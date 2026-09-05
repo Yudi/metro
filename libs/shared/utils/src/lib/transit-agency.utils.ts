@@ -148,7 +148,14 @@ export const AGENCIES_DATA: AgenciesData = {
     shortName: 'LinhaUni',
     type: 'rail',
     contact: {
-      phones: [],
+      phones: [
+        {
+          number: '08005803172',
+          title: 'Central de Atendimento',
+          whatsapp: false,
+          sms: false,
+        },
+      ],
       site: 'https://www.linhauni.com.br/',
     },
   },
@@ -182,20 +189,13 @@ export const AGENCIES_DATA: AgenciesData = {
     contact: {
       phones: [
         {
-          number: '+5511919762794',
-          title: 'Atendimento por WhatsApp',
-          description: 'Seg a Sex das 6h30 às 22h\nSáb e Dom das 8h às 18h',
+          number: ' 08000746733',
+          title: 'Central de Atendimento',
           whatsapp: true,
           sms: false,
         },
-        {
-          number: '08000070670',
-          title: 'Central de Atendimento',
-          whatsapp: false,
-          sms: false,
-        },
       ],
-      site: 'https://tictrens.com.br/',
+      site: 'https://triviatrens.com.br/',
     },
   },
   [TransitAgency.CPTM]: {

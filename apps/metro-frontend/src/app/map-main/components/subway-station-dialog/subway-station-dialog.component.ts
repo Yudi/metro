@@ -32,6 +32,8 @@ import {
   RailStatusCode,
   ExtendedNextTrainLineCode,
   hardNormalizeString,
+  resolveStationBathroomInfo,
+  StationBathroomStatus,
 } from '@metro/shared/utils';
 import { DialogHeaderComponent } from '../../../shared/components/dialog-header/dialog-header.component';
 import { NextTrainCardComponent } from '../../../shared/components/next-train-card/next-train-card.component';
@@ -119,6 +121,35 @@ export class SubwayStationDialogComponent implements OnInit {
   readonly staticLineInfo = computed(() => {
     const codes = this.lineCodes();
     return RAIL_LINES.filter((line) => codes.includes(line.code));
+  });
+
+  readonly bathroomInfo = computed(() => {
+    const bathroom = resolveStationBathroomInfo(
+      this.data.stop.name,
+      this.lineCodes(),
+    );
+
+    if (!bathroom) {
+      return undefined;
+    }
+
+    const detail = (() => {
+      switch (bathroom.status) {
+        case StationBathroomStatus.PaidArea:
+          return 'área paga';
+        case StationBathroomStatus.FreeArea:
+          return 'área livre';
+        case StationBathroomStatus.PaidAndFreeAreas:
+          return 'áreas paga e livre';
+        case StationBathroomStatus.AvailableLocationUnknown:
+          return 'localização não informada';
+        case StationBathroomStatus.Unavailable:
+          return 'não possui';
+      }
+    })();
+
+    const note = bathroom.notes.join('; ') || undefined;
+    return { detail, note };
   });
 
   // Next train stations detection (L4/L8/L9 have codes, CPTM lines have empty codes)

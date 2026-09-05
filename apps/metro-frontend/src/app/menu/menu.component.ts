@@ -88,6 +88,11 @@ export class MenuComponent {
     ],
     null: [
       {
+        label: 'Telefones úteis',
+        icon: 'contact_phone',
+        route: '/telefones',
+      },
+      {
         label: 'Sobre',
         icon: 'info',
         route: '/sobre',

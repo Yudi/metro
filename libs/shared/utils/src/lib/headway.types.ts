@@ -90,17 +90,24 @@ export const HEADWAY_BUCKETS: HeadwayBucketDefinition[] = [
 ];
 
 const SAO_PAULO_TZ = 'America/Sao_Paulo';
+const OFF_HOURS_START_MINUTES = 0;
+const OFF_HOURS_END_MINUTES = 4 * 60;
+const OFF_HOURS_REMAINING_TRAINS_TOLERANCE_MINUTES = 60;
+
+function getSaoPauloMinutesFromMidnight(timestamp?: number): number {
+  const date = new Date(timestamp ?? Date.now());
+  const spTime = new Date(
+    date.toLocaleString('en-US', { timeZone: SAO_PAULO_TZ }),
+  );
+  return spTime.getHours() * 60 + spTime.getMinutes();
+}
 
 /**
  * Determine which bucket a timestamp falls into (São Paulo local time).
  * Defaults to the current time when no timestamp is provided.
  */
 export function getHeadwayBucket(timestamp?: number): HeadwayBucketId {
-  const date = new Date(timestamp ?? Date.now());
-  const spTime = new Date(
-    date.toLocaleString('en-US', { timeZone: SAO_PAULO_TZ }),
-  );
-  const totalMinutes = spTime.getHours() * 60 + spTime.getMinutes();
+  const totalMinutes = getSaoPauloMinutesFromMidnight(timestamp);
 
   for (const bucket of HEADWAY_BUCKETS) {
     if (totalMinutes < bucket.endMinutes) {
@@ -108,6 +115,23 @@ export function getHeadwayBucket(timestamp?: number): HeadwayBucketId {
     }
   }
   return 'night';
+}
+
+/**
+ * Whether headway persistence is suppressed overnight after the last trains
+ * have cleared and before the first trains are expected to enter service.
+ */
+export function isHeadwayOffHoursSuppressionWindow(
+  timestamp?: number,
+): boolean {
+  const minutes = getSaoPauloMinutesFromMidnight(timestamp);
+  return (
+    minutes >=
+      OFF_HOURS_START_MINUTES +
+        OFF_HOURS_REMAINING_TRAINS_TOLERANCE_MINUTES &&
+    minutes <
+      OFF_HOURS_END_MINUTES - OFF_HOURS_REMAINING_TRAINS_TOLERANCE_MINUTES
+  );
 }
 
 /**

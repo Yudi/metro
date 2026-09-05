@@ -41,12 +41,12 @@ export class MapFeatureInteractionService {
 
     const properties = targetFeature.getProperties();
 
-    if (this.vectorTileService.isVectorTileFeature(feature)) {
+    if (properties['estimatedPosition'] === true) {
+      this.showEstimatedVehicleInfo(properties);
+    } else if (this.vectorTileService.isVectorTileFeature(feature)) {
       this.handleVectorTileFeatureSelection(feature);
       return;
-    }
-
-    if (properties['vehicleId']) {
+    } else if (properties['vehicleId']) {
       this.showVehicleInfo(properties);
     } else if (properties['stopId']) {
       this.detailsService.showRoutesForStop(properties['stopId'] as string);
@@ -222,6 +222,16 @@ export class MapFeatureInteractionService {
       `Ônibus ${vehicleId} - Linha ${routeShortName}`,
       'Close',
       { duration: 3000 },
+    );
+  }
+
+  private showEstimatedVehicleInfo(properties: Record<string, unknown>): void {
+    const lineCode = String(properties['lineCode'] || 'ferroviária');
+
+    this.snackBar.open(
+      `Linha ${lineCode}: Localização estimada. A posição exibida pode diferir da posição real do trem.`,
+      'Fechar',
+      { duration: 5000 },
     );
   }
 

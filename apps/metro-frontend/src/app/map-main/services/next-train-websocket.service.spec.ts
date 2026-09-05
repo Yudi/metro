@@ -128,4 +128,49 @@ describe('NextTrainWebsocketService', () => {
       processing: false, dataReceived: true,
     });
   });
+
+  it('shares one generic vehicle stream owner for L8 estimates', () => {
+    const service = TestBed.inject(NextTrainWebsocketService);
+    const firstRelease = service.subscribeToCptmVehicles('L8');
+    const secondRelease = service.subscribeToCptmVehicles('L8');
+
+    expect(socket.emit).toHaveBeenCalledTimes(1);
+    expect(socket.emit).toHaveBeenCalledWith('subscribe_cptm_vehicles', {
+      lineCode: 'L8',
+    });
+
+    listeners.get('cptm_vehicle_update')?.({
+      type: 'full',
+      lineCode: 'L8',
+      vehicles: [
+        {
+          id: 'estimate-uuid',
+          prefix: 'legacy-prefix',
+          lat: -23.53,
+          lng: -46.78,
+          bearing: 0,
+          wheelchair: false,
+          climatized: false,
+          lastUpdate: Date.now(),
+          averageSpeed: 0,
+          stopSequence: 0,
+          estimated: true,
+          validUntil: Date.now() + 20_000,
+        },
+      ],
+      timestamp: 200,
+    });
+
+    expect(service.getCptmVehicles('L8')).toHaveLength(1);
+    firstRelease();
+    expect(socket.emit).not.toHaveBeenCalledWith('unsubscribe_cptm_vehicles', {
+      lineCode: 'L8',
+    });
+
+    secondRelease();
+    expect(socket.emit).toHaveBeenCalledWith('unsubscribe_cptm_vehicles', {
+      lineCode: 'L8',
+    });
+    expect(service.getCptmVehicles('L8')).toHaveLength(0);
+  });
 });

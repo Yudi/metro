@@ -19,6 +19,7 @@ import {
   ExtendedNextTrainLineCode,
   getHeadwayBucket,
   getHeadwayBucketLabel,
+  isHeadwayOffHoursSuppressionWindow,
   isActualCptmLine,
   isSpecialCptmLine,
 } from '@metro/shared/utils';
@@ -143,6 +144,16 @@ export class HeadwayTrackingService implements OnModuleDestroy {
     if (isActualCptmLine(lineCode) || isSpecialCptmLine(lineCode)) return;
 
     const key = `${lineCode}:${stationCode}`;
+
+    // Clear an earlier snapshot inside the central overnight suppression
+    // window, so a disappearance cannot be interpreted as a passage when
+    // service resumes. The first and final hours remain available for trains
+    // that still run around the timetable boundary.
+    if (isHeadwayOffHoursSuppressionWindow(fetchedAt)) {
+      this.previousSnapshots.delete(key);
+      return;
+    }
+
     const previous = this.previousSnapshots.get(key);
 
     if (previous) {

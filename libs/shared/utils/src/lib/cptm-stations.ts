@@ -4,6 +4,7 @@ import {
 } from './rail-stations.entity';
 import { hardNormalizeString } from './strings.utils';
 import { TRIVIATRENS_LIVE_DATA_ENABLED } from './transit-agency.utils';
+import { getLiveTrainTrackingApiIds } from './search.utils';
 
 /**
  * Vehicle position delivered by the backend for tracked rail lines.
@@ -20,12 +21,18 @@ export interface TrackedRailVehicle {
   averageSpeed: number;
   stopSequence: number;
   destination?: string;
+  /** Whether the map location is approximate. */
+  estimated?: boolean;
+  /** Optional display expiry in Unix milliseconds, assigned by the source. */
+  validUntil?: number;
 }
 
 /**
  * Line code type for lines tracked by the rail integration service.
  */
 export type CptmLineCode = 'L4' | 'L10' | 'L11' | 'L12' | 'L13' | 'EA' | '10X';
+
+export type TrackedRailLineCode = CptmLineCode | 'L8' | 'L9';
 
 /**
  * Line code type for actual CPTM-operated lines (excludes L4)
@@ -249,13 +256,14 @@ export function isValidApi1RailStationCode(
 }
 
 /**
- * Check if a line code has privately tracked vehicles.
- * Includes L4 and L10-L13
+ * Check whether a line currently supports the rail vehicle stream.
  */
 export function hasExternalRailVehicles(
   lineCode: string,
-): lineCode is CptmLineCode {
-  return lineCode === 'L4' || isApi1RailLine(lineCode);
+): lineCode is TrackedRailLineCode {
+  return lineCode === 'L4' || isApi1RailLine(lineCode) ||
+    ((lineCode === 'L8' || lineCode === 'L9') &&
+      getLiveTrainTrackingApiIds([Number(lineCode.slice(1))]).length > 0);
 }
 
 /**
@@ -308,21 +316,19 @@ export function extractCptmLineCode(
 }
 
 /**
- * Extract line code that has private vehicle tracking from route shortName or lineId
- * Handles L4 (Amarela), L10-L13 (CPTM lines)
- * Formats: "L4", "L4-Amarela", "CPTM L10", "CPTM L10-Turquesa", "L10", etc.
- * @returns CptmLineCode if found (L4 or L10-L13), undefined otherwise
+ * Extract a supported vehicle-stream line from a route name or line identifier.
+ * Availability can be ignored when releasing an existing subscription.
  */
 export function extractTrackedRailVehicleLineCode(
   shortName: string,
-): CptmLineCode | undefined {
+  requireAvailable = true,
+): TrackedRailLineCode | undefined {
   if (!shortName) return undefined;
 
-  // Match L4, L10, L11, L12, or L13 in the string
-  const match = shortName.match(/(?:L(?:4|1[0-3])|EA|10X)/i);
+  const match = shortName.match(/(?:^|[^A-Za-z0-9])(L(?:4|8|9|1[0-3])|EA|10X)(?=$|[^A-Za-z0-9])/i);
   if (match) {
-    const lineCode = match[0].toUpperCase() as CptmLineCode;
-    if (hasExternalRailVehicles(lineCode)) {
+    const lineCode = match[1].toUpperCase() as TrackedRailLineCode;
+    if (!requireAvailable || hasExternalRailVehicles(lineCode)) {
       return lineCode;
     }
   }

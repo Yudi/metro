@@ -12,6 +12,7 @@ import { WsThrottlerGuard } from '../common/guards/ws-throttler.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { RailIntegrationClientModule } from '../rail-integration/rail-integration-client.module';
 import { RailModule } from '../rail/rail.module';
+import { RailMapContextService } from './services/rail-map-context.service';
 
 @Module({
   imports: [RailIntegrationClientModule, RailModule],
@@ -21,6 +22,7 @@ import { RailModule } from '../rail/rail.module';
     CptmVehiclePollingService,
     NextTrainPollingService,
     NextTrainScheduleService,
+    RailMapContextService,
     HeadwayCacheService,
     HeadwayTrackingService,
     CptmHeadwayTrackingService,

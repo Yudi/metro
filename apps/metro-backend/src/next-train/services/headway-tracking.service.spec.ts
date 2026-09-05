@@ -194,6 +194,62 @@ describe('HeadwayTrackingService', () => {
     });
   });
 
+  it('clears an L4 snapshot instead of recording it in the central off-hours window', async () => {
+    const train = {
+      destinationCode: 'LUZ',
+      destinationName: 'Luz',
+      trainCurrentStationName: '',
+      arrivalTime: '01:00',
+      isAtPlatform: null,
+      isTrainStopped: null,
+    };
+
+    await service.processPollResult(
+      'L4',
+      'BUT',
+      [train],
+      new Date('2026-06-12T00:59:00-03:00').getTime(),
+    );
+    await service.processPollResult(
+      'L4',
+      'BUT',
+      [],
+      new Date('2026-06-12T01:01:00-03:00').getTime(),
+    );
+
+    expect(cache.recordPassage).not.toHaveBeenCalled();
+    expect(prisma.trainPassage.create).not.toHaveBeenCalled();
+    expect(
+      (
+        service as unknown as {
+          previousSnapshots: Map<string, unknown>;
+        }
+      ).previousSnapshots.has('L4:BUT'),
+    ).toBe(false);
+  });
+
+  it('records L4 passages during the final-train off-hours grace period', async () => {
+    const train = {
+      destinationCode: 'LUZ',
+      destinationName: 'Luz',
+      trainCurrentStationName: '',
+      arrivalTime: '00:01',
+      isAtPlatform: null,
+      isTrainStopped: null,
+    };
+    const passageAt = new Date('2026-06-12T00:01:00-03:00').getTime();
+
+    await service.processPollResult('L4', 'BUT', [train], passageAt - 30_000);
+    await service.processPollResult('L4', 'BUT', [], passageAt + 30_000);
+
+    expect(cache.recordPassage).toHaveBeenCalledWith(
+      'L4',
+      'BUT',
+      'Luz',
+      passageAt,
+    );
+  });
+
   it('does not treat a delayed L8/L9 platform train as a new passage', async () => {
     const firstPollAt = new Date('2026-06-15T12:28:30-03:00').getTime();
     const secondPollAt = new Date('2026-06-15T12:31:00-03:00').getTime();

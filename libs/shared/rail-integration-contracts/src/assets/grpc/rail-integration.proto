@@ -8,7 +8,7 @@ service RailIntegrationService {
   rpc GetStationName(LineStationRequest) returns (StationNameResponse);
   rpc GetStationCodes(LineRequest) returns (StationCodesResponse);
   rpc GetStationByName(StationByNameRequest) returns (StationLookupResponse);
-  rpc GetVehiclesForLine(LineRequest) returns (VehiclesResponse);
+  rpc GetVehiclesForLine(VehiclesRequest) returns (VehiclesResponse);
   rpc GetAvailableSpecialRailServices(ReadinessRequest) returns (SpecialRailServicesResponse);
   rpc FetchHeadwayObservations(LineStationRequest) returns (HeadwayObservationsResponse);
   rpc FetchRailStatusLines(ReadinessRequest) returns (RailStatusLinesResponse);
@@ -91,6 +91,33 @@ message VehiclePosition {
   double average_speed = 9;
   int32 stop_sequence = 10;
   optional string destination = 11;
+  optional bool estimated = 12;
+  optional int64 valid_until = 13;
+}
+
+message MapCoordinate {
+  double lat = 1;
+  double lng = 2;
+}
+
+message MapStation {
+  string code = 1;
+  double lat = 2;
+  double lng = 3;
+}
+
+message MapPath {
+  repeated MapCoordinate points = 1;
+}
+
+message RailVehicleMapContext {
+  repeated MapStation stations = 1;
+  repeated MapPath paths = 2;
+}
+
+message VehiclesRequest {
+  string line_code = 1;
+  optional RailVehicleMapContext map_context = 2;
 }
 
 message VehiclesResponse {

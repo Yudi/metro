@@ -48,6 +48,51 @@ const PARAISO: BusStopGraphQL = {
   routeShortNames: ['L1', 'L2'],
 };
 
+const JABAQUARA: BusStopGraphQL = {
+  ...PARAISO,
+  id: 'jabaquara-1',
+  stopId: 'jabaquara-1',
+  name: 'Jabaquara-Comitê Paralímpico Brasileiro',
+  description: 'Estação terminal da Linha 1 - Azul.',
+  routeShortNames: ['L1'],
+};
+
+const SAO_JUDAS: BusStopGraphQL = {
+  ...PARAISO,
+  id: 'sao-judas-1',
+  stopId: 'sao-judas-1',
+  name: 'São Judas',
+  description: 'Estação São Judas da Linha 1 - Azul.',
+  routeShortNames: ['L1'],
+};
+
+const SANTA_CRUZ: BusStopGraphQL = {
+  ...PARAISO,
+  id: 'santa-cruz-1',
+  stopId: 'santa-cruz-1',
+  name: 'Santa Cruz',
+  description: 'Integração entre as linhas 1 - Azul e 5 - Lilás.',
+  routeShortNames: ['L1', 'L5'],
+};
+
+const SANTANA: BusStopGraphQL = {
+  ...PARAISO,
+  id: 'santana-1',
+  stopId: 'santana-1',
+  name: 'Santana',
+  description: 'Estação Santana da Linha 1 - Azul.',
+  routeShortNames: ['L1'],
+};
+
+const VILA_DAS_BELEZAS: BusStopGraphQL = {
+  ...PARAISO,
+  id: 'vila-das-belezas-1',
+  stopId: 'vila-das-belezas-1',
+  name: 'Vila das Belezas',
+  description: 'Estação Vila das Belezas da Linha 5 - Lilás.',
+  routeShortNames: ['L5'],
+};
+
 // Mock Data: Pinheiros Station (L9 Esmeralda) - has next train feature
 
 const PINHEIROS: BusStopGraphQL = {
@@ -245,6 +290,86 @@ export const Default: Story = {
   decorators: [
     applicationConfig({
       providers: createProviders(PARAISO, {
+        cached: null,
+        isFresh: true,
+        fetchKind: 'normal',
+        fetchDelayMs: 0,
+      }),
+    }),
+  ],
+};
+
+/**
+ * Useful access note: restroom is in the free area at the bus terminal.
+ */
+export const BathroomWithAccessNote: Story = {
+  decorators: [
+    applicationConfig({
+      providers: createProviders(JABAQUARA, {
+        cached: null,
+        isFresh: true,
+        fetchKind: 'normal',
+        fetchDelayMs: 0,
+      }),
+    }),
+  ],
+};
+
+/**
+ * Restrooms available on both sides of the fare gates at an interchange.
+ */
+export const BathroomsInPaidAndFreeAreas: Story = {
+  decorators: [
+    applicationConfig({
+      providers: createProviders(SANTA_CRUZ, {
+        cached: null,
+        isFresh: true,
+        fetchKind: 'normal',
+        fetchDelayMs: 0,
+      }),
+    }),
+  ],
+};
+
+/**
+ * Known absence: the researched negative is shown instead of being hidden.
+ */
+export const WithoutBathrooms: Story = {
+  decorators: [
+    applicationConfig({
+      providers: createProviders(SAO_JUDAS, {
+        cached: null,
+        isFresh: true,
+        fetchKind: 'normal',
+        fetchDelayMs: 0,
+      }),
+    }),
+  ],
+};
+
+/**
+ * Confirmed restroom whose position relative to the fare gates is unknown.
+ */
+export const BathroomLocationUnknown: Story = {
+  decorators: [
+    applicationConfig({
+      providers: createProviders(SANTANA, {
+        cached: null,
+        isFresh: true,
+        fetchKind: 'normal',
+        fetchDelayMs: 0,
+      }),
+    }),
+  ],
+};
+
+/**
+ * Fully unknown existence: no restroom row is rendered.
+ */
+export const BathroomInfoUnknown: Story = {
+  decorators: [
+    applicationConfig({
+      providers: createProviders(VILA_DAS_BELEZAS, {
         cached: null,
         isFresh: true,
         fetchKind: 'normal',

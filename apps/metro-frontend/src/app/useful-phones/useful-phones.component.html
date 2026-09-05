@@ -1,0 +1,79 @@
+<main class="useful-phones-page">
+  <header class="page-header">
+    <h1>Telefones úteis</h1>
+  </header>
+
+  @for (group of groups; track group.title) {
+    @if (group.agencies.length > 0) {
+      <section class="agency-group" [attr.aria-labelledby]="group.title">
+        <h2 [id]="group.title">
+          <mat-icon aria-hidden="true">{{ group.icon }}</mat-icon>
+          {{ group.title }}
+        </h2>
+
+        <div class="agency-list">
+          @for (agency of group.agencies; track agency.agencyKey) {
+            <article class="agency">
+              <header class="agency-header">
+                <img
+                  class="agency-logo"
+                  [ngSrc]="agencyIconPath(agency)"
+                  width="36"
+                  height="36"
+                  alt=""
+                />
+                <div class="agency-name">
+                  <h3>{{ agency.shortName }}</h3>
+                  @if (agency.name !== agency.shortName) {
+                    <span>{{ agency.name }}</span>
+                  }
+                </div>
+                <a
+                  mat-icon-button
+                  [href]="agency.contact.site"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  [attr.aria-label]="'Abrir site ' + agency.shortName"
+                >
+                  <mat-icon aria-hidden="true">open_in_new</mat-icon>
+                </a>
+              </header>
+
+              @if (agency.contact.additionalInformation) {
+                <p class="additional-information">
+                  {{ agency.contact.additionalInformation }}
+                </p>
+              }
+
+              @if (agency.contact.phones.length > 0) {
+                <ul class="contact-list">
+                  @for (phone of agency.contact.phones; track phone) {
+                    <li>
+                      <div class="contact-copy">
+                        <strong>{{ phone.title }}</strong>
+                        @if (phone.description) {
+                          <span>{{ phone.description }}</span>
+                        }
+                      </div>
+                      <a
+                        mat-button
+                        class="phone-action"
+                        [href]="phoneHref(phone)"
+                        [attr.aria-label]="phoneActionLabel(phone)"
+                      >
+                        <mat-icon aria-hidden="true">{{
+                          phoneIcon(phone)
+                        }}</mat-icon>
+                        {{ formatPhoneNumber(phone.number) }}
+                      </a>
+                    </li>
+                  }
+                </ul>
+              }
+            </article>
+          }
+        </div>
+      </section>
+    }
+  }
+</main>

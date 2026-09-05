@@ -409,6 +409,8 @@ export function createMockRailGraphqlService(opts: MockRailServiceOptions) {
   return {
     getCachedStatus: () => opts.cached,
     isCacheFresh: () => opts.isFresh,
+    specialServices: () => [],
+    fetchSpecialServices: () => of([]),
     fetchLinesStatus: () => {
       const result = fetchResult();
       return opts.fetchDelayMs > 0

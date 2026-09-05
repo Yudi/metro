@@ -5,6 +5,23 @@
 />
 
 <mat-dialog-content class="station-content">
+  @if (bathroomInfo(); as bathroom) {
+    <div class="station-restrooms">
+      <mat-icon aria-hidden="true">wc</mat-icon>
+      <p class="station-restrooms__copy">
+        <span class="station-restrooms__label">Sanitários</span>
+        <span class="station-restrooms__spoken-separator">: </span>
+        <span class="station-restrooms__separator" aria-hidden="true">·</span>
+        <span>{{ bathroom.detail }}</span>
+        @if (bathroom.note) {
+          <span class="station-restrooms__spoken-separator">. </span>
+          <span class="station-restrooms__separator" aria-hidden="true">·</span>
+          <span>{{ bathroom.note }}</span>
+        }
+      </p>
+    </div>
+  }
+
   @if (data.stop.description) {
     <p class="station-description">{{ data.stop.description }}</p>
     <mat-divider></mat-divider>

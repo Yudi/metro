@@ -302,6 +302,8 @@ export class MapSelectionService {
       this.logger.info(
         `Subscribed to private vehicles for line: ${vehicleLineCode}`,
       );
+    } else if (isRailRouteReference(shortName)) {
+      this.logger.debug(`Tracked rail vehicles are unavailable for route: ${shortName}`);
     } else if (
       !shortName.startsWith('METRÔ') &&
       !shortName.startsWith('CPTM')
@@ -318,12 +320,14 @@ export class MapSelectionService {
       return;
     }
 
-    const vehicleLineCode = extractTrackedRailVehicleLineCode(shortName);
+    const vehicleLineCode = extractTrackedRailVehicleLineCode(shortName, false);
     if (vehicleLineCode) {
       this.cptmVehicleLayer.unsubscribeFromLine(vehicleLineCode);
       this.logger.info(
         `Unsubscribed from private vehicles for line: ${vehicleLineCode}`,
       );
+    } else if (isRailRouteReference(shortName)) {
+      this.logger.debug(`Tracked rail vehicles were unavailable for route: ${shortName}`);
     } else if (
       !shortName.startsWith('METRÔ') &&
       !shortName.startsWith('CPTM')
@@ -332,4 +336,13 @@ export class MapSelectionService {
       this.logger.info(`Unsubscribed from real-time for route: ${shortName}`);
     }
   }
+}
+
+/** Keep disabled rail references out of the generic bus realtime fallback. */
+function isRailRouteReference(shortName: string): boolean {
+  return (
+    shortName.startsWith('METRÔ') ||
+    shortName.startsWith('CPTM') ||
+    /(?:^|[^A-Za-z0-9])L(?:[1-9]|1[0-7])(?=$|[^A-Za-z0-9])/i.test(shortName)
+  );
 }

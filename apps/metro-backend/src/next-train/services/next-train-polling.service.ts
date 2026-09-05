@@ -4,6 +4,7 @@ import {
   ExtendedNextTrainLineCode,
   getHeadwayBucket,
   getStationName,
+  isHeadwayOffHoursSuppressionWindow,
   isApi1RailLine,
   NextTrainLineCode,
   RailStatusCode,
@@ -65,9 +66,6 @@ const POLL_INTERVALS: Record<PollBucket, { normal: number; error: number }> = {
 };
 
 const OFF_HOURS_STATUS_RECHECK_INTERVAL = 300_000;
-const OFF_HOURS_START_MINUTES = 0;
-const OFF_HOURS_END_MINUTES = 4 * 60;
-const OFF_HOURS_REMAINING_TRAINS_TOLERANCE_MINUTES = 60;
 const MAX_CONCURRENT_STATION_POLLS = 8;
 
 const NON_OPERATING_STATUS_CODES = new Set<RailStatusCode>([
@@ -559,7 +557,7 @@ export class NextTrainPollingService implements OnModuleDestroy {
       return false;
     }
 
-    if (!this.isOffHoursSuppressionWindow(timestamp)) {
+    if (!isHeadwayOffHoursSuppressionWindow(timestamp)) {
       return false;
     }
 
@@ -627,22 +625,4 @@ export class NextTrainPollingService implements OnModuleDestroy {
     return Number(match[1]);
   }
 
-  private isOffHoursSuppressionWindow(timestamp: number): boolean {
-    const minutes = this.getSaoPauloMinutesFromMidnight(timestamp);
-    return (
-      minutes >=
-        OFF_HOURS_START_MINUTES +
-          OFF_HOURS_REMAINING_TRAINS_TOLERANCE_MINUTES &&
-      minutes <
-        OFF_HOURS_END_MINUTES - OFF_HOURS_REMAINING_TRAINS_TOLERANCE_MINUTES
-    );
-  }
-
-  private getSaoPauloMinutesFromMidnight(timestamp: number): number {
-    const date = new Date(timestamp);
-    const saoPauloTime = new Date(
-      date.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }),
-    );
-    return saoPauloTime.getHours() * 60 + saoPauloTime.getMinutes();
-  }
 }

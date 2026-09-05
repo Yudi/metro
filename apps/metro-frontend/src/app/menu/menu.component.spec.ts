@@ -30,4 +30,16 @@ describe('MenuComponent', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
   });
+
+  it('lists useful phones immediately before the about page', () => {
+    const ungroupedItems = component.menuList['null'];
+
+    expect(ungroupedItems.slice(0, 2)).toEqual([
+      expect.objectContaining({
+        label: 'Telefones úteis',
+        route: '/telefones',
+      }),
+      expect.objectContaining({ label: 'Sobre', route: '/sobre' }),
+    ]);
+  });
 });

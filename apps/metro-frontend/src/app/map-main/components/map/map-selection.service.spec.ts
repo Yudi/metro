@@ -20,6 +20,7 @@ describe('MapSelectionService', () => {
     syncVectorTileFilters: jest.Mock;
     loadRouteData: jest.Mock;
     loadStopData: jest.Mock;
+    removeRouteDisplayData: jest.Mock;
   };
   let logger: {
     debug: jest.Mock;
@@ -38,6 +39,7 @@ describe('MapSelectionService', () => {
       syncVectorTileFilters: jest.fn(),
       loadRouteData: jest.fn(() => Promise.resolve()),
       loadStopData: jest.fn(() => Promise.resolve()),
+      removeRouteDisplayData: jest.fn(),
     };
     logger = {
       debug: jest.fn(),
@@ -190,5 +192,20 @@ describe('MapSelectionService', () => {
     ).toBeLessThan(dataLoader.loadStopData.mock.invocationCallOrder[0]);
     expect(mapState.selectedStops().has('stop-1')).toBe(true);
     expect(snackBar.open).not.toHaveBeenCalled();
+  });
+
+  it('subscribes and releases estimated rail markers for a selected L8 line', () => {
+    service.addRailLineToSelection('L8', false);
+
+    expect(
+      TestBed.inject(CptmVehicleLayerService).subscribeToLine,
+    ).toHaveBeenCalledWith('L8');
+    expect(mapState.selectedRoutes().has('L8')).toBe(true);
+
+    service.removeRouteFromSelection('L8');
+
+    expect(
+      TestBed.inject(CptmVehicleLayerService).unsubscribeFromLine,
+    ).toHaveBeenCalledWith('L8');
   });
 });

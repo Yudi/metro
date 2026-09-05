@@ -316,4 +316,82 @@ describe('HeadwayPollingService', () => {
       ).not.toHaveBeenCalled();
     },
   );
+
+  it('does not record an L4 polling error in the central off-hours window', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-06-06T02:00:00-03:00'));
+    const historicalService = {
+      recordHeadwayError: jest.fn(async () => undefined),
+    };
+    const service = new HeadwayPollingService(
+      { get: jest.fn() } as never,
+      { fetchNextTrains: jest.fn() } as never,
+      {} as never,
+      {} as never,
+      {
+        getCached: jest.fn(),
+        onPollComplete: jest.fn(),
+        offPollComplete: jest.fn(),
+      } as never,
+      { getLineStatus: jest.fn() } as never,
+      historicalService as never,
+    );
+
+    await (
+      service as unknown as {
+        recordHeadwayPollError(
+          lineCode: 'L4',
+          stationCode: string,
+          params: { reason: string; observedAt: Date },
+        ): Promise<void>;
+      }
+    ).recordHeadwayPollError('L4', 'BUT', {
+      reason: 'upstream_api_error',
+      observedAt: new Date(),
+    });
+
+    expect(historicalService.recordHeadwayError).not.toHaveBeenCalled();
+  });
+
+  it('records an L4 polling error during the final-train grace period', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-06-06T00:30:00-03:00'));
+    const historicalService = {
+      recordHeadwayError: jest.fn(async () => undefined),
+    };
+    const service = new HeadwayPollingService(
+      { get: jest.fn() } as never,
+      { fetchNextTrains: jest.fn() } as never,
+      {} as never,
+      {} as never,
+      {
+        getCached: jest.fn(),
+        onPollComplete: jest.fn(),
+        offPollComplete: jest.fn(),
+      } as never,
+      { getLineStatus: jest.fn() } as never,
+      historicalService as never,
+    );
+
+    await (
+      service as unknown as {
+        recordHeadwayPollError(
+          lineCode: 'L4',
+          stationCode: string,
+          params: { reason: string; observedAt: Date },
+        ): Promise<void>;
+      }
+    ).recordHeadwayPollError('L4', 'BUT', {
+      reason: 'upstream_api_error',
+      observedAt: new Date(),
+    });
+
+    expect(historicalService.recordHeadwayError).toHaveBeenCalledWith({
+      lineCode: 'L4',
+      stationCode: 'BUT',
+      source: 'headway_polling',
+      observedAt: new Date('2026-06-06T00:30:00-03:00'),
+      reason: 'upstream_api_error',
+    });
+  });
 });

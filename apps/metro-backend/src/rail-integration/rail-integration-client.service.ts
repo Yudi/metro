@@ -15,7 +15,7 @@ import {
 } from '@grpc/grpc-js';
 import {
   ActualCptmLineCode,
-  CptmLineCode,
+  TrackedRailLineCode,
   ExtendedNextTrainLineCode,
   SpecialRailService,
 } from '@metro/shared/utils';
@@ -28,6 +28,7 @@ import {
   RailRealtimeSourcePort,
   RailStationLookupResult,
   RailVehiclePosition,
+  RailVehicleMapContext,
   RAIL_INTEGRATION_GRPC_DEFAULT_CLIENT_URL,
   RailStatusSourceLine,
   RailStatusSourcePort,
@@ -242,10 +243,12 @@ export class RailIntegrationClientService
   }
 
   async getVehiclesForLine(
-    lineCode: CptmLineCode,
+    lineCode: TrackedRailLineCode,
+    mapContext?: RailVehicleMapContext,
   ): Promise<RailVehiclePosition[]> {
     const response = await this.call<VehiclesResponse>('getVehiclesForLine', {
       lineCode,
+      mapContext,
     });
     return response.vehicles ?? [];
   }

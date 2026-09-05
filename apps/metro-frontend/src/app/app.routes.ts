@@ -77,6 +77,14 @@ export const routes: Routes = [
         title: 'Sobre | Transporte Metropolitano de São Paulo',
       },
       {
+        path: 'telefones',
+        loadComponent: () =>
+          import('./useful-phones/useful-phones.component').then(
+            (m) => m.UsefulPhonesComponent,
+          ),
+        title: 'Telefones úteis | Transporte Metropolitano de São Paulo',
+      },
+      {
         path: 'menu',
         loadComponent: () =>
           import('./menu/menu.component').then((m) => m.MenuComponent),

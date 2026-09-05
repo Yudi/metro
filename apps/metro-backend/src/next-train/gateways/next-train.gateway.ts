@@ -25,7 +25,7 @@ import {
   hasExternalRailVehicles,
   hasNextTrainIntegration,
   isApi1RailLine,
-  CptmLineCode,
+  TrackedRailLineCode,
   isValidApi1RailStationCode,
 } from '@metro/shared/utils';
 
@@ -68,7 +68,7 @@ export class NextTrainGateway
   // Track client vehicle subscriptions: Map<clientId, Set<"L11">>
   private readonly clientVehicleSubscriptions = new Map<
     string,
-    Set<CptmLineCode>
+    Set<TrackedRailLineCode>
   >();
 
   // Bound listeners for polling services
@@ -381,7 +381,7 @@ function parseStationSubscription(body: unknown): SubscribeStationDto | null {
   };
 }
 
-function parseVehicleSubscription(body: unknown): CptmLineCode | null {
+function parseVehicleSubscription(body: unknown): TrackedRailLineCode | null {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return null;
   }
@@ -395,5 +395,5 @@ function parseVehicleSubscription(body: unknown): CptmLineCode | null {
     return null;
   }
 
-  return candidate['lineCode'] as CptmLineCode;
+  return candidate['lineCode'] as TrackedRailLineCode;
 }

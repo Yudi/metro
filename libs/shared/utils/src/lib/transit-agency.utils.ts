@@ -189,7 +189,7 @@ export const AGENCIES_DATA: AgenciesData = {
     contact: {
       phones: [
         {
-          number: ' 08000746733',
+          number: '08000746733',
           title: 'Central de Atendimento',
           whatsapp: true,
           sms: false,

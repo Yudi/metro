@@ -40,7 +40,7 @@ import {
 import { BreathingAnimationService } from '../../services/breathing-animation.service';
 
 /**
- * Component to display real-time next train arrivals for L4/L8/L9 stations
+ * Component to display real-time next train arrivals for supported rail stations
  * Uses WebSocket for delta updates to minimize bandwidth
  */
 @Component({
@@ -379,25 +379,43 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
    * Get subtitle for train (current location)
    */
   getTrainLocation(train: NextTrainArrival): string {
-    // For CPTM lines, use the simplified position status
-    if (train.trainPositionStatus) {
-      return this.getCptmPositionText(train);
-    }
-
-    // For CPTM without position status, don't show anything
-    // (the arrival time is already shown)
-    if (this.isCptm()) {
-      return '';
-    }
-
+    // A train at this station has an explicit platform label in the arrival time.
     if (train.isAtPlatform) {
       return '';
     }
-    // For ViaMobilidade (L8/L9), show different text based on whether train is stopped or moving
-    if (train.isTrainStopped) {
-      return `Em ${train.trainCurrentStationName}`;
-    } else if (train.isTrainStopped === false) {
-      return `Partiu de ${train.trainCurrentStationName}`;
+
+    // Keep the stronger live position labels when they are available.
+    if (
+      train.trainPositionStatus === 'approaching' ||
+      train.trainPositionStatus === 'at_station'
+    ) {
+      return this.getCptmPositionText(train);
+    }
+
+    // Prefer an explicit current-station status to the last-passed fallback.
+    const currentStationName = this.getStationName(
+      train.trainCurrentStationName,
+    );
+    if (train.isTrainStopped === true && currentStationName) {
+      return `Em ${currentStationName}`;
+    }
+    if (train.isTrainStopped === false && currentStationName) {
+      return `Partiu de ${currentStationName}`;
+    }
+
+    const lastPassedStationName = this.getStationName(
+      train.trainLastPassedStationName,
+    );
+    if (lastPassedStationName) {
+      return `Passou por ${lastPassedStationName}`;
+    }
+
+    if (
+      train.trainPositionStatus === 'in_transit' ||
+      train.trainPositionStatus === 'departing' ||
+      this.isCptm()
+    ) {
+      return '';
     }
 
     return 'Previsto';
@@ -411,16 +429,23 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
    */
   getCptmPositionText(train: NextTrainArrival): string {
     switch (train.trainPositionStatus) {
-      case 'at_station':
-        return train.trainNearStationName
-          ? `Em ${train.trainNearStationName}`
-          : 'Na estação';
+      case 'at_station': {
+        const stationName =
+          this.getStationName(train.trainNearStationName) ??
+          this.getStationName(train.trainCurrentStationName);
+        return stationName ? `Em ${stationName}` : 'Na estação';
+      }
       case 'approaching':
         return 'Chegando';
       default:
         // Don't show anything for in_transit - the arrival time is enough
         return '';
     }
+  }
+
+  private getStationName(name: string | null | undefined): string | null {
+    const trimmed = name?.trim();
+    return trimmed ? trimmed : null;
   }
 
   /**

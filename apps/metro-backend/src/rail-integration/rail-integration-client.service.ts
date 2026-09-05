@@ -191,6 +191,7 @@ export class RailIntegrationClientService
           : null,
         trainPositionStatus: train.trainPositionStatus,
         trainNearStationName: train.trainNearStationName,
+        trainLastPassedStationName: train.trainLastPassedStationName || null,
         cars: train.cars,
       })),
     }));

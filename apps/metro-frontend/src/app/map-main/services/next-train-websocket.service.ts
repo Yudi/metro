@@ -36,6 +36,8 @@ export interface NextTrainArrival {
   // CPTM-specific fields for live position tracking
   trainPositionStatus?: TrainPositionStatus;
   trainNearStationName?: string | null;
+  /** Last passed station, when unambiguous in the current position snapshot. */
+  trainLastPassedStationName?: string | null;
   cars?: TrainCarOccupancy[];
 }
 

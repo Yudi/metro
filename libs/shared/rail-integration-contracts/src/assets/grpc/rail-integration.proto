@@ -54,6 +54,7 @@ message NextTrainArrival {
   repeated TrainCarOccupancy cars = 9;
   bool has_is_at_platform = 10;
   bool has_is_train_stopped = 11;
+  optional string train_last_passed_station_name = 12;
 }
 
 message NextTrainsResponse {

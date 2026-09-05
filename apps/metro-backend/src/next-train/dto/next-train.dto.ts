@@ -66,6 +66,13 @@ export class NextTrainArrivalDto {
   trainNearStationName?: string | null;
 
   @ApiProperty({
+    example: 'Brás',
+    description: 'Last passed station resolved from the current position snapshot, when unambiguous',
+    required: false,
+  })
+  trainLastPassedStationName?: string | null;
+
+  @ApiProperty({
     description:
       'Per-car occupancy normalized from empty (0) to full (6), when supported by the provider',
     required: false,

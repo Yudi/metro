@@ -539,6 +539,10 @@ export class NextTrainPollingService implements OnModuleDestroy {
         curr: t.trainCurrentStationName,
         time: t.arrivalTime,
         plat: t.isAtPlatform,
+        stopped: t.isTrainStopped,
+        position: t.trainPositionStatus,
+        near: t.trainNearStationName,
+        passed: t.trainLastPassedStationName,
         cars: t.cars,
       })),
     };

@@ -69,6 +69,7 @@ describe('RailIntegrationClientService', () => {
             hasIsAtPlatform: false,
             hasIsTrainStopped: true,
             isTrainStopped: false,
+            trainLastPassedStationName: 'Brás',
           },
         ],
       }),
@@ -79,6 +80,7 @@ describe('RailIntegrationClientService', () => {
         {
           isAtPlatform: null,
           isTrainStopped: false,
+          trainLastPassedStationName: 'Brás',
         },
       ],
     });

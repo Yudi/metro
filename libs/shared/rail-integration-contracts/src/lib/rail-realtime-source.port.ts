@@ -22,6 +22,8 @@ export interface RailNextTrainArrival {
   isTrainStopped: boolean | null;
   trainPositionStatus?: TrainPositionStatus;
   trainNearStationName?: string | null;
+  /** Last passed station, when unambiguous in the current position snapshot. */
+  trainLastPassedStationName?: string | null;
   cars?: TrainCarOccupancy[];
 }
 

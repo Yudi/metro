@@ -138,6 +138,53 @@ describe('NextTrainPollingService', () => {
     );
   });
 
+  it('broadcasts location-only changes and clears the fallback when the source stops supplying it', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-06-06T12:00:00-03:00'));
+    const train: NextTrainArrivalDto = {
+      destinationCode: 'LUZ',
+      destinationName: 'Luz',
+      trainCurrentStationName: '',
+      arrivalTime: '12:10',
+      isAtPlatform: null,
+      isTrainStopped: null,
+      trainLastPassedStationName: 'Juventus-Mooca',
+    };
+    externalRailProvider.getStationName.mockResolvedValue('Luz');
+    externalRailProvider.fetchNextTrains.mockResolvedValue({
+      success: true, trains: [train], isApiError: false,
+    });
+    const listener = jest.fn();
+    service.onPollComplete(listener);
+    service.subscribe('client', 'L10', 'LUZ');
+    await flushMicrotasks();
+    listener.mockClear();
+
+    for (const location of [
+      { trainLastPassedStationName: 'Brás' },
+      { trainLastPassedStationName: null, trainPositionStatus: 'approaching' as const },
+      { trainLastPassedStationName: null, trainPositionStatus: null },
+    ]) {
+      const updated = { ...train, ...location };
+      externalRailProvider.fetchNextTrains.mockResolvedValue({
+        success: true, trains: [updated], isApiError: false,
+      });
+      await jest.advanceTimersByTimeAsync(30_000);
+      expect(listener).toHaveBeenLastCalledWith([
+        expect.objectContaining({ trains: [updated] }),
+      ]);
+    }
+    expect(listener).toHaveBeenCalledTimes(3);
+
+    listener.mockClear();
+    await jest.advanceTimersByTimeAsync(30_000);
+    expect(listener).not.toHaveBeenCalled();
+    service.unsubscribe('client', 'L10', 'LUZ');
+    externalRailProvider.fetchNextTrains.mockClear();
+    await jest.advanceTimersByTimeAsync(60_000);
+    expect(externalRailProvider.fetchNextTrains).not.toHaveBeenCalled();
+  });
+
   it('marks operation closed without polling upstream after the off-hours offset when no cached trains remain', async () => {
     jest.useFakeTimers();
     jest.setSystemTime(new Date('2026-06-06T02:00:00-03:00'));

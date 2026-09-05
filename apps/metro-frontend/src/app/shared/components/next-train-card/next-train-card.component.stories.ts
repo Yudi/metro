@@ -1,6 +1,6 @@
 /**
  * Storybook stories for NextTrainCardComponent
- * Displays real-time next train arrivals for L8/L9 ViaMobilidade stations
+ * Displays real-time next train arrivals for supported rail stations
  */
 
 import {
@@ -83,6 +83,54 @@ const TRAIN_STOPPED_ELSEWHERE: NextTrainArrival = {
   isTrainStopped: true,
 };
 
+const TRAIN_LAST_PASSED_FALLBACK: NextTrainArrival = {
+  destinationCode: 'RGS',
+  destinationName: 'Rio Grande da Serra',
+  trainCurrentStationName: '',
+  arrivalTime: '14:40',
+  isAtPlatform: null,
+  isTrainStopped: null,
+  trainPositionStatus: null,
+  trainLastPassedStationName: 'Brás',
+};
+
+const TRAIN_L4_LAST_PASSED_FALLBACK: NextTrainArrival = {
+  destinationCode: 'LUZ',
+  destinationName: 'Luz',
+  trainCurrentStationName: '',
+  arrivalTime: '14:40',
+  isAtPlatform: null,
+  isTrainStopped: null,
+  trainPositionStatus: null,
+  trainLastPassedStationName: 'Butantã',
+};
+
+const TRAIN_APPROACHING_WITH_LAST_PASSED: NextTrainArrival = {
+  ...TRAIN_LAST_PASSED_FALLBACK,
+  arrivalTime: '14:38',
+  trainPositionStatus: 'approaching',
+};
+
+const TRAIN_AT_STATION_WITH_LAST_PASSED: NextTrainArrival = {
+  ...TRAIN_LAST_PASSED_FALLBACK,
+  destinationCode: 'BFU',
+  destinationName: 'Palmeiras–Barra Funda',
+  arrivalTime: '14:36',
+  trainPositionStatus: 'at_station',
+  trainNearStationName: 'Juventus-Mooca',
+};
+
+const TRAIN_WITHOUT_POSITION_METADATA: NextTrainArrival = {
+  ...TRAIN_LAST_PASSED_FALLBACK,
+  trainPositionStatus: null,
+  trainLastPassedStationName: null,
+};
+
+const TRAIN_LONG_LAST_PASSED_NAME: NextTrainArrival = {
+  ...TRAIN_LAST_PASSED_FALLBACK,
+  trainLastPassedStationName: 'São Caetano do Sul-Prefeito Walter Braido',
+};
+
 // Mock Service Factory
 
 type SubscriptionKey = `${string}:${string}`;
@@ -159,8 +207,8 @@ const meta: Meta<NextTrainCardComponent> = {
   argTypes: {
     lineCode: {
       control: 'select',
-      options: ['L8', 'L9'],
-      description: 'Line code (L8 or L9)',
+      options: ['L4', 'L8', 'L9', 'L10'],
+      description: 'Line code (L4, L8, L9, or L10)',
     },
     stationCode: {
       control: 'text',
@@ -196,6 +244,117 @@ export const Default: Story = {
         trains: [TRAIN_ARRIVING, TRAIN_AT_PLATFORM, TRAIN_SECOND],
         lineCode: 'L9',
         stationCode: 'HBR',
+      }),
+    }),
+  ],
+};
+
+/**
+ * API1 default: shows the last station passed when no current position label
+ * is available.
+ */
+export const LastPassedStationFallback: Story = {
+  args: {
+    lineCode: 'L10',
+    stationCode: 'MOC',
+  },
+  decorators: [
+    applicationConfig({
+      providers: createProviders({
+        connected: true,
+        lastUpdate: Date.now(),
+        trains: [TRAIN_LAST_PASSED_FALLBACK],
+        lineCode: 'L10',
+        stationCode: 'MOC',
+      }),
+    }),
+  ],
+};
+
+/**
+ * API1 fallback on Line 4: the provider-neutral field is rendered regardless
+ * of the line ownership flag.
+ */
+export const Line4LastPassedStationFallback: Story = {
+  args: {
+    lineCode: 'L4',
+    stationCode: 'PIH',
+  },
+  decorators: [
+    applicationConfig({
+      providers: createProviders({
+        connected: true,
+        lastUpdate: Date.now(),
+        trains: [TRAIN_L4_LAST_PASSED_FALLBACK],
+        lineCode: 'L4',
+        stationCode: 'PIH',
+      }),
+    }),
+  ],
+};
+
+/**
+ * Stronger position statuses remain ahead of the last-passed station text.
+ */
+export const PositionStatusTakesPrecedence: Story = {
+  args: {
+    lineCode: 'L10',
+    stationCode: 'MOC',
+  },
+  decorators: [
+    applicationConfig({
+      providers: createProviders({
+        connected: true,
+        lastUpdate: Date.now(),
+        trains: [
+          TRAIN_APPROACHING_WITH_LAST_PASSED,
+          TRAIN_AT_STATION_WITH_LAST_PASSED,
+        ],
+        lineCode: 'L10',
+        stationCode: 'MOC',
+      }),
+    }),
+  ],
+};
+
+/**
+ * Missing position metadata keeps the API1 card's existing blank location
+ * line.
+ */
+export const NoPositionMetadata: Story = {
+  args: {
+    lineCode: 'L10',
+    stationCode: 'MOC',
+  },
+  decorators: [
+    applicationConfig({
+      providers: createProviders({
+        connected: true,
+        lastUpdate: Date.now(),
+        trains: [TRAIN_WITHOUT_POSITION_METADATA],
+        lineCode: 'L10',
+        stationCode: 'MOC',
+      }),
+    }),
+  ],
+};
+
+/**
+ * Long Portuguese station names remain readable in the secondary line.
+ */
+export const LongLastPassedStationName: Story = {
+  args: {
+    lineCode: 'L10',
+    stationCode: 'SAN',
+  },
+  decorators: [
+    applicationConfig({
+      providers: createProviders({
+        connected: true,
+        lastUpdate: Date.now(),
+        trains: [TRAIN_LONG_LAST_PASSED_NAME],
+        lineCode: 'L10',
+        stationCode: 'SAN',
       }),
     }),
   ],

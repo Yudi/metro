@@ -35,6 +35,28 @@ export interface RailLineInfo {
   carDoorCount: number; // Number of doors per car
 }
 
+export type RailLineTrafficHand = 'LHT' | 'RHT';
+
+export const RAIL_LINE_TRAFFIC_HANDS: Readonly<
+  Record<number, RailLineTrafficHand>
+> = {
+  1: 'RHT',
+  2: 'RHT',
+  3: 'RHT',
+  4: 'RHT',
+  5: 'RHT',
+  6: 'RHT',
+  7: 'LHT',
+  8: 'RHT',
+  9: 'RHT',
+  10: 'LHT',
+  11: 'LHT',
+  12: 'LHT',
+  13: 'LHT',
+  15: 'RHT',
+  17: 'RHT',
+};
+
 /**
  * Static rail line information for São Paulo metro/rail system
  * Based on official line data

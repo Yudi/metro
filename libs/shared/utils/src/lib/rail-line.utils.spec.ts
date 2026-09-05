@@ -4,6 +4,8 @@ import {
   getRailLineByCode,
   getRailLinesByAgency,
   LINE_AGENCY_MAPPING,
+  RAIL_LINE_TRAFFIC_HANDS,
+  RAIL_LINES,
 } from './rail-line.utils';
 import {
   getLiveTrainTrackingApiIds,
@@ -30,6 +32,27 @@ describe('Linha 17 agency', () => {
         (line) => line.code === 17,
       ),
     ).toBe(false);
+  });
+});
+
+describe('rail line traffic hand', () => {
+  it('records LHT for Lines 7 and 10 through 13', () => {
+    expect(
+      [7, 10, 11, 12, 13].map((lineCode) =>
+        RAIL_LINE_TRAFFIC_HANDS[lineCode],
+      ),
+    ).toEqual(['LHT', 'LHT', 'LHT', 'LHT', 'LHT']);
+  });
+
+  it('records RHT for every other cataloged line and Line 17', () => {
+    expect(
+      RAIL_LINES.every(
+        (line) => RAIL_LINE_TRAFFIC_HANDS[line.code] === 'RHT' ||
+          [7, 10, 11, 12, 13].includes(line.code),
+      ),
+    ).toBe(true);
+    expect(RAIL_LINE_TRAFFIC_HANDS[6]).toBe('RHT');
+    expect(RAIL_LINE_TRAFFIC_HANDS[17]).toBe('RHT');
   });
 });
 

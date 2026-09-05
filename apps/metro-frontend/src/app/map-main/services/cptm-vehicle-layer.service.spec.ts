@@ -107,13 +107,15 @@ describe('CptmVehicleLayerService', () => {
     expect(service.isLineSubscribed('L8')).toBe(false);
   });
 
-  it('renders generic estimated vehicles with opaque identity and no source fields', () => {
+  it('renders estimated vehicles with an opaque identity and terminal direction', () => {
     service.subscribeToLine('L8');
     const estimate = createVehicle({
       id: 'estimate-uuid',
       estimated: true,
       validUntil: Date.now() + 20_000,
       bearing: 0,
+      destination: 'Varginha',
+      estimatedPositionDescription: 'entre Berrini e Morumbi',
     });
     vehicles.set(new Map([['L8', [estimate]]]));
 
@@ -122,7 +124,23 @@ describe('CptmVehicleLayerService', () => {
     expect(getFeatures()).toHaveLength(1);
     expect(getFeatures()[0].get('vehicleId')).toBe('estimate-uuid');
     expect(getFeatures()[0].get('lineCode')).toBe('L8');
+    expect(getFeatures()[0].get('destination')).toBe('Varginha');
+    expect(getFeatures()[0].get('estimatedPositionDescription')).toBe(
+      'entre Berrini e Morumbi',
+    );
     expect(getFeatures()[0].get('estimatedPosition')).toBe(true);
+  });
+
+  it('renders the estimated terminal above its status label', () => {
+    const styles = service['createVehicleStyle'](
+      'L9',
+      'Varginha',
+      undefined,
+      undefined,
+      true,
+    );
+
+    expect(styles).toHaveLength(3);
   });
 
   it('removes line markers when its owned stream is released', () => {

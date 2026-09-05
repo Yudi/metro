@@ -54,6 +54,8 @@ export interface RailVehiclePosition {
   destination?: string;
   estimated?: boolean;
   validUntil?: number;
+  /** Public station block used to project an estimated map position. */
+  estimatedPositionDescription?: string;
 }
 
 /** Public network reference data supplied to the rail integration service. */

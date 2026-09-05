@@ -106,7 +106,7 @@ export class CptmVehicleLayerService implements OnDestroy {
         const bearing = feature.get('bearing') as number | undefined;
         return this.createVehicleStyle(
           lineCode,
-          estimated ? undefined : destination,
+          destination,
           estimated ? undefined : bearing,
           resolution,
           estimated,
@@ -161,25 +161,40 @@ export class CptmVehicleLayerService implements OnDestroy {
 
     styles.push(new Style({ image: this.lineIcons[lineCode] }));
 
-    const label = estimated ? 'Localização estimada' : destination;
-    if (label) {
+    if (destination || estimated) {
       const lineCodeNumber = parseInt(lineCode.replace('L', ''), 10);
       let fillColor = getRailLineByCode(lineCodeNumber)?.colorHex ?? '#000';
       if (lineCodeNumber === 4) {
         fillColor = '#004C40';
       }
 
-      styles.push(
-        new Style({
-          text: new Text({
-            text: label,
-            offsetY: 22,
-            font: 'bold 9px sans-serif',
-            fill: new Fill({ color: fillColor }),
-            stroke: new Stroke({ color: '#fff', width: 2 }),
+      if (destination) {
+        styles.push(
+          new Style({
+            text: new Text({
+              text: destination,
+              offsetY: 22,
+              font: 'bold 9px sans-serif',
+              fill: new Fill({ color: fillColor }),
+              stroke: new Stroke({ color: '#fff', width: 2 }),
+            }),
           }),
-        }),
-      );
+        );
+      }
+
+      if (estimated) {
+        styles.push(
+          new Style({
+            text: new Text({
+              text: 'Loc. estimada',
+              offsetY: destination ? 34 : 22,
+              font: '9px sans-serif',
+              fill: new Fill({ color: fillColor }),
+              stroke: new Stroke({ color: '#fff', width: 2 }),
+            }),
+          }),
+        );
+      }
     }
 
     return styles;
@@ -271,6 +286,8 @@ export class CptmVehicleLayerService implements OnDestroy {
           geometry: new Point(fromLonLat([vehicle.lng, vehicle.lat])),
           vehicleId,
           lineCode,
+          destination: vehicle.destination,
+          estimatedPositionDescription: vehicle.estimatedPositionDescription,
           estimatedPosition: true,
         });
         feature.setId(`cptm-vehicle-${lineCode}-${vehicleId}`);

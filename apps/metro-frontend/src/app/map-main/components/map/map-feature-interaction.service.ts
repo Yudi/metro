@@ -227,9 +227,21 @@ export class MapFeatureInteractionService {
 
   private showEstimatedVehicleInfo(properties: Record<string, unknown>): void {
     const lineCode = String(properties['lineCode'] || 'ferroviária');
+    const destination = properties['destination'];
+    const direction =
+      typeof destination === 'string' && destination.trim()
+        ? ` rumo a ${destination}`
+        : '';
+    const estimatedPositionDescription =
+      properties['estimatedPositionDescription'];
+    const position =
+      typeof estimatedPositionDescription === 'string' &&
+      estimatedPositionDescription.trim()
+        ? `Posição estimada ${estimatedPositionDescription}.`
+        : 'Localização estimada. A posição exibida pode diferir da posição real do trem.';
 
     this.snackBar.open(
-      `Linha ${lineCode}: Localização estimada. A posição exibida pode diferir da posição real do trem.`,
+      `Linha ${lineCode}${direction}: ${position}`,
       'Fechar',
       { duration: 5000 },
     );

@@ -64,6 +64,8 @@ describe('MapFeatureInteractionService', () => {
     const properties = {
       estimatedPosition: true,
       lineCode: 'L8',
+      destination: 'Itapevi',
+      estimatedPositionDescription: 'entre Osasco e Comandante Sampaio',
       vehicleId: 'estimate-uuid',
     };
     const feature = {
@@ -74,7 +76,7 @@ describe('MapFeatureInteractionService', () => {
     service.handleFeatureSelection(feature as never);
 
     expect(snackBar.open).toHaveBeenCalledWith(
-      'Linha L8: Localização estimada. A posição exibida pode diferir da posição real do trem.',
+      'Linha L8 rumo a Itapevi: Posição estimada entre Osasco e Comandante Sampaio.',
       'Fechar',
       { duration: 5000 },
     );

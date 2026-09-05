@@ -25,6 +25,8 @@ export interface TrackedRailVehicle {
   estimated?: boolean;
   /** Optional display expiry in Unix milliseconds, assigned by the source. */
   validUntil?: number;
+  /** Public station block used to project an estimated map position. */
+  estimatedPositionDescription?: string;
 }
 
 /**

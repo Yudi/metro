@@ -93,6 +93,7 @@ message VehiclePosition {
   optional string destination = 11;
   optional bool estimated = 12;
   optional int64 valid_until = 13;
+  optional string estimated_position_description = 14;
 }
 
 message MapCoordinate {

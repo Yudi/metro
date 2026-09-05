@@ -365,6 +365,9 @@ export class CptmVehiclePollingService implements OnModuleDestroy {
       if (
         oldV.id !== newV.id ||
         oldV.prefix !== newV.prefix ||
+        oldV.destination !== newV.destination ||
+        oldV.estimatedPositionDescription !==
+          newV.estimatedPositionDescription ||
         oldV.estimated !== newV.estimated ||
         oldV.validUntil !== newV.validUntil ||
         Math.abs(oldV.lat - newV.lat) > 0.0001 ||

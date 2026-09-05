@@ -223,7 +223,12 @@ export class RailSpecialLinesService {
   }
 
   private buildAeromovelGruStatus(now: Date): SpecialRailLine {
-    const openFrom = this.parseTime(now, AEROMOVEL_GRU_OPERATION.openFrom);
+    const openFrom = this.parseTime(
+      now,
+      isWeekend(now)
+        ? AEROMOVEL_GRU_OPERATION.weekendOpenFrom
+        : AEROMOVEL_GRU_OPERATION.weekdayOpenFrom,
+    );
     const isOpen = !isBefore(now, openFrom) || this.isExactlyMidnight(now);
 
     return this.buildSpecialLine({

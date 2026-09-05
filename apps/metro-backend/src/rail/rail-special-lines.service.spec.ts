@@ -68,4 +68,33 @@ describe('RailSpecialLinesService', () => {
       }),
     );
   });
+
+  it('opens Aeromóvel GRU from 04:00 on weekends', () => {
+    for (const date of [
+      '2026-07-11T04:00:00-03:00',
+      '2026-07-12T04:00:00-03:00',
+    ]) {
+      const statuses = service.getSpecialLinesStatus([], new Date(date));
+
+      expect(statuses.find((line) => line.code === 'GRU')).toEqual(
+        expect.objectContaining({
+          statusCode: 'OperacaoNormal',
+          statusLabel: 'Aberto',
+        }),
+      );
+    }
+  });
+
+  it('keeps Aeromóvel GRU closed before 16:00 on weekdays', () => {
+    const statuses = service.getSpecialLinesStatus(
+      [],
+      new Date('2026-07-08T15:59:00-03:00'),
+    );
+
+    expect(statuses.find((line) => line.code === 'GRU')).toEqual(
+      expect.objectContaining({
+        statusCode: 'OperacaoEncerrada',
+      }),
+    );
+  });
 });

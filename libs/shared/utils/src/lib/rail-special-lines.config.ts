@@ -153,7 +153,8 @@ export function isExpressoLinha10ScheduledAt(
 }
 
 export const AEROMOVEL_GRU_OPERATION = {
-  openFrom: '16:00',
+  weekdayOpenFrom: '16:00',
+  weekendOpenFrom: '04:00',
   openUntil: '00:00',
 } as const;
 

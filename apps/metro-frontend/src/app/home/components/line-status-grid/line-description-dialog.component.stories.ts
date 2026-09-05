@@ -109,7 +109,7 @@ export const AeromovelGru: Story = {
   decorators: storyProviders({
     title: 'GRU - Aeromóvel GRU',
     details: [
-      `Todos os dias, das ${formatWholeHour(AEROMOVEL_GRU_OPERATION.openFrom)} às ${formatWholeHour(AEROMOVEL_GRU_OPERATION.openUntil)}, com intervalo teórico de 6 minutos.`,
+      `De segunda a sexta, das ${formatWholeHour(AEROMOVEL_GRU_OPERATION.weekdayOpenFrom)} às ${formatWholeHour(AEROMOVEL_GRU_OPERATION.openUntil)}. Aos sábados e domingos, das ${formatWholeHour(AEROMOVEL_GRU_OPERATION.weekendOpenFrom)} às ${formatWholeHour(AEROMOVEL_GRU_OPERATION.openUntil)}, com intervalo teórico de 6 minutos.`,
       'Você também pode optar por translado por ônibus das 04h às 00h.',
     ],
     link: {

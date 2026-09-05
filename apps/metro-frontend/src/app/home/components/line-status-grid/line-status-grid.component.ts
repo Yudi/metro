@@ -36,7 +36,7 @@ function formatWholeHour(time: string): string {
 }
 
 const AEROMOVEL_GRU_DIALOG_INFO = {
-  scheduleText: `Todos os dias, das ${formatWholeHour(AEROMOVEL_GRU_OPERATION.openFrom)} às ${formatWholeHour(AEROMOVEL_GRU_OPERATION.openUntil)}, com intervalo teórico de 6 minutos.`,
+  scheduleText: `De segunda a sexta, das ${formatWholeHour(AEROMOVEL_GRU_OPERATION.weekdayOpenFrom)} às ${formatWholeHour(AEROMOVEL_GRU_OPERATION.openUntil)}. Aos sábados e domingos, das ${formatWholeHour(AEROMOVEL_GRU_OPERATION.weekendOpenFrom)} às ${formatWholeHour(AEROMOVEL_GRU_OPERATION.openUntil)}, com intervalo teórico de 6 minutos.`,
   shuttleMessage:
     'Você também pode optar por translado por ônibus das 04h às 00h.',
   shuttleUrl:

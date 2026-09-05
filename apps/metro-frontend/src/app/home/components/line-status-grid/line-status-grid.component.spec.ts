@@ -161,7 +161,7 @@ describe('LineStatusGridComponent', () => {
     });
   });
 
-  it('opens the Aeromóvel GRU dialog with the daily operating window', () => {
+  it('opens the Aeromóvel GRU dialog with weekday and weekend operating windows', () => {
     component.specialLineClick(
       createSpecialLine({
         code: 'GRU',
@@ -176,7 +176,9 @@ describe('LineStatusGridComponent', () => {
       data: expect.objectContaining({
         title: 'GRU - Aeromóvel GRU',
         details: expect.arrayContaining([
-          expect.stringContaining('Todos os dias, das 16h às 00h'),
+          expect.stringContaining(
+            'De segunda a sexta, das 16h às 00h. Aos sábados e domingos, das 4h às 00h',
+          ),
         ]),
       }),
     });

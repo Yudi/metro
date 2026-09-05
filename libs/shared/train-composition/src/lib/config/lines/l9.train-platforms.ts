@@ -110,14 +110,30 @@ export const L9_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
         direction: { destinationCodes: ['VAG'] },
         disembarkingSide: 'left',
         platformType: 'island',
-        features: [],
+        features: [
+          // Crowdsourced: Tabela Escadinha SP
+          {
+            id: 'l9-pin-vag-escalator-up-car-1-door-1',
+            type: 'escalator-up',
+            label: 'Escada rolante de subida próxima ao carro 1, porta 1',
+            anchor: { type: 'door', carPosition: 1, doorPosition: 1 },
+          },
+        ],
       },
       {
         id: 'l9-pin-towards-osa',
         direction: { destinationCodes: ['OSA'] },
         disembarkingSide: 'left',
         platformType: 'island',
-        features: [],
+        features: [
+          // Crowdsourced: Tabela Escadinha SP
+          {
+            id: 'l9-pin-osa-escalator-up-car-8-door-4',
+            type: 'escalator-up',
+            label: 'Escada rolante de subida próxima ao carro 8, porta 4',
+            anchor: { type: 'door', carPosition: 8, doorPosition: 4 },
+          },
+        ],
       },
     ],
 
@@ -229,7 +245,15 @@ export const L9_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
         direction: { destinationCodes: ['VAG'] },
         disembarkingSide: 'left',
         platformType: 'island',
-        features: [],
+        features: [
+          // Crowdsourced: Tabela Escadinha SP
+          {
+            id: 'l9-jod-vag-escalator-up-car-2-door-2',
+            type: 'escalator-up',
+            label: 'Escada rolante de subida próxima ao carro 2, porta 2',
+            anchor: { type: 'door', carPosition: 2, doorPosition: 2 },
+          },
+        ],
       },
       {
         id: 'l9-jod-towards-osa',

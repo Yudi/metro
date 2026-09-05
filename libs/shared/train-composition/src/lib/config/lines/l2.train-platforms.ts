@@ -9,7 +9,15 @@ export const L2_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
         direction: { destinationCodes: ['VMD'] },
         disembarkingSide: 'right',
         platformType: 'side',
-        features: [],
+        features: [
+          // Crowdsourced: Tabela Escadinha SP
+          {
+            id: 'l2-vmd-vmd-escalator-up-car-2-door-2',
+            type: 'escalator-up',
+            label: 'Escada rolante de subida próxima ao carro 2, porta 2',
+            anchor: { type: 'door', carPosition: 2, doorPosition: 2 },
+          },
+        ],
       },
       {
         id: 'l2-vmd-towards-vpt',
@@ -50,7 +58,15 @@ export const L2_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
         direction: { destinationCodes: ['VMD'] },
         disembarkingSide: 'right',
         platformType: 'side',
-        features: [],
+        features: [
+          // Crowdsourced: Tabela Escadinha SP
+          {
+            id: 'l2-cli-vmd-escalator-up-car-1-door-3',
+            type: 'escalator-up',
+            label: 'Escada rolante de subida próxima ao carro 1, porta 3',
+            anchor: { type: 'door', carPosition: 1, doorPosition: 3 },
+          },
+        ],
       },
     ],
 

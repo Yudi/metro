@@ -182,7 +182,15 @@ export const L11_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
         platformType: 'island',
         direction: { destinationCodes: ['EST'] },
         disembarkingSide: 'right',
-        features: [],
+        features: [
+          // Crowdsourced: Tabela Escadinha SP
+          {
+            id: 'l11-fvc-est-escalator-up-car-5-door-4',
+            type: 'escalator-up',
+            label: 'Escada rolante de subida próxima ao carro 5, porta 4',
+            anchor: { type: 'door', carPosition: 5, doorPosition: 4 },
+          },
+        ],
       },
       {
         id: 'l11-fvc-towards-bfu',
@@ -241,7 +249,15 @@ export const L11_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
         platformType: 'island',
         direction: { destinationCodes: ['BFU'] },
         disembarkingSide: 'right',
-        features: [],
+        features: [
+          // Crowdsourced: Tabela Escadinha SP
+          {
+            id: 'l11-suz-bfu-escalator-up-car-6-door-4',
+            type: 'escalator-up',
+            label: 'Escada rolante de subida próxima ao carro 6, porta 4',
+            anchor: { type: 'door', carPosition: 6, doorPosition: 4 },
+          },
+        ],
       },
     ],
 

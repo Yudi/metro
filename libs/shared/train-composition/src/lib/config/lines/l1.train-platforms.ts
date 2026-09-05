@@ -300,7 +300,15 @@ export const L1_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
         direction: { destinationCodes: ['JAB'] },
         disembarkingSide: 'right',
         platformType: 'side',
-        features: [],
+        features: [
+          // Crowdsourced: Tabela Escadinha SP
+          {
+            id: 'l1-scz-jab-escalator-up-car-6-door-4',
+            type: 'escalator-up',
+            label: 'Escada rolante de subida próxima ao carro 6, porta 4',
+            anchor: { type: 'door', carPosition: 6, doorPosition: 4 },
+          },
+        ],
       },
       {
         id: 'l1-scz-towards-tuc',
@@ -375,7 +383,15 @@ export const L1_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
         direction: { destinationCodes: ['TUC'] },
         disembarkingSide: 'right',
         platformType: 'side',
-        features: [],
+        features: [
+          // Crowdsourced: Tabela Escadinha SP
+          {
+            id: 'l1-con-tuc-escalator-up-car-2-door-1',
+            type: 'escalator-up',
+            label: 'Escada rolante de subida próxima ao carro 2, porta 1',
+            anchor: { type: 'door', carPosition: 2, doorPosition: 1 },
+          },
+        ],
       },
     ],
 

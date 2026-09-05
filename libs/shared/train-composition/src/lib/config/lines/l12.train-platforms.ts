@@ -63,7 +63,15 @@ export const L12_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
         platformType: 'island',
         direction: { destinationCodes: ['CMV'] },
         disembarkingSide: 'right',
-        features: [],
+        features: [
+          // Crowdsourced: Tabela Escadinha SP
+          {
+            id: 'l12-usl-cmv-escalator-up-car-6-door-4',
+            type: 'escalator-up',
+            label: 'Escada rolante de subida próxima ao carro 6, porta 4',
+            anchor: { type: 'door', carPosition: 6, doorPosition: 4 },
+          },
+        ],
       },
       {
         id: 'l12-usl-towards-bas',

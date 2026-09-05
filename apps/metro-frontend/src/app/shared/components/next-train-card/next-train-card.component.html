@@ -173,7 +173,7 @@
       <mat-icon>nightlight</mat-icon>
       <span>Operação Encerrada</span>
     </div>
-  } @else if (staticCompositionDirections().length > 0 && dataReceived()) {
+  } @else if (staticCompositionDirections().length > 0) {
     <div class="directions-container">
       @for (
         direction of staticCompositionDirections();
@@ -192,6 +192,15 @@
         </div>
       }
     </div>
+
+    @if (processing() || loading()) {
+      <div class="loading-state" role="status">
+        <mat-spinner diameter="24"></mat-spinner>
+        <span>
+          {{ processing() ? "Em processamento" : "Carregando horários..." }}
+        </span>
+      </div>
+    }
   } @else if (processing()) {
     <div class="loading-state">
       <mat-spinner diameter="24"></mat-spinner>

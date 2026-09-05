@@ -275,7 +275,8 @@ export const MultipleTrains: Story = {
 };
 
 /**
- * Loading: No trains yet, showing loading state
+ * Loading: The hardcoded train composition and door guidance remain visible
+ * while live arrival data is loading.
  */
 export const Loading: Story = {
   args: {

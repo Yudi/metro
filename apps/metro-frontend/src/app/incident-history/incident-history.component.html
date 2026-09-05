@@ -131,32 +131,19 @@
               <tr>
                 <td>{{ formatDateTime(incident.data_hora) }}</td>
                 <td>
-                  <div class="line-identity">
-                    @if (lineBadge(incident); as badge) {
-                      <span
-                        class="line-badge"
-                        [style.backgroundColor]="badge.backgroundColor"
-                        [style.color]="badge.textColor"
-                      >
-                        {{ badge.code }}
-                      </span>
-                    }
-                    <strong>{{ incident.linha.nome }}</strong>
-                  </div>
+                  @let badge = lineBadge(incident);
+                  <app-history-line-identity
+                    [name]="incident.linha.nome"
+                    [badge]="badge?.code ?? null"
+                    [badgeBackgroundColor]="badge?.backgroundColor"
+                    [badgeTextColor]="badge?.textColor"
+                  />
                 </td>
                 <td>
-                  <div class="agency-identity">
-                    @if (agencyIconPath(incident); as iconPath) {
-                      <img
-                        class="agency-icon"
-                        [ngSrc]="iconPath"
-                        width="28"
-                        height="28"
-                        alt=""
-                      />
-                    }
-                    <span>{{ incident.empresa.nome }}</span>
-                  </div>
+                  <app-history-agency-identity
+                    [name]="incident.empresa.nome"
+                    [iconPath]="agencyIconPath(incident)"
+                  />
                 </td>
                 <td>
                   <span class="situation">{{ incident.situacao }}</span>

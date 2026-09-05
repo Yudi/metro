@@ -144,10 +144,19 @@
               <tr>
                 <td>{{ formatDateTime(row.snapshot.observedAt) }}</td>
                 <td>
-                  <strong>{{ row.lineName }}</strong>
-                  <span class="line-code">{{ row.snapshot.lineCode }}</span>
+                  <app-history-line-identity
+                    [name]="row.lineName"
+                    [badge]="row.lineBadge"
+                    [badgeBackgroundColor]="row.lineBackgroundColor"
+                    [badgeTextColor]="row.lineTextColor"
+                  />
                 </td>
-                <td>{{ row.agencyName }}</td>
+                <td>
+                  <app-history-agency-identity
+                    [name]="row.agencyName"
+                    [iconPath]="row.agencyIconPath"
+                  />
+                </td>
                 <td>{{ row.stationName }}</td>
                 <td>{{ row.snapshot.direction }}</td>
                 <td>

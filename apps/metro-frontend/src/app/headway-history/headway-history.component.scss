@@ -134,7 +134,6 @@ td {
   color: var(--mat-sys-on-surface);
 }
 
-.line-code,
 .fallback-badge {
   border-radius: 999px;
   display: inline-flex;
@@ -144,11 +143,6 @@ td {
   margin-left: 8px;
   padding: 5px 8px;
   white-space: nowrap;
-}
-
-.line-code {
-  background: var(--mat-sys-surface-container-high);
-  color: var(--mat-sys-on-surface-variant);
 }
 
 .fallback-badge {

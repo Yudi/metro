@@ -17,7 +17,10 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { RailGraphqlService } from '@metro/shared/api';
 import {
   AGENCIES_DATA,
+  getAgencyIconPath,
+  getContrastColor,
   HistoricalHeadwaySnapshot,
+  RailLineInfo,
   TransitAgency,
   getRailLineById,
 } from '@metro/shared/utils';
@@ -35,11 +38,19 @@ import {
 } from '../shared/history-view.utils';
 import { HistoryPaginationComponent } from '../shared/history-pagination.component';
 import { HistoryDateRangeFieldsComponent } from '../shared/history-date-range-fields.component';
+import {
+  HistoryAgencyIdentityComponent,
+  HistoryLineIdentityComponent,
+} from '../shared/history-transit-identity.component';
 
 interface HeadwayHistoryRow {
   snapshot: HistoricalHeadwaySnapshot;
   lineName: string;
+  lineBadge: number | null;
+  lineBackgroundColor: string | undefined;
+  lineTextColor: string | undefined;
   agencyName: string;
+  agencyIconPath: string | null;
   stationName: string;
 }
 
@@ -56,6 +67,8 @@ interface HeadwayHistoryRow {
     MatSelectModule,
     MatTooltipModule,
     HistoryDateRangeFieldsComponent,
+    HistoryAgencyIdentityComponent,
+    HistoryLineIdentityComponent,
     HistoryPaginationComponent,
   ],
   templateUrl: './headway-history.component.html',
@@ -256,29 +269,31 @@ export class HeadwayHistoryComponent {
 
   private toRow(snapshot: HistoricalHeadwaySnapshot): HeadwayHistoryRow {
     const line = getRailLineById(snapshot.lineCode);
-    const agencyName = this.formatAgencyName(snapshot.agency, line?.agency);
+    const agency = this.resolveAgency(snapshot.agency, line);
 
     return {
       snapshot,
       lineName: line?.fullName ?? snapshot.lineCode,
-      agencyName,
+      lineBadge: line?.code ?? null,
+      lineBackgroundColor: line?.colorHex,
+      lineTextColor: line ? getContrastColor(line.colorHex) : undefined,
+      agencyName: agency
+        ? AGENCIES_DATA[agency].shortName
+        : snapshot.agency.trim() || 'Não identificada',
+      agencyIconPath: agency ? getAgencyIconPath(agency) : null,
       stationName: this.formatStationName(snapshot),
     };
   }
 
-  private formatAgencyName(
+  private resolveAgency(
     recordedAgency: string,
-    fallbackAgency?: TransitAgency,
-  ): string {
+    line?: RailLineInfo,
+  ): TransitAgency | undefined {
     if (this.isTransitAgency(recordedAgency)) {
-      return AGENCIES_DATA[recordedAgency].shortName;
+      return recordedAgency;
     }
 
-    if (fallbackAgency) {
-      return AGENCIES_DATA[fallbackAgency].shortName;
-    }
-
-    return recordedAgency.trim() || 'Não identificada';
+    return line?.agency;
   }
 
   private isTransitAgency(value: string): value is TransitAgency {

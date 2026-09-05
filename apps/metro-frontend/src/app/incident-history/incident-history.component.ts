@@ -5,7 +5,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { CommonModule, NgOptimizedImage } from '@angular/common';
+import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
@@ -40,13 +40,16 @@ import {
 } from '../shared/history-view.utils';
 import { HistoryPaginationComponent } from '../shared/history-pagination.component';
 import { HistoryDateRangeFieldsComponent } from '../shared/history-date-range-fields.component';
+import {
+  HistoryAgencyIdentityComponent,
+  HistoryLineIdentityComponent,
+} from '../shared/history-transit-identity.component';
 
 @Component({
   selector: 'app-incident-history',
   imports: [
     CommonModule,
     FormsModule,
-    NgOptimizedImage,
     MatButtonModule,
     MatCheckboxModule,
     MatFormFieldModule,
@@ -56,6 +59,8 @@ import { HistoryDateRangeFieldsComponent } from '../shared/history-date-range-fi
     MatSelectModule,
     MatTooltipModule,
     HistoryDateRangeFieldsComponent,
+    HistoryAgencyIdentityComponent,
+    HistoryLineIdentityComponent,
     HistoryPaginationComponent,
   ],
   templateUrl: './incident-history.component.html',

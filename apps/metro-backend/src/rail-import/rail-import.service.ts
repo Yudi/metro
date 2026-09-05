@@ -14,6 +14,7 @@ import {
   ImportProgress,
   WFSProcessingResult,
   ImportStatus,
+  WFSDatasetMetadata,
 } from './types/wfs.types';
 import { SearchService } from '../search/services/search.service';
 import {
@@ -44,6 +45,7 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
   };
   private currentImportRunId = 0;
   private statusResetTimer?: ReturnType<typeof setTimeout>;
+  private readonly sourceFailureAttempts = new Map<string, number>();
 
   constructor(
     private readonly wfsProcessingService: WFSProcessingService,
@@ -140,11 +142,16 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
     return this.withImportLock(
       'GeoSampa WFS import',
       () => this.startImportLocked(),
-      { waitForLock: true },
+      {
+        waitForLock: true,
+        timeoutMs: WFSConfig.IMPORT_LOCK_TIMEOUT_MS,
+      },
     );
   }
 
-  private async startImportLocked(): Promise<WFSProcessingResult> {
+  private async startImportLocked(
+    forceReimport = false,
+  ): Promise<WFSProcessingResult> {
     if (
       this.currentImportStatus.status !== 'idle' &&
       this.currentImportStatus.status !== 'completed' &&
@@ -163,7 +170,14 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
     );
 
     try {
-      const result = await this.performImport();
+      const pendingDatasets: WFSDatasetMetadata[] = [];
+      const result = await this.performImport(forceReimport, pendingDatasets);
+
+      if (!result.success) {
+        this.updateImportStatus('error', 0, this.getFinalImportMessage(result));
+        this.scheduleStatusReset(5000, runId);
+        return result;
+      }
 
       if (result.sourcesProcessed > 0) {
         this.logger.debug('Refreshing rail vector tile views...');
@@ -174,6 +188,12 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
         ]);
 
         this.vectorTilesService.clearCache();
+      }
+
+      // A source is current only after all derived data has been refreshed.
+      // Failed runs leave its metadata absent so a later process retries it.
+      for (const metadata of pendingDatasets) {
+        await this.wfsDatabaseService.createOrUpdateDataset(metadata);
       }
 
       this.updateImportStatus(
@@ -256,8 +276,14 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
     this.logger.debug('Starting scheduled GeoSampa WFS import...');
 
     try {
-      await this.startImportInBackground();
-      this.logger.debug('Scheduled GeoSampa WFS import completed successfully');
+      const result = await this.startImportInBackground();
+      if (result.success) {
+        this.logger.debug('Scheduled GeoSampa WFS import completed successfully');
+      } else {
+        this.logger.warn(
+          `Scheduled GeoSampa WFS import completed with errors: ${result.errors.join('; ')}`,
+        );
+      }
     } catch (error) {
       this.logger.error(
         `Scheduled GeoSampa WFS import failed: ${errorMessage(error)}`,
@@ -268,7 +294,10 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
   /**
    * Main import logic
    */
-  private async performImport(): Promise<WFSProcessingResult> {
+  private async performImport(
+    forceReimport: boolean,
+    pendingDatasets: WFSDatasetMetadata[],
+  ): Promise<WFSProcessingResult> {
     const result: WFSProcessingResult = {
       success: true,
       sourcesProcessed: 0,
@@ -288,6 +317,7 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
       const progressBase =
         (this.currentImportStatus.processedSources / sources.length) * 100;
 
+      let sourceFailed = false;
       try {
         this.updateImportStatus(
           'downloading',
@@ -302,16 +332,17 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
           `Fetched ${source.source}: ${(downloaded.fileSize / 1024).toFixed(2)} KB, hash: ${downloaded.fileHash.substring(0, 8)}...`,
         );
 
-        const isCurrentHash = await this.wfsDatabaseService.isCurrentHash(
-          source.source,
-          downloaded.fileHash,
-        );
+        const isCurrentHash = forceReimport
+          ? false
+          : await this.wfsDatabaseService.isCurrentHash(
+              source.source,
+              downloaded.fileHash,
+            );
 
         if (isCurrentHash) {
           this.logger.debug(`${source.source} unchanged, skipping import`);
           result.skippedSources.push(source.source);
           this.currentImportStatus.processedSources++;
-          await this.wfsProcessingService.delayBetweenRequests();
           continue;
         }
 
@@ -321,6 +352,10 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
           `Importing ${source.source} into PostGIS...`,
         );
 
+        // Invalidate before changing live rows, including forced imports of
+        // the same hash. Keeping the previous hash could incorrectly skip a
+        // retry if the process stops or the provider rolls back its content.
+        await this.wfsDatabaseService.invalidateDataset(source.source);
         const recordCount = await this.wfsProcessingService.replaceSourceTable(
           source,
           downloaded.featureCollection,
@@ -331,7 +366,7 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
           `Imported ${recordCount} records from ${source.source}`,
         );
 
-        await this.wfsDatabaseService.createOrUpdateDataset({
+        pendingDatasets.push({
           source: source.source,
           fileHash: downloaded.fileHash,
           fileSize: downloaded.fileSize,
@@ -342,16 +377,32 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
         this.currentImportStatus.processedSources++;
 
         this.logger.debug(`Successfully processed ${source.source}`);
-        await this.wfsProcessingService.delayBetweenRequests();
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : 'Unknown error';
         this.logger.error(`Failed to process ${source.source}:`, errorMessage);
         result.errors.push(`${source.source}: ${errorMessage}`);
         result.success = false;
+        sourceFailed = true;
+        this.sourceFailureAttempts.set(
+          source.source,
+          (this.sourceFailureAttempts.get(source.source) ?? 0) + 1,
+        );
 
         // Continue with next source even if one fails
         this.currentImportStatus.processedSources++;
+      } finally {
+        const failureAttempt = this.sourceFailureAttempts.get(source.source) ?? 0;
+        const delayMs = sourceFailed
+          ? Math.min(
+              WFSConfig.BETWEEN_REQUEST_DELAY_MS * 2 ** (failureAttempt - 1),
+              60_000,
+            )
+          : WFSConfig.BETWEEN_REQUEST_DELAY_MS;
+        if (!sourceFailed) {
+          this.sourceFailureAttempts.delete(source.source);
+        }
+        await this.wfsProcessingService.delayBetweenRequests(delayMs);
       }
     }
 
@@ -376,16 +427,13 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
       throw new Error('Import already in progress');
     }
 
-    this.logger.debug(
-      'Clearing all GeoSampa WFS rail data and starting fresh import...',
-    );
+    this.logger.debug('Forcing a complete GeoSampa WFS replacement import...');
 
     try {
-      // Clear all data and tracking
-      await this.wfsDatabaseService.clearAllRailData();
-
-      // Start fresh import
-      return await this.startImportLocked();
+      // Keep the healthy active tables in place while the replacement is
+      // downloaded and validated. Force only bypasses the unchanged-source
+      // shortcut; the normal post-processing barrier still applies.
+      return await this.startImportLocked(true);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';

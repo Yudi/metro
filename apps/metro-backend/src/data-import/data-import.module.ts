@@ -12,6 +12,7 @@ import { DataImportHooksService } from './services/data-import-hooks.service';
 import { SearchModule } from '../search/search.module';
 import { VectorTilesModule } from '../vector-tiles/vector-tiles.module';
 import { TransitDataModule } from '../transit-data/transit-data.module';
+import { RealtimeModule } from '../realtime/realtime.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { TransitDataModule } from '../transit-data/transit-data.module';
     SearchModule,
     VectorTilesModule,
     TransitDataModule,
+    RealtimeModule,
   ],
   controllers: [DataImportController],
   providers: [

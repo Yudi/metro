@@ -10,6 +10,8 @@ export interface ImportLockOptions {
    * Background imports use this so startup ordering cannot drop a run.
    */
   readonly waitForLock?: boolean;
+  /** Maximum time to wait for a background lock, when configured. */
+  readonly timeoutMs?: number;
 }
 
 @Injectable()
@@ -38,12 +40,29 @@ export class ImportLockService implements OnModuleDestroy {
   ): Promise<T> {
     const client = await this.pool.connect();
     let lockAcquired = false;
+    let statementTimeoutConfigured = false;
 
     try {
       if (options?.waitForLock) {
+        if (
+          options.timeoutMs !== undefined &&
+          (!Number.isSafeInteger(options.timeoutMs) || options.timeoutMs <= 0)
+        ) {
+          throw new Error('Import lock timeout must be a positive integer');
+        }
+
+        if (options.timeoutMs !== undefined) {
+          await client.query('SELECT set_config($1, $2, false)', [
+            'statement_timeout',
+            `${options.timeoutMs}ms`,
+          ]);
+          statementTimeoutConfigured = true;
+        }
+
         // A blocking advisory lock is atomic with respect to other processes,
         // so a background import remains queued until the current owner
-        // releases the shared catalog lock.
+        // releases the shared catalog lock. PostgreSQL's statement timeout
+        // bounds the wait when a configured deadline is supplied.
         await client.query('SELECT pg_advisory_lock(hashtext($1))', [
           lockName,
         ]);
@@ -64,6 +83,17 @@ export class ImportLockService implements OnModuleDestroy {
 
       return await action();
     } finally {
+      if (statementTimeoutConfigured) {
+        try {
+          await client.query('SELECT set_config($1, $2, false)', [
+            'statement_timeout',
+            '0',
+          ]);
+        } catch (error) {
+          this.logger.warn('Failed to reset import lock statement timeout:', error);
+        }
+      }
+
       if (lockAcquired) {
         try {
           await client.query('SELECT pg_advisory_unlock(hashtext($1))', [

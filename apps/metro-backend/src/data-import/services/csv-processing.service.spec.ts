@@ -149,4 +149,16 @@ describe('CsvProcessingService', () => {
       service.countCsvRecords('/does/not/exist.csv'),
     ).rejects.toThrow('CSV record count failed');
   });
+
+  it('preserves the underlying CSV failure as a non-serialized cause', async () => {
+    let failure: unknown;
+    try {
+      await service.countCsvRecords('/does/not/exist.csv');
+    } catch (error) {
+      failure = error;
+    }
+
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error & { cause?: unknown }).cause).toBeDefined();
+  });
 });

@@ -119,8 +119,7 @@ function createMockNextTrainService(
     connected: signal(opts.connected),
     lastUpdate: signal(opts.lastUpdate),
     stationData: signal(dataMap),
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
-    subscribe: () => {},
+    subscribe: () => () => undefined,
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     unsubscribe: () => {},
     getTrains: (lineCode: 'L8' | 'L9', stationCode: string) => {

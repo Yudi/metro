@@ -68,6 +68,7 @@ const OFF_HOURS_STATUS_RECHECK_INTERVAL = 300_000;
 const OFF_HOURS_START_MINUTES = 0;
 const OFF_HOURS_END_MINUTES = 4 * 60;
 const OFF_HOURS_REMAINING_TRAINS_TOLERANCE_MINUTES = 60;
+const MAX_CONCURRENT_STATION_POLLS = 8;
 
 const NON_OPERATING_STATUS_CODES = new Set<RailStatusCode>([
   'OperacaoEncerrada',
@@ -85,7 +86,7 @@ export class NextTrainPollingService implements OnModuleDestroy {
     PollBucket,
     ReturnType<typeof setInterval>
   >();
-  private readonly isPolling = new Map<PollBucket, boolean>();
+  private readonly activeBucketPolls = new Map<PollBucket, Promise<void>>();
   private readonly intervals = new Map<PollBucket, number>(
     Object.entries(POLL_INTERVALS).map(([bucket, intervals]) => [
       bucket as PollBucket,
@@ -95,6 +96,8 @@ export class NextTrainPollingService implements OnModuleDestroy {
 
   private readonly pollCompleteListeners: Set<PollCompleteListener> = new Set();
   private readonly immediatePolls = new Map<string, Promise<void>>();
+  private readonly pollSequences = new Map<string, symbol>();
+  private readonly stationNames = new Map<string, string>();
 
   private readonly lineOperationChecks = new Map<
     LineCode,
@@ -107,8 +110,12 @@ export class NextTrainPollingService implements OnModuleDestroy {
     private readonly schedule: NextTrainScheduleService,
   ) {}
 
-  onModuleDestroy(): void {
+  async onModuleDestroy(): Promise<void> {
     this.stopAllPolling();
+    await Promise.allSettled([
+      ...this.activeBucketPolls.values(),
+      ...this.immediatePolls.values(),
+    ]);
   }
 
   subscribe(
@@ -154,6 +161,8 @@ export class NextTrainPollingService implements OnModuleDestroy {
       if (clients.size === 0) {
         this.subscriptions.delete(key);
         this.cache.delete(key);
+        this.pollSequences.delete(key);
+        this.stationNames.delete(key);
       }
     }
 
@@ -171,6 +180,8 @@ export class NextTrainPollingService implements OnModuleDestroy {
         if (clients.size === 0) {
           this.subscriptions.delete(key);
           this.cache.delete(key);
+          this.pollSequences.delete(key);
+          this.stationNames.delete(key);
         }
       }
     }
@@ -296,16 +307,26 @@ export class NextTrainPollingService implements OnModuleDestroy {
   }
 
   private async pollBucket(bucket: PollBucket): Promise<void> {
-    if (this.isPolling.get(bucket)) return;
+    const currentPoll = this.activeBucketPolls.get(bucket);
+    if (currentPoll) {
+      await currentPoll;
+      return;
+    }
 
     const keys = this.getKeysByBucket(bucket);
     if (keys.length === 0) return;
 
-    this.isPolling.set(bucket, true);
-    await this.pollKeys(keys, (hasErrors) =>
+    const activePoll = this.pollKeys(keys, (hasErrors) =>
       this.adjustInterval(bucket, hasErrors),
     );
-    this.isPolling.set(bucket, false);
+    this.activeBucketPolls.set(bucket, activePoll);
+    try {
+      await activePoll;
+    } finally {
+      if (this.activeBucketPolls.get(bucket) === activePoll) {
+        this.activeBucketPolls.delete(bucket);
+      }
+    }
   }
 
   private async pollKeyImmediately(key: string): Promise<void> {
@@ -341,23 +362,39 @@ export class NextTrainPollingService implements OnModuleDestroy {
   ): Promise<void> {
     const timestamp = Date.now();
 
-    try {
-      const results = await Promise.all(
-        keys.map((key) => this.fetchAndCacheKey(key, timestamp)),
+    const results: Array<{
+      delta: StationDelta | null;
+      hasError: boolean;
+    }> = [];
+
+    for (
+      let offset = 0;
+      offset < keys.length;
+      offset += MAX_CONCURRENT_STATION_POLLS
+    ) {
+      const batch = keys.slice(offset, offset + MAX_CONCURRENT_STATION_POLLS);
+      const outcomes = await Promise.all(
+        batch.map(async (key) => {
+          try {
+            return await this.fetchAndCacheKey(key, timestamp);
+          } catch (error) {
+            this.logger.error(`Error polling next trains for ${key}`, error);
+            return { delta: null, hasError: true };
+          }
+        }),
       );
+      results.push(...outcomes);
+    }
 
-      const deltas = results.flatMap((result) =>
-        result.delta ? [result.delta] : [],
-      );
-      const anyError = results.some((result) => result.hasError);
+    const deltas = results.flatMap((result) =>
+      result.delta ? [result.delta] : [],
+    );
+    const anyError = results.some((result) => result.hasError);
 
-      adjustInterval(anyError);
+    adjustInterval(anyError);
 
-      if (deltas.length > 0) {
-        this.notifyPollComplete(deltas);
-      }
-    } catch (error) {
-      this.logger.error('Error during next train polling', error);
+    if (deltas.length > 0) {
+      this.notifyPollComplete(deltas);
     }
   }
 
@@ -365,15 +402,18 @@ export class NextTrainPollingService implements OnModuleDestroy {
     key: string,
     timestamp: number,
   ): Promise<{ delta: StationDelta | null; hasError: boolean }> {
+    // A token cannot be reused after unsubscribe deletes the key.
+    const sequence = Symbol(key);
+    this.pollSequences.set(key, sequence);
     const { lineCode, stationCode } = this.parseKey(key);
-    const cached = this.cache.get(key);
+    const initialCached = this.cache.get(key);
     const outOfSchedule = !(await this.schedule.isOperating(
       lineCode,
       new Date(timestamp),
     ));
     const operationClosed = outOfSchedule
       ? false
-      : await this.shouldCloseOperation(lineCode, cached, timestamp);
+      : await this.shouldCloseOperation(lineCode, initialCached, timestamp);
     const { trains, isApiError } =
       operationClosed || outOfSchedule
         ? { trains: [], isApiError: false }
@@ -385,12 +425,13 @@ export class NextTrainPollingService implements OnModuleDestroy {
       outOfSchedule,
     );
 
-    const stationName =
-      (await this.externalRailProvider.getStationName(lineCode, stationCode)) ??
-      (!isApi1RailLine(lineCode)
-        ? getStationName(lineCode as NextTrainLineCode, stationCode)
-        : undefined) ??
-      stationCode;
+    const stationName = await this.resolveStationName(lineCode, stationCode, sequence);
+
+    if (this.pollSequences.get(key) !== sequence) {
+      return { delta: null, hasError: isApiError };
+    }
+
+    const cached = this.cache.get(key);
 
     const entry: StationCacheEntry = {
       lineCode,
@@ -430,6 +471,40 @@ export class NextTrainPollingService implements OnModuleDestroy {
     }
 
     return { delta: null, hasError: isApiError };
+  }
+
+  private async resolveStationName(
+    lineCode: LineCode,
+    stationCode: string,
+    sequence: symbol,
+  ): Promise<string> {
+    const key = this.makeKey(lineCode, stationCode);
+    const cachedName = this.stationNames.get(key);
+    if (cachedName) {
+      return cachedName;
+    }
+
+    const localName = !isApi1RailLine(lineCode)
+      ? getStationName(lineCode as NextTrainLineCode, stationCode)
+      : undefined;
+    try {
+      const stationName = await this.externalRailProvider.getStationName(
+        lineCode,
+        stationCode,
+      );
+      if (stationName) {
+        if (this.pollSequences.get(key) === sequence) {
+          this.stationNames.set(key, stationName);
+        }
+        return stationName;
+      }
+    } catch {
+      this.logger.warn(
+        `Station metadata unavailable for ${key}; using local fallback`,
+      );
+    }
+
+    return localName ?? stationCode;
   }
 
   private notifyPollComplete(deltas: StationDelta[]): void {
@@ -493,7 +568,7 @@ export class NextTrainPollingService implements OnModuleDestroy {
       timestamp,
     );
 
-    return operationState !== 'operating';
+    return operationState === 'nonOperating';
   }
 
   private async getLineOperationState(

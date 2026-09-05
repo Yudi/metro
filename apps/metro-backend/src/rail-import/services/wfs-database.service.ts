@@ -53,6 +53,11 @@ export class WFSDatabaseService {
     return dataset;
   }
 
+  /** Clear the completion marker before replacing a source's live table. */
+  async invalidateDataset(source: WFSSourceType): Promise<void> {
+    await this.prisma.gPKGDataset.deleteMany({ where: { source } });
+  }
+
   async getAllDatasets() {
     return await this.prisma.gPKGDataset.findMany({
       orderBy: { lastUpdated: 'desc' },

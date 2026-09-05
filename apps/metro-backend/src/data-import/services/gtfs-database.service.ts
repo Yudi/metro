@@ -95,14 +95,22 @@ export class GTFSDatabaseService {
     });
   }
 
-  /**
-   * Find GTFS file by hash across all datasets
-   */
-  async findFileByHash(fileHash: string) {
-    return await this.prisma.gTFSFile.findFirst({
-      where: { fileHash },
-      include: { dataset: true },
-      orderBy: { lastUpdated: 'desc' },
+  /** Mark a candidate dataset incomplete before any live-table processing. */
+  async prepareDatasetForImport(
+    datasetId: string,
+    fileNames?: string[],
+  ): Promise<void> {
+    if (fileNames) {
+      await this.prisma.gTFSFile.deleteMany({
+        where: {
+          datasetId,
+          fileName: { notIn: fileNames },
+        },
+      });
+    }
+    await this.prisma.gTFSFile.updateMany({
+      where: { datasetId },
+      data: { recordCount: null },
     });
   }
 
@@ -148,7 +156,7 @@ export class GTFSDatabaseService {
         `Failed to upsert files for dataset ${datasetId}:`,
         errorMessage,
       );
-      throw new Error(`Database error: ${errorMessage}`);
+      throw withCause(`Database error: ${errorMessage}`, error);
     }
   }
 
@@ -179,7 +187,7 @@ export class GTFSDatabaseService {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Failed to update file ${fileName}:`, errorMessage);
-      throw new Error(`Database error: ${errorMessage}`);
+      throw withCause(`Database error: ${errorMessage}`, error);
     }
   }
 
@@ -217,7 +225,7 @@ export class GTFSDatabaseService {
       // Optional files that are present in a feed must also have completed;
       // absent optional files remain valid for feeds that do not publish them.
       const presentFilesComplete = dataset.gtfsFiles.every(
-        (file) => (file.recordCount ?? 0) > 0,
+        (file) => file.recordCount !== null && file.recordCount !== undefined,
       );
 
       return requiredFilesComplete && presentFilesComplete;
@@ -269,7 +277,17 @@ export class GTFSDatabaseService {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       this.logger.error('Failed to clear GTFS data:', errorMessage);
-      throw new Error(`Clear data failed: ${errorMessage}`);
+      throw withCause(`Clear data failed: ${errorMessage}`, error);
     }
   }
+}
+
+function withCause(message: string, cause: unknown): Error {
+  const wrapped = new Error(message);
+  Object.defineProperty(wrapped, 'cause', {
+    configurable: true,
+    enumerable: false,
+    value: cause,
+  });
+  return wrapped;
 }

@@ -54,4 +54,23 @@ Archive:  /tmp/sptrans.zip
       { fileName: 'stop_times.txt', uncompressedSize: 5053366 },
     ]);
   });
+
+  it('aborts archive processing when any extracted file cannot be analyzed', async () => {
+    const fileOperations = {
+      listFiles: jest.fn().mockResolvedValue(['agency.txt', 'stops.txt']),
+      calculateFileHash: jest
+        .fn()
+        .mockResolvedValueOnce('agency-hash')
+        .mockRejectedValueOnce(new Error('read failed')),
+      getFileSize: jest.fn().mockResolvedValue(10),
+    };
+    service = new ZipProcessingService(fileOperations as never);
+    (
+      service as unknown as { extractZipFile: jest.Mock }
+    ).extractZipFile = jest.fn().mockResolvedValue(undefined);
+
+    await expect(
+      service.extractAndAnalyzeFiles('/tmp/feed.zip', '/tmp/feed'),
+    ).rejects.toThrow('stops.txt: read failed');
+  });
 });

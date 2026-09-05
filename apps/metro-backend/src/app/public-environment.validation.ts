@@ -7,6 +7,7 @@ export interface PublicEnvironment {
   TYPESENSE_PORT?: string | number;
   TYPESENSE_PROTOCOL?: 'http' | 'https';
   RAIL_INTEGRATION_GRPC_URL?: string;
+  ALLOWED_ORIGINS?: string;
   [key: string]: unknown;
 }
 
@@ -55,7 +56,55 @@ export function validatePublicEnvironment(
   }
   environment.RAIL_INTEGRATION_GRPC_URL = grpcTarget;
 
+  const allowedOrigins = optionalString(input['ALLOWED_ORIGINS']);
+  if (allowedOrigins) {
+    environment.ALLOWED_ORIGINS = validateAllowedOrigins(allowedOrigins).join(
+      ',',
+    );
+  }
+
   return environment;
+}
+
+export function validateAllowedOrigins(value: string): string[] {
+  const origins = Array.from(
+    new Set(
+      value
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean),
+    ),
+  );
+
+  if (origins.length === 0) {
+    throw new Error('ALLOWED_ORIGINS must contain at least one origin');
+  }
+
+  for (const origin of origins) {
+    if (origin === '*') {
+      throw new Error(
+        'ALLOWED_ORIGINS cannot contain * when credentials are enabled',
+      );
+    }
+
+    let parsed: URL;
+    try {
+      parsed = new URL(origin);
+    } catch {
+      throw new Error(`ALLOWED_ORIGINS contains an invalid origin: ${origin}`);
+    }
+
+    if (
+      !['http:', 'https:'].includes(parsed.protocol) ||
+      parsed.origin !== origin ||
+      parsed.username ||
+      parsed.password
+    ) {
+      throw new Error(`ALLOWED_ORIGINS contains an invalid origin: ${origin}`);
+    }
+  }
+
+  return origins;
 }
 
 function optionalString(value: unknown): string | undefined {

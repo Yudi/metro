@@ -75,6 +75,39 @@ describe('BusStopServiceOptimized', () => {
       500,
     ]);
   });
+
+  it('treats an explicitly null search term as omitted and retains bounds', async () => {
+    const result = await service.searchBusStops({
+      searchTerm: null,
+      bounds: { minLat: -23.7, maxLat: -23.4, minLng: -46.8, maxLng: -46.4 },
+      limit: 10,
+    } as never);
+
+    expect(result).toHaveLength(1);
+    expect(sqlText(prisma.$queryRaw)).toContain('ST_MakeEnvelope');
+    expect(sqlText(prisma.$queryRaw)).not.toContain('ILIKE');
+  });
+
+  it('escapes SQL wildcard characters in literal stop searches', async () => {
+    await service.searchBusStops({ searchTerm: '100%_term', limit: 10 });
+
+    const sql = sqlText(prisma.$queryRaw);
+    expect(sql).toContain('ESCAPE');
+    expect(prisma.$queryRaw.mock.calls[0].slice(1)).toEqual([
+      '%100\\%\\_term%',
+      '%100\\%\\_term%',
+      '100\\%\\_term%',
+      '%100\\%\\_term%',
+      10,
+    ]);
+  });
+
+  it('rejects blank direct search terms instead of scanning every stop', async () => {
+    await expect(service.searchBusStops({ searchTerm: '   ' })).rejects.toMatchObject({
+      status: 400,
+    });
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+  });
 });
 
 function sqlText(queryRaw: jest.Mock): string {

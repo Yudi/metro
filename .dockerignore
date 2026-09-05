@@ -1,0 +1,27 @@
+# Keep generated and local-only output out of every Docker build context.
+.git
+.gitignore
+AGENTS.md
+node_modules
+dist
+coverage
+.nx
+.angular
+storybook-static
+temp
+**/temp
+target
+**/target
+**/.DS_Store
+
+# Environment files must be supplied as runtime secrets, never copied into an
+# image build context.
+.env
+**/.env
+*.env
+**/*.env
+
+# Local editor and operating-system metadata.
+.idea
+.vscode
+*.log

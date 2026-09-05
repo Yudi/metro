@@ -42,8 +42,8 @@ export class BikePollingService implements OnModuleInit, OnModuleDestroy {
     this.pollingCoordinator.ensurePolling();
   }
 
-  onModuleDestroy(): void {
-    this.pollingCoordinator.stopPolling();
+  async onModuleDestroy(): Promise<void> {
+    await this.pollingCoordinator.stopAndDrain();
   }
 
   onPollComplete(listener: () => void): void {

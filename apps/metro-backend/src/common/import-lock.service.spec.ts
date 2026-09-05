@@ -88,4 +88,37 @@ describe('ImportLockService', () => {
     );
     expect(client.release).toHaveBeenCalledTimes(1);
   });
+
+  it('bounds configured background lock waits with PostgreSQL statement_timeout', async () => {
+    const action = jest.fn().mockResolvedValue('imported');
+    client.query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await expect(
+      service.withLock(
+        TRANSIT_CATALOG_IMPORT_LOCK,
+        'scheduled import',
+        action,
+        { waitForLock: true, timeoutMs: 120_000 },
+      ),
+    ).resolves.toBe('imported');
+
+    expect(client.query).toHaveBeenNthCalledWith(
+      1,
+      'SELECT set_config($1, $2, false)',
+      ['statement_timeout', '120000ms'],
+    );
+    expect(client.query).toHaveBeenNthCalledWith(
+      2,
+      'SELECT pg_advisory_lock(hashtext($1))',
+      [TRANSIT_CATALOG_IMPORT_LOCK],
+    );
+    expect(client.query).toHaveBeenNthCalledWith(
+      3,
+      'SELECT set_config($1, $2, false)',
+      ['statement_timeout', '0'],
+    );
+  });
 });

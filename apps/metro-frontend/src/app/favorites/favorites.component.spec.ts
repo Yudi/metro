@@ -32,7 +32,10 @@ describe('FavoritesComponent', () => {
           useValue: {
             favorites: favorites.asReadonly(),
             dashboardSelections: dashboardSelections.asReadonly(),
+            syncError: signal<string | null>(null).asReadonly(),
             removeFavorite: jest.fn(),
+            retryFailedFavoriteSync: jest.fn(),
+            discardFailedFavoriteSync: jest.fn(),
             toggleDashboardRailStationLine: jest.fn(),
             toggleDashboardBusStopRoute: jest.fn(),
           },

@@ -8,7 +8,7 @@ describe('TypesenseService', () => {
     jest.useRealTimers();
   });
 
-  it('skips per-document bulk import failures when usable documents remain', async () => {
+  it('fails a bulk import when any document is rejected', async () => {
     const importDocuments = jest.fn().mockResolvedValue([
       { success: true, id: 'ok' },
       { success: false, id: 'bad', error: 'invalid route_type', code: 400 },
@@ -32,7 +32,7 @@ describe('TypesenseService', () => {
         { id: 'ok' },
         { id: 'bad' },
       ]),
-    ).resolves.toBeUndefined();
+    ).rejects.toThrow('rejected 1 malformed');
     expect(importDocuments).toHaveBeenCalledWith(
       [{ id: 'ok' }, { id: 'bad' }],
       { action: 'upsert' },
@@ -63,6 +63,79 @@ describe('TypesenseService', () => {
         }
       ).importDocuments('metro-sptrans-gtfs-routes', [{ id: 'bad' }]),
     ).rejects.toThrow('rejected 1 malformed');
+  });
+
+  it('applies a global search result limit across all selected indexes', async () => {
+    const service = new TypesenseService(new ConfigService());
+    (service as never as { client: unknown }).client = {
+      multiSearch: {
+        perform: jest.fn().mockResolvedValue({
+          results: [
+            {
+              hits: [
+                { document: { id: 'route-1', route_id: 'route-1' } },
+                { document: { id: 'route-2', route_id: 'route-2' } },
+              ],
+            },
+            {
+              hits: [
+                { document: { id: 'stop-1', is_subway_station: false } },
+                { document: { id: 'stop-2', is_subway_station: false } },
+              ],
+            },
+          ],
+        }),
+      },
+    };
+    (service as never as { initialized: boolean }).initialized = true;
+
+    await expect(
+      service.search('central', ['busRoute', 'busStop'], 2),
+    ).resolves.toHaveLength(4);
+    service.onModuleDestroy();
+  });
+
+  it('preserves unaliased rebuilds owned by other processes during startup', async () => {
+    const deleteCollection = jest.fn().mockResolvedValue(undefined);
+    const retrieveCollection = jest.fn().mockResolvedValue({});
+    const retrieveCollections = jest.fn().mockResolvedValue([
+      { name: 'metro-sptrans-gtfs-routes' },
+      { name: 'metro-sptrans-gtfs-routes__rebuild_orphan' },
+      { name: 'metro-sptrans-gtfs-stops__rebuild_active' },
+    ]);
+    const collections = jest.fn((name?: string) =>
+      name
+        ? { retrieve: retrieveCollection, delete: deleteCollection }
+        : { retrieve: retrieveCollections, create: jest.fn() },
+    );
+    const service = new TypesenseService(new ConfigService());
+    (service as never as { client: unknown }).client = {
+      health: { retrieve: jest.fn().mockResolvedValue({ ok: true }) },
+      collections,
+      aliases: jest.fn((name?: string) =>
+        name
+          ? { retrieve: jest.fn().mockRejectedValue({ httpStatus: 404 }) }
+          : {
+              retrieve: jest.fn().mockResolvedValue({
+                aliases: [
+                  {
+                    collection_name:
+                      'metro-sptrans-gtfs-stops__rebuild_active',
+                  },
+                ],
+              }),
+            },
+      ),
+    };
+
+    await service.onModuleInit();
+
+    expect(service.isAvailable()).toBe(true);
+    expect(deleteCollection).not.toHaveBeenCalled();
+    expect(collections).not.toHaveBeenCalledWith(
+      'metro-sptrans-gtfs-stops__rebuild_active',
+    );
+    service.onModuleDestroy();
   });
 
   it('fails search immediately while Typesense is known to be unavailable', async () => {

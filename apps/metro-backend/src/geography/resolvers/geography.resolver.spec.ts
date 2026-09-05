@@ -45,6 +45,24 @@ describe('GeographyResolver input bounds', () => {
       'stop-2',
     ]);
   });
+
+  it('rejects whitespace and control characters in singular identifiers', async () => {
+    const geographyService = {
+      getBusStop: jest.fn(),
+    };
+    const resolver = new GeographyResolver(
+      geographyService as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(resolver.busStop('  ')).rejects.toMatchObject({ status: 400 });
+    await expect(resolver.busStop('stop\n1')).rejects.toMatchObject({
+      status: 400,
+    });
+    expect(geographyService.getBusStop).not.toHaveBeenCalled();
+  });
 });
 
 describe('GeographyResolver full-data selections', () => {

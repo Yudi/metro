@@ -111,6 +111,8 @@ export interface BikeStation {
   hasElectricBikesAvailable: boolean;
   vehicleAvailability: BikeVehicleAvailability[];
   detailsLoaded: boolean;
+  /** True when the last on-demand detail request failed or timed out. */
+  detailsError?: boolean;
 }
 
 /**

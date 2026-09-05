@@ -104,6 +104,7 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
 
   /** Unsubscribe function for breathing animation */
   private unsubscribeBreathing: (() => void) | null = null;
+  private releaseNextTrainSubscription: (() => void) | null = null;
 
   /** Station data including error state */
   private readonly stationData = computed(() => {
@@ -287,7 +288,10 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     // Subscribe to next train updates
-    this.nextTrainService.subscribe(this.lineCode(), this.stationCode());
+    this.releaseNextTrainSubscription = this.nextTrainService.subscribe(
+      this.lineCode(),
+      this.stationCode(),
+    );
 
     // Subscribe to breathing animation
     this.unsubscribeBreathing = this.breathingService.subscribe();
@@ -295,7 +299,7 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     // Unsubscribe when component is destroyed
-    this.nextTrainService.unsubscribe(this.lineCode(), this.stationCode());
+    this.releaseNextTrainSubscription?.();
     this.unsubscribeBreathing?.();
   }
 

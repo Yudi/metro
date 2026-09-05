@@ -66,6 +66,13 @@ export class MapSelectionService {
       return;
     }
 
+    // The lookup is asynchronous, so two callers can pass the initial
+    // selection check before either one updates map state. Only the first
+    // completed lookup owns the realtime route subscription.
+    if (this.mapState.selectedRoutes().has(route.routeId)) {
+      return;
+    }
+
     const selectedRoute: SelectedRoute = {
       id: route.routeId,
       shortName: route.shortName,
@@ -232,8 +239,6 @@ export class MapSelectionService {
   }
 
   removeStopFromSelection(stopId: string): void {
-    this.realtimeService.unsubscribeFromStop(stopId);
-
     this.mapState.removeStopFromSelection(stopId);
     this.dataLoader.removeStopDisplayData(stopId);
 
@@ -274,10 +279,6 @@ export class MapSelectionService {
   clearAllSelections(shouldDisplaySnackbar = true): void {
     for (const route of this.mapState.selectedRoutes().values()) {
       this.unsubscribeFromRouteRealtime(route.shortName);
-    }
-
-    for (const stopId of this.mapState.selectedStops().keys()) {
-      this.realtimeService.unsubscribeFromStop(stopId);
     }
 
     this.mapState.clearAllSelections();

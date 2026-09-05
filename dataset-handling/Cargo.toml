@@ -9,6 +9,8 @@ geo = "0.31.0"
 rayon = "1.11.0"
 tokio = { version = "1.47.1", features = ["rt-multi-thread"] }
 tokio-postgres = "0.7.14"
+tokio-postgres-rustls = { version = "0.14.0", features = ["ring", "webpki-roots"] }
+rustls = { version = "0.23", default-features = false, features = ["std", "ring", "tls12"] }
 csv = "1.1"
 log = "0.4"
 env_logger = "0.10"

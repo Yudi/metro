@@ -51,7 +51,12 @@
 
   <section class="vehicle-section">
     <h3>Veículos disponíveis</h3>
-    @if (!detailsLoaded()) {
+    @if (detailsError()) {
+      <p class="empty-state">
+        Não foi possível carregar os detalhes agora. Tente novamente em alguns
+        instantes.
+      </p>
+    } @else if (!detailsLoaded()) {
       <p class="empty-state">Carregando detalhes em tempo real…</p>
     } @else if (availableVehicles().length === 0) {
       <p class="empty-state">Nenhuma bicicleta disponível neste momento.</p>

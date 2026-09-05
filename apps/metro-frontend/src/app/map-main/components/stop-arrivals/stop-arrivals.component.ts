@@ -103,10 +103,13 @@ export class StopArrivalsComponent {
     effect((onCleanup) => {
       const stop = this.stop();
       let loadingTimeout: ReturnType<typeof setTimeout> | undefined;
+      let releaseStopSubscription: (() => void) | undefined;
 
       if (stop?.stopId) {
         // Subscribe to this stop
-        this.realtimeService.subscribeToStop(stop.stopId);
+        releaseStopSubscription = this.realtimeService.subscribeToStop(
+          stop.stopId,
+        );
         this.isLoading.set(true);
 
         // Set timeout to stop loading state after 10 seconds
@@ -123,7 +126,7 @@ export class StopArrivalsComponent {
         }
 
         if (stop?.stopId) {
-          this.realtimeService.unsubscribeFromStop(stop.stopId);
+          releaseStopSubscription?.();
         }
       });
     });

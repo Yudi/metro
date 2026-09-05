@@ -7,8 +7,12 @@ export const L12_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
       // TODO: Não sei
       {
         id: 'l12-bas-towards-cmv',
+        platformType: 'both',
         direction: { destinationCodes: ['CMV'] },
         disembarkingSide: 'left',
+        directionalFactReview: {
+          status: 'unknown',
+        },
         features: [],
       },
     ],
@@ -16,14 +20,22 @@ export const L12_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
     TAT: [
       {
         id: 'l12-tat-towards-cmv',
+        platformType: 'island',
         direction: { destinationCodes: ['CMV'] },
         disembarkingSide: 'right',
         features: [],
       },
       {
         id: 'l12-tat-towards-bas',
+        platformType: 'island',
         direction: { destinationCodes: ['BAS'] },
         disembarkingSide: 'right',
+        directionalFactReview: {
+          status: 'reviewed',
+          source:
+            'https://www.metrocptm.com.br/cptm-tem-linhas-demais-para-poucos-trilhos/',
+          lastReviewedAt: '2026-09-04',
+        },
         features: [],
       },
     ],
@@ -31,12 +43,14 @@ export const L12_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
     EGO: [
       {
         id: 'l12-ego-towards-cmv',
+        platformType: 'island',
         direction: { destinationCodes: ['CMV'] },
         disembarkingSide: 'right',
         features: [],
       },
       {
         id: 'l12-ego-towards-bas',
+        platformType: 'island',
         direction: { destinationCodes: ['BAS'] },
         disembarkingSide: 'right',
         features: [],
@@ -46,12 +60,14 @@ export const L12_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
     USL: [
       {
         id: 'l12-usl-towards-cmv',
+        platformType: 'island',
         direction: { destinationCodes: ['CMV'] },
         disembarkingSide: 'right',
         features: [],
       },
       {
         id: 'l12-usl-towards-bas',
+        platformType: 'island',
         direction: { destinationCodes: ['BAS'] },
         disembarkingSide: 'right',
         features: [],
@@ -61,12 +77,14 @@ export const L12_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
     ERM: [
       {
         id: 'l12-erm-towards-cmv',
+        platformType: 'island',
         direction: { destinationCodes: ['CMV'] },
         disembarkingSide: 'right',
         features: [],
       },
       {
         id: 'l12-erm-towards-bas',
+        platformType: 'island',
         direction: { destinationCodes: ['BAS'] },
         disembarkingSide: 'right',
         features: [],
@@ -76,12 +94,14 @@ export const L12_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
     SMP: [
       {
         id: 'l12-smp-towards-cmv',
+        platformType: 'island',
         direction: { destinationCodes: ['CMV'] },
         disembarkingSide: 'right',
         features: [],
       },
       {
         id: 'l12-smp-towards-bas',
+        platformType: 'island',
         direction: { destinationCodes: ['BAS'] },
         disembarkingSide: 'right',
         features: [],
@@ -91,12 +111,14 @@ export const L12_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
     JHE: [
       {
         id: 'l12-jhe-towards-cmv',
+        platformType: 'island',
         direction: { destinationCodes: ['CMV'] },
         disembarkingSide: 'right',
         features: [],
       },
       {
         id: 'l12-jhe-towards-bas',
+        platformType: 'island',
         direction: { destinationCodes: ['BAS'] },
         disembarkingSide: 'right',
         features: [],
@@ -106,12 +128,14 @@ export const L12_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
     ITI: [
       {
         id: 'l12-iti-towards-cmv',
+        platformType: 'island',
         direction: { destinationCodes: ['CMV'] },
         disembarkingSide: 'right',
         features: [],
       },
       {
         id: 'l12-iti-towards-bas',
+        platformType: 'island',
         direction: { destinationCodes: ['BAS'] },
         disembarkingSide: 'right',
         features: [],
@@ -136,12 +160,14 @@ export const L12_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
     EMF: [
       {
         id: 'l12-emf-towards-cmv',
+        platformType: 'side',
         direction: { destinationCodes: ['CMV'] },
         disembarkingSide: 'left',
         features: [],
       },
       {
         id: 'l12-emf-towards-bas',
+        platformType: 'side',
         direction: { destinationCodes: ['BAS'] },
         disembarkingSide: 'left',
         features: [],
@@ -151,12 +177,14 @@ export const L12_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
     IQC: [
       {
         id: 'l12-iqc-towards-cmv',
+        platformType: 'island',
         direction: { destinationCodes: ['CMV'] },
         disembarkingSide: 'right',
         features: [],
       },
       {
         id: 'l12-iqc-towards-bas',
+        platformType: 'island',
         direction: { destinationCodes: ['BAS'] },
         disembarkingSide: 'right',
         features: [],
@@ -166,12 +194,14 @@ export const L12_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
     ARC: [
       {
         id: 'l12-arc-towards-cmv',
+        platformType: 'island',
         direction: { destinationCodes: ['CMV'] },
         disembarkingSide: 'right',
         features: [],
       },
       {
         id: 'l12-arc-towards-bas',
+        platformType: 'island',
         direction: { destinationCodes: ['BAS'] },
         disembarkingSide: 'right',
         features: [],
@@ -182,6 +212,7 @@ export const L12_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
       // TODO: Não sei
       {
         id: 'l12-cmv-towards-bas',
+        platformType: 'island',
         direction: { destinationCodes: ['BAS'] },
         disembarkingSide: 'right',
         features: [],

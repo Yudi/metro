@@ -10,10 +10,13 @@ describe('validatePublicEnvironment', () => {
         TYPESENSE_PROTOCOL: 'https',
         TYPESENSE_PORT: '443',
         RAIL_INTEGRATION_GRPC_URL: 'rail-private:50051',
+        ALLOWED_ORIGINS:
+          ' https://metro.yudi.com.br,https://metro.yudi.com.br ',
       }),
     ).toMatchObject({
       NODE_ENV: 'production',
       TYPESENSE_PORT: '443',
+      ALLOWED_ORIGINS: 'https://metro.yudi.com.br',
     });
   });
 
@@ -29,6 +32,20 @@ describe('validatePublicEnvironment', () => {
         RAIL_INTEGRATION_GRPC_URL: 'invalid target',
       },
       'RAIL_INTEGRATION_GRPC_URL must use host:port format',
+    ],
+    [
+      {
+        DATABASE_URL: 'postgresql://db/metro',
+        ALLOWED_ORIGINS: '*',
+      },
+      'ALLOWED_ORIGINS cannot contain * when credentials are enabled',
+    ],
+    [
+      {
+        DATABASE_URL: 'postgresql://db/metro',
+        ALLOWED_ORIGINS: 'https://metro.yudi.com.br/path',
+      },
+      'ALLOWED_ORIGINS contains an invalid origin',
     ],
   ])('rejects invalid startup configuration', (environment, message) => {
     expect(() => validatePublicEnvironment(environment)).toThrow(message);

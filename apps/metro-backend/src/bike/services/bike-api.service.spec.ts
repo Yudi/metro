@@ -100,6 +100,56 @@ describe('BikeApiService', () => {
       }),
     ]);
   });
+
+  it.each(['vehicle_types', 'system_pricing_plans'] as const)(
+    'keeps core station data when optional %s feed fails',
+    async (failedFeed) => {
+      const feeds = {
+        station_information: response<GbfsStationInformationData>({
+          stations: [
+            {
+              station_id: '1',
+              name: [{ text: 'Estação', language: 'pt' }],
+              lat: -23.5,
+              lon: -46.6,
+              capacity: 10,
+            },
+          ],
+        }),
+        station_status: response<GbfsStationStatusData>({
+          stations: [
+            {
+              station_id: '1',
+              num_vehicles_available: 2,
+              num_vehicles_disabled: 0,
+              num_docks_available: 8,
+              num_docks_disabled: 0,
+              last_reported: '2026-07-26T00:40:29Z',
+              is_installed: true,
+              is_renting: true,
+              is_returning: true,
+            },
+          ],
+        }),
+        vehicle_types: response<GbfsVehicleTypesData>({ vehicle_types: [] }),
+        system_pricing_plans: response<GbfsPricingPlansData>({ plans: [] }),
+      };
+      const gbfs = {
+        fetchFeed: jest.fn((feedName: keyof typeof feeds) =>
+          feedName === failedFeed
+            ? Promise.reject(new Error('optional feed unavailable'))
+            : Promise.resolve(feeds[feedName]),
+        ),
+      } as unknown as GbfsClientService;
+      const service = new BikeApiService(gbfs, new BikePricingService());
+
+      await expect(service.fetchStations()).resolves.toEqual(
+        expect.objectContaining({
+          stations: [expect.objectContaining({ stationId: '1' })],
+        }),
+      );
+    },
+  );
 });
 
 function response<T>(data: T) {

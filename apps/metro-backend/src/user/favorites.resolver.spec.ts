@@ -147,6 +147,30 @@ describe('FavoritesResolver', () => {
     });
   });
 
+  it('retries a bounded serializable write conflict', async () => {
+    const transaction = prisma.$transaction;
+    transaction
+      .mockRejectedValueOnce({ code: 'P2034' })
+      .mockImplementationOnce(
+        async (callback: (tx: typeof prisma) => unknown) => callback(prisma),
+      );
+
+    await expect(
+      resolver.addFavorite(FavoriteType.RailLine, 'L4', 'user-id'),
+    ).resolves.toEqual({ success: true, message: 'Added to favorites' });
+    expect(transaction).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry a non-transaction error', async () => {
+    const transaction = prisma.$transaction;
+    transaction.mockRejectedValueOnce(new Error('database unavailable'));
+
+    await expect(
+      resolver.addFavorite(FavoriteType.RailLine, 'L4', 'user-id'),
+    ).rejects.toThrow('database unavailable');
+    expect(transaction).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects an oversized code before touching Prisma', async () => {
     await expect(
       resolver.addFavorite(

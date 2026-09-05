@@ -17,11 +17,6 @@ export class GTFSConfig {
   static readonly TEMP_DIR = 'temp/gtfs';
 
   /**
-   * Maximum file age before re-download (in hours)
-   */
-  static readonly MAX_FILE_AGE_HOURS = 24;
-
-  /**
    * Download timeout in milliseconds
    */
   static readonly DOWNLOAD_TIMEOUT_MS = 600000; // 10 minutes
@@ -42,11 +37,6 @@ export class GTFSConfig {
   static readonly MAX_GTFS_ZIP_BYTES = 256 * 1024 * 1024; // 256 MB
   static readonly MAX_GTFS_ZIP_UNCOMPRESSED_BYTES = 1024 * 1024 * 1024; // 1 GB
   static readonly MAX_GTFS_ZIP_ENTRY_BYTES = 512 * 1024 * 1024; // 512 MB
-
-  /**
-   * Maximum concurrent file processing
-   */
-  static readonly MAX_CONCURRENT_FILES = 3;
 
   /**
    * Cron expression for daily import at 3 AM
@@ -135,6 +125,13 @@ export class GTFSConfig {
 
   static isRequiredFile(fileName: string): boolean {
     return this.getRequiredFiles().includes(fileName);
+  }
+
+  /** Optional GTFS relations may be published as a valid header-only file. */
+  static isEmptyAllowedFile(fileName: string): boolean {
+    return (
+      this.getExpectedFiles().includes(fileName) && !this.isRequiredFile(fileName)
+    );
   }
 
   /**

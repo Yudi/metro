@@ -37,7 +37,11 @@ export class ZipProcessingService {
           '-d',
           extractDir,
         ],
-        { maxBuffer: 1024 * 1024 },
+        {
+          maxBuffer: 1024 * 1024,
+          timeout: GTFSConfig.PROCESSING_TIMEOUT_MS,
+          killSignal: 'SIGTERM',
+        },
       );
 
       if (stderr) {
@@ -48,8 +52,8 @@ export class ZipProcessingService {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to extract ${zipFilePath}:`, error);
-      throw new Error(`ZIP extraction failed: ${errorMessage}`);
+      this.logger.error(`Failed to extract ${zipFilePath}:`, errorMessage);
+      throw withCause(`ZIP extraction failed: ${errorMessage}`, error);
     }
   }
 
@@ -64,6 +68,8 @@ export class ZipProcessingService {
 
     const files = await this.fileOperationsService.listFiles(extractDir);
     const fileInfos: GTFSFileInfo[] = [];
+    const analysisErrors: string[] = [];
+    let firstAnalysisCause: unknown;
 
     this.logger.debug(`Analyzing ${files.length} extracted files...`);
 
@@ -90,7 +96,16 @@ export class ZipProcessingService {
         const errorMessage =
           error instanceof Error ? error.message : 'Unknown error';
         this.logger.error(`Failed to analyze file ${fileName}:`, errorMessage);
+        analysisErrors.push(`${fileName}: ${errorMessage}`);
+        firstAnalysisCause ??= error;
       }
+    }
+
+    if (analysisErrors.length > 0) {
+      throw withCause(
+        `GTFS archive analysis failed for ${analysisErrors.length} file(s): ${analysisErrors.join('; ')}`,
+        firstAnalysisCause,
+      );
     }
 
     return fileInfos;
@@ -134,6 +149,8 @@ export class ZipProcessingService {
 
     const { stdout } = await execFileAsync('unzip', ['-l', zipFilePath], {
       maxBuffer: 2 * 1024 * 1024,
+      timeout: GTFSConfig.PROCESSING_TIMEOUT_MS,
+      killSignal: 'SIGTERM',
     });
 
     const entries = this.parseZipListing(stdout.toString());
@@ -205,4 +222,14 @@ export class ZipProcessingService {
       throw new Error(`Unexpected GTFS ZIP entry: ${fileName}`);
     }
   }
+}
+
+function withCause(message: string, cause: unknown): Error {
+  const wrapped = new Error(message);
+  Object.defineProperty(wrapped, 'cause', {
+    configurable: true,
+    enumerable: false,
+    value: cause,
+  });
+  return wrapped;
 }

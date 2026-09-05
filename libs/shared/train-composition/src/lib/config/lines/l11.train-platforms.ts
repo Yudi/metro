@@ -9,6 +9,9 @@ export const L11_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
         id: 'l11-bfu-towards-est',
         direction: { destinationCodes: ['EST'] },
         disembarkingSide: 'left',
+        directionalFactReview: {
+          status: 'unknown',
+        },
         features: [],
       },
     ],
@@ -16,12 +19,20 @@ export const L11_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
     LUZ: [
       {
         id: 'l11-luz-towards-est',
+        platformType: 'both',
         direction: { destinationCodes: ['EST'] },
         disembarkingSide: 'left',
+        directionalFactReview: {
+          status: 'reviewed',
+          source:
+            'https://pt.wikipedia.org/wiki/Esta%C3%A7%C3%A3o_da_Luz',
+          lastReviewedAt: '2026-09-04',
+        },
         features: [],
       },
       {
         id: 'l11-luz-towards-bfu',
+        platformType: 'both',
         direction: { destinationCodes: ['BFU'] },
         disembarkingSide: 'left',
         features: [],
@@ -29,15 +40,22 @@ export const L11_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
     ],
 
     BAS: [
-      // TODO: Não sei
       {
         id: 'l11-bas-towards-est',
+        platformType: 'island',
         direction: { destinationCodes: ['EST'] },
         disembarkingSide: 'left',
+        directionalFactReview: {
+          status: 'reviewed',
+          source:
+            'https://pt.wikipedia.org/wiki/Esta%C3%A7%C3%A3o_Br%C3%A1s',
+          lastReviewedAt: '2026-09-04',
+        },
         features: [],
       },
       {
         id: 'l11-bas-towards-bfu',
+        platformType: 'island',
         direction: { destinationCodes: ['BFU'] },
         disembarkingSide: 'left',
         features: [],
@@ -47,12 +65,14 @@ export const L11_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
     TAT: [
       {
         id: 'l11-tat-towards-est',
+        platformType: 'island',
         direction: { destinationCodes: ['EST'] },
         disembarkingSide: 'right',
         features: [],
       },
       {
         id: 'l11-tat-towards-bfu',
+        platformType: 'island',
         direction: { destinationCodes: ['BFU'] },
         disembarkingSide: 'right',
         features: [],
@@ -62,12 +82,14 @@ export const L11_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
     ITQ: [
       {
         id: 'l11-itq-towards-est',
+        platformType: 'island',
         direction: { destinationCodes: ['EST'] },
         disembarkingSide: 'right',
         features: [],
       },
       {
         id: 'l11-itq-towards-bfu',
+        platformType: 'island',
         direction: { destinationCodes: ['BFU'] },
         disembarkingSide: 'right',
         features: [],
@@ -77,14 +99,28 @@ export const L11_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
     DOB: [
       {
         id: 'l11-dob-towards-est',
+        platformType: 'side',
         direction: { destinationCodes: ['EST'] },
         disembarkingSide: 'left',
+        directionalFactReview: {
+          status: 'reviewed',
+          source:
+            'https://www.metrocptm.com.br/cptm-tem-linhas-demais-para-poucos-trilhos/',
+          lastReviewedAt: '2026-09-04',
+        },
         features: [],
       },
       {
         id: 'l11-dob-towards-bfu',
+        platformType: 'side',
         direction: { destinationCodes: ['BFU'] },
         disembarkingSide: 'left',
+        directionalFactReview: {
+          status: 'reviewed',
+          source:
+            'https://www.metrocptm.com.br/cptm-tem-linhas-demais-para-poucos-trilhos/',
+          lastReviewedAt: '2026-09-04',
+        },
         features: [],
       },
     ],
@@ -92,12 +128,14 @@ export const L11_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
     JBO: [
       {
         id: 'l11-jbo-towards-est',
+        platformType: 'side',
         direction: { destinationCodes: ['EST'] },
         disembarkingSide: 'left',
         features: [],
       },
       {
         id: 'l11-jbo-towards-bfu',
+        platformType: 'side',
         direction: { destinationCodes: ['BFU'] },
         disembarkingSide: 'left',
         features: [],
@@ -107,12 +145,14 @@ export const L11_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
     GUA: [
       {
         id: 'l11-gua-towards-est',
+        platformType: 'island',
         direction: { destinationCodes: ['EST'] },
         disembarkingSide: 'right',
         features: [],
       },
       {
         id: 'l11-gua-towards-bfu',
+        platformType: 'island',
         direction: { destinationCodes: ['BFU'] },
         disembarkingSide: 'right',
         features: [],
@@ -122,12 +162,14 @@ export const L11_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
     AGN: [
       {
         id: 'l11-agn-towards-est',
+        platformType: 'side',
         direction: { destinationCodes: ['EST'] },
         disembarkingSide: 'left',
         features: [],
       },
       {
         id: 'l11-agn-towards-bfu',
+        platformType: 'side',
         direction: { destinationCodes: ['BFU'] },
         disembarkingSide: 'left',
         features: [],
@@ -137,12 +179,14 @@ export const L11_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
     FVC: [
       {
         id: 'l11-fvc-towards-est',
+        platformType: 'island',
         direction: { destinationCodes: ['EST'] },
         disembarkingSide: 'right',
         features: [],
       },
       {
         id: 'l11-fvc-towards-bfu',
+        platformType: 'island',
         direction: { destinationCodes: ['BFU'] },
         disembarkingSide: 'right',
         features: [],
@@ -152,12 +196,14 @@ export const L11_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
     POA: [
       {
         id: 'l11-poa-towards-est',
+        platformType: 'side',
         direction: { destinationCodes: ['EST'] },
         disembarkingSide: 'left',
         features: [],
       },
       {
         id: 'l11-poa-towards-bfu',
+        platformType: 'side',
         direction: { destinationCodes: ['BFU'] },
         disembarkingSide: 'left',
         features: [],
@@ -168,12 +214,14 @@ export const L11_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
       // TODO: Não sei
       {
         id: 'l11-cal-towards-est',
+        platformType: 'both',
         direction: { destinationCodes: ['EST'] },
         disembarkingSide: 'left',
         features: [],
       },
       {
         id: 'l11-cal-towards-bfu',
+        platformType: 'both',
         direction: { destinationCodes: ['BFU'] },
         disembarkingSide: 'left',
         features: [],
@@ -183,12 +231,14 @@ export const L11_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
     SUZ: [
       {
         id: 'l11-suz-towards-est',
+        platformType: 'island',
         direction: { destinationCodes: ['EST'] },
         disembarkingSide: 'right',
         features: [],
       },
       {
         id: 'l11-suz-towards-bfu',
+        platformType: 'island',
         direction: { destinationCodes: ['BFU'] },
         disembarkingSide: 'right',
         features: [],
@@ -198,12 +248,14 @@ export const L11_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
     JPB: [
       {
         id: 'l11-jpb-towards-est',
+        platformType: 'side',
         direction: { destinationCodes: ['EST'] },
         disembarkingSide: 'left',
         features: [],
       },
       {
         id: 'l11-jpb-towards-bfu',
+        platformType: 'side',
         direction: { destinationCodes: ['BFU'] },
         disembarkingSide: 'left',
         features: [],
@@ -213,12 +265,14 @@ export const L11_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
     BCB: [
       {
         id: 'l11-bcb-towards-est',
+        platformType: 'side',
         direction: { destinationCodes: ['EST'] },
         disembarkingSide: 'left',
         features: [],
       },
       {
         id: 'l11-bcb-towards-bfu',
+        platformType: 'side',
         direction: { destinationCodes: ['BFU'] },
         disembarkingSide: 'left',
         features: [],
@@ -229,12 +283,14 @@ export const L11_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
       // TODO: Não sei
       {
         id: 'l11-mdc-towards-est',
+        platformType: 'both',
         direction: { destinationCodes: ['EST'] },
         disembarkingSide: 'left',
         features: [],
       },
       {
         id: 'l11-mdc-towards-bfu',
+        platformType: 'both',
         direction: { destinationCodes: ['BFU'] },
         disembarkingSide: 'left',
         features: [],

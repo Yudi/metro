@@ -27,7 +27,7 @@ export class RailTileService {
   ): Promise<Buffer | null> {
     const viewExists = await this.ensureRailMvtViewExists('mvt_rail_stations');
     if (!viewExists) {
-      return null;
+      throw new Error('Rail stations vector-tile view is unavailable');
     }
 
     const { minX, minY, maxX, maxY } = tileToBounds(z, x, y);
@@ -64,7 +64,7 @@ export class RailTileService {
         `Error generating rail stations tile (${z}/${x}/${y}):`,
         error,
       );
-      return null;
+      throw error;
     }
   }
 
@@ -78,7 +78,7 @@ export class RailTileService {
   ): Promise<Buffer | null> {
     const viewExists = await this.ensureRailMvtViewExists('mvt_rail_routes');
     if (!viewExists) {
-      return null;
+      throw new Error('Rail routes vector-tile view is unavailable');
     }
 
     const { minX, minY, maxX, maxY } = tileToBounds(z, x, y);
@@ -122,7 +122,7 @@ export class RailTileService {
         `Error generating rail routes tile (${z}/${x}/${y}):`,
         error,
       );
-      return null;
+      throw error;
     }
   }
 
@@ -172,7 +172,7 @@ export class RailTileService {
         `Error generating subway routes tile (${z}/${x}/${y}):`,
         error,
       );
-      return null;
+      throw error;
     }
   }
 
@@ -205,7 +205,7 @@ export class RailTileService {
       await this.railVectorTileService.refreshMvtViews();
     } catch (error) {
       this.logger.error('Failed to create missing rail MVT views:', error);
-      return false;
+      throw error;
     }
 
     if (await this.railMvtViewExists(viewName)) {
@@ -217,7 +217,7 @@ export class RailTileService {
     this.logger.warn(
       `Rail MVT view "${viewName}" is still unavailable after refresh`,
     );
-    return false;
+    throw new Error(`Rail MVT view "${viewName}" is unavailable after refresh`);
   }
 
   private async railMvtViewExists(viewName: RailMvtViewName): Promise<boolean> {
@@ -228,7 +228,7 @@ export class RailTileService {
       return result[0]?.exists ?? false;
     } catch (error) {
       this.logger.error(`Failed to check rail MVT view "${viewName}":`, error);
-      return false;
+      throw error;
     }
   }
 }

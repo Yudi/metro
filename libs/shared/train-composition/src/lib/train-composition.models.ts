@@ -4,6 +4,16 @@ export type TrainFacingSideRelativeToBoarding = 'left' | 'right';
 
 export type TrainDisembarkingSide = 'left' | 'right' | 'both';
 
+export type TrainDirectionalFactReview =
+  | {
+      readonly status: 'reviewed';
+      readonly source: string;
+      readonly lastReviewedAt: string;
+    }
+  | {
+      readonly status: 'unknown';
+    };
+
 export type TrainCarMode = 'left' | 'center' | 'right';
 
 export type TrainCarLoadUnavailableReason =
@@ -93,6 +103,8 @@ export interface TrainPlatformDirectionConfig {
   readonly formation?: TrainFormationOverride;
   /** Side relative to the train's direction of travel. */
   readonly disembarkingSide?: TrainDisembarkingSide;
+  /** Provenance state for directional guidance, when explicitly recorded. */
+  readonly directionalFactReview?: TrainDirectionalFactReview;
   /** Side where the front of the train appears from the boarding platform. */
   readonly trainFacingSideRelativeToBoarding?: TrainFacingSideRelativeToBoarding;
   readonly features: readonly TrainPlatformFeature[];
@@ -164,6 +176,7 @@ export interface TrainCompositionView {
   readonly stationName: string;
   readonly lineCode: string;
   readonly directionName: string;
+  readonly directionalFactReview?: TrainDirectionalFactReview;
   readonly trainFacingSideRelativeToBoarding?: TrainFacingSideRelativeToBoarding;
   readonly disembarkingSide?: TrainDisembarkingSide;
   readonly hasLiveOccupancy: boolean;

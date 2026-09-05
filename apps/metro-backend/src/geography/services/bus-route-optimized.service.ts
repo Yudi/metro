@@ -112,4 +112,10 @@ export class BusRouteServiceOptimized {
       },
     };
   }
+
+  async getRouteShapesForRoute(
+    routeId: string,
+  ): Promise<Array<{ shape_id: string; coordinates: number[][] }>> {
+    return this.queryOptimization.getRouteShapesOptimized(routeId);
+  }
 }

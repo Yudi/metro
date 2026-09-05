@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { tileToBounds } from '../utils/vector-tile-geometry.util';
 import { VectorTileOptions } from '../vector-tile.types';
@@ -23,7 +23,9 @@ export class BusVectorTileService {
   ): Promise<Buffer | null> {
     const routeIds = this.normalizeIds(options.routeIds);
     if (routeIds.length === 0) {
-      return null;
+      throw new BadRequestException(
+        'routeIds must contain at least one identifier',
+      );
     }
 
     const { minX, minY, maxX, maxY } = tileToBounds(z, x, y);
@@ -87,7 +89,7 @@ export class BusVectorTileService {
         `Error generating bus routes tile (${z}/${x}/${y}):`,
         error,
       );
-      return null;
+      throw error;
     }
   }
 
@@ -108,7 +110,9 @@ export class BusVectorTileService {
     const nearby = this.normalizeNearby(options.nearby);
 
     if (routeIds.length === 0 && stopIds.length === 0 && !nearby) {
-      return null;
+      throw new BadRequestException(
+        'At least one route, stop, or nearby filter is required',
+      );
     }
 
     const { minX, minY, maxX, maxY } = tileToBounds(z, x, y);
@@ -205,19 +209,24 @@ export class BusVectorTileService {
         `Error generating bus stops tile (${z}/${x}/${y}):`,
         error,
       );
-      return null;
+      throw error;
     }
   }
 
   normalizeIds(ids: string[] | undefined): string[] {
-    return Array.from(
-      new Set(
-        (ids ?? [])
-          .map((id) => id.trim())
-          .filter((id) => id.length > 0)
-          .slice(0, 100),
-      ),
-    );
+    const values = ids ?? [];
+    if (values.length > 100) {
+      throw new BadRequestException('A maximum of 100 identifiers is supported');
+    }
+
+    const normalized = values.map((id) => id.trim());
+    if (normalized.some((id) => !isSafeIdentifier(id))) {
+      throw new BadRequestException(
+        'Identifiers must be non-empty and contain at most 128 characters',
+      );
+    }
+
+    return Array.from(new Set(normalized));
   }
 
   normalizeNearby(
@@ -232,7 +241,9 @@ export class BusVectorTileService {
       !Number.isFinite(nearby.longitude) ||
       !Number.isFinite(nearby.radiusMeters)
     ) {
-      return null;
+      throw new BadRequestException(
+        'Nearby coordinates and radius must be finite',
+      );
     }
 
     if (
@@ -241,7 +252,15 @@ export class BusVectorTileService {
       nearby.longitude < -180 ||
       nearby.longitude > 180
     ) {
-      return null;
+      throw new BadRequestException(
+        'Nearby coordinates are outside their valid ranges',
+      );
+    }
+
+    if (nearby.radiusMeters <= 0 || nearby.radiusMeters > 5_000) {
+      throw new BadRequestException(
+        'Nearby radius must be greater than 0 and at most 5000 meters',
+      );
     }
 
     return {
@@ -250,4 +269,15 @@ export class BusVectorTileService {
       radiusMeters: Math.min(Math.max(nearby.radiusMeters, 50), 5000),
     };
   }
+}
+
+function isSafeIdentifier(value: string): boolean {
+  return (
+    value.length > 0 &&
+    value.length <= 128 &&
+    !Array.from(value).some((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint <= 0x1f || codePoint === 0x7f;
+    })
+  );
 }

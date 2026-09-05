@@ -4,6 +4,7 @@ import { SearchService } from '../../search/services/search.service';
 import { SubwayStationProcessorService } from '../../vector-tiles/services/subway-station-processor.service';
 import { VectorTilesService } from '../../vector-tiles/vector-tiles.service';
 import { TransitDataPrecomputeService } from '../../transit-data/transit-data-precompute.service';
+import { RouteStopMappingService } from '../../realtime/services/route-stop-mapping.service';
 
 export interface DataImportHookOptions {
   readonly dataChanged?: boolean;
@@ -20,6 +21,7 @@ export class DataImportHooksService {
     private readonly vectorTilesService: VectorTilesService,
     private readonly transitDataPrecompute: TransitDataPrecomputeService,
     private readonly gtfsDatabaseService: GTFSDatabaseService,
+    private readonly routeStopMapping: RouteStopMappingService,
   ) {}
 
   async onDataImportComplete(options: DataImportHookOptions = {}): Promise<void> {
@@ -58,6 +60,8 @@ export class DataImportHooksService {
 
     this.logger.debug('Refreshing GTFS-derived transit data...');
     await this.transitDataPrecompute.refreshAfterGtfsImport();
+
+    this.routeStopMapping.clearCaches();
 
     // Clear vector tile cache to force regeneration only after station
     // processing succeeds.

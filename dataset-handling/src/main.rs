@@ -21,12 +21,6 @@ pub struct DatabaseImporterArgs {
     /// Path to shapes.txt
     #[arg(long)]
     shapes_path: String,
-    /// Database connection string
-    #[arg(
-        long,
-        default_value = "host=localhost user=postgres password=postgres dbname=postgres"
-    )]
-    db_url: String,
     /// SRID for geometries
     #[arg(long, default_value = "4326")]
     srid: i32,
@@ -41,14 +35,36 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     match args.command {
         Commands::DatabaseImporter(import_args) => {
+            let db_url = std::env::var("DATABASE_URL").map_err(|_| {
+                "DATABASE_URL environment variable is required for database-importer"
+            })?;
             let rt = tokio::runtime::Runtime::new()?;
             rt.block_on(gtfs::process_gtfs_shapes(
                 &import_args.shapes_path,
-                &import_args.db_url,
+                &db_url,
                 import_args.srid,
                 &import_args.schema,
             ))?;
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn database_url_is_not_accepted_as_a_command_line_argument() {
+        let result = Args::try_parse_from([
+            "metro-dataset-handling",
+            "database-importer",
+            "--shapes-path",
+            "shapes.txt",
+            "--db-url",
+            "postgresql://user:secret@example.invalid/db",
+        ]);
+
+        assert!(result.is_err());
+    }
 }

@@ -44,4 +44,33 @@ describe('NextTrainGateway', () => {
       }),
     );
   });
+
+  it.each([null, 'invalid', [], { lineCode: 'L11' }])(
+    'rejects malformed station payloads without calling polling',
+    async (payload) => {
+      const polling = {
+        onPollComplete: jest.fn(),
+        offPollComplete: jest.fn(),
+        subscribe: jest.fn(),
+      };
+      const vehiclePolling = {
+        onPollComplete: jest.fn(),
+        offPollComplete: jest.fn(),
+      };
+      const gateway = new NextTrainGateway(
+        polling as never,
+        vehiclePolling as never,
+        {} as never,
+      );
+      const client = { id: 'client-id', emit: jest.fn() };
+      gateway.handleConnection(client as never);
+
+      await gateway.handleSubscribe(client as never, payload);
+
+      expect(polling.subscribe).not.toHaveBeenCalled();
+      expect(client.emit).toHaveBeenCalledWith('error', {
+        message: 'Invalid subscription payload.',
+      });
+    },
+  );
 });

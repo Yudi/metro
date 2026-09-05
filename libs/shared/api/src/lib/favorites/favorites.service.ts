@@ -26,6 +26,10 @@ export const ANONYMOUS_FAVORITES_SCOPE = 'anonymous';
 export const FAVORITE_CODE_MAX_LENGTH = 128;
 const MAX_FAVORITES_PER_SCOPE = 500;
 const FAVORITES_DATABASE_NAME = 'metro-favorites';
+const FAVORITE_SYNC_ERROR_MESSAGE =
+  'Não foi possível sincronizar seus favoritos. Revise os favoritos pendentes e tente novamente.';
+const FAVORITE_LIMIT_ERROR_MESSAGE =
+  'Você já atingiu o limite de 500 favoritos.';
 
 const favoriteTypes: FavoriteTypes[] = [
   'bikeStation',
@@ -36,6 +40,7 @@ const favoriteTypes: FavoriteTypes[] = [
 ];
 
 export type FavoriteOperation = 'add' | 'remove' | 'replace';
+export type FavoriteOutboxStatus = 'pending' | 'dead-letter';
 
 interface FavoriteRecord {
   key: string;
@@ -70,11 +75,65 @@ interface LegacyDashboardSelectionRecord {
 export interface FavoriteOutboxRecord {
   operationId: string;
   scope: string;
+  status?: FavoriteOutboxStatus;
+  attempts?: number;
+  lastError?: string;
   operation: FavoriteOperation;
   type?: FavoriteTypes;
   code?: string;
   favorites?: FavoriteList;
   createdAt: number;
+}
+
+export type FavoriteSyncErrorKind = 'transient' | 'terminal';
+
+export interface FavoriteSyncErrorInfo {
+  kind: FavoriteSyncErrorKind;
+  reason: string;
+}
+
+class FavoriteSyncFailure extends Error {
+  constructor(
+    readonly kind: FavoriteSyncErrorKind,
+    readonly reason: string,
+  ) {
+    super(reason);
+    this.name = 'FavoriteSyncFailure';
+  }
+}
+
+export function classifyFavoriteSyncError(
+  error: unknown,
+): FavoriteSyncErrorInfo {
+  if (error instanceof FavoriteSyncFailure) {
+    return { kind: error.kind, reason: error.reason };
+  }
+
+  const status = readHttpStatus(error);
+  if (
+    status === 0 ||
+    status === 408 ||
+    status === 425 ||
+    status === 429 ||
+    (status !== null && status >= 500)
+  ) {
+    return { kind: 'transient', reason: `http-${status ?? 'unknown'}` };
+  }
+
+  if (
+    status === 400 ||
+    status === 401 ||
+    status === 403 ||
+    status === 409 ||
+    status === 422
+  ) {
+    return { kind: 'terminal', reason: `http-${status}` };
+  }
+
+  // Only explicitly recognized transport failures are retryable. Unknown
+  // errors are terminal so malformed local records or an unexpected contract
+  // cannot create an endless background loop.
+  return { kind: 'terminal', reason: 'unknown' };
 }
 
 interface GraphqlResponse<T> {
@@ -290,6 +349,8 @@ export class FavoritesService implements OnDestroy {
 
   private readonly _favorites = signal<FavoriteList>(createEmptyFavorites());
   readonly favorites: Signal<FavoriteList> = this._favorites.asReadonly();
+  private readonly _syncError = signal<string | null>(null);
+  readonly syncError: Signal<string | null> = this._syncError.asReadonly();
   private readonly _dashboardSelections = signal<DashboardFavoriteSelections>(
     this.createEmptyDashboardSelections(),
   );
@@ -326,7 +387,9 @@ export class FavoritesService implements OnDestroy {
       return;
     }
 
-    void this.addFavoriteRecord(code, type);
+    void this.addFavoriteRecord(code, type).catch(() => {
+      this._syncError.set(FAVORITE_SYNC_ERROR_MESSAGE);
+    });
   }
 
   removeFavorite(code: string, type: FavoriteTypes): void {
@@ -397,6 +460,57 @@ export class FavoritesService implements OnDestroy {
     );
   }
 
+  async retryFailedFavoriteSync(): Promise<void> {
+    if (!this.db) {
+      return;
+    }
+
+    const scope = this.activeScope;
+    await this.db.transaction('rw', this.db.outbox, async () => {
+      const failed = (await this.readOutbox(scope, true)).filter(
+        (operation) => operation.status === 'dead-letter',
+      );
+      await this.db?.outbox.bulkPut(
+        failed.map((operation) => ({
+          ...operation,
+          status: 'pending' as const,
+          lastError: undefined,
+        })),
+      );
+    });
+
+    if (scope === this.activeScope) {
+      this._syncError.set(null);
+      this.retryAttempt = 0;
+      this.syncWithServer();
+    }
+  }
+
+  async discardFailedFavoriteSync(): Promise<void> {
+    if (!this.db) {
+      return;
+    }
+
+    const scope = this.activeScope;
+    await this.db.transaction('rw', this.db.outbox, async () => {
+      const failed = await this.db?.outbox
+        .where('scope')
+        .equals(scope)
+        .filter((operation) => operation.status === 'dead-letter')
+        .toArray();
+      if (failed && failed.length > 0) {
+        await this.db?.outbox.bulkDelete(
+          failed.map((operation) => operation.operationId),
+        );
+      }
+    });
+
+    if (scope === this.activeScope) {
+      this._syncError.set(null);
+      this.syncWithServer();
+    }
+  }
+
   isFavorite(code: string, type: FavoriteTypes): boolean {
     if (!isPlatformBrowser(this.platformId)) {
       return false;
@@ -458,6 +572,7 @@ export class FavoritesService implements OnDestroy {
     this.syncInFlight = undefined;
     this.clearRetryTimer();
     this.retryAttempt = 0;
+    this._syncError.set(null);
     this.stopSubscriptions();
     this.activeScope = scope;
     this._favorites.set(this.createEmptyFavorites());
@@ -501,12 +616,16 @@ export class FavoritesService implements OnDestroy {
     }
 
     const db = this.db;
-    this.favoritesSubscription = liveQuery(() =>
-      db.favorites.where('scope').equals(scope).toArray(),
-    ).subscribe({
-      next: (records) => {
+    this.favoritesSubscription = liveQuery(async () => ({
+      records: await db.favorites.where('scope').equals(scope).toArray(),
+      operations: await this.readOutbox(scope, true),
+    })).subscribe({
+      next: ({ records, operations }) => {
         if (scope === this.activeScope) {
           this._favorites.set(this.recordsToFavoriteList(records));
+          if (operations.some((operation) => operation.status === 'dead-letter')) {
+            this._syncError.set(FAVORITE_SYNC_ERROR_MESSAGE);
+          }
         }
       },
       error: () => {
@@ -551,20 +670,27 @@ export class FavoritesService implements OnDestroy {
     }
 
     const scope = this.activeScope;
-    const current = await this.db.favorites.get(
-      getFavoriteKey(scope, type, normalizedCode),
-    );
-    if (current) {
-      return;
-    }
-
-    await this.db.transaction(
+    const db = this.db;
+    const result = await db.transaction(
       'rw',
-      this.db.favorites,
-      this.db.outbox,
+      db.favorites,
+      db.outbox,
       async () => {
-        await this.db?.favorites.put({
-          key: getFavoriteKey(scope, type, normalizedCode),
+        const key = getFavoriteKey(scope, type, normalizedCode);
+        if (await db.favorites.get(key)) {
+          return 'already-present' as const;
+        }
+
+        const count = await db.favorites
+          .where('scope')
+          .equals(scope)
+          .count();
+        if (count >= MAX_FAVORITES_PER_SCOPE) {
+          return 'limit-reached' as const;
+        }
+
+        await db.favorites.put({
+          key,
           scope,
           type,
           code: normalizedCode,
@@ -575,16 +701,24 @@ export class FavoritesService implements OnDestroy {
           await this.replacePendingOperation(scope, {
             operationId: this.createOperationId(),
             scope,
+            status: 'pending',
             operation: 'add',
             type,
             code: normalizedCode,
             createdAt: Date.now(),
           });
         }
+
+        return 'added' as const;
       },
     );
 
-    if (scope !== ANONYMOUS_FAVORITES_SCOPE) {
+    if (result === 'limit-reached') {
+      this._syncError.set(FAVORITE_LIMIT_ERROR_MESSAGE);
+      return;
+    }
+
+    if (result === 'added' && scope !== ANONYMOUS_FAVORITES_SCOPE) {
       this.syncWithServer();
     }
   }
@@ -616,6 +750,7 @@ export class FavoritesService implements OnDestroy {
           await this.replacePendingOperation(scope, {
             operationId: this.createOperationId(),
             scope,
+            status: 'pending',
             operation: 'remove',
             type,
             code: normalizedCode,
@@ -668,6 +803,7 @@ export class FavoritesService implements OnDestroy {
           await this.db?.outbox.put({
             operationId: this.createOperationId(),
             scope,
+            status: 'pending',
             operation: 'replace',
             favorites: desired,
             createdAt: Date.now(),
@@ -711,6 +847,9 @@ export class FavoritesService implements OnDestroy {
 
   private async syncScope(scope: string, generation: number): Promise<void> {
     try {
+      if (this.pauseForFailedOperations(await this.readOutbox(scope, true), scope, generation)) {
+        return;
+      }
       const result = await this.postGraphql<UserFavoritesResult>({
         query: `
           query GetFavorites {
@@ -738,13 +877,17 @@ export class FavoritesService implements OnDestroy {
           return;
         }
 
-        const pending = await this.readOutbox(scope);
+        const pending = await this.readOutbox(scope, true);
+        if (this.pauseForFailedOperations(pending, scope, generation)) {
+          return;
+        }
         const effective = this.applyOperations(snapshot.favorites, pending);
         await this.replaceScopeFavorites(scope, effective);
 
         if (pending.length === 0) {
           this.retryAttempt = 0;
           this.clearRetryTimer();
+          this._syncError.set(null);
           return;
         }
 
@@ -784,8 +927,9 @@ export class FavoritesService implements OnDestroy {
           continue;
         }
         if (!syncResult?.success) {
-          throw new Error(
-            syncResult?.message ?? 'Favorite synchronization failed',
+          throw new FavoriteSyncFailure(
+            'terminal',
+            'server-rejected-favorites',
           );
         }
 
@@ -793,7 +937,10 @@ export class FavoritesService implements OnDestroy {
           pending.map((operation) => operation.operationId),
         );
 
-        const remaining = await this.readOutbox(scope);
+        const remaining = await this.readOutbox(scope, true);
+        if (this.pauseForFailedOperations(remaining, scope, generation)) {
+          return;
+        }
         await this.replaceScopeFavorites(
           scope,
           this.applyOperations(snapshot.favorites, remaining),
@@ -801,25 +948,52 @@ export class FavoritesService implements OnDestroy {
         if (remaining.length === 0) {
           this.retryAttempt = 0;
           this.clearRetryTimer();
+          this._syncError.set(null);
           return;
         }
       }
 
-      throw new Error('Favorite synchronization conflict retry limit reached');
-    } catch {
+      throw new FavoriteSyncFailure('terminal', 'conflict-retry-limit-reached');
+    } catch (error: unknown) {
+      const failure = classifyFavoriteSyncError(error);
+      if (failure.kind === 'terminal') {
+        try {
+          await this.quarantinePendingOperations(scope, failure.reason);
+        } catch {
+          // The terminal state is still exposed even if IndexedDB is itself
+          // unavailable, preventing another unbounded replay attempt.
+        }
+        if (scope === this.activeScope && generation === this.scopeGeneration) {
+          this.clearRetryTimer();
+          this._syncError.set(FAVORITE_SYNC_ERROR_MESSAGE);
+        }
+        return;
+      }
+
+      await this.recordTransientFailure(scope, failure.reason);
       this.scheduleRetry(scope, generation);
     }
   }
 
   private async postGraphql<T>(body: unknown): Promise<T> {
-    const response = await firstValueFrom(
-      this.http.post<GraphqlResponse<T>>('/api/graphql', body),
-    );
+    let response: GraphqlResponse<T>;
+    try {
+      response = await firstValueFrom(
+        this.http.post<GraphqlResponse<T>>('/api/graphql', body),
+      );
+    } catch (error: unknown) {
+      const failure = classifyFavoriteSyncError(error);
+      throw new FavoriteSyncFailure(failure.kind, failure.reason);
+    }
+
     if (response.errors && response.errors.length > 0) {
-      throw new Error('GraphQL request returned errors');
+      throw new FavoriteSyncFailure(
+        classifyGraphqlErrors(response.errors),
+        'graphql-errors',
+      );
     }
     if (!response.data) {
-      throw new Error('GraphQL request returned no data');
+      throw new FavoriteSyncFailure('terminal', 'graphql-no-data');
     }
 
     return response.data;
@@ -834,7 +1008,10 @@ export class FavoritesService implements OnDestroy {
       !Number.isInteger(value.revision) ||
       (value.revision ?? -1) < 0
     ) {
-      throw new Error('Favorite synchronization returned an invalid revision');
+      throw new FavoriteSyncFailure(
+        'terminal',
+        'invalid-favorite-snapshot',
+      );
     }
 
     return {
@@ -843,12 +1020,35 @@ export class FavoritesService implements OnDestroy {
     };
   }
 
-  private async readOutbox(scope: string): Promise<FavoriteOutboxRecord[]> {
+  private pauseForFailedOperations(
+    operations: FavoriteOutboxRecord[],
+    scope: string,
+    generation: number,
+  ): boolean {
+    if (scope !== this.activeScope || generation !== this.scopeGeneration) {
+      return true;
+    }
+    if (!operations.some((operation) => operation.status === 'dead-letter')) {
+      return false;
+    }
+
+    this.clearRetryTimer();
+    this._syncError.set(FAVORITE_SYNC_ERROR_MESSAGE);
+    return true;
+  }
+
+  private async readOutbox(
+    scope: string,
+    includeFailed = false,
+  ): Promise<FavoriteOutboxRecord[]> {
     if (!this.db) {
       return [];
     }
 
-    const records = await this.db.outbox.where('scope').equals(scope).toArray();
+    const records = (await this.db.outbox
+      .where('scope')
+      .equals(scope)
+      .toArray()).filter((operation) => includeFailed || operation.status !== 'dead-letter');
     return records.sort(
       (left, right) =>
         left.createdAt - right.createdAt ||
@@ -864,7 +1064,7 @@ export class FavoritesService implements OnDestroy {
       return;
     }
 
-    const pending = await this.readOutbox(scope);
+    const pending = await this.readOutbox(scope, true);
     const matching = pending.filter(
       (item) =>
         item.operation !== 'replace' &&
@@ -876,6 +1076,61 @@ export class FavoritesService implements OnDestroy {
       await this.db.outbox.bulkDelete(matching.map((item) => item.operationId));
     }
     await this.db.outbox.put(operation);
+  }
+
+  private async quarantinePendingOperations(
+    scope: string,
+    reason: string,
+  ): Promise<void> {
+    if (!this.db) {
+      return;
+    }
+
+    const pending = await this.readOutbox(scope);
+    if (pending.length === 0) {
+      return;
+    }
+
+    await this.db.transaction('rw', this.db.outbox, async () => {
+      await this.db?.outbox.bulkPut(
+        pending.map((operation) => ({
+          ...operation,
+          status: 'dead-letter' as const,
+          attempts: (operation.attempts ?? 0) + 1,
+          lastError: reason.slice(0, 64),
+        })),
+      );
+    });
+  }
+
+  private async recordTransientFailure(
+    scope: string,
+    reason: string,
+  ): Promise<void> {
+    if (!this.db) {
+      return;
+    }
+
+    try {
+      const pending = await this.readOutbox(scope);
+      if (pending.length === 0) {
+        return;
+      }
+
+      await this.db.transaction('rw', this.db.outbox, async () => {
+        await this.db?.outbox.bulkPut(
+          pending.map((operation) => ({
+            ...operation,
+            status: 'pending' as const,
+            attempts: (operation.attempts ?? 0) + 1,
+            lastError: reason.slice(0, 64),
+          })),
+        );
+      });
+    } catch {
+      // Persistence of retry metadata must not prevent the bounded retry
+      // scheduler from handling a transient IndexedDB failure.
+    }
   }
 
   private async replaceScopeFavorites(
@@ -1044,4 +1299,56 @@ export class FavoritesService implements OnDestroy {
 
     return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   }
+}
+
+function classifyGraphqlErrors(
+  errors: readonly unknown[],
+): FavoriteSyncErrorKind {
+  const codes = errors.flatMap((error) => {
+    if (!isRecord(error) || !isRecord(error['extensions'])) {
+      return [];
+    }
+    const code = error['extensions']['code'];
+    return typeof code === 'string' ? [code.toUpperCase()] : [];
+  });
+
+  if (
+    codes.some((code) =>
+      ['BAD_USER_INPUT', 'UNAUTHENTICATED', 'FORBIDDEN', 'CONFLICT'].includes(
+        code,
+      ),
+    )
+  ) {
+    return 'terminal';
+  }
+
+  return 'transient';
+}
+
+function readHttpStatus(error: unknown): number | null {
+  if (!isRecord(error)) {
+    return null;
+  }
+
+  const status = error['status'];
+  if (typeof status === 'number' && Number.isInteger(status)) {
+    return status;
+  }
+
+  const nested = error['error'];
+  if (isRecord(nested)) {
+    const nestedStatus = nested['status'];
+    if (
+      typeof nestedStatus === 'number' &&
+      Number.isInteger(nestedStatus)
+    ) {
+      return nestedStatus;
+    }
+  }
+
+  return null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }

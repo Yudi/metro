@@ -228,6 +228,10 @@ export class CptmVehicleLayerService {
       return;
     }
 
+    if (this.subscribedLines().has(lineCode)) {
+      return;
+    }
+
     this.nextTrainService.subscribeToCptmVehicles(lineCode);
     this.subscribedLines.update((set) => new Set([...set, lineCode]));
     this.logger.debug(`Subscribed to CPTM vehicles for line ${lineCode}`);

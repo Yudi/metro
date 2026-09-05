@@ -88,7 +88,10 @@ describe('DataImportService', () => {
         action: () => Promise<unknown>,
         options: { waitForLock?: boolean },
       ) => {
-        expect(options).toEqual({ waitForLock: true });
+        expect(options).toEqual({
+          waitForLock: true,
+          timeoutMs: expect.any(Number),
+        });
         await lockAvailable;
         return action();
       },
@@ -249,5 +252,22 @@ describe('DataImportService', () => {
     await secondRun;
     jest.runOnlyPendingTimers();
     jest.useRealTimers();
+  });
+
+  it('keeps the active tables while forcing a replacement import', async () => {
+    const startImportLocked = jest.fn().mockResolvedValue({
+      success: true,
+      filesProcessed: 1,
+      recordsImported: 1,
+      skippedFiles: [],
+      errors: [],
+    });
+    Object.defineProperty(service, 'startImportLocked', {
+      value: startImportLocked,
+    });
+
+    await service.clearAndReimport();
+
+    expect(startImportLocked).toHaveBeenCalledWith(true);
   });
 });

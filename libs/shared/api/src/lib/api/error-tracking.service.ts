@@ -1,4 +1,10 @@
-import { ErrorHandler, Service, inject, isDevMode } from '@angular/core';
+import {
+  ErrorHandler,
+  OnDestroy,
+  Service,
+  inject,
+  isDevMode,
+} from '@angular/core';
 
 export interface ErrorContext {
   component?: string;
@@ -35,19 +41,26 @@ const SENSITIVE_CONTEXT_KEY =
   /token|authorization|cookie|password|secret|credential|user.?id|latitude|longitude|coordinate/i;
 
 @Service()
-export class ErrorTrackingService {
+export class ErrorTrackingService implements OnDestroy {
   private errorLog: ErrorLog[] = [];
   private readonly MAX_LOG_SIZE = 100;
   private readonly sessionId = createEventId();
   private initialized = false;
+  private readonly onlineHandler = () => void this.flushQueuedErrors();
 
   initialize(): void {
     if (this.initialized || typeof window === 'undefined') {
       return;
     }
     this.initialized = true;
-    window.addEventListener('online', () => void this.flushQueuedErrors());
+    window.addEventListener('online', this.onlineHandler);
     void this.flushQueuedErrors();
+  }
+
+  ngOnDestroy(): void {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('online', this.onlineHandler);
+    }
   }
 
   trackError(

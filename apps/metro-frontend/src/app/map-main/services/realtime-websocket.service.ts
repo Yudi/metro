@@ -44,6 +44,8 @@ export interface StopArrivalUpdate {
   cacheTimestamp: number;
 }
 
+export type RealtimeSubscriptionRelease = () => void;
+
 enum RealtimeMessageType {
   SUBSCRIBE_ROUTE = 'subscribe_route',
   UNSUBSCRIBE_ROUTE = 'unsubscribe_route',
@@ -76,9 +78,14 @@ export class RealtimeWebsocketService implements OnDestroy {
   );
   readonly stopArrivals = signal<Map<string, StopArrivalUpdate>>(new Map());
 
-  // Track active subscriptions
-  private subscribedRoutes = new Set<string>();
-  private subscribedStops = new Set<string>();
+  // Track owners rather than only keys. A map/details component can observe
+  // the same route or stop at the same time, so releasing one owner must not
+  // tear down the shared upstream subscription for the others.
+  private subscribedRoutes = new Map<string, number>();
+  private subscribedStops = new Map<string, number>();
+
+  private readonly latestRouteUpdateTimestamps = new Map<string, number>();
+  private readonly latestStopUpdateTimestamps = new Map<string, number>();
 
   constructor() {
     this.connect();
@@ -157,33 +164,47 @@ export class RealtimeWebsocketService implements OnDestroy {
   /**
    * Subscribe to real-time vehicle positions for a route
    */
-  subscribeToRoute(routeShortName: string): void {
-    if (this.subscribedRoutes.has(routeShortName)) {
-      this.logger.debug(`Already subscribed to route: ${routeShortName}`);
-      return; // Already subscribed
+  subscribeToRoute(routeShortName: string): RealtimeSubscriptionRelease {
+    const owners = this.subscribedRoutes.get(routeShortName) ?? 0;
+    this.subscribedRoutes.set(routeShortName, owners + 1);
+
+    if (owners === 0) {
+      this.logger.debug(`Subscribing to route: ${routeShortName}`);
+
+      if (this.socket?.connected) {
+        this.socket.emit(RealtimeMessageType.SUBSCRIBE_ROUTE, {
+          routeShortName,
+        });
+        this.logger.debug(
+          `Sent subscription request for route: ${routeShortName}`,
+        );
+      } else {
+        this.logger.warn('Socket not connected, will subscribe when connected');
+      }
     }
 
-    this.logger.debug(`Subscribing to route: ${routeShortName}`);
-    this.subscribedRoutes.add(routeShortName);
-
-    if (this.socket?.connected) {
-      this.socket.emit(RealtimeMessageType.SUBSCRIBE_ROUTE, {
-        routeShortName,
-      });
-      this.logger.debug(
-        `Sent subscription request for route: ${routeShortName}`,
-      );
-    } else {
-      this.logger.warn('Socket not connected, will subscribe when connected');
-    }
+    let released = false;
+    return () => {
+      if (released) {
+        return;
+      }
+      released = true;
+      this.unsubscribeFromRoute(routeShortName);
+    };
   }
 
   /**
    * Unsubscribe from real-time vehicle positions for a route
    */
   unsubscribeFromRoute(routeShortName: string): void {
-    if (!this.subscribedRoutes.has(routeShortName)) {
+    const owners = this.subscribedRoutes.get(routeShortName);
+    if (!owners) {
       return; // Not subscribed
+    }
+
+    if (owners > 1) {
+      this.subscribedRoutes.set(routeShortName, owners - 1);
+      return;
     }
 
     this.subscribedRoutes.delete(routeShortName);
@@ -199,32 +220,45 @@ export class RealtimeWebsocketService implements OnDestroy {
     const positions = this.vehiclePositions();
     positions.delete(routeShortName);
     this.vehiclePositions.set(new Map(positions));
+    this.latestRouteUpdateTimestamps.delete(routeShortName);
   }
 
   /**
    * Subscribe to real-time arrival predictions for a stop
    */
-  subscribeToStop(stopCode: string): void {
-    if (this.subscribedStops.has(stopCode)) {
-      return; // Already subscribed
-    }
+  subscribeToStop(stopCode: string): RealtimeSubscriptionRelease {
+    const owners = this.subscribedStops.get(stopCode) ?? 0;
+    this.subscribedStops.set(stopCode, owners + 1);
 
-    this.subscribedStops.add(stopCode);
-
-    if (this.socket?.connected) {
+    if (owners === 0 && this.socket?.connected) {
       this.socket.emit(RealtimeMessageType.SUBSCRIBE_STOP, {
         stopCode,
       });
       this.logger.debug(`Subscribed to stop: ${stopCode}`);
     }
+
+    let released = false;
+    return () => {
+      if (released) {
+        return;
+      }
+      released = true;
+      this.unsubscribeFromStop(stopCode);
+    };
   }
 
   /**
    * Unsubscribe from real-time arrival predictions for a stop
    */
   unsubscribeFromStop(stopCode: string): void {
-    if (!this.subscribedStops.has(stopCode)) {
+    const owners = this.subscribedStops.get(stopCode);
+    if (!owners) {
       return; // Not subscribed
+    }
+
+    if (owners > 1) {
+      this.subscribedStops.set(stopCode, owners - 1);
+      return;
     }
 
     this.subscribedStops.delete(stopCode);
@@ -240,19 +274,20 @@ export class RealtimeWebsocketService implements OnDestroy {
     const arrivals = this.stopArrivals();
     arrivals.delete(stopCode);
     this.stopArrivals.set(new Map(arrivals));
+    this.latestStopUpdateTimestamps.delete(stopCode);
   }
 
   /**
    * Re-subscribe to all active subscriptions after reconnection
    */
   private resubscribeAll(): void {
-    for (const routeShortName of this.subscribedRoutes) {
+    for (const routeShortName of this.subscribedRoutes.keys()) {
       this.socket?.emit(RealtimeMessageType.SUBSCRIBE_ROUTE, {
         routeShortName,
       });
     }
 
-    for (const stopCode of this.subscribedStops) {
+    for (const stopCode of this.subscribedStops.keys()) {
       this.socket?.emit(RealtimeMessageType.SUBSCRIBE_STOP, {
         stopCode,
       });
@@ -267,10 +302,30 @@ export class RealtimeWebsocketService implements OnDestroy {
    * Handle incoming vehicle position updates
    */
   private handleVehiclePositions(data: VehiclePositionUpdate): void {
+    const latestTimestamp = this.latestRouteUpdateTimestamps.get(
+      data.routeShortName,
+    );
+    if (
+      latestTimestamp !== undefined &&
+      Number.isFinite(data.cacheTimestamp) &&
+      data.cacheTimestamp < latestTimestamp
+    ) {
+      this.logger.debug(
+        `Ignoring stale vehicle positions for route ${data.routeShortName}`,
+      );
+      return;
+    }
+
     const positions = this.vehiclePositions();
     positions.set(data.routeShortName, data);
     this.vehiclePositions.set(new Map(positions));
-    this.lastUpdateTimestamp.set(Date.now());
+    if (Number.isFinite(data.cacheTimestamp)) {
+      this.latestRouteUpdateTimestamps.set(
+        data.routeShortName,
+        data.cacheTimestamp,
+      );
+    }
+    this.updateLastUpdateTimestamp(data.cacheTimestamp);
 
     this.logger.debug(
       `Updated vehicle positions for route ${data.routeShortName}: ${
@@ -283,10 +338,23 @@ export class RealtimeWebsocketService implements OnDestroy {
    * Handle incoming arrival prediction updates
    */
   private handleArrivalPredictions(data: StopArrivalUpdate): void {
+    const latestTimestamp = this.latestStopUpdateTimestamps.get(data.stopCode);
+    if (
+      latestTimestamp !== undefined &&
+      Number.isFinite(data.cacheTimestamp) &&
+      data.cacheTimestamp < latestTimestamp
+    ) {
+      this.logger.debug(`Ignoring stale arrival predictions for stop ${data.stopCode}`);
+      return;
+    }
+
     const arrivals = this.stopArrivals();
     arrivals.set(data.stopCode, data);
     this.stopArrivals.set(new Map(arrivals));
-    this.lastUpdateTimestamp.set(Date.now());
+    if (Number.isFinite(data.cacheTimestamp)) {
+      this.latestStopUpdateTimestamps.set(data.stopCode, data.cacheTimestamp);
+    }
+    this.updateLastUpdateTimestamp(data.cacheTimestamp);
 
     this.logger.debug(
       `Updated arrival predictions for stop ${data.stopCode}: ${
@@ -318,5 +386,13 @@ export class RealtimeWebsocketService implements OnDestroy {
    */
   isConnected(): boolean {
     return this.connected();
+  }
+
+  private updateLastUpdateTimestamp(timestamp: number): void {
+    const current = this.lastUpdateTimestamp();
+    const next = Number.isFinite(timestamp) ? timestamp : Date.now();
+    this.lastUpdateTimestamp.set(
+      current === null ? next : Math.max(current, next),
+    );
   }
 }

@@ -7,6 +7,7 @@ import { NextFunction, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { RequestContextService } from './common/request-context/request-context.service';
 import { createRequestTimingMiddleware } from './observability/request-timing.middleware';
+import { validateAllowedOrigins } from './app/public-environment.validation';
 
 export async function bootstrap() {
   initializeFirebase();
@@ -70,9 +71,11 @@ export async function bootstrap() {
     'http://127.0.0.1:4201',
   ];
   const prodOrigins = ['https://metro.yudi.com.br'];
-  const allowedOrigins =
-    process.env.ALLOWED_ORIGINS?.split(',') ||
-    (process.env.NODE_ENV === 'production' ? prodOrigins : devOrigins);
+  const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? validateAllowedOrigins(process.env.ALLOWED_ORIGINS)
+    : isProduction
+      ? prodOrigins
+      : devOrigins;
 
   app.enableCors({
     origin: allowedOrigins,

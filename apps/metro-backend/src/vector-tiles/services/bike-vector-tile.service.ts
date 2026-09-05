@@ -1,4 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { BikePollingService } from '../../bike/services/bike-polling.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { tileToBounds } from '../utils/vector-tile-geometry.util';
@@ -26,7 +30,10 @@ export class BikeVectorTileService {
     y: number,
   ): Promise<Buffer | null> {
     const cached = this.bikePolling.getCachedSummaryPayload();
-    if (!cached || cached.stations.length === 0) {
+    if (!cached) {
+      throw new ServiceUnavailableException('Bike station data is unavailable');
+    }
+    if (cached.stations.length === 0) {
       return null;
     }
 
@@ -106,7 +113,7 @@ export class BikeVectorTileService {
         `Error generating bike stations tile (${z}/${x}/${y}):`,
         error,
       );
-      return null;
+      throw error;
     }
   }
 

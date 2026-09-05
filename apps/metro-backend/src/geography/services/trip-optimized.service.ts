@@ -35,10 +35,11 @@ export class TripServiceOptimized {
         shape_id: string;
       }>
     >`
-      SELECT id, route_id, service_id, trip_id, trip_headsign, direction_id, shape_id
+      SELECT DISTINCT ON (direction_id, trip_headsign, shape_id)
+        id, route_id, service_id, trip_id, trip_headsign, direction_id, shape_id
       FROM "SPTrans_Trip"
       WHERE route_id = ${route.route_id}
-      LIMIT 20
+      ORDER BY direction_id, trip_headsign, shape_id, trip_id
     `;
 
     return trips.map((trip) => ({

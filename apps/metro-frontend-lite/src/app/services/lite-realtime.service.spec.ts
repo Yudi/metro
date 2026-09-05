@@ -80,4 +80,53 @@ describe('LiteRealtimeService', () => {
       }),
     ]);
   });
+
+  it('keeps a stop subscription while a one-shot request or another owner remains', async () => {
+    const service = TestBed.inject(LiteRealtimeService);
+    const release = service.subscribeToStop('1234');
+    const oneShot = service.fetchStopArrivalOnce('1234');
+
+    expect(socket.emit).toHaveBeenCalledWith('subscribe_stop', {
+      stopCode: '1234',
+    });
+    expect(
+      socket.emit.mock.calls.filter(
+        ([event]) => event === 'subscribe_stop',
+      ),
+    ).toHaveLength(1);
+
+    listeners.get('arrival_predictions')?.({
+      data: {
+        stopCode: '1234',
+        p: null,
+        cacheTimestamp: 100,
+      },
+    });
+    await expect(oneShot).resolves.toEqual(
+      expect.objectContaining({ cacheTimestamp: 100 }),
+    );
+
+    expect(socket.emit).not.toHaveBeenCalledWith('unsubscribe_stop', {
+      stopCode: '1234',
+    });
+    release();
+    expect(socket.emit).toHaveBeenCalledWith('unsubscribe_stop', {
+      stopCode: '1234',
+    });
+  });
+
+  it('ignores stale arrival updates for a stop', () => {
+    const service = TestBed.inject(LiteRealtimeService);
+    service.subscribeToStop('1234');
+    const arrivalListener = listeners.get('arrival_predictions');
+
+    arrivalListener?.({
+      data: { stopCode: '1234', p: null, cacheTimestamp: 200 },
+    });
+    arrivalListener?.({
+      data: { stopCode: '1234', p: null, cacheTimestamp: 100 },
+    });
+
+    expect(service.stopArrivals().get('1234')?.cacheTimestamp).toBe(200);
+  });
 });

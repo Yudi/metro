@@ -358,7 +358,7 @@ export class SearchService {
       this.logger.error(
         `Failed to search rail stations: ${formatTypesenseError(error)}`,
       );
-      return [];
+      throw error;
     }
   }
 
@@ -407,7 +407,7 @@ export class SearchService {
       this.logger.error(
         `Failed to search nearby rail stations: ${formatTypesenseError(error)}`,
       );
-      return [];
+      throw error;
     }
   }
 
@@ -489,6 +489,7 @@ export class SearchService {
       this.logger.error(
         `Failed to index rail lines: ${formatTypesenseError(error)}`,
       );
+      throw error;
     }
   }
 
@@ -608,6 +609,7 @@ export class SearchService {
       this.logger.error(
         `Failed to index rail stations: ${formatTypesenseError(error)}`,
       );
+      throw error;
     }
   }
 

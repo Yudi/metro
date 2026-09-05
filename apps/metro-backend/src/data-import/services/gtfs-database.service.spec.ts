@@ -8,6 +8,7 @@ describe('GTFSDatabaseService', () => {
   const executeRawUnsafe = jest.fn();
   const prisma = {
     gTFSDataset: { findMany, upsert },
+    gTFSFile: { deleteMany: jest.fn(), updateMany: jest.fn() },
     $queryRaw: queryRaw,
     $executeRawUnsafe: executeRawUnsafe,
   } as unknown as PrismaService;
@@ -121,5 +122,43 @@ describe('GTFSDatabaseService', () => {
       ['ANALYZE "external_gtfs"."SPTrans_StopTime"'],
       ['ANALYZE "external_gtfs"."SPTrans_Shape"'],
     ]);
+  });
+
+  it('accepts a processed empty optional GTFS relation as complete', async () => {
+    findMany.mockResolvedValue([
+      {
+        id: 'dataset-id',
+        lastUpdated: new Date('2026-09-04T00:00:00Z'),
+        fileHash: 'current-hash',
+        fileSize: 10,
+        version: '2026-09-04',
+        gtfsFiles: [
+          ...completeFiles(100),
+          { fileName: 'frequencies.txt', recordCount: 0 },
+        ],
+      },
+    ]);
+
+    await expect(service.getCurrentDataset()).resolves.toMatchObject({
+      fileHash: 'current-hash',
+    });
+  });
+
+  it('invalidates candidate file counts before reusing a historical feed hash', async () => {
+    await service.prepareDatasetForImport('dataset-id', [
+      'agency.txt',
+      'routes.txt',
+    ]);
+
+    expect(prisma.gTFSFile.deleteMany).toHaveBeenCalledWith({
+      where: {
+        datasetId: 'dataset-id',
+        fileName: { notIn: ['agency.txt', 'routes.txt'] },
+      },
+    });
+    expect(prisma.gTFSFile.updateMany).toHaveBeenCalledWith({
+      where: { datasetId: 'dataset-id' },
+      data: { recordCount: null },
+    });
   });
 });

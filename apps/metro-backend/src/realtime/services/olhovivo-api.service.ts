@@ -16,11 +16,12 @@ import {
  */
 @Injectable()
 export class OlhoVivoApiService implements OnModuleInit {
+  private static readonly REQUEST_TIMEOUT_MS = 15_000;
   private readonly logger = new Logger(OlhoVivoApiService.name);
   private readonly sptransApiUrl = 'https://api.olhovivo.sptrans.com.br/v2.1';
   private readonly token: string;
   private isAuthenticated = false;
-  private authInProgress = false;
+  private authenticationPromise?: Promise<boolean>;
   private cookieJar: string | null = null; // Store authentication cookie
 
   constructor(
@@ -31,10 +32,6 @@ export class OlhoVivoApiService implements OnModuleInit {
     if (!this.token) {
       this.logger.warn(
         'OLHOVIVO_API_TOKEN not configured. Real-time features will not work.',
-      );
-    } else {
-      this.logger.debug(
-        `OlhoVivo API token loaded: ${this.token.substring(0, 10)}...`,
       );
     }
   }
@@ -49,27 +46,29 @@ export class OlhoVivoApiService implements OnModuleInit {
    * Authenticate with OlhoVivo API
    */
   private async authenticate(): Promise<boolean> {
-    if (this.authInProgress) {
-      // Wait for ongoing authentication
-      this.logger.debug('Authentication already in progress, waiting...');
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      return this.isAuthenticated;
-    }
-
     if (this.isAuthenticated) {
       this.logger.debug('Already authenticated');
       return true;
     }
 
+    if (this.authenticationPromise) {
+      return this.authenticationPromise;
+    }
+
+    const authenticationPromise = this.performAuthentication();
+    this.authenticationPromise = authenticationPromise;
     try {
-      this.authInProgress = true;
-      this.logger.debug(`Authenticating with OlhoVivo API...`);
-      this.logger.debug(`Using token: ${this.token.substring(0, 10)}...`);
-      this.logger.debug(
-        `Auth URL: ${
-          this.sptransApiUrl
-        }/Login/Autenticar?token=${this.token.substring(0, 10)}...`,
-      );
+      return await authenticationPromise;
+    } finally {
+      if (this.authenticationPromise === authenticationPromise) {
+        this.authenticationPromise = undefined;
+      }
+    }
+  }
+
+  private async performAuthentication(): Promise<boolean> {
+    try {
+      this.logger.debug('Authenticating with OlhoVivo API...');
 
       const response = await firstValueFrom(
         this.httpService.post<boolean>(
@@ -82,6 +81,7 @@ export class OlhoVivoApiService implements OnModuleInit {
             },
             // Don't follow redirects, get the cookies directly
             maxRedirects: 0,
+            timeout: OlhoVivoApiService.REQUEST_TIMEOUT_MS,
             validateStatus: (status) => status >= 200 && status < 400,
           },
         ),
@@ -93,13 +93,9 @@ export class OlhoVivoApiService implements OnModuleInit {
         this.cookieJar = setCookieHeader
           .map((cookie) => cookie.split(';', 1)[0])
           .join('; ');
-        this.logger.debug(
-          `Cookies received: ${this.cookieJar.substring(0, 50)}...`,
-        );
       }
 
       this.logger.debug(`Auth response status: ${response.status}`);
-      this.logger.debug(`Auth response data: ${JSON.stringify(response.data)}`);
 
       // API returns true on success
       this.isAuthenticated = response.data === true;
@@ -107,43 +103,18 @@ export class OlhoVivoApiService implements OnModuleInit {
       if (this.isAuthenticated) {
         this.logger.debug('Successfully authenticated with OlhoVivo API');
       } else {
-        this.logger.error(
-          `Authentication failed - API returned: ${response.data}`,
-        );
-        this.logger.error(
-          'Expected: true, but got:',
-          typeof response.data,
-          response.data,
-        );
+        this.logger.error('OlhoVivo API authentication was rejected');
       }
 
       return this.isAuthenticated;
     } catch (error) {
-      this.logger.error('Error authenticating with OlhoVivo API:');
-      if (error && typeof error === 'object') {
-        if ('response' in error) {
-          const axiosError = error as {
-            response?: { status?: number; data?: unknown; headers?: unknown };
-          };
-          this.logger.error(`Status: ${axiosError.response?.status}`);
-          this.logger.error(
-            `Data: ${JSON.stringify(axiosError.response?.data)}`,
-          );
-          this.logger.error(
-            `Headers: ${JSON.stringify(axiosError.response?.headers)}`,
-          );
-        }
-        if ('message' in error) {
-          this.logger.error(
-            `Message: ${(error as { message: string }).message}`,
-          );
-        }
-      } else {
-        this.logger.error(String(error));
-      }
+      const status = getHttpStatus(error);
+      this.logger.error(
+        status
+          ? `OlhoVivo API authentication failed with HTTP ${status}`
+          : 'OlhoVivo API authentication failed',
+      );
       return false;
-    } finally {
-      this.authInProgress = false;
     }
   }
 
@@ -182,6 +153,7 @@ export class OlhoVivoApiService implements OnModuleInit {
           `${this.sptransApiUrl}/Posicao`,
           {
             headers: this.getRequestHeaders(),
+            timeout: OlhoVivoApiService.REQUEST_TIMEOUT_MS,
           },
         ),
       );
@@ -215,6 +187,7 @@ export class OlhoVivoApiService implements OnModuleInit {
             `${this.sptransApiUrl}/Posicao`,
             {
               headers: this.getRequestHeaders(),
+              timeout: OlhoVivoApiService.REQUEST_TIMEOUT_MS,
             },
           ),
         );
@@ -224,7 +197,9 @@ export class OlhoVivoApiService implements OnModuleInit {
         return this.normalizePositionResponse(response.data);
       }
 
-      this.logger.error('Error fetching all positions:', error);
+      this.logger.error(
+        `Error fetching all positions: ${formatUpstreamFailure(error)}`,
+      );
       throw error;
     }
   }
@@ -240,7 +215,10 @@ export class OlhoVivoApiService implements OnModuleInit {
       const response = await firstValueFrom(
         this.httpService.get<StopArrivalResponse>(
           `${this.sptransApiUrl}/Previsao/Parada?codigoParada=${codigoParada}`,
-          { headers: this.getRequestHeaders() },
+          {
+            headers: this.getRequestHeaders(),
+            timeout: OlhoVivoApiService.REQUEST_TIMEOUT_MS,
+          },
         ),
       );
 
@@ -263,7 +241,10 @@ export class OlhoVivoApiService implements OnModuleInit {
         const response = await firstValueFrom(
           this.httpService.get<StopArrivalResponse>(
             `${this.sptransApiUrl}/Previsao/Parada?codigoParada=${codigoParada}`,
-            { headers: this.getRequestHeaders() },
+            {
+              headers: this.getRequestHeaders(),
+              timeout: OlhoVivoApiService.REQUEST_TIMEOUT_MS,
+            },
           ),
         );
 
@@ -276,8 +257,7 @@ export class OlhoVivoApiService implements OnModuleInit {
       }
 
       this.logger.error(
-        `Error fetching arrivals for stop ${codigoParada}:`,
-        error,
+        `Error fetching arrivals for stop ${codigoParada}: ${formatUpstreamFailure(error)}`,
       );
       throw error;
     }
@@ -294,7 +274,10 @@ export class OlhoVivoApiService implements OnModuleInit {
       const response = await firstValueFrom(
         this.httpService.get<LineArrivalResponse>(
           `${this.sptransApiUrl}/Previsao/Linha?codigoLinha=${codigoLinha}`,
-          { headers: this.getRequestHeaders() },
+          {
+            headers: this.getRequestHeaders(),
+            timeout: OlhoVivoApiService.REQUEST_TIMEOUT_MS,
+          },
         ),
       );
 
@@ -314,7 +297,10 @@ export class OlhoVivoApiService implements OnModuleInit {
         const response = await firstValueFrom(
           this.httpService.get<LineArrivalResponse>(
             `${this.sptransApiUrl}/Previsao/Linha?codigoLinha=${codigoLinha}`,
-            { headers: this.getRequestHeaders() },
+            {
+              headers: this.getRequestHeaders(),
+              timeout: OlhoVivoApiService.REQUEST_TIMEOUT_MS,
+            },
           ),
         );
 
@@ -327,8 +313,7 @@ export class OlhoVivoApiService implements OnModuleInit {
       }
 
       this.logger.error(
-        `Error fetching line arrivals for ${codigoLinha}:`,
-        error,
+        `Error fetching line arrivals for ${codigoLinha}: ${formatUpstreamFailure(error)}`,
       );
       throw error;
     }
@@ -347,7 +332,10 @@ export class OlhoVivoApiService implements OnModuleInit {
       const response = await firstValueFrom(
         this.httpService.get<StopArrivalResponse>(
           `${this.sptransApiUrl}/Previsao?codigoParada=${codigoParada}&codigoLinha=${codigoLinha}`,
-          { headers: this.getRequestHeaders() },
+          {
+            headers: this.getRequestHeaders(),
+            timeout: OlhoVivoApiService.REQUEST_TIMEOUT_MS,
+          },
         ),
       );
 
@@ -367,7 +355,10 @@ export class OlhoVivoApiService implements OnModuleInit {
         const response = await firstValueFrom(
           this.httpService.get<StopArrivalResponse>(
             `${this.sptransApiUrl}/Previsao?codigoParada=${codigoParada}&codigoLinha=${codigoLinha}`,
-            { headers: this.getRequestHeaders() },
+            {
+              headers: this.getRequestHeaders(),
+              timeout: OlhoVivoApiService.REQUEST_TIMEOUT_MS,
+            },
           ),
         );
 
@@ -380,8 +371,7 @@ export class OlhoVivoApiService implements OnModuleInit {
       }
 
       this.logger.error(
-        `Error fetching arrivals for stop ${codigoParada} and line ${codigoLinha}:`,
-        error,
+        `Error fetching arrivals for stop ${codigoParada} and line ${codigoLinha}: ${formatUpstreamFailure(error)}`,
       );
       throw error;
     }
@@ -403,7 +393,10 @@ export class OlhoVivoApiService implements OnModuleInit {
       const response = await firstValueFrom(
         this.httpService.get<LineSearchResult[]>(
           `${this.sptransApiUrl}/Linha/Buscar?termosBusca=${encodedTerm}`,
-          { headers: this.getRequestHeaders() },
+          {
+            headers: this.getRequestHeaders(),
+            timeout: OlhoVivoApiService.REQUEST_TIMEOUT_MS,
+          },
         ),
       );
 
@@ -443,7 +436,10 @@ export class OlhoVivoApiService implements OnModuleInit {
         const response = await firstValueFrom(
           this.httpService.get<LineSearchResult[]>(
             `${this.sptransApiUrl}/Linha/Buscar?termosBusca=${encodedTerm}`,
-            { headers: this.getRequestHeaders() },
+            {
+              headers: this.getRequestHeaders(),
+              timeout: OlhoVivoApiService.REQUEST_TIMEOUT_MS,
+            },
           ),
         );
 
@@ -455,7 +451,9 @@ export class OlhoVivoApiService implements OnModuleInit {
         return response.data;
       }
 
-      this.logger.error(`Error searching for line "${termosBusca}":`, error);
+      this.logger.error(
+        `Error searching for line "${termosBusca}": ${formatUpstreamFailure(error)}`,
+      );
       throw error;
     }
   }
@@ -556,4 +554,28 @@ export class OlhoVivoApiService implements OnModuleInit {
   getAuthenticationStatus(): boolean {
     return this.isAuthenticated;
   }
+}
+
+function getHttpStatus(error: unknown): number | undefined {
+  if (!error || typeof error !== 'object' || !('response' in error)) {
+    return undefined;
+  }
+
+  return (error as { response?: { status?: number } }).response?.status;
+}
+
+function formatUpstreamFailure(error: unknown): string {
+  const status = getHttpStatus(error);
+  if (status) {
+    return `HTTP ${status}`;
+  }
+
+  if (error && typeof error === 'object' && 'code' in error) {
+    const code = String(error.code);
+    if (/^[A-Za-z0-9._-]{1,40}$/.test(code)) {
+      return `request failed (${code})`;
+    }
+  }
+
+  return 'request failed';
 }

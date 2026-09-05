@@ -197,7 +197,10 @@ export class CsvProcessingService {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Failed to process ${fileName}:`, errorMessage);
-      throw new Error(`CSV processing failed for ${fileName}: ${errorMessage}`);
+      throw withCause(
+        `CSV processing failed for ${fileName}: ${errorMessage}`,
+        error,
+      );
     }
   }
 
@@ -249,7 +252,7 @@ export class CsvProcessingService {
           );
         }
 
-        if (recordCount === 0) {
+        if (recordCount === 0 && !GTFSConfig.isEmptyAllowedFile(fileName)) {
           this.logger.warn(`No records found in ${fileName}`);
           throw new Error(`${fileName} contains no usable records`);
         }
@@ -287,7 +290,7 @@ export class CsvProcessingService {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Failed to truncate table ${tableName}:`, errorMessage);
-      throw new Error(`Table truncate failed: ${errorMessage}`);
+      throw withCause(`Table truncate failed: ${errorMessage}`, error);
     }
   }
 
@@ -753,12 +756,23 @@ export class CsvProcessingService {
       }
       return count;
     } catch (error) {
-      this.logger.error(`Failed to count records in ${filePath}:`, error);
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(
+      this.logger.error(`Failed to count records in ${filePath}:`, errorMessage);
+      throw withCause(
         `CSV record count failed for ${filePath}: ${errorMessage}`,
+        error,
       );
     }
   }
+}
+
+function withCause(message: string, cause: unknown): Error {
+  const wrapped = new Error(message);
+  Object.defineProperty(wrapped, 'cause', {
+    configurable: true,
+    enumerable: false,
+    value: cause,
+  });
+  return wrapped;
 }

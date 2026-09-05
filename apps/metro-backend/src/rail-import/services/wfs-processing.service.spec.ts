@@ -1,5 +1,8 @@
 import { WFSConfig } from '../config/wfs.config';
-import { WFSProcessingService } from './wfs-processing.service';
+import {
+  canonicalWfsHash,
+  WFSProcessingService,
+} from './wfs-processing.service';
 
 describe('WFSProcessingService', () => {
   it('enforces a response byte limit while reading the body', async () => {
@@ -174,5 +177,44 @@ describe('WFSProcessingService', () => {
       ),
     ).rejects.toThrow('no usable features');
     expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it('keeps the WFS hash stable across equivalent feature/property ordering', () => {
+    const first = {
+      type: 'FeatureCollection' as const,
+      features: [
+        {
+          type: 'Feature' as const,
+          id: 'station-2',
+          geometry: { type: 'Point', coordinates: [-46.61, -23.51] },
+          properties: { name: 'B', primaryindex: '2' },
+        },
+        {
+          type: 'Feature' as const,
+          id: 'station-1',
+          geometry: { type: 'Point', coordinates: [-46.6, -23.5] },
+          properties: { name: 'A', primaryindex: '1' },
+        },
+      ],
+    };
+    const equivalent = {
+      type: 'FeatureCollection' as const,
+      features: [
+        {
+          properties: { primaryindex: '1', name: 'A' },
+          geometry: { coordinates: [-46.60000001, -23.50000001], type: 'Point' },
+          type: 'Feature' as const,
+          id: 'station-1',
+        },
+        {
+          properties: { primaryindex: '2', name: 'B' },
+          geometry: { coordinates: [-46.61, -23.51], type: 'Point' },
+          type: 'Feature' as const,
+          id: 'station-2',
+        },
+      ],
+    };
+
+    expect(canonicalWfsHash(first)).toBe(canonicalWfsHash(equivalent));
   });
 });

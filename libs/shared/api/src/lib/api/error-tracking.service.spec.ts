@@ -30,5 +30,27 @@ describe('ErrorTrackingService', () => {
     expect(event.context).not.toHaveProperty('latitude');
     expect(event.stack).not.toContain('secret-value');
     expect(event.stack).toContain('[REDACTED]');
+    service.ngOnDestroy();
+  });
+
+  it('removes the online listener when the service is destroyed', () => {
+    const addEventListener = jest.spyOn(window, 'addEventListener');
+    const removeEventListener = jest.spyOn(window, 'removeEventListener');
+    const service = new ErrorTrackingService();
+
+    service.initialize();
+    service.ngOnDestroy();
+
+    const onlineListener = addEventListener.mock.calls.find(
+      ([event]) => event === 'online',
+    )?.[1];
+    expect(onlineListener).toEqual(expect.any(Function));
+    expect(removeEventListener).toHaveBeenCalledWith(
+      'online',
+      onlineListener,
+    );
+
+    addEventListener.mockRestore();
+    removeEventListener.mockRestore();
   });
 });

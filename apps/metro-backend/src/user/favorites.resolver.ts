@@ -74,36 +74,38 @@ export class FavoritesResolver {
   ): Promise<MutationResponse> {
     const normalizedCode = normalizeFavoriteCode(code);
 
-    await this.prisma.$transaction(
-      async (tx) => {
-        await tx.user.upsert({
-          where: { id: userId },
-          update: {},
-          create: { id: userId },
-        });
-
-        const created = await tx.favorite.createMany({
-          data: [{ userId, type, code: normalizedCode }],
-          skipDuplicates: true,
-        });
-
-        const count = await tx.favorite.count({ where: { userId } });
-        if (count > MAX_FAVORITES_PER_USER) {
-          throw new BadRequestException(
-            `A user can have at most ${MAX_FAVORITES_PER_USER} favorites`,
-          );
-        }
-
-        if (created.count > 0) {
-          await tx.user.update({
+    await this.withSerializableRetry(() =>
+      this.prisma.$transaction(
+        async (tx) => {
+          await tx.user.upsert({
             where: { id: userId },
-            data: { favoritesRevision: { increment: 1 } },
+            update: {},
+            create: { id: userId },
           });
-        }
-      },
-      {
-        isolationLevel: 'Serializable',
-      },
+
+          const created = await tx.favorite.createMany({
+            data: [{ userId, type, code: normalizedCode }],
+            skipDuplicates: true,
+          });
+
+          const count = await tx.favorite.count({ where: { userId } });
+          if (count > MAX_FAVORITES_PER_USER) {
+            throw new BadRequestException(
+              `A user can have at most ${MAX_FAVORITES_PER_USER} favorites`,
+            );
+          }
+
+          if (created.count > 0) {
+            await tx.user.update({
+              where: { id: userId },
+              data: { favoritesRevision: { increment: 1 } },
+            });
+          }
+        },
+        {
+          isolationLevel: 'Serializable',
+        },
+      ),
     );
 
     return { success: true, message: 'Added to favorites' };
@@ -251,6 +253,30 @@ export class FavoritesResolver {
     });
   }
 
+  private async withSerializableRetry<T>(
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    const maximumAttempts = 3;
+    for (let attempt = 1; attempt <= maximumAttempts; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        if (
+          !isRetryableTransactionConflict(error) ||
+          attempt === maximumAttempts
+        ) {
+          throw error;
+        }
+
+        const delayMs =
+          10 * 2 ** (attempt - 1) + Math.floor(Math.random() * 10);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+
+    throw new Error('Serializable transaction retry limit reached');
+  }
+
   private toFavoriteList(
     records: Array<{ type: string; code: string }>,
   ): FavoriteList {
@@ -263,4 +289,13 @@ export class FavoritesResolver {
     });
     return favorites;
   }
+}
+
+function isRetryableTransactionConflict(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 'P2034'
+  );
 }

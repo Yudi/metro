@@ -13,12 +13,14 @@ describe('DataImportHooksService', () => {
     const gtfsDatabase = {
       analyzeImportedTables: jest.fn().mockResolvedValue(undefined),
     };
+    const routeStopMapping = { clearCaches: jest.fn() };
     const service = new DataImportHooksService(
       search as never,
       subwayStationProcessor as never,
       vectorTiles as never,
       precompute as never,
       gtfsDatabase as never,
+      routeStopMapping as never,
     );
 
     await service.onDataImportComplete();
@@ -28,6 +30,7 @@ describe('DataImportHooksService', () => {
     expect(vectorTiles.clearCache).toHaveBeenCalledTimes(1);
     expect(search.indexAllData).toHaveBeenCalledTimes(1);
     expect(gtfsDatabase.analyzeImportedTables).toHaveBeenCalledTimes(1);
+    expect(routeStopMapping.clearCaches).toHaveBeenCalledTimes(1);
     expect(
       gtfsDatabase.analyzeImportedTables.mock.invocationCallOrder[0],
     ).toBeLessThan(subwayStationProcessor.refreshMergedStations.mock.invocationCallOrder[0]);
@@ -47,12 +50,14 @@ describe('DataImportHooksService', () => {
     const gtfsDatabase = {
       analyzeImportedTables: jest.fn().mockResolvedValue(undefined),
     };
+    const routeStopMapping = { clearCaches: jest.fn() };
     const service = new DataImportHooksService(
       { indexAllData: search.indexAllData } as never,
       { refreshMergedStations: jest.fn() } as never,
       vectorTiles as never,
       precompute as never,
       gtfsDatabase as never,
+      routeStopMapping as never,
     );
 
     await expect(service.onDataImportComplete()).rejects.toThrow(
@@ -73,12 +78,14 @@ describe('DataImportHooksService', () => {
     const vectorTiles = { clearCache: jest.fn() };
     const search = { indexAllData: jest.fn() };
     const gtfsDatabase = { analyzeImportedTables: jest.fn() };
+    const routeStopMapping = { clearCaches: jest.fn() };
     const service = new DataImportHooksService(
       search as never,
       subwayStationProcessor as never,
       vectorTiles as never,
       precompute as never,
       gtfsDatabase as never,
+      routeStopMapping as never,
     );
 
     await service.onDataImportComplete({
@@ -93,6 +100,7 @@ describe('DataImportHooksService', () => {
     expect(gtfsDatabase.analyzeImportedTables).not.toHaveBeenCalled();
     expect(subwayStationProcessor.refreshMergedStations).not.toHaveBeenCalled();
     expect(search.indexAllData).not.toHaveBeenCalled();
+    expect(routeStopMapping.clearCaches).not.toHaveBeenCalled();
   });
 
   it('retries the hook chain after a partial post-processing failure', async () => {
@@ -117,12 +125,14 @@ describe('DataImportHooksService', () => {
     const gtfsDatabase = {
       analyzeImportedTables: jest.fn().mockResolvedValue(undefined),
     };
+    const routeStopMapping = { clearCaches: jest.fn() };
     const service = new DataImportHooksService(
       search as never,
       subwayStationProcessor as never,
       vectorTiles as never,
       precompute as never,
       gtfsDatabase as never,
+      routeStopMapping as never,
     );
 
     await expect(

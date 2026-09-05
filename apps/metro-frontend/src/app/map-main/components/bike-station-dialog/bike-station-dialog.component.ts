@@ -88,6 +88,7 @@ export class BikeStationDialogComponent {
   );
 
   readonly detailsLoaded = computed(() => this.station().detailsLoaded);
+  readonly detailsError = computed(() => this.station().detailsError ?? false);
 
   updateStation(station: BikeStation): void {
     this.stationSignal.set(station);

@@ -64,7 +64,7 @@ export class GeographyResolver {
   async busStop(
     @Args('id', { type: () => ID }) id: string,
   ): Promise<BusStop | null> {
-    return this.geographyService.getBusStop(id);
+    return this.geographyService.getBusStop(validateIdentifier(id, 'id'));
   }
 
   @Query(() => [BusStop])
@@ -124,7 +124,7 @@ export class GeographyResolver {
   async busRoute(
     @Args('id', { type: () => ID }) id: string,
   ): Promise<BusRoute | null> {
-    return this.geographyService.getBusRoute(id);
+    return this.geographyService.getBusRoute(validateIdentifier(id, 'id'));
   }
 
   @Query(() => [BusRoute])
@@ -158,7 +158,9 @@ export class GeographyResolver {
   async busShape(
     @Args('shapeId', { type: () => String }) shapeId: string,
   ): Promise<BusShape | null> {
-    return this.geographyService.getBusShape(shapeId);
+    return this.geographyService.getBusShape(
+      validateIdentifier(shapeId, 'shapeId'),
+    );
   }
 
   @Query(() => [BusShape])
@@ -178,7 +180,9 @@ export class GeographyResolver {
   async tripsForRoute(
     @Args('routeId', { type: () => String }) routeId: string,
   ): Promise<Trip[]> {
-    return this.geographyService.getTripsForRoute(routeId);
+    return this.geographyService.getTripsForRoute(
+      validateIdentifier(routeId, 'routeId'),
+    );
   }
 
   // Stops along a route
@@ -186,7 +190,9 @@ export class GeographyResolver {
   async stopsForRoute(
     @Args('routeId', { type: () => String }) routeId: string,
   ): Promise<BusStop[]> {
-    return this.geographyService.getStopsForRoute(routeId);
+    return this.geographyService.getStopsForRoute(
+      validateIdentifier(routeId, 'routeId'),
+    );
   }
 
   // Routes through a stop
@@ -194,7 +200,9 @@ export class GeographyResolver {
   async routesForStop(
     @Args('stopId', { type: () => String }) stopId: string,
   ): Promise<BusRoute[]> {
-    return this.geographyService.getRoutesForStop(stopId);
+    return this.geographyService.getRoutesForStop(
+      validateIdentifier(stopId, 'stopId'),
+    );
   }
 
   // Batch routes for multiple stops
@@ -245,7 +253,9 @@ export class GeographyResolver {
     @Args('stopId', { type: () => String }) stopId: string,
   ): Promise<MergedSubwayStation | null> {
     const station =
-      await this.subwayStationProcessor.getStationByStopId(stopId);
+      await this.subwayStationProcessor.getStationByStopId(
+        validateIdentifier(stopId, 'stopId'),
+      );
     if (!station) return null;
 
     return {
@@ -272,11 +282,13 @@ export class GeographyResolver {
     @Info() info?: GraphQLResolveInfo,
   ): Promise<RouteFullData | null> {
     if (!info) {
-      return this.geographyService.getRouteFullData(routeId);
+      return this.geographyService.getRouteFullData(
+        validateIdentifier(routeId, 'routeId'),
+      );
     }
 
     return this.geographyService.getRouteFullData(
-      routeId,
+      validateIdentifier(routeId, 'routeId'),
       requestedRouteFullDataOptions(info),
     );
   }
@@ -291,7 +303,7 @@ export class GeographyResolver {
     @Info() info: GraphQLResolveInfo,
   ): Promise<StopFullData | null> {
     return this.geographyService.getStopFullData(
-      stopId,
+      validateIdentifier(stopId, 'stopId'),
       requestsRouteDetails(info),
     );
   }
@@ -305,7 +317,7 @@ export class GeographyResolver {
     @Args('routeIds', { type: () => [String] }) routeIds: string[],
   ): Promise<RouteRailConnection[]> {
     return this.geographyService.getRouteRailConnectionsForStop(
-      stopId,
+      validateIdentifier(stopId, 'stopId'),
       validateIdentifiers(routeIds, 'routeIds'),
     );
   }
@@ -343,7 +355,7 @@ export class GeographyResolver {
   })
   async searchRailStations(
     @Args('searchTerm', { type: () => String }) searchTerm: string,
-    @Args('limit', { type: () => Number, nullable: true, defaultValue: 20 })
+    @Args('limit', { type: () => Int, nullable: true, defaultValue: 20 })
     limit?: number,
   ): Promise<RailStation[]> {
     return this.railStationService.searchRailStations(searchTerm, limit);
@@ -374,7 +386,7 @@ export class GeographyResolver {
     description: 'Get a merged rail station by any of its IDs',
   })
   async mergedRailStation(
-    @Args('id', { type: () => Number }) id: number,
+    @Args('id', { type: () => Int }) id: number,
   ): Promise<MergedRailStation | null> {
     const station = await this.railStationProcessor.getStationById(id);
     if (!station) return null;
@@ -465,6 +477,22 @@ function validateIdentifiers(values: string[], argumentName: string): string[] {
   }
 
   return Array.from(new Set(identifiers));
+}
+
+function validateIdentifier(value: string, argumentName: string): string {
+  const identifier = value.trim();
+  if (
+    identifier.length === 0 ||
+    identifier.length > MAX_IDENTIFIER_LENGTH ||
+    Array.from(identifier).some((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint <= 0x1f || codePoint === 0x7f;
+    })
+  ) {
+    throw new BadRequestException(`${argumentName} contains an invalid identifier`);
+  }
+
+  return identifier;
 }
 
 function findFieldSelectionSets(

@@ -82,9 +82,11 @@ services:
     environment:
       NODE_ENV: production
       RAIL_INTEGRATION_GRPC_URL: ${RAIL_INTEGRATION_GRPC_URL:-metro-core-private-grpc:50051}
-      TYPESENSE_HOST: ${TYPESENSE_INTERNAL_HOST:-typesense}
-      TYPESENSE_PORT: ${TYPESENSE_INTERNAL_PORT:-8108}
-      TYPESENSE_PROTOCOL: ${TYPESENSE_INTERNAL_PROTOCOL:-http}
+      # Typesense is an external deployment dependency; keep its host
+      # contract aligned with docker/.env rather than silently ignoring it.
+      TYPESENSE_HOST: ${TYPESENSE_HOST:-typesense}
+      TYPESENSE_PORT: ${TYPESENSE_PORT:-8108}
+      TYPESENSE_PROTOCOL: ${TYPESENSE_PROTOCOL:-http}
     labels:
       - "traefik.enable=true"
       - "traefik.scope=public"
@@ -138,7 +140,7 @@ services:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
       backend-migrate:
         condition: service_completed_successfully
       metro-core-private-migrate:
@@ -204,6 +206,12 @@ services:
     logging: *default-logging
     restart: unless-stopped
     command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
 
   db:
     image: postgis/postgis:17-3.5

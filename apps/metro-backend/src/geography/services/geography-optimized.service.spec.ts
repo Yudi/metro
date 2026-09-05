@@ -93,6 +93,34 @@ describe('GeographyServiceOptimized route full data', () => {
     expect(tripService.getStopsForRoute).not.toHaveBeenCalled();
   });
 
+  it('returns shapes when the route-full-data caller requests them', async () => {
+    const { service } = createRouteDataService();
+    const busRouteService = (
+      service as never as {
+        busRouteService: { getRouteShapesForRoute: jest.Mock };
+      }
+    ).busRouteService;
+    busRouteService.getRouteShapesForRoute.mockResolvedValue([
+      { shape_id: 'shape-1', coordinates: [[-46.6, -23.5]] },
+    ]);
+
+    await expect(
+      service.getRouteFullData('route-1', {
+        includeTrips: false,
+        includeShapes: true,
+        includeStops: false,
+      }),
+    ).resolves.toMatchObject({
+      shapes: [
+        {
+          id: 'shape-1',
+          shapeId: 'shape-1',
+          geometry: { type: 'LineString', coordinates: [[-46.6, -23.5]] },
+        },
+      ],
+    });
+  });
+
   it('keeps full-data loading for callers without options', async () => {
     const { service } = createRouteDataService();
     const getTripsForRoute = jest.spyOn(service, 'getTripsForRoute');
@@ -185,6 +213,24 @@ describe('GeographyServiceOptimized precomputed rail connections', () => {
       service.getRouteRailConnectionsForStop('stop-1', ['775A-10']),
     ).resolves.toEqual([]);
   });
+
+  it('rejects route-rail connection requests that exceed the service cap', async () => {
+    const service = new GeographyServiceOptimized(
+      { $queryRaw: jest.fn() } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(
+      service.getRouteRailConnectionsForStop(
+        'stop-1',
+        Array.from({ length: 101 }, (_, index) => `route-${index}`),
+      ),
+    ).rejects.toMatchObject({ status: 413 });
+  });
 });
 
 function createService(routeCount: number): GeographyServiceOptimized {
@@ -240,6 +286,7 @@ function createRouteDataService(): {
       color: '',
       textColor: '',
     }),
+    getRouteShapesForRoute: jest.fn().mockResolvedValue([]),
   };
 
   return {

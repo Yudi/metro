@@ -20,6 +20,7 @@ export class RealtimePollingService implements OnModuleDestroy {
   private readonly POLL_INTERVAL = OLHOVIVO_POLL_INTERVAL_MS;
   private readonly MAX_ACTIVE_ROUTES = 200;
   private readonly MAX_ACTIVE_STOPS = 500;
+  private readonly STOP_POLL_CONCURRENCY = 8;
   private readonly pollingCoordinator = new PollingCoordinator(
     this.logger,
     () => this.poll(),
@@ -50,8 +51,8 @@ export class RealtimePollingService implements OnModuleDestroy {
     private vehicleDirection: VehicleDirectionBackendService,
   ) {}
 
-  onModuleDestroy(): void {
-    this.pollingCoordinator.stopPolling();
+  async onModuleDestroy(): Promise<void> {
+    await this.pollingCoordinator.stopAndDrain();
     this.routeSubscriptionCounts.clear();
     this.stopSubscriptionCounts.clear();
     this.subscriptions.routeShortNames.clear();
@@ -260,6 +261,7 @@ export class RealtimePollingService implements OnModuleDestroy {
       const allData = await this.olhoVivoApi.getAllPositions();
       this.logger.debug(`Received ${allData.l?.length ?? 0} lines from API`);
       const subscribedRoutes = new Set(this.subscriptions.routeShortNames);
+      const activeVehicleIds = new Set<number>();
       for (const routeShortName of subscribedRoutes) {
         this.clearRouteCache(routeShortName);
       }
@@ -276,6 +278,9 @@ export class RealtimePollingService implements OnModuleDestroy {
           l: [line],
         };
         this.vehicleDirection.addHeadingsToPositionResponse(combinedData);
+        for (const vehicle of line.vs ?? []) {
+          activeVehicleIds.add(vehicle.p);
+        }
 
         // Cache key includes both route code and direction to keep them separate
         const cacheKey = `${line.c}-dir${line.sl}`;
@@ -293,6 +298,7 @@ export class RealtimePollingService implements OnModuleDestroy {
           directions.add(cacheKey);
         }
       }
+      this.vehicleDirection.cleanupStaleVehicles(activeVehicleIds);
       this.logger.debug(
         `Polling complete: Updated ${this.routeToDirectionsIndex.size} subscribed routes with vehicle data`,
       );
@@ -305,35 +311,48 @@ export class RealtimePollingService implements OnModuleDestroy {
    * Poll arrival predictions for all subscribed stops
    */
   private async pollStopArrivals(timestamp: number): Promise<void> {
-    for (const stopCode of this.subscriptions.stopCodes) {
-      try {
-        const apiCode = await this.mapping.getApiStopCode(stopCode);
+    const stopCodes = Array.from(this.subscriptions.stopCodes);
+    for (
+      let offset = 0;
+      offset < stopCodes.length;
+      offset += this.STOP_POLL_CONCURRENCY
+    ) {
+      const batch = stopCodes.slice(
+        offset,
+        offset + this.STOP_POLL_CONCURRENCY,
+      );
+      await Promise.all(
+        batch.map(async (stopCode) => {
+          try {
+            const apiCode = await this.mapping.getApiStopCode(stopCode);
 
-        if (apiCode === null) {
-          this.logger.debug(
-            `Skipping stop ${stopCode} - not supported for real-time`,
-          );
-          continue;
-        }
+            if (apiCode === null) {
+              this.logger.debug(
+                `Skipping stop ${stopCode} - not supported for real-time`,
+              );
+              return;
+            }
 
-        const data = await this.olhoVivoApi.getStopArrivals(apiCode);
+            const data = await this.olhoVivoApi.getStopArrivals(apiCode);
 
-        this.arrivalPredictionsCache.set(stopCode, {
-          data,
-          timestamp,
-        });
+            this.arrivalPredictionsCache.set(stopCode, {
+              data,
+              timestamp,
+            });
 
-        this.logger.debug(
-          `Updated arrival predictions for stop ${stopCode} (${
-            data.p?.l?.length ?? 0
-          } lines)`,
-        );
-      } catch (error) {
-        this.logger.error(
-          `Error polling arrivals for stop ${stopCode}:`,
-          error,
-        );
-      }
+            this.logger.debug(
+              `Updated arrival predictions for stop ${stopCode} (${
+                data.p?.l?.length ?? 0
+              } lines)`,
+            );
+          } catch (error) {
+            this.logger.error(
+              `Error polling arrivals for stop ${stopCode}:`,
+              error,
+            );
+          }
+        }),
+      );
     }
   }
 

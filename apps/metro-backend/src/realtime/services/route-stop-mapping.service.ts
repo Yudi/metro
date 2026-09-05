@@ -9,6 +9,7 @@ import { OlhoVivoApiService } from './olhovivo-api.service';
 @Injectable()
 export class RouteStopMappingService {
   private readonly logger = new Logger(RouteStopMappingService.name);
+  private static readonly CACHE_TTL_MS = 60 * 60 * 1000;
 
   // Cache for route short name -> SPTrans API line codes mapping (array for both directions)
   private routeCodeCache = new Map<string, number[] | null>();
@@ -17,6 +18,7 @@ export class RouteStopMappingService {
   private stopCodeCache = new Map<string, number | null>();
   private routeValidationCache = new Map<string, boolean>();
   private stopValidationCache = new Map<string, boolean>();
+  private cachesExpireAt = Date.now() + RouteStopMappingService.CACHE_TTL_MS;
 
   constructor(
     private prisma: PrismaService,
@@ -31,6 +33,7 @@ export class RouteStopMappingService {
    * @returns Array of SPTrans API line codes (one per direction) or null if route doesn't support real-time
    */
   async getApiLineCodes(routeShortName: string): Promise<number[] | null> {
+    this.expireCachesIfNeeded();
     // Check cache first
     if (this.routeCodeCache.has(routeShortName)) {
       return this.routeCodeCache.get(routeShortName) ?? null;
@@ -100,6 +103,7 @@ export class RouteStopMappingService {
   }
 
   async isKnownRealtimeRoute(routeShortName: string): Promise<boolean> {
+    this.expireCachesIfNeeded();
     if (!this.isSafeRouteShortName(routeShortName)) {
       return false;
     }
@@ -137,6 +141,7 @@ export class RouteStopMappingService {
    * @returns SPTrans API stop code or null if not found
    */
   async getApiStopCode(stopId: string): Promise<number | null> {
+    this.expireCachesIfNeeded();
     // Check cache first
     if (this.stopCodeCache.has(stopId)) {
       return this.stopCodeCache.get(stopId) ?? null;
@@ -177,25 +182,15 @@ export class RouteStopMappingService {
         return null;
       }
 
-      // Try to parse the stop_id as a number (many SPTrans stops use numeric IDs)
-      let apiStopCode: number;
-
-      // If stop_id is already numeric, use it
-      const numericStopId = parseInt(stopId, 10);
-      if (!isNaN(numericStopId)) {
-        apiStopCode = numericStopId;
-      } else {
-        // Try extracting numbers from stop_id (e.g., "STOP_123" -> 123)
-        const numericPart = stopId.match(/\d+/);
-        if (numericPart) {
-          apiStopCode = parseInt(numericPart[0], 10);
-        } else {
-          this.logger.warn(
-            `Cannot map non-numeric stop ID ${stopId} to API code`,
-          );
-          this.stopCodeCache.set(stopId, null);
-          return null;
-        }
+      if (!/^\d+$/.test(stopId)) {
+        this.logger.warn(`Cannot map non-numeric stop ID ${stopId} to API code`);
+        this.stopCodeCache.set(stopId, null);
+        return null;
+      }
+      const apiStopCode = Number(stopId);
+      if (!Number.isSafeInteger(apiStopCode)) {
+        this.stopCodeCache.set(stopId, null);
+        return null;
       }
 
       this.logger.debug(`Mapped stop ${stopId} to API code ${apiStopCode}`);
@@ -208,6 +203,7 @@ export class RouteStopMappingService {
   }
 
   async isKnownRealtimeStop(stopId: string): Promise<boolean> {
+    this.expireCachesIfNeeded();
     if (!this.isSafeStopCode(stopId)) {
       return false;
     }
@@ -230,6 +226,13 @@ export class RouteStopMappingService {
     this.stopCodeCache.clear();
     this.routeValidationCache.clear();
     this.stopValidationCache.clear();
+    this.cachesExpireAt = Date.now() + RouteStopMappingService.CACHE_TTL_MS;
+  }
+
+  private expireCachesIfNeeded(): void {
+    if (Date.now() >= this.cachesExpireAt) {
+      this.clearCaches();
+    }
   }
 
   private isSafeRouteShortName(routeShortName: string): boolean {

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { QueryOptimizationService } from './query-optimization.service';
 import { BusStop } from '../entities/geography.entity';
@@ -27,17 +27,21 @@ export class BusStopServiceOptimized {
   ) {}
 
   async searchBusStops(input?: StopSearchInput): Promise<BusStop[]> {
-    const limit = this.normalizeLimit(input?.limit);
+    const searchTerm = normalizeSearchTerm(input?.searchTerm ?? undefined);
+    const normalizedInput = input?.searchTerm === undefined
+      ? input
+      : { ...input, searchTerm };
+    const limit = this.normalizeLimit(normalizedInput?.limit);
     let stops;
 
-    if (input?.searchTerm) {
-      stops = await this.searchStopsByTerm(input.searchTerm, limit);
-    } else if (input?.bounds) {
+    if (searchTerm) {
+      stops = await this.searchStopsByTerm(searchTerm, limit);
+    } else if (normalizedInput?.bounds) {
       stops = await this.findStopsInBounds(
-        input.bounds.minLat,
-        input.bounds.maxLat,
-        input.bounds.minLng,
-        input.bounds.maxLng,
+        normalizedInput.bounds.minLat,
+        normalizedInput.bounds.maxLat,
+        normalizedInput.bounds.minLng,
+        normalizedInput.bounds.maxLng,
         limit,
       );
     } else {
@@ -144,6 +148,7 @@ export class BusStopServiceOptimized {
   }
 
   private async searchStopsByTerm(searchTerm: string, limit = 50) {
+    const escapedSearchTerm = escapeLikePattern(searchTerm);
     return this.prisma.$queryRaw<
       Array<{
         id: number;
@@ -156,12 +161,12 @@ export class BusStopServiceOptimized {
     >`
       SELECT id, stop_id, stop_name, stop_desc, stop_lat, stop_lon
       FROM "SPTrans_Stop"
-      WHERE stop_name ILIKE ${`%${searchTerm}%`}
-      OR stop_id ILIKE ${`%${searchTerm}%`}
+      WHERE stop_name ILIKE ${`%${escapedSearchTerm}%`} ESCAPE '\\'
+      OR stop_id ILIKE ${`%${escapedSearchTerm}%`} ESCAPE '\\'
       ORDER BY 
         CASE 
-          WHEN stop_name ILIKE ${`${searchTerm}%`} THEN 1
-          WHEN stop_name ILIKE ${`%${searchTerm}%`} THEN 2
+          WHEN stop_name ILIKE ${`${escapedSearchTerm}%`} ESCAPE '\\' THEN 1
+          WHEN stop_name ILIKE ${`%${escapedSearchTerm}%`} ESCAPE '\\' THEN 2
           ELSE 3
         END,
         stop_name
@@ -176,4 +181,32 @@ export class BusStopServiceOptimized {
 
     return Math.min(Math.max(Math.trunc(limit), 1), 25_000);
   }
+}
+
+const MAX_SEARCH_TERM_LENGTH = 160;
+
+function normalizeSearchTerm(value: string | undefined): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const searchTerm = value.trim();
+  if (
+    searchTerm.length === 0 ||
+    searchTerm.length > MAX_SEARCH_TERM_LENGTH ||
+    Array.from(searchTerm).some((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint <= 0x1f || codePoint === 0x7f;
+    })
+  ) {
+    throw new BadRequestException(
+      'searchTerm must be a non-empty value of at most 160 characters',
+    );
+  }
+
+  return searchTerm;
+}
+
+function escapeLikePattern(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/[%_]/g, '\\$&');
 }

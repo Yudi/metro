@@ -184,7 +184,10 @@ export class RouteFullData {
   @Field(() => BusRoute, { description: 'The route information' })
   route!: BusRoute;
 
-  @Field(() => [Trip], { description: 'All trips for this route' })
+  @Field(() => [Trip], {
+    description:
+      'Representative trip for each direction, headsign, and shape pattern on this route',
+  })
   trips!: Trip[];
 
   @Field(() => [BusShape], { description: 'All shapes for this route' })

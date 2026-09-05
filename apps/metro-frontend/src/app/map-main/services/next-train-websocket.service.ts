@@ -80,6 +80,7 @@ export interface StationTrainData {
  * Subscription key format
  */
 type SubscriptionKey = `${string}:${string}`;
+export type NextTrainSubscriptionRelease = () => void;
 
 const NEXT_TRAIN_SUBSCRIBE_EVENT = 'subscribe_station';
 const NEXT_TRAIN_UNSUBSCRIBE_EVENT = 'unsubscribe_station';
@@ -125,11 +126,19 @@ export class NextTrainWebsocketService implements OnDestroy {
     Map<CptmLineCode, TrackedRailVehicle[]>
   >(new Map());
 
-  // Track active subscriptions for reconnection
-  private readonly activeSubscriptions = new Set<SubscriptionKey>();
+  // Track owners rather than only keys. Multiple cards can render the same
+  // station (for example in different dialogs) and must share one upstream
+  // subscription without being able to release one another's owner.
+  private readonly activeSubscriptions = new Map<SubscriptionKey, number>();
 
   // Track CPTM vehicle subscriptions
-  private readonly cptmVehicleSubscriptions = new Set<CptmLineCode>();
+  private readonly cptmVehicleSubscriptions = new Map<CptmLineCode, number>();
+
+  private readonly latestStationUpdateTimestamps = new Map<
+    SubscriptionKey,
+    number
+  >();
+  private readonly latestVehicleUpdateTimestamps = new Map<CptmLineCode, number>();
 
   constructor() {
     // Don't auto-connect, let components trigger connection on demand
@@ -143,24 +152,32 @@ export class NextTrainWebsocketService implements OnDestroy {
    * Subscribe to next train updates for a station
    * Automatically connects if not already connected
    */
-  subscribe(lineCode: ExtendedNextTrainLineCode, stationCode: string): void {
+  subscribe(
+    lineCode: ExtendedNextTrainLineCode,
+    stationCode: string,
+  ): NextTrainSubscriptionRelease {
     if (!hasNextTrainIntegration(lineCode)) {
       this.logger.warn(`No next-train integration for line: ${lineCode}`);
-      return;
+      return () => undefined;
     }
 
     const key: SubscriptionKey = `${lineCode}:${stationCode}`;
-
-    if (this.activeSubscriptions.has(key)) {
-      return; // Already subscribed
-    }
-
-    this.activeSubscriptions.add(key);
+    const owners = this.activeSubscriptions.get(key) ?? 0;
+    this.activeSubscriptions.set(key, owners + 1);
     this.ensureConnected();
 
-    if (this.socket?.connected) {
+    if (owners === 0 && this.socket?.connected) {
       this.socket.emit(NEXT_TRAIN_SUBSCRIBE_EVENT, { lineCode, stationCode });
     }
+
+    let released = false;
+    return () => {
+      if (released) {
+        return;
+      }
+      released = true;
+      this.unsubscribe(lineCode, stationCode);
+    };
   }
 
   /**
@@ -168,6 +185,16 @@ export class NextTrainWebsocketService implements OnDestroy {
    */
   unsubscribe(lineCode: ExtendedNextTrainLineCode, stationCode: string): void {
     const key: SubscriptionKey = `${lineCode}:${stationCode}`;
+
+    const owners = this.activeSubscriptions.get(key);
+    if (!owners) {
+      return;
+    }
+
+    if (owners > 1) {
+      this.activeSubscriptions.set(key, owners - 1);
+      return;
+    }
 
     this.activeSubscriptions.delete(key);
 
@@ -181,6 +208,7 @@ export class NextTrainWebsocketService implements OnDestroy {
       newMap.delete(key);
       return newMap;
     });
+    this.latestStationUpdateTimestamps.delete(key);
 
     // Disconnect if no more subscriptions (including vehicle subscriptions)
     if (
@@ -216,29 +244,41 @@ export class NextTrainWebsocketService implements OnDestroy {
   /**
    * Subscribe to vehicle positions for private-tracked lines (L4, L10-L13)
    */
-  subscribeToCptmVehicles(lineCode: CptmLineCode): void {
+  subscribeToCptmVehicles(lineCode: CptmLineCode): NextTrainSubscriptionRelease {
     if (!hasExternalRailVehicles(lineCode)) {
       this.logger.warn(`Invalid line code for private vehicles: ${lineCode}`);
-      return;
+      return () => undefined;
     }
 
-    if (this.cptmVehicleSubscriptions.has(lineCode)) {
-      return; // Already subscribed
-    }
-
-    this.cptmVehicleSubscriptions.add(lineCode);
+    const owners = this.cptmVehicleSubscriptions.get(lineCode) ?? 0;
+    this.cptmVehicleSubscriptions.set(lineCode, owners + 1);
     this.ensureConnected();
 
-    if (this.socket?.connected) {
+    if (owners === 0 && this.socket?.connected) {
       this.socket.emit(CPTM_VEHICLE_SUBSCRIBE_EVENT, { lineCode });
     }
+
+    let released = false;
+    return () => {
+      if (released) {
+        return;
+      }
+      released = true;
+      this.unsubscribeFromCptmVehicles(lineCode);
+    };
   }
 
   /**
    * Unsubscribe from CPTM vehicle positions for a line
    */
   unsubscribeFromCptmVehicles(lineCode: CptmLineCode): void {
-    if (!this.cptmVehicleSubscriptions.has(lineCode)) {
+    const owners = this.cptmVehicleSubscriptions.get(lineCode);
+    if (!owners) {
+      return;
+    }
+
+    if (owners > 1) {
+      this.cptmVehicleSubscriptions.set(lineCode, owners - 1);
       return;
     }
 
@@ -254,6 +294,7 @@ export class NextTrainWebsocketService implements OnDestroy {
       newMap.delete(lineCode);
       return newMap;
     });
+    this.latestVehicleUpdateTimestamps.delete(lineCode);
 
     // Disconnect if no more subscriptions
     if (
@@ -345,7 +386,7 @@ export class NextTrainWebsocketService implements OnDestroy {
   }
 
   private resubscribeAll(): void {
-    for (const key of this.activeSubscriptions) {
+    for (const key of this.activeSubscriptions.keys()) {
       const [lineCode, stationCode] = key.split(':') as [
         ExtendedNextTrainLineCode,
         string,
@@ -354,13 +395,22 @@ export class NextTrainWebsocketService implements OnDestroy {
     }
 
     // Re-subscribe to CPTM vehicle updates
-    for (const lineCode of this.cptmVehicleSubscriptions) {
+    for (const lineCode of this.cptmVehicleSubscriptions.keys()) {
       this.socket?.emit(CPTM_VEHICLE_SUBSCRIBE_EVENT, { lineCode });
     }
   }
 
   private handleUpdate(update: NextTrainUpdate): void {
     const key: SubscriptionKey = `${update.lineCode}:${update.stationCode}`;
+    const latestTimestamp = this.latestStationUpdateTimestamps.get(key);
+    if (
+      latestTimestamp !== undefined &&
+      Number.isFinite(update.timestamp) &&
+      update.timestamp < latestTimestamp
+    ) {
+      this.logger.debug(`Ignoring stale next-train update for ${key}`);
+      return;
+    }
 
     this._stationData.update((map) => {
       const newMap = new Map(map);
@@ -376,7 +426,11 @@ export class NextTrainWebsocketService implements OnDestroy {
       return newMap;
     });
 
-    this.lastUpdate.set(update.timestamp);
+    if (!update.processing && Number.isFinite(update.timestamp)) {
+      this.latestStationUpdateTimestamps.set(key, update.timestamp);
+    }
+
+    this.updateLastUpdateTimestamp(update.timestamp);
 
     this.logger.debug(
       `Received ${update.type} update for ${key}: ${
@@ -388,16 +442,40 @@ export class NextTrainWebsocketService implements OnDestroy {
   }
 
   private handleCptmVehicleUpdate(update: CptmVehicleUpdate): void {
+    const latestTimestamp = this.latestVehicleUpdateTimestamps.get(
+      update.lineCode,
+    );
+    if (
+      latestTimestamp !== undefined &&
+      Number.isFinite(update.timestamp) &&
+      update.timestamp < latestTimestamp
+    ) {
+      this.logger.debug(
+        `Ignoring stale CPTM vehicle update for ${update.lineCode}`,
+      );
+      return;
+    }
+
     this._cptmVehicles.update((map) => {
       const newMap = new Map(map);
       newMap.set(update.lineCode, update.vehicles);
       return newMap;
     });
 
-    this.lastUpdate.set(update.timestamp);
+    if (Number.isFinite(update.timestamp)) {
+      this.latestVehicleUpdateTimestamps.set(update.lineCode, update.timestamp);
+    }
+
+    this.updateLastUpdateTimestamp(update.timestamp);
 
     this.logger.debug(
       `Received ${update.type} CPTM vehicle update for ${update.lineCode}: ${update.vehicles.length} vehicle(s)`,
     );
+  }
+
+  private updateLastUpdateTimestamp(timestamp: number): void {
+    const current = this.lastUpdate();
+    const next = Number.isFinite(timestamp) ? timestamp : Date.now();
+    this.lastUpdate.set(current === null ? next : Math.max(current, next));
   }
 }

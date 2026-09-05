@@ -1,5 +1,7 @@
 import { RailImportService } from './rail-import.service';
-import { WFSConfig } from './config/wfs.config';
+import { WFSConfig, WFSSourceConfig } from './config/wfs.config';
+import { WFSDatabaseService } from './services/wfs-database.service';
+import { WFSDatasetMetadata, WFSSourceType } from './types/wfs.types';
 
 describe('RailImportService', () => {
   let service: RailImportService;
@@ -12,6 +14,7 @@ describe('RailImportService', () => {
   let wfsDatabaseService: {
     isCurrentHash: jest.Mock;
     createOrUpdateDataset: jest.Mock;
+    invalidateDataset: jest.Mock;
     clearAllRailData: jest.Mock;
     getAllDatasets: jest.Mock;
   };
@@ -39,6 +42,7 @@ describe('RailImportService', () => {
     wfsDatabaseService = {
       isCurrentHash: jest.fn().mockResolvedValue(true),
       createOrUpdateDataset: jest.fn().mockResolvedValue(undefined),
+      invalidateDataset: jest.fn().mockResolvedValue(undefined),
       clearAllRailData: jest.fn().mockResolvedValue(undefined),
       getAllDatasets: jest.fn().mockResolvedValue([]),
     };
@@ -68,6 +72,118 @@ describe('RailImportService', () => {
     jest.runOnlyPendingTimers();
     jest.useRealTimers();
   });
+
+  function usePersistedMetadata() {
+    const datasets = new Map<WFSSourceType, WFSDatasetMetadata>(
+      WFSConfig.getAllSources().map(({ source }) => [
+        source,
+        { source, fileHash: 'hash', fileSize: 123 },
+      ]),
+    );
+    const database = new WFSDatabaseService({
+      gPKGDataset: {
+        findUnique: jest.fn(async ({ where }: { where: { source: WFSSourceType } }) =>
+          datasets.get(where.source) ?? null,
+        ),
+        deleteMany: jest.fn(async ({ where }: { where: { source: WFSSourceType } }) => {
+          datasets.delete(where.source);
+          return { count: 1 };
+        }),
+        upsert: jest.fn(async ({ create }: { create: WFSDatasetMetadata }) => {
+          datasets.set(create.source, create);
+          return { id: create.source };
+        }),
+      },
+    } as never);
+    const restart = () => {
+      service = new RailImportService(
+        wfsProcessingService as never,
+        database,
+        railVectorTileService as never,
+        vectorTilesService as never,
+        searchService as never,
+        importLockService as never,
+      );
+    };
+    restart();
+    return { datasets, restart };
+  }
+
+  it.each(['updated-hash', 'hash'])(
+    'retries a partially imported source after restart when its next hash is %s',
+    async (retryHash) => {
+      const { datasets, restart } = usePersistedMetadata();
+      const [changedSource, failingSource] = WFSConfig.getAllSources();
+      let sourceUnavailable = true;
+      let currentHash = 'updated-hash';
+      wfsProcessingService.downloadLayer.mockImplementation(async (source: WFSSourceConfig) => {
+        if (source.source === failingSource.source && sourceUnavailable) {
+          throw new Error('temporary source failure');
+        }
+        return {
+          fileHash: source.source === changedSource.source ? currentHash : 'hash',
+          fileSize: 123,
+          featureCollection: { features: [] },
+          sourceSrid: WFSConfig.TARGET_SRID,
+        };
+      });
+      wfsProcessingService.replaceSourceTable.mockResolvedValue(1);
+
+      await expect(service.startImport()).resolves.toMatchObject({
+        success: false,
+        sourcesProcessed: 1,
+      });
+      expect(datasets.has(changedSource.source)).toBe(false);
+      expect(datasets.get(failingSource.source)?.fileHash).toBe('hash');
+      expect(railVectorTileService.refreshMvtViewsWithinImport).not.toHaveBeenCalled();
+
+      sourceUnavailable = false;
+      currentHash = retryHash;
+      restart();
+      await expect(service.startImport()).resolves.toMatchObject({
+        success: true,
+        sourcesProcessed: 1,
+      });
+      expect(wfsProcessingService.replaceSourceTable).toHaveBeenCalledTimes(2);
+      expect(railVectorTileService.refreshMvtViewsWithinImport).toHaveBeenCalledTimes(1);
+      expect(searchService.indexRailLines).toHaveBeenCalledTimes(1);
+      expect(searchService.indexRailStations).toHaveBeenCalledTimes(1);
+      expect(vectorTilesService.clearCache).toHaveBeenCalledTimes(1);
+      expect(datasets.get(changedSource.source)?.fileHash).toBe(retryHash);
+
+      await expect(service.startImport()).resolves.toMatchObject({
+        success: true,
+        sourcesProcessed: 0,
+      });
+      expect(railVectorTileService.refreshMvtViewsWithinImport).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(['views', 'search'])(
+    'retries a forced same-hash import after a %s failure and restart',
+    async (stage) => {
+      const { datasets, restart } = usePersistedMetadata();
+      const refresh = stage === 'views'
+        ? railVectorTileService.refreshMvtViewsWithinImport
+        : searchService.indexRailStations;
+      refresh.mockRejectedValueOnce(new Error('refresh failed'));
+
+      await expect(service.clearAndReimport()).rejects.toThrow('refresh failed');
+      expect(datasets.size).toBe(0);
+      expect(vectorTilesService.clearCache).not.toHaveBeenCalled();
+
+      searchService.indexRailStations.mockImplementation(async () => {
+        expect(datasets.size).toBe(0);
+      });
+      restart();
+      await expect(service.startImport()).resolves.toMatchObject({
+        success: true,
+        sourcesProcessed: WFSConfig.getAllSources().length,
+      });
+      expect(datasets.size).toBe(WFSConfig.getAllSources().length);
+      expect(vectorTilesService.clearCache).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it('holds a Postgres advisory transaction lock around WFS import', async () => {
     await expect(service.startImport()).resolves.toEqual({
@@ -123,7 +239,10 @@ describe('RailImportService', () => {
         action: () => Promise<unknown>,
         options: { waitForLock?: boolean },
       ) => {
-        expect(options).toEqual({ waitForLock: true });
+        expect(options).toEqual({
+          waitForLock: true,
+          timeoutMs: expect.any(Number),
+        });
         await lockAvailable;
         return action();
       },
@@ -199,7 +318,7 @@ describe('RailImportService', () => {
       errors: ['metro_station: upstream unavailable'],
     });
     expect(service.getImportStatus()).toMatchObject({
-      status: 'completed',
+      status: 'error',
       message: expect.stringContaining('completed with errors'),
     });
   });
@@ -212,6 +331,6 @@ describe('RailImportService', () => {
       'GeoSampa WFS clear and reimport',
       expect.any(Function),
     );
-    expect(wfsDatabaseService.clearAllRailData).toHaveBeenCalledTimes(1);
+    expect(wfsDatabaseService.clearAllRailData).not.toHaveBeenCalled();
   });
 });

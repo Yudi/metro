@@ -43,6 +43,8 @@ interface BikeStationDetailsPayloadApi {
 const BIKE_WS_UPDATE_EVENT = 'stations_update';
 const BIKE_WS_DETAILS_EVENT = 'station_details';
 const BIKE_WS_DETAILS_REQUEST_EVENT = 'station_details_request';
+const BIKE_DETAILS_REQUEST_TIMEOUT_MS = 10_000;
+const BIKE_DETAILS_RETRY_DELAY_MS = 30_000;
 
 @Service()
 export class BikeStationsService implements OnDestroy {
@@ -57,6 +59,7 @@ export class BikeStationsService implements OnDestroy {
     string,
     ReturnType<typeof setTimeout>
   >();
+  private readonly detailRetryAfter = new Map<string, number>();
 
   readonly stations = signal<BikeStation[]>([]);
   readonly lastUpdated = signal<number | null>(null);
@@ -100,11 +103,16 @@ export class BikeStationsService implements OnDestroy {
 
   ngOnDestroy(): void {
     this.disconnect();
+    this.detailRetryAfter.clear();
   }
 
   ensureStationDetails(stationId: string): void {
     const station = this.getStation(stationId);
-    if (station?.detailsLoaded || this.inFlightDetailRequests.has(stationId)) {
+    if (
+      station?.detailsLoaded ||
+      this.inFlightDetailRequests.has(stationId) ||
+      (this.detailRetryAfter.get(stationId) ?? 0) > Date.now()
+    ) {
       return;
     }
 
@@ -157,6 +165,7 @@ export class BikeStationsService implements OnDestroy {
       hasElectricBikesAvailable: summary.electricBikesAvailable > 0,
       vehicleAvailability: previous?.vehicleAvailability ?? [],
       detailsLoaded: previous?.detailsLoaded ?? false,
+      detailsError: previous?.detailsError ?? false,
     };
 
     if (index >= 0) {
@@ -242,8 +251,11 @@ export class BikeStationsService implements OnDestroy {
 
     if (!station) {
       this.logger.warn('Received empty bike station details payload', payload);
+      this.markDetailsError(stationId);
       return;
     }
+
+    this.detailRetryAfter.delete(stationId);
 
     const existing =
       this.getStation(stationId) ??
@@ -263,6 +275,7 @@ export class BikeStationsService implements OnDestroy {
       vehicleAvailability: station.vehicleAvailability,
       fetchedAt: payload.fetchedAt ?? existing.fetchedAt,
       detailsLoaded: true,
+      detailsError: false,
     } satisfies BikeStation;
 
     const stations = this.stations();
@@ -292,7 +305,8 @@ export class BikeStationsService implements OnDestroy {
     const timeout = setTimeout(() => {
       this.inFlightDetailRequests.delete(stationId);
       this.pendingDetailTimeouts.delete(stationId);
-    }, 10_000);
+      this.markDetailsError(stationId);
+    }, BIKE_DETAILS_REQUEST_TIMEOUT_MS);
 
     this.pendingDetailTimeouts.set(stationId, timeout);
   }
@@ -310,5 +324,26 @@ export class BikeStationsService implements OnDestroy {
     this.inFlightDetailRequests.clear();
     this.pendingDetailTimeouts.forEach((timeout) => clearTimeout(timeout));
     this.pendingDetailTimeouts.clear();
+  }
+
+  private markDetailsError(stationId: string): void {
+    this.detailRetryAfter.set(
+      stationId,
+      Date.now() + BIKE_DETAILS_RETRY_DELAY_MS,
+    );
+
+    const index = this.stations().findIndex(
+      (item) => item.stationId === stationId,
+    );
+    if (index < 0) {
+      return;
+    }
+
+    const nextStations = [...this.stations()];
+    nextStations[index] = {
+      ...nextStations[index],
+      detailsError: true,
+    };
+    this.stations.set(nextStations);
   }
 }

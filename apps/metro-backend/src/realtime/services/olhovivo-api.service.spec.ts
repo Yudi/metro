@@ -1,6 +1,7 @@
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
-import { of } from 'rxjs';
+import { Logger } from '@nestjs/common';
+import { of, Subject, throwError } from 'rxjs';
 import { OlhoVivoApiService } from './olhovivo-api.service';
 
 describe('OlhoVivoApiService', () => {
@@ -142,6 +143,78 @@ describe('OlhoVivoApiService', () => {
 
     expect(positions.l[0].vs[0].p).toBe(11879);
     expect(lineArrivals.ps[0].vs[0].p).toBe(11831);
+  });
+
+  it('shares one in-flight authentication attempt between concurrent callers', async () => {
+    const authentication = new Subject<{
+      data: boolean;
+      status: number;
+      headers: Record<string, string[]>;
+    }>();
+    post.mockClear();
+    get.mockClear();
+    post.mockReturnValue(authentication);
+    get.mockReturnValue(
+      of({ data: { hr: '15:31', l: [] }, status: 200, headers: {} }),
+    );
+    const concurrentService = new OlhoVivoApiService(
+      { get: jest.fn().mockReturnValue('concurrent-token') } as unknown as ConfigService,
+      { get, post } as unknown as HttpService,
+    );
+
+    const first = concurrentService.getAllPositions();
+    const second = concurrentService.getAllPositions();
+    await Promise.resolve();
+
+    expect(post).toHaveBeenCalledTimes(1);
+    authentication.next({ data: true, status: 200, headers: {} });
+    authentication.complete();
+
+    await expect(Promise.all([first, second])).resolves.toHaveLength(2);
+    expect(get).toHaveBeenCalledTimes(2);
+  });
+
+  it('never writes token or cookie fragments to logs', async () => {
+    const debug = jest.spyOn(Logger.prototype, 'debug').mockImplementation();
+    const error = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+    const canaryToken = 'token-canary-that-must-not-be-logged';
+    const canaryCookie = 'cookie-canary-that-must-not-be-logged';
+    const localPost = jest.fn().mockReturnValue(
+      of({
+        data: true,
+        status: 200,
+        headers: { 'set-cookie': [`session=${canaryCookie}; HttpOnly`] },
+      }),
+    );
+    const localService = new OlhoVivoApiService(
+      { get: jest.fn().mockReturnValue(canaryToken) } as unknown as ConfigService,
+      { get: jest.fn(), post: localPost } as unknown as HttpService,
+    );
+
+    await localService.onModuleInit();
+    const upstreamError = {
+      code: 'ECONNRESET',
+      message: `request failed for ${canaryToken}`,
+      config: { headers: { Cookie: canaryCookie } },
+      response: {
+        status: 500,
+        data: canaryToken,
+        headers: { 'set-cookie': canaryCookie },
+      },
+    };
+    (localService as unknown as { httpService: HttpService }).httpService = {
+      get: jest.fn(() => throwError(() => upstreamError)),
+    } as unknown as HttpService;
+    await expect(localService.getAllPositions()).rejects.toBe(upstreamError);
+
+    const serializedLogs = JSON.stringify([
+      ...debug.mock.calls,
+      ...error.mock.calls,
+    ]);
+    expect(serializedLogs).not.toContain(canaryToken);
+    expect(serializedLogs).not.toContain(canaryCookie);
+    debug.mockRestore();
+    error.mockRestore();
   });
 });
 

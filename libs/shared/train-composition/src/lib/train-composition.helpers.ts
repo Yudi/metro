@@ -253,6 +253,7 @@ export function buildTrainCompositionView(params: {
     stationName: platform.station.name,
     lineCode: platform.lineCode,
     directionName,
+    directionalFactReview: platform.directionalFactReview,
     trainFacingSideRelativeToBoarding,
     disembarkingSide: platform.disembarkingSide,
     hasLiveOccupancy:

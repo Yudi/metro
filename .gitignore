@@ -55,6 +55,7 @@ target/
 *.pdb
 **/*.rs.bk
 Cargo.lock
+!dataset-handling/Cargo.lock
 
 tmp/
 .angular

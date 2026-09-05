@@ -79,7 +79,7 @@ export class WFSProcessingService {
 
       return {
         text,
-        fileHash: createHash('sha256').update(text).digest('hex'),
+        fileHash: canonicalWfsHash(featureCollection),
         fileSize: Buffer.byteLength(text),
         featureCollection,
         sourceSrid,
@@ -173,9 +173,11 @@ export class WFSProcessingService {
     );
   }
 
-  async delayBetweenRequests(): Promise<void> {
+  async delayBetweenRequests(
+    delayMs = WFSConfig.BETWEEN_REQUEST_DELAY_MS,
+  ): Promise<void> {
     await new Promise((resolve) =>
-      setTimeout(resolve, WFSConfig.BETWEEN_REQUEST_DELAY_MS),
+      setTimeout(resolve, delayMs),
     );
   }
 
@@ -657,4 +659,63 @@ export class WFSProcessingService {
 
     return `"${identifier.replace(/"/g, '""')}"`;
   }
+}
+
+/**
+ * Hash semantic WFS content rather than transport serialization. Providers
+ * are free to reorder features or JSON properties without changing the layer.
+ */
+export function canonicalWfsHash(
+  featureCollection: WFSFeatureCollection,
+): string {
+  const features = featureCollection.features
+    .map((feature) => canonicalize(feature))
+    .sort((left, right) => {
+      const leftKey = featureSortKey(left);
+      const rightKey = featureSortKey(right);
+      return leftKey.localeCompare(rightKey);
+    });
+  const canonical = canonicalize({
+    type: featureCollection.type,
+    crs: featureCollection.crs,
+    features,
+  });
+
+  return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
+}
+
+function featureSortKey(feature: unknown): string {
+  if (typeof feature !== 'object' || feature === null) {
+    return JSON.stringify(feature);
+  }
+
+  const candidate = feature as {
+    id?: unknown;
+    properties?: Record<string, unknown> | null;
+  };
+  const stableId =
+    candidate.id ?? candidate.properties?.['primaryindex'] ?? candidate.properties?.['id'];
+  return stableId === undefined
+    ? JSON.stringify(feature)
+    : String(stableId);
+}
+
+function canonicalize(value: unknown): unknown {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? Number(value.toFixed(7)) : null;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => canonicalize(item));
+  }
+
+  if (typeof value === 'object' && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, item]) => [key, canonicalize(item)]),
+    );
+  }
+
+  return value;
 }

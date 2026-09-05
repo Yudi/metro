@@ -88,6 +88,7 @@ export class FavoritesComponent {
   readonly busRoutes = computed(() => [...this.busRoutesById().values()]);
   readonly busStops = computed(() => [...this.busStopsById().values()]);
   readonly railLines = computed(() => [...this.railLinesById().values()]);
+  readonly syncError = this.favoritesService.syncError;
 
   readonly railStations = computed(() => {
     const groups = new Map<string, FavoriteRailStation>();
@@ -279,6 +280,14 @@ export class FavoritesComponent {
     }
 
     this.favoritesService.removeFavorite(code, type);
+  }
+
+  retryFavoriteSync(): void {
+    void this.favoritesService.retryFailedFavoriteSync();
+  }
+
+  discardFailedFavoriteSync(): void {
+    void this.favoritesService.discardFailedFavoriteSync();
   }
 
   removeRailStationFavorite(station: FavoriteRailStation): void {

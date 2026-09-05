@@ -132,8 +132,10 @@ export class Search {
         return;
       }
 
-      this.realtimeService.subscribeToStop(stop.stopId);
-      onCleanup(() => this.realtimeService.unsubscribeFromStop(stop.stopId));
+      const releaseStopSubscription = this.realtimeService.subscribeToStop(
+        stop.stopId,
+      );
+      onCleanup(() => releaseStopSubscription());
     });
   }
 

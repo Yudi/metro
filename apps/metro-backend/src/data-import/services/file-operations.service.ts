@@ -92,16 +92,16 @@ export class FileOperationsService {
           `size: ${(fileSize / 1024 / 1024).toFixed(2)} MB`,
       );
     } catch (error) {
-      this.logger.error(`Failed to download ${url}:`, error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to download ${url}:`, errorMessage);
       // Cleanup partial download
       try {
         await fs.unlink(filePath);
       } catch {
         // Ignore cleanup errors
       }
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(`Download failed: ${errorMessage}`);
+      throw withCause(`Download failed: ${errorMessage}`, error);
     } finally {
       if (signal && abortFromCaller) {
         signal.removeEventListener('abort', abortFromCaller);
@@ -122,10 +122,13 @@ export class FileOperationsService {
 
       return hashSum.digest('hex');
     } catch (error) {
-      this.logger.error(`Failed to calculate hash for ${filePath}:`, error);
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(`Hash calculation failed: ${errorMessage}`);
+      this.logger.error(
+        `Failed to calculate hash for ${filePath}:`,
+        errorMessage,
+      );
+      throw withCause(`Hash calculation failed: ${errorMessage}`, error);
     }
   }
 
@@ -137,10 +140,10 @@ export class FileOperationsService {
       const stats = await fs.stat(filePath);
       return stats.size;
     } catch (error) {
-      this.logger.error(`Failed to get file size for ${filePath}:`, error);
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(`File size check failed: ${errorMessage}`);
+      this.logger.error(`Failed to get file size for ${filePath}:`, errorMessage);
+      throw withCause(`File size check failed: ${errorMessage}`, error);
     }
   }
 
@@ -243,4 +246,14 @@ export class FileOperationsService {
 
     return results;
   }
+}
+
+function withCause(message: string, cause: unknown): Error {
+  const wrapped = new Error(message);
+  Object.defineProperty(wrapped, 'cause', {
+    configurable: true,
+    enumerable: false,
+    value: cause,
+  });
+  return wrapped;
 }

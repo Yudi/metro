@@ -150,8 +150,15 @@ export class VectorTilesController {
     @Query('routeIds') routeIds: string | undefined,
     @Res() res: Response,
   ): Promise<void> {
+    const parsedRouteIds = this.parseCsv(routeIds, 'routeIds');
+    if (parsedRouteIds.length === 0) {
+      throw new BadRequestException(
+        'routeIds must contain at least one identifier',
+      );
+    }
+
     await this.sendVectorTile(res, VectorTileLayer.BUS_ROUTES, z, x, y, {
-      routeIds: this.parseCsv(routeIds),
+      routeIds: parsedRouteIds,
     });
   }
 
@@ -176,18 +183,19 @@ export class VectorTilesController {
     @Query('radiusMeters') radiusMeters: string | undefined,
     @Res() res: Response,
   ): Promise<void> {
-    const nearby =
-      lat !== undefined && lon !== undefined && radiusMeters !== undefined
-        ? {
-            latitude: Number(lat),
-            longitude: Number(lon),
-            radiusMeters: Number(radiusMeters),
-          }
-        : undefined;
+    const parsedRouteIds = this.parseCsv(routeIds, 'routeIds');
+    const parsedStopIds = this.parseCsv(stopIds, 'stopIds');
+    const nearby = this.parseNearby(lat, lon, radiusMeters);
+
+    if (parsedRouteIds.length === 0 && parsedStopIds.length === 0 && !nearby) {
+      throw new BadRequestException(
+        'At least one routeIds, stopIds, or complete nearby filter is required',
+      );
+    }
 
     await this.sendVectorTile(res, VectorTileLayer.BUS_STOPS, z, x, y, {
-      routeIds: this.parseCsv(routeIds),
-      stopIds: this.parseCsv(stopIds),
+      routeIds: parsedRouteIds,
+      stopIds: parsedStopIds,
       nearby,
     });
   }
@@ -282,15 +290,92 @@ export class VectorTilesController {
     res.send(tile);
   }
 
-  private parseCsv(value: string | undefined): string[] {
-    if (!value) {
+  private parseCsv(value: string | undefined, argumentName: string): string[] {
+    if (value === undefined) {
       return [];
     }
 
-    return value
-      .split(',')
-      .map((item) => item.trim())
-      .filter((item) => item.length > 0)
-      .slice(0, 100);
+    if (typeof value !== 'string') {
+      throw new BadRequestException(
+        `${argumentName} must be a comma-separated string`,
+      );
+    }
+
+    const items = value.split(',').map((item) => item.trim());
+    if (
+      items.length > 100 ||
+      items.some((item) => !isSafeIdentifier(item))
+    ) {
+      throw new BadRequestException(
+        `${argumentName} must contain at most 100 non-empty identifiers of up to 128 characters`,
+      );
+    }
+
+    return Array.from(new Set(items));
   }
+
+  private parseNearby(
+    lat: string | undefined,
+    lon: string | undefined,
+    radiusMeters: string | undefined,
+  ): { latitude: number; longitude: number; radiusMeters: number } | undefined {
+    const provided = [lat, lon, radiusMeters].filter(
+      (value) => value !== undefined,
+    ).length;
+    if (provided === 0) {
+      return undefined;
+    }
+    if (provided !== 3) {
+      throw new BadRequestException(
+        'lat, lon, and radiusMeters must be provided together',
+      );
+    }
+
+    const latitude = this.parseFiniteNumber(lat as string, 'lat');
+    const longitude = this.parseFiniteNumber(lon as string, 'lon');
+    const radius = this.parseFiniteNumber(
+      radiusMeters as string,
+      'radiusMeters',
+    );
+    if (latitude < -90 || latitude > 90) {
+      throw new BadRequestException('lat must be between -90 and 90');
+    }
+    if (longitude < -180 || longitude > 180) {
+      throw new BadRequestException('lon must be between -180 and 180');
+    }
+    if (radius <= 0 || radius > 5_000) {
+      throw new BadRequestException(
+        'radiusMeters must be greater than 0 and at most 5000',
+      );
+    }
+
+    return { latitude, longitude, radiusMeters: radius };
+  }
+
+  private parseFiniteNumber(value: string, argumentName: string): number {
+    if (
+      typeof value !== 'string' ||
+      !/^-?(?:\d+\.?\d*|\.\d+)$/.test(value.trim())
+    ) {
+      throw new BadRequestException(`${argumentName} must be a finite number`);
+    }
+
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      throw new BadRequestException(`${argumentName} must be a finite number`);
+    }
+
+    return parsed;
+  }
+}
+
+function isSafeIdentifier(value: string): boolean {
+  return (
+    value.length > 0 &&
+    value.length <= 128 &&
+    !Array.from(value).some((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint <= 0x1f || codePoint === 0x7f;
+    })
+  );
 }

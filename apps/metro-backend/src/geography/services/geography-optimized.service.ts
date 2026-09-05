@@ -189,15 +189,25 @@ export class GeographyServiceOptimized {
     }
 
     const includeTrips = options.includeTrips ?? true;
+    const includeShapes = options.includeShapes ?? true;
     const includeStops = options.includeStops ?? true;
 
     const tripsPromise = includeTrips
       ? this.getTripsForRoute(routeId)
       : Promise.resolve<Trip[]>([]);
+    const shapesPromise = includeShapes
+      ? this.busRouteService.getRouteShapesForRoute(route.routeId)
+      : Promise.resolve<Array<{ shape_id: string; coordinates: number[][] }>>(
+          [],
+        );
     const stopsPromise = includeStops
       ? this.getStopsForRoute(routeId)
       : Promise.resolve<BusStop[]>([]);
-    const [trips, stops] = await Promise.all([tripsPromise, stopsPromise]);
+    const [trips, shapes, stops] = await Promise.all([
+      tripsPromise,
+      shapesPromise,
+      stopsPromise,
+    ]);
 
     this.logger.debug(
       `Route ${routeId}: ${trips.length} trips, ${stops.length} stops`,
@@ -206,7 +216,14 @@ export class GeographyServiceOptimized {
     return {
       route,
       trips,
-      shapes: [],
+      shapes: shapes.map((shape) => ({
+        id: shape.shape_id,
+        shapeId: shape.shape_id,
+        geometry: {
+          type: 'LineString',
+          coordinates: shape.coordinates,
+        },
+      })),
       stops,
     };
   }
@@ -279,13 +296,16 @@ export class GeographyServiceOptimized {
   ): Promise<RouteRailConnection[]> {
     const uniqueRouteIds = Array.from(
       new Set(routeIds.map((routeId) => routeId.trim()).filter(Boolean)),
-    )
-      .sort()
-      .slice(0, MAX_ROUTE_RAIL_CONNECTION_ROUTES);
+    ).sort();
     const normalizedStopId = stopId.trim();
 
     if (!normalizedStopId || uniqueRouteIds.length === 0) {
       return [];
+    }
+    if (uniqueRouteIds.length > MAX_ROUTE_RAIL_CONNECTION_ROUTES) {
+      throw new PayloadTooLargeException(
+        `Route rail connections support at most ${MAX_ROUTE_RAIL_CONNECTION_ROUTES} routes`,
+      );
     }
 
     const rows = await this.prisma.$queryRaw<

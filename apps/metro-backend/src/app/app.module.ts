@@ -60,7 +60,7 @@ const isProduction = process.env.NODE_ENV === 'production';
       inject: [LoadersService],
       useFactory: (loadersService: LoadersService) => ({
         graphiql: false,
-        autoSchemaFile: join(process.cwd(), 'src/schema.gql'),
+        autoSchemaFile: isProduction ? true : join(__dirname, 'schema.gql'),
         sortSchema: true,
         path: '/api/graphql',
         playground: false,
@@ -98,7 +98,6 @@ const isProduction = process.env.NODE_ENV === 'production';
     UserModule,
     HistoricalModule,
     ObservabilityModule,
-    PrismaModule,
     LoadersModule,
   ],
   controllers: [AppController],

@@ -46,7 +46,8 @@ export class LiteRealtimeService implements OnDestroy {
   private readonly isBrowser = isPlatformBrowser(this.platformId);
   private readonly socketUrl = this.baseUrl.replace(/\/api$/, '');
   private socket: Socket | null = null;
-  private readonly subscribedStops = new Set<string>();
+  private readonly subscribedStops = new Map<string, number>();
+  private readonly latestStopUpdateTimestamps = new Map<string, number>();
   private readonly pendingRequests = new Set<() => void>();
 
   readonly connected = signal(false);
@@ -76,14 +77,13 @@ export class LiteRealtimeService implements OnDestroy {
         settle(update);
       };
 
+      let release: () => void = () => undefined;
+
       const cleanup = () => {
         window.clearTimeout(timeoutId);
         this.socket?.off(ARRIVAL_PREDICTIONS_EVENT, handler);
         this.pendingRequests.delete(cancel);
-
-        if (!this.subscribedStops.has(stopCode)) {
-          this.socket?.emit(UNSUBSCRIBE_STOP_EVENT, { stopCode });
-        }
+        release();
       };
 
       const settle = (update: LiteStopArrivalUpdate | null) => {
@@ -98,32 +98,32 @@ export class LiteRealtimeService implements OnDestroy {
       const cancel = () => settle(null);
 
       this.socket?.on(ARRIVAL_PREDICTIONS_EVENT, handler);
-      this.socket?.emit(SUBSCRIBE_STOP_EVENT, { stopCode });
       this.pendingRequests.add(cancel);
+      release = this.acquireStop(stopCode);
     });
   }
 
-  subscribeToStop(stopCode: string): void {
-    if (!this.isBrowser || !stopCode || this.subscribedStops.has(stopCode)) {
-      return;
+  subscribeToStop(stopCode: string): () => void {
+    if (!this.isBrowser || !stopCode) {
+      return () => undefined;
     }
 
     this.ensureSocket();
-    this.subscribedStops.add(stopCode);
-    this.socket?.emit(SUBSCRIBE_STOP_EVENT, { stopCode });
+    return this.acquireStop(stopCode);
   }
 
   unsubscribeFromStop(stopCode: string): void {
-    if (!this.subscribedStops.has(stopCode)) {
+    const owners = this.subscribedStops.get(stopCode);
+    if (!owners) {
       return;
     }
 
-    this.subscribedStops.delete(stopCode);
-    this.socket?.emit(UNSUBSCRIBE_STOP_EVENT, { stopCode });
+    if (owners > 1) {
+      this.subscribedStops.set(stopCode, owners - 1);
+      return;
+    }
 
-    const arrivals = new Map(this.stopArrivals());
-    arrivals.delete(stopCode);
-    this.stopArrivals.set(arrivals);
+    this.releaseStop(stopCode);
   }
 
   ngOnDestroy(): void {
@@ -132,6 +132,7 @@ export class LiteRealtimeService implements OnDestroy {
     this.socket = null;
     this.connected.set(false);
     this.subscribedStops.clear();
+    this.latestStopUpdateTimestamps.clear();
   }
 
   private ensureSocket(): void {
@@ -150,7 +151,7 @@ export class LiteRealtimeService implements OnDestroy {
 
     this.socket.on('connect', () => {
       this.connected.set(true);
-      for (const stopCode of this.subscribedStops) {
+      for (const stopCode of this.subscribedStops.keys()) {
         this.socket?.emit(SUBSCRIBE_STOP_EVENT, { stopCode });
       }
     });
@@ -171,9 +172,23 @@ export class LiteRealtimeService implements OnDestroy {
       return;
     }
 
+    const latestTimestamp = this.latestStopUpdateTimestamps.get(
+      update.stopCode,
+    );
+    if (
+      latestTimestamp !== undefined &&
+      update.cacheTimestamp < latestTimestamp
+    ) {
+      return;
+    }
+
     const arrivals = new Map(this.stopArrivals());
     arrivals.set(update.stopCode, update);
     this.stopArrivals.set(arrivals);
+    this.latestStopUpdateTimestamps.set(
+      update.stopCode,
+      update.cacheTimestamp,
+    );
   }
 
   private readArrivalUpdate(payload: unknown): LiteStopArrivalUpdate | null {
@@ -214,6 +229,44 @@ export class LiteRealtimeService implements OnDestroy {
     for (const cancel of [...this.pendingRequests]) {
       cancel();
     }
+  }
+
+  private acquireStop(stopCode: string): () => void {
+    const owners = this.subscribedStops.get(stopCode) ?? 0;
+    this.subscribedStops.set(stopCode, owners + 1);
+
+    if (owners === 0) {
+      this.socket?.emit(SUBSCRIBE_STOP_EVENT, { stopCode });
+    }
+
+    let released = false;
+    return () => {
+      if (released) {
+        return;
+      }
+      released = true;
+      this.releaseStop(stopCode);
+    };
+  }
+
+  private releaseStop(stopCode: string): void {
+    const owners = this.subscribedStops.get(stopCode);
+    if (!owners) {
+      return;
+    }
+
+    if (owners > 1) {
+      this.subscribedStops.set(stopCode, owners - 1);
+      return;
+    }
+
+    this.subscribedStops.delete(stopCode);
+    this.socket?.emit(UNSUBSCRIBE_STOP_EVENT, { stopCode });
+
+    const arrivals = new Map(this.stopArrivals());
+    arrivals.delete(stopCode);
+    this.stopArrivals.set(arrivals);
+    this.latestStopUpdateTimestamps.delete(stopCode);
   }
 }
 

@@ -53,7 +53,7 @@ export class CptmVehiclePollingService implements OnModuleDestroy {
   private readonly cache = new Map<CptmLineCode, CptmVehicleUpdate>();
 
   private pollTimer: ReturnType<typeof setInterval> | null = null;
-  private isPolling = false;
+  private activePoll: Promise<void> | null = null;
   private pollInterval = POLL_INTERVAL;
   private hasError = false;
 
@@ -61,8 +61,9 @@ export class CptmVehiclePollingService implements OnModuleDestroy {
 
   constructor(private readonly externalRailProvider: RailRealtimeSourcePort) {}
 
-  onModuleDestroy(): void {
+  async onModuleDestroy(): Promise<void> {
     this.stopPolling();
+    await this.activePoll;
   }
 
   /**
@@ -218,12 +219,26 @@ export class CptmVehiclePollingService implements OnModuleDestroy {
   }
 
   private async poll(): Promise<void> {
-    if (this.isPolling) return;
+    if (this.activePoll) {
+      await this.activePoll;
+      return;
+    }
 
+    const activePoll = this.runPoll();
+    this.activePoll = activePoll;
+    try {
+      await activePoll;
+    } finally {
+      if (this.activePoll === activePoll) {
+        this.activePoll = null;
+      }
+    }
+  }
+
+  private async runPoll(): Promise<void> {
     const lineCodes = Array.from(this.subscriptions.keys());
     if (lineCodes.length === 0) return;
 
-    this.isPolling = true;
     const deltas: CptmVehicleDelta[] = [];
     const timestamp = Date.now();
     let anyError = false;
@@ -253,10 +268,8 @@ export class CptmVehiclePollingService implements OnModuleDestroy {
         const cached = this.cache.get(lineCode);
 
         // Check if vehicles changed
-        const vehiclesChanged = this.hasVehiclesChanged(
-          cached?.vehicles ?? [],
-          vehicles,
-        );
+        const vehiclesChanged =
+          !cached || this.hasVehiclesChanged(cached.vehicles, vehicles);
 
         // Update cache
         const update: CptmVehicleUpdate = {
@@ -299,8 +312,6 @@ export class CptmVehiclePollingService implements OnModuleDestroy {
       }
     } catch (error) {
       this.logger.error('Error during CPTM vehicle polling', error);
-    } finally {
-      this.isPolling = false;
     }
   }
 

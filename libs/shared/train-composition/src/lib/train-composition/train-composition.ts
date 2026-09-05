@@ -35,7 +35,10 @@ export class TrainCompositionComponent {
   protected readonly ariaLabel = computed(() => {
     const composition = this.composition();
     const disembarkingSideLabel = composition.disembarkingSide
-      ? this.getDisembarkingSideLabel(composition.disembarkingSide)
+      ? this.getDisembarkingSideLabel(
+          composition.disembarkingSide,
+          composition.directionalFactReview,
+        )
       : undefined;
 
     return [
@@ -51,8 +54,14 @@ export class TrainCompositionComponent {
   });
 
   protected readonly disembarkingSideLabel = computed(() => {
-    const side = this.composition().disembarkingSide;
-    return side ? this.getDisembarkingSideLabel(side) : null;
+    const composition = this.composition();
+    const side = composition.disembarkingSide;
+    return side
+      ? this.getDisembarkingSideLabel(
+          side,
+          composition.directionalFactReview,
+        )
+      : null;
   });
 
   protected getFeatureIcon(feature: TrainPlatformFeatureView): string {
@@ -87,14 +96,23 @@ export class TrainCompositionComponent {
     return `Carro ${car.carPosition}: lotação ${car.load.level} de 6`;
   }
 
-  private getDisembarkingSideLabel(side: TrainDisembarkingSide): string {
-    switch (side) {
-      case 'left':
-        return 'Desembarque pelo lado esquerdo';
-      case 'right':
-        return 'Desembarque pelo lado direito';
-      case 'both':
-        return 'Desembarque pelos dois lados';
-    }
+  private getDisembarkingSideLabel(
+    side: TrainDisembarkingSide,
+    review: TrainCompositionView['directionalFactReview'],
+  ): string {
+    const label = (() => {
+      switch (side) {
+        case 'left':
+          return 'Desembarque pelo lado esquerdo';
+        case 'right':
+          return 'Desembarque pelo lado direito';
+        case 'both':
+          return 'Desembarque pelos dois lados';
+      }
+    })();
+
+    return review?.status === 'unknown'
+      ? `${label} (não confirmado)`
+      : label;
   }
 }

@@ -27,7 +27,6 @@ import {
   LoggerService,
   RailGraphqlService,
 } from '@metro/shared/api';
-import { RealtimeWebsocketService } from '../../services/realtime-websocket.service';
 import { RealtimeVehicleLayerService } from '../../services/realtime-vehicle-layer.service';
 import { CptmVehicleLayerService } from '../../services/cptm-vehicle-layer.service';
 import { BikeStationsService } from '../../services/bike-stations.service';
@@ -77,7 +76,6 @@ export class MapComponent implements AfterViewInit, OnDestroy {
   private interactionService = inject(MapInteractionService);
   private dialog = inject(MatDialog);
   private logger = inject(LoggerService);
-  private realtimeService = inject(RealtimeWebsocketService);
   private vehicleLayerService = inject(RealtimeVehicleLayerService);
   private cptmVehicleLayerService = inject(CptmVehicleLayerService);
   private bikeStationsService = inject(BikeStationsService);
@@ -159,9 +157,6 @@ export class MapComponent implements AfterViewInit, OnDestroy {
         );
       }
     });
-
-    // Watch for route selections and subscribe to real-time data
-    this.setupRealtimeSubscriptions();
 
     effect(() => {
       const stations = this.bikeStationsService.stations();
@@ -806,42 +801,6 @@ export class MapComponent implements AfterViewInit, OnDestroy {
         zoom,
       });
     }
-  }
-
-  private setupRealtimeSubscriptions(): void {
-    // Real-time subscriptions are now handled by MapInteractionService
-    // when routes are added/removed from selection.
-    // This effect is kept for backwards compatibility with routes
-    // that were loaded through other means (e.g., from stop selection).
-    effect(() => {
-      const routes = this.displayedRoutes();
-      const derivedFromStops = this.mapState.routesDerivedFromStops();
-      const selectedRouteIds = this.mapState.selectedRouteIds();
-
-      // Subscribe to real-time data only for routes that are:
-      // 1. Explicitly selected (handled in interaction service, but re-checking here for robustness)
-      // 2. Not derived from stop selections
-      // 3. Not subway/metro routes
-      for (const route of routes) {
-        // Skip routes that were derived from stop selections
-        if (derivedFromStops.has(route.routeId)) {
-          continue;
-        }
-
-        // Only subscribe if this route is explicitly selected
-        if (!selectedRouteIds.has(route.routeId)) {
-          continue;
-        }
-
-        if (
-          route.shortName &&
-          !route.shortName.startsWith('METRÔ') &&
-          !route.shortName.startsWith('CPTM')
-        ) {
-          this.realtimeService.subscribeToRoute(route.shortName);
-        }
-      }
-    });
   }
 
   // Map navigation controls

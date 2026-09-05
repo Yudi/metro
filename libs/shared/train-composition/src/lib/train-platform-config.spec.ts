@@ -313,4 +313,34 @@ describe('train platform configuration', () => {
       }),
     ).toThrow('Feature invalid-door has an invalid car or door position');
   });
+
+  it('marks explicitly unverified platform sides without hiding the best effort value', () => {
+    const configWithUnknownGuidance = defineTrainLinePlatformConfig({
+      lineCode: 'L4',
+      platforms: {
+        PIH: [
+          {
+            id: 'unknown-platform',
+            direction: { destinationCodes: ['LUZ'] },
+            directionalFactReview: { status: 'unknown' },
+            disembarkingSide: 'right',
+            features: [],
+          },
+        ],
+      },
+    });
+
+    const resolvedAtPinheiros = resolveTrainCompositionConfig(
+      [configWithUnknownGuidance],
+      'L4',
+      'PIH',
+      'LUZ',
+      'Luz',
+    ).platform;
+    expect(resolvedAtPinheiros?.disembarkingSide).toBe('right');
+    expect(resolvedAtPinheiros?.directionalFactReview).toEqual({
+      status: 'unknown',
+    });
+  });
+
 });

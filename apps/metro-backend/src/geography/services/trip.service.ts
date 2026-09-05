@@ -58,10 +58,11 @@ export class TripService {
     );
 
     const trips = await this.prisma.$queryRaw<GtfsTripRow[]>`
-      SELECT id, route_id, service_id, trip_id, trip_headsign, direction_id, shape_id
+      SELECT DISTINCT ON (direction_id, trip_headsign, shape_id)
+        id, route_id, service_id, trip_id, trip_headsign, direction_id, shape_id
       FROM "SPTrans_Trip"
       WHERE route_id = ${route.route_id}
-      LIMIT 20
+      ORDER BY direction_id, trip_headsign, shape_id, trip_id
     `;
 
     this.logger.debug(

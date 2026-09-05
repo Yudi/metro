@@ -9,6 +9,7 @@ export class PollingCoordinator {
   private readonly eventEmitter = new EventEmitter();
   private pollingInterval: NodeJS.Timeout | null = null;
   private activePoll: Promise<void> | null = null;
+  private stopped = true;
 
   constructor(
     private readonly logger: Logger,
@@ -27,6 +28,7 @@ export class PollingCoordinator {
     this.logger.debug(
       `Starting polling loop (every ${this.pollIntervalMs / 1000} seconds)`,
     );
+    this.stopped = false;
 
     // Kick off the recurring interval
     this.pollingInterval = setInterval(() => {
@@ -41,13 +43,17 @@ export class PollingCoordinator {
    * Stop polling loop and clear any scheduled intervals.
    */
   stopPolling(): void {
-    if (!this.pollingInterval) {
-      return;
+    this.stopped = true;
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
+      this.logger.debug('Stopped polling loop');
     }
+  }
 
-    clearInterval(this.pollingInterval);
-    this.pollingInterval = null;
-    this.logger.debug('Stopped polling loop');
+  async stopAndDrain(): Promise<void> {
+    this.stopPolling();
+    await this.activePoll;
   }
 
   /**
@@ -55,6 +61,7 @@ export class PollingCoordinator {
    */
   async triggerImmediatePoll(): Promise<void> {
     this.logger.debug('Immediate poll requested');
+    this.stopped = false;
     await this.executePoll();
   }
 
@@ -85,7 +92,9 @@ export class PollingCoordinator {
   private async runPoll(): Promise<void> {
     try {
       await this.pollFn();
-      this.eventEmitter.emit('pollComplete');
+      if (!this.stopped) {
+        this.eventEmitter.emit('pollComplete');
+      }
     } catch (error) {
       const trace =
         error instanceof Error ? error.stack : JSON.stringify(error);

@@ -145,11 +145,16 @@ export class DataImportService implements OnModuleInit {
     return this.withImportLock(
       'GTFS import',
       () => this.startImportLocked(),
-      { waitForLock: true },
+      {
+        waitForLock: true,
+        timeoutMs: GTFSConfig.IMPORT_LOCK_TIMEOUT_MS,
+      },
     );
   }
 
-  private async startImportLocked(): Promise<GTFSProcessingResult> {
+  private async startImportLocked(
+    forceReimport = false,
+  ): Promise<GTFSProcessingResult> {
     if (
       this.currentImportStatus.status !== 'idle' &&
       this.currentImportStatus.status !== 'completed' &&
@@ -164,7 +169,7 @@ export class DataImportService implements OnModuleInit {
     this.updateImportStatus('downloading', 0, 'Starting GTFS import...');
 
     try {
-      const result = await this.performImport();
+      const result = await this.performImport(forceReimport);
       if (!result.success) {
         throw new ImportFailureError(result);
       }
@@ -255,7 +260,9 @@ export class DataImportService implements OnModuleInit {
   /**
    * Main import logic
    */
-  private async performImport(): Promise<GTFSProcessingResult> {
+  private async performImport(
+    forceReimport = false,
+  ): Promise<GTFSProcessingResult> {
     const zipFileName = 'gtfs.zip';
     const zipFilePath = path.join(this.tempDir, zipFileName);
     const extractDir = path.join(this.tempDir, 'extracted');
@@ -290,8 +297,9 @@ export class DataImportService implements OnModuleInit {
       );
 
       // Step 3: Check if we already have this version
-      const isCurrentHash =
-        await this.gtfsDatabaseService.isCurrentHash(fileHash);
+      const isCurrentHash = forceReimport
+        ? false
+        : await this.gtfsDatabaseService.isCurrentHash(fileHash);
       if (isCurrentHash) {
         this.logger.debug('GTFS data unchanged, skipping import');
         await this.fileOperationsService.cleanup(zipFilePath);
@@ -322,6 +330,11 @@ export class DataImportService implements OnModuleInit {
           zipFilePath,
           extractDir,
         );
+
+      await this.gtfsDatabaseService.prepareDatasetForImport(
+        dataset.id,
+        extractedFiles.map((file) => file.fileName),
+      );
 
       // Save file information to database
       await this.gtfsDatabaseService.upsertDatasetFiles(
@@ -410,38 +423,9 @@ export class DataImportService implements OnModuleInit {
           `Processing ${fileName}...`,
         );
 
-        // Check if we already have this exact file processed successfully
-        const existingFile = await this.gtfsDatabaseService.findFileByHash(
-          fileInfo.fileHash,
-        );
-        if (
-          existingFile &&
-          existingFile.recordCount &&
-          existingFile.recordCount > 0
-        ) {
-          this.logger.debug(
-            `Skipping ${fileName} (already processed with same hash, ${existingFile.recordCount} records)`,
-          );
-          result.skippedFiles.push(fileName);
-
-          // Update file record for this dataset
-          await this.gtfsDatabaseService.updateFileRecord(
-            datasetId,
-            fileName,
-            existingFile.recordCount,
-          );
-
-          // Delete the duplicate file
-          const filePath = path.join(extractDir, fileName);
-          await this.fileOperationsService.deleteFile(filePath);
-          continue;
-        } else if (existingFile) {
-          this.logger.debug(
-            `Reprocessing ${fileName} (previous import failed with 0 records)`,
-          );
-        }
-
-        // Process new or changed file
+        // Process every file in a changed feed. A matching file hash from a
+        // historical dataset does not prove that its rows are present in the
+        // currently active physical tables.
         const filePath = path.join(extractDir, fileName);
         let recordCount = 0;
 
@@ -542,14 +526,14 @@ export class DataImportService implements OnModuleInit {
       throw new Error('Import already in progress');
     }
 
-    this.logger.debug('Clearing all GTFS data and starting fresh import...');
+    this.logger.debug('Forcing a complete GTFS replacement import...');
 
     try {
-      // Clear all data and tracking
-      await this.gtfsDatabaseService.clearAllGTFSData();
-
-      // Start fresh import
-      return await this.startImportLocked();
+      // Keep the healthy active tables in place while the replacement is
+      // downloaded, validated, and processed. The forced flag bypasses only
+      // the whole-feed hash shortcut; activation remains governed by the
+      // normal import result/hooks.
+      return await this.startImportLocked(true);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';

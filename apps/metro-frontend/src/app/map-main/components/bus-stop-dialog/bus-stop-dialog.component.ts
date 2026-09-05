@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnDestroy, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import {
   MatDialogModule,
   MatDialogRef,
@@ -14,7 +14,6 @@ import {
 } from '../../services/geography-graphql.service';
 import { FavoritesService, LoggerService } from '@metro/shared/api';
 import { StopArrivalsComponent } from '../stop-arrivals/stop-arrivals.component';
-import { RealtimeWebsocketService } from '../../services/realtime-websocket.service';
 import { getContrastColor } from '@metro/shared/utils';
 import { DialogHeaderComponent } from '../../../shared/components/dialog-header/dialog-header.component';
 
@@ -39,11 +38,10 @@ export interface BusStopDialogData {
   templateUrl: './bus-stop-dialog.component.html',
   styleUrls: ['./bus-stop-dialog.component.scss'],
 })
-export class BusStopDialogComponent implements OnDestroy {
+export class BusStopDialogComponent {
   readonly dialogRef = inject(MatDialogRef<BusStopDialogComponent>);
   readonly data = inject<BusStopDialogData>(MAT_DIALOG_DATA);
   private logger = inject(LoggerService);
-  private realtimeService = inject(RealtimeWebsocketService);
   private favoriteService = inject(FavoritesService);
   readonly isFavorite = computed(() =>
     this.favoriteService.isFavorite(this.data.stop.stopId, 'busStop'),
@@ -177,12 +175,4 @@ export class BusStopDialogComponent implements OnDestroy {
     return routeCode.trim().toUpperCase();
   }
 
-  ngOnDestroy(): void {
-    if (this.data.stop.stopId) {
-      this.logger.debug(
-        `Bus stop dialog closing - unsubscribing from stop: ${this.data.stop.stopId}`,
-      );
-      this.realtimeService.unsubscribeFromStop(this.data.stop.stopId);
-    }
-  }
 }

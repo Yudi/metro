@@ -96,7 +96,7 @@ export class SearchResolver {
           this.getAdjustedScore(a, input.query),
       );
 
-      return sortedByScore.map((hit) => ({
+      return sortedByScore.slice(0, input.limit ?? 10).map((hit) => ({
         ...this.formatSearchDocument(hit.document, hit.type),
         score: hit.score,
         type: hit.type,

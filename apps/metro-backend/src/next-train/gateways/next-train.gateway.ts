@@ -108,9 +108,14 @@ export class NextTrainGateway
   @SubscribeMessage(NEXT_TRAIN_SUBSCRIBE_EVENT)
   async handleSubscribe(
     @ConnectedSocket() client: Socket,
-    @MessageBody() body: SubscribeStationDto,
+    @MessageBody() body: unknown,
   ): Promise<void> {
-    const { lineCode, stationCode } = body;
+    const subscription = parseStationSubscription(body);
+    if (!subscription) {
+      client.emit('error', { message: 'Invalid subscription payload.' });
+      return;
+    }
+    const { lineCode, stationCode } = subscription;
 
     // Validate line code
     if (!hasNextTrainIntegration(lineCode)) {
@@ -187,9 +192,11 @@ export class NextTrainGateway
   @SubscribeMessage(NEXT_TRAIN_UNSUBSCRIBE_EVENT)
   handleUnsubscribe(
     @ConnectedSocket() client: Socket,
-    @MessageBody() body: SubscribeStationDto,
+    @MessageBody() body: unknown,
   ): void {
-    const { lineCode, stationCode } = body;
+    const subscription = parseStationSubscription(body);
+    if (!subscription) return;
+    const { lineCode, stationCode } = subscription;
 
     if (!hasNextTrainIntegration(lineCode)) return;
 
@@ -208,9 +215,13 @@ export class NextTrainGateway
   @SubscribeMessage(CPTM_VEHICLE_SUBSCRIBE_EVENT)
   handleVehicleSubscribe(
     @ConnectedSocket() client: Socket,
-    @MessageBody() body: { lineCode: CptmLineCode },
+    @MessageBody() body: unknown,
   ): void {
-    const { lineCode } = body;
+    const lineCode = parseVehicleSubscription(body);
+    if (!lineCode) {
+      client.emit('error', { message: 'Invalid subscription payload.' });
+      return;
+    }
 
     if (!hasExternalRailVehicles(lineCode)) {
       this.logger.warn(`Invalid line code for private vehicles: ${lineCode}`);
@@ -247,9 +258,10 @@ export class NextTrainGateway
   @SubscribeMessage(CPTM_VEHICLE_UNSUBSCRIBE_EVENT)
   handleVehicleUnsubscribe(
     @ConnectedSocket() client: Socket,
-    @MessageBody() body: { lineCode: CptmLineCode },
+    @MessageBody() body: unknown,
   ): void {
-    const { lineCode } = body;
+    const lineCode = parseVehicleSubscription(body);
+    if (!lineCode) return;
 
     if (!hasExternalRailVehicles(lineCode)) return;
 
@@ -343,4 +355,45 @@ export class NextTrainGateway
       );
     }
   }
+}
+
+function parseStationSubscription(body: unknown): SubscribeStationDto | null {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return null;
+  }
+
+  const candidate = body as Record<string, unknown>;
+  if (
+    typeof candidate['lineCode'] !== 'string' ||
+    typeof candidate['stationCode'] !== 'string' ||
+    candidate['lineCode'].length > 8 ||
+    candidate['stationCode'].length > 32 ||
+    Object.keys(candidate).some(
+      (key) => key !== 'lineCode' && key !== 'stationCode',
+    )
+  ) {
+    return null;
+  }
+
+  return {
+    lineCode: candidate['lineCode'] as SubscribeStationDto['lineCode'],
+    stationCode: candidate['stationCode'],
+  };
+}
+
+function parseVehicleSubscription(body: unknown): CptmLineCode | null {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return null;
+  }
+
+  const candidate = body as Record<string, unknown>;
+  if (
+    typeof candidate['lineCode'] !== 'string' ||
+    candidate['lineCode'].length > 8 ||
+    Object.keys(candidate).some((key) => key !== 'lineCode')
+  ) {
+    return null;
+  }
+
+  return candidate['lineCode'] as CptmLineCode;
 }

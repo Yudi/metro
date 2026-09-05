@@ -29,25 +29,42 @@ export class BikeApiService {
 
   async fetchStations(): Promise<BikeStationsPayloadDto> {
     const fetchedAt = Date.now();
-    const [information, statuses, vehicleTypes, pricingPlans] =
-      await Promise.all([
-        this.gbfs.fetchFeed<GbfsStationInformationData>('station_information'),
-        this.gbfs.fetchFeed<GbfsStationStatusData>('station_status'),
-        this.gbfs.fetchFeed<GbfsVehicleTypesData>('vehicle_types'),
-        this.gbfs.fetchFeed<GbfsPricingPlansData>('system_pricing_plans'),
-      ]);
+    const [information, statuses] = await Promise.all([
+      this.gbfs.fetchFeed<GbfsStationInformationData>('station_information'),
+      this.gbfs.fetchFeed<GbfsStationStatusData>('station_status'),
+    ]);
+    const [vehicleTypesResult, pricingPlansResult] = await Promise.allSettled([
+      this.gbfs.fetchFeed<GbfsVehicleTypesData>('vehicle_types'),
+      this.gbfs.fetchFeed<GbfsPricingPlansData>('system_pricing_plans'),
+    ]);
+    if (vehicleTypesResult.status === 'rejected') {
+      this.logger.warn(
+        'Optional GBFS vehicle-types feed is unavailable; publishing core station data',
+      );
+    }
+    if (pricingPlansResult.status === 'rejected') {
+      this.logger.warn(
+        'Optional GBFS pricing feed is unavailable; publishing core station data',
+      );
+    }
 
     const informationById = new Map(
       information.data.stations.map((station) => [station.station_id, station]),
     );
     const vehicleTypesById = new Map(
-      vehicleTypes.data.vehicle_types.map((vehicleType) => [
+      (vehicleTypesResult.status === 'fulfilled'
+        ? vehicleTypesResult.value.data.vehicle_types
+        : []
+      ).map((vehicleType) => [
         vehicleType.vehicle_type_id,
         vehicleType,
       ]),
     );
     const pricingPlansById = new Map(
-      pricingPlans.data.plans.map((plan) => [plan.plan_id, plan]),
+      (pricingPlansResult.status === 'fulfilled'
+        ? pricingPlansResult.value.data.plans
+        : []
+      ).map((plan) => [plan.plan_id, plan]),
     );
 
     const stations = statuses.data.stations.flatMap((status) => {

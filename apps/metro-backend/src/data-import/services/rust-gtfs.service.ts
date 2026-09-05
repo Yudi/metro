@@ -3,6 +3,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
 import * as fs from 'fs';
+import { GTFSConfig } from '../config/gtfs.config';
 
 const execFileAsync = promisify(execFile);
 
@@ -87,15 +88,18 @@ export class RustGtfsService {
           'database-importer',
           '--shapes-path',
           shapesFilePath,
-          '--db-url',
-          dbUrl,
           '--srid',
           srid.toString(),
           '--schema',
           'external_gtfs',
         ],
         {
-          timeout: 300000, // 5 minutes timeout
+          timeout: GTFSConfig.PROCESSING_TIMEOUT_MS,
+          killSignal: 'SIGTERM',
+          env: {
+            ...process.env,
+            DATABASE_URL: dbUrl,
+          },
         },
       );
 
@@ -140,7 +144,10 @@ export class RustGtfsService {
    */
   async getRustToolVersion(): Promise<string> {
     try {
-      const { stdout } = await execFileAsync(this.rustToolPath, ['--version']);
+      const { stdout } = await execFileAsync(this.rustToolPath, ['--version'], {
+        timeout: 10_000,
+        killSignal: 'SIGTERM',
+      });
       return stdout.trim();
     } catch {
       throw new Error('Failed to get Rust tool version');

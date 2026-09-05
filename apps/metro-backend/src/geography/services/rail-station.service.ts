@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RailStation } from '../entities/rail-station.entity';
 import { BoundingBoxInput } from '../dto/geography.input';
@@ -73,7 +73,7 @@ export class RailStationService {
       }));
     } catch (error) {
       this.logger.error('Failed to fetch merged subway stations', error);
-      return [];
+      throw error;
     }
   }
 
@@ -136,9 +136,14 @@ export class RailStationService {
    * Get a single rail station by ID
    */
   async getRailStationById(id: string): Promise<RailStation | null> {
-    const numericId = parseInt(id, 10);
-    if (isNaN(numericId)) {
-      return null;
+    const normalizedId = id.trim();
+    if (!/^\d+$/.test(normalizedId)) {
+      throw new BadRequestException('Rail station id must be an integer');
+    }
+
+    const numericId = Number(normalizedId);
+    if (!Number.isSafeInteger(numericId)) {
+      throw new BadRequestException('Rail station id is outside the allowed range');
     }
 
     const stations = await this.prisma.$queryRaw<
@@ -191,6 +196,9 @@ export class RailStationService {
     searchTerm: string,
     limit = 20,
   ): Promise<RailStation[]> {
+    const normalizedSearchTerm = normalizeSearchTerm(searchTerm);
+    const escapedSearchTerm = escapeLikePattern(normalizedSearchTerm);
+    const safeLimit = normalizeLimit(limit);
     // Use merged_rail_stations for search to show merged stations as single results
     const mergedStations = await this.prisma.$queryRaw<
       Array<{
@@ -212,10 +220,10 @@ export class RailStationService {
         agencies,
         lines
       FROM merged_rail_stations
-      WHERE name ILIKE ${`%${searchTerm}%`}
-         OR "originalName" ILIKE ${`%${searchTerm}%`}
+      WHERE name ILIKE ${`%${escapedSearchTerm}%`} ESCAPE '\\'
+         OR "originalName" ILIKE ${`%${escapedSearchTerm}%`} ESCAPE '\\'
       ORDER BY name
-      LIMIT ${limit}
+      LIMIT ${safeLimit}
     `;
 
     // Map merged stations to RailStation entities
@@ -239,6 +247,9 @@ export class RailStationService {
     radiusMeters = 1000,
     limit = 20,
   ): Promise<RailStation[]> {
+    validateCoordinates(latitude, longitude);
+    const safeRadius = normalizeRadius(radiusMeters);
+    const safeLimit = normalizeLimit(limit);
     // Use merged_rail_stations for nearby search to show merged stations as single results
     const mergedStations = await this.prisma.$queryRaw<
       Array<{
@@ -268,10 +279,10 @@ export class RailStationService {
       WHERE ST_DWithin(
         ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography,
         ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography,
-        ${radiusMeters}
+        ${safeRadius}
       )
       ORDER BY distance
-      LIMIT ${limit}
+      LIMIT ${safeLimit}
     `;
 
     // Map merged stations to RailStation entities
@@ -402,5 +413,68 @@ export class RailStationService {
       (180 / Math.PI);
 
     return { lat, lng };
+  }
+}
+
+const MAX_SEARCH_TERM_LENGTH = 160;
+const MAX_SEARCH_LIMIT = 100;
+const MAX_NEARBY_RADIUS_METERS = 5_000;
+
+function normalizeSearchTerm(value: string): string {
+  const searchTerm = value.trim();
+  if (
+    searchTerm.length === 0 ||
+    searchTerm.length > MAX_SEARCH_TERM_LENGTH ||
+    Array.from(searchTerm).some((character) => {
+      const codePoint = character.codePointAt(0) ?? 0;
+      return codePoint <= 0x1f || codePoint === 0x7f;
+    })
+  ) {
+    throw new BadRequestException(
+      'searchTerm must be a non-empty value of at most 160 characters',
+    );
+  }
+
+  return searchTerm;
+}
+
+function escapeLikePattern(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/[%_]/g, '\\$&');
+}
+
+function normalizeLimit(limit: number): number {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_SEARCH_LIMIT) {
+    throw new BadRequestException(
+      `limit must be an integer between 1 and ${MAX_SEARCH_LIMIT}`,
+    );
+  }
+
+  return limit;
+}
+
+function normalizeRadius(radiusMeters: number): number {
+  if (
+    !Number.isFinite(radiusMeters) ||
+    radiusMeters <= 0 ||
+    radiusMeters > MAX_NEARBY_RADIUS_METERS
+  ) {
+    throw new BadRequestException(
+      `radiusMeters must be greater than 0 and at most ${MAX_NEARBY_RADIUS_METERS}`,
+    );
+  }
+
+  return radiusMeters;
+}
+
+function validateCoordinates(latitude: number, longitude: number): void {
+  if (
+    !Number.isFinite(latitude) ||
+    latitude < -90 ||
+    latitude > 90 ||
+    !Number.isFinite(longitude) ||
+    longitude < -180 ||
+    longitude > 180
+  ) {
+    throw new BadRequestException('latitude and longitude are outside their valid ranges');
   }
 }

@@ -168,6 +168,17 @@ const BIKE_STATIONS_SCHEMA = {
 
 const DEFAULT_CONNECTION_TIMEOUT_SECONDS = 1;
 const DEFAULT_RECOVERY_INTERVAL_MS = 15_000;
+const MAX_SEARCH_LIMIT = 100;
+
+function normalizeSearchLimit(limit: number): number {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_SEARCH_LIMIT) {
+    throw new RangeError(
+      `Search limit must be an integer between 1 and ${MAX_SEARCH_LIMIT}`,
+    );
+  }
+
+  return limit;
+}
 
 /**
  * Keep third-party client errors out of logs. Axios/Typesense errors contain
@@ -323,6 +334,9 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
           this.liveCollectionTargets.set(collectionName, collectionName);
         }
       }
+
+      // Unaliased rebuilds may still belong to another active process.
+      // Only discard staging collections created by this instance's rebuild.
 
       this.logger.debug('Typesense collections initialized successfully');
       this.initialized = true;
@@ -607,10 +621,7 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
         )
         .join('; ');
       const message = `Typesense rejected ${failures.length} malformed ${baseName} document(s): ${details}`;
-      if (failures.length === documents.length) {
-        throw new Error(message);
-      }
-      this.logger.warn(message);
+      throw new Error(message);
     }
 
     if (this.rebuildCollectionTargets.has(baseName)) {
@@ -726,28 +737,6 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
     this.logger.debug('Recreated stops collection');
   }
 
-  async clearAllData(): Promise<void> {
-    await Promise.all([
-      this.clearRoutes(),
-      this.clearStops(),
-      this.clearRailLines(),
-      this.clearRailStations(),
-      this.clearBikeStations(),
-    ]);
-    this.logger.debug('Cleared all data from Typesense');
-  }
-
-  async clearTransitData(): Promise<void> {
-    await Promise.all([
-      this.clearRoutes(),
-      this.clearStops(),
-      this.clearRailLines(),
-      this.clearRailStations(),
-      this.clearBikeStations(),
-    ]);
-    this.logger.debug('Cleared transit search data from Typesense');
-  }
-
   async indexStops(stops: StopDocument[]): Promise<void> {
     try {
       if (
@@ -785,6 +774,7 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
     types: SearchTypes[],
     limit = 10,
   ): Promise<SearchResult[]> {
+    const safeLimit = normalizeSearchLimit(limit);
     const searches: Array<{
       type: SearchTypes;
       request: SearchRequest;
@@ -798,7 +788,7 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
           q: query,
           query_by: 'line_code,line_fullname,agency',
           query_by_weights: '8,12,1',
-          per_page: limit,
+          per_page: safeLimit,
           typo_tokens_threshold: 2,
         },
       });
@@ -812,7 +802,7 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
           q: query,
           query_by: 'station_code,station_name,station_aliases',
           query_by_weights: '2,8,4',
-          per_page: limit,
+          per_page: safeLimit,
           typo_tokens_threshold: 2,
         },
       });
@@ -825,7 +815,7 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
           collection: this.getReadCollectionName(GTFS_ROUTES_COLLECTION_NAME),
           q: query,
           query_by: 'route_short_name,route_long_name',
-          per_page: limit,
+          per_page: safeLimit,
           typo_tokens_threshold: 2,
         },
       });
@@ -838,7 +828,7 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
           collection: this.getReadCollectionName(GTFS_STOPS_COLLECTION_NAME),
           q: query,
           query_by: 'stop_name,stop_desc',
-          per_page: limit,
+          per_page: safeLimit,
           typo_tokens_threshold: 2,
         },
       });
@@ -851,7 +841,7 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
           collection: this.getReadCollectionName(BIKE_STATIONS_COLLECTION_NAME),
           q: query,
           query_by: 'station_id,station_name',
-          per_page: limit,
+          per_page: safeLimit,
           typo_tokens_threshold: 2,
         },
       });
@@ -871,6 +861,8 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
         searches: searches.map((search) => search.request),
       });
 
+      // Return only bounded candidates from each index. The resolver applies
+      // its domain-specific ranking before enforcing the global result limit.
       return results.results.flatMap((result, index) =>
         (result.hits ?? [])
           .map((hit) => ({
@@ -1146,7 +1138,13 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
   }
 
   async clearIndex(): Promise<void> {
-    await this.clearAllData();
+    await Promise.all([
+      this.clearRoutes(),
+      this.clearStops(),
+      this.clearRailLines(),
+      this.clearRailStations(),
+      this.clearBikeStations(),
+    ]);
     this.logger.debug('Cleared and recreated all Typesense collections');
   }
 

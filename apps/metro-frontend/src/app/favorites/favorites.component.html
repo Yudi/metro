@@ -5,6 +5,18 @@
     </div>
   </header>
 
+  @if (syncError(); as error) {
+    <div class="sync-error" role="alert">
+      <span>{{ error }}</span>
+      <button mat-stroked-button type="button" (click)="retryFavoriteSync()">
+        Tentar novamente
+      </button>
+      <button mat-button type="button" (click)="discardFailedFavoriteSync()">
+        Remover pendências
+      </button>
+    </div>
+  }
+
   @if (!hasFavorites()) {
     <div class="empty-state">
       <mat-icon>favorite_border</mat-icon>

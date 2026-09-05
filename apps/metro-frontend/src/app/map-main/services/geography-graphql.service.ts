@@ -209,20 +209,6 @@ export class GeographyGraphQLService {
     }).pipe(map((data) => data.busStop));
   }
 
-  getSubwayStations(): Observable<BusStopGraphQL[]> {
-    const query = `
-      query GetSubwayStations {
-        subwayStations {
-          ${this.stopFields}
-        }
-      }
-    `;
-
-    return this.executeGraphQL<{ subwayStations: BusStopGraphQL[] }>(
-      query,
-    ).pipe(map((data) => data.subwayStations));
-  }
-
   // Bus Routes
   getAllBusRoutes(): Observable<BusRouteGraphQL[]> {
     const query = `
@@ -244,26 +230,6 @@ export class GeographyGraphQLService {
         this.busRoutesSubject.next(data.busRoutes);
         return data.busRoutes;
       }),
-    );
-  }
-
-  getSubwayRoutes(): Observable<BusRouteGraphQL[]> {
-    const query = `
-      query GetSubwayRoutes {
-        subwayRoutes {
-          id
-          routeId
-          shortName
-          longName
-          routeType
-          color
-          textColor
-        }
-      }
-    `;
-
-    return this.executeGraphQL<{ subwayRoutes: BusRouteGraphQL[] }>(query).pipe(
-      map((data) => data.subwayRoutes),
     );
   }
 

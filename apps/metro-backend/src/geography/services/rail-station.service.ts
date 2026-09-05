@@ -13,48 +13,6 @@ export class RailStationService {
 
   constructor(private prisma: PrismaService) {}
 
-  /**
-   * Get all rail stations from GeoSampa rail data
-   */
-  async getAllRawRailStations(): Promise<RailStation[]> {
-    const stations = await this.prisma.$queryRaw<
-      Array<{
-        id: number;
-        name: string;
-        lines: string[] | null;
-        agencies: string[];
-        status: string | null;
-        latitude: number;
-        longitude: number;
-      }>
-    >`
-      SELECT 
-        id,
-        name,
-        lines,
-        agencies,
-        NULL::TEXT as status,
-        ST_Y(ST_Transform(geom_3857, 4326)) as latitude,
-        ST_X(ST_Transform(geom_3857, 4326)) as longitude
-      FROM mvt_rail_stations
-      ORDER BY name
-    `;
-
-    return stations.map((station) => ({
-      id: station.id.toString(),
-      name: station.name,
-      lines: station.lines || [],
-      agencies: station.agencies,
-      status: station.status || undefined,
-      latitude: station.latitude,
-      longitude: station.longitude,
-      geometry: {
-        type: 'Point',
-        coordinates: [[station.longitude, station.latitude]],
-      },
-    }));
-  }
-
   async getAllRailStations(): Promise<RailStation[]> {
     try {
       const stations = await this.prisma.mergedRailStation.findMany();

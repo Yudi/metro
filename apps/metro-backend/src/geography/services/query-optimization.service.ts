@@ -33,19 +33,6 @@ export class QueryOptimizationService {
   }
 
   /**
-   * Get stops that serve ONLY GTFS rail routes (METRÔ/CPTM)
-   * These stops should be excluded from bus queries since we use GeoSampa for rail
-   */
-  async getRailOnlyStops(stopIds: string[]): Promise<Set<string>> {
-    const serviceInfo = await this.batchGetStopServiceInfo(stopIds);
-    return new Set(
-      Array.from(serviceInfo.entries())
-        .filter(([, info]) => info.servesRail && !info.servesBus)
-        .map(([stopId]) => stopId),
-    );
-  }
-
-  /**
    * Batch get agencies for stops (single query)
    */
   async batchGetStopAgencies(

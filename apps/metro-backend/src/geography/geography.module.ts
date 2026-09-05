@@ -1,10 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
-import { GeographyService } from './services/geography.service';
 import { PostGISService } from './services/postgis.service';
 import { BusStopService } from './services/bus-stop.service';
 import { SubwayStationService } from './services/subway-station.service';
-import { BusRouteService } from './services/bus-route.service';
-import { TripService } from './services/trip.service';
 import { RailStationService } from './services/rail-station.service';
 import { GeographyResolver } from './resolvers/geography.resolver';
 import { PrismaService } from '../prisma/prisma.service';
@@ -20,12 +17,9 @@ import { VectorTilesModule } from '../vector-tiles/vector-tiles.module';
 @Module({
   imports: [forwardRef(() => VectorTilesModule)],
   providers: [
-    GeographyService,
     PostGISService,
     BusStopService,
     SubwayStationService,
-    BusRouteService,
-    TripService,
     RailStationService,
     GeographyResolver,
     PrismaService,
@@ -37,12 +31,9 @@ import { VectorTilesModule } from '../vector-tiles/vector-tiles.module';
     GeographyServiceOptimized,
   ],
   exports: [
-    GeographyService,
     PostGISService,
     BusStopService,
     SubwayStationService,
-    BusRouteService,
-    TripService,
     RailStationService,
     // Export optimized services for use
     QueryOptimizationService,

@@ -126,56 +126,6 @@ export class RailTileService {
     }
   }
 
-  /**
-   * Generate MVT tile for subway routes.
-   */
-  async generateSubwayRoutesTile(
-    z: number,
-    x: number,
-    y: number,
-  ): Promise<Buffer | null> {
-    const { minX, minY, maxX, maxY } = tileToBounds(z, x, y);
-
-    try {
-      const result = await this.prisma.$queryRaw<[{ mvt: Buffer }]>`
-        WITH bounds AS (
-          SELECT ST_Transform(
-            ST_MakeEnvelope(${minX}::float8, ${minY}::float8, ${maxX}::float8, ${maxY}::float8, 3857),
-            4326
-          ) AS geom
-        ),
-        mvtgeom AS (
-          SELECT
-            r.id,
-            r.route_id,
-            r.short_name,
-            r.long_name,
-            r.color,
-            r.text_color,
-            ST_AsMVTGeom(
-              ST_Transform(r.geom, 3857),
-              ST_MakeEnvelope(${minX}::float8, ${minY}::float8, ${maxX}::float8, ${maxY}::float8, 3857),
-              4096,
-              256,
-              true
-            ) AS geom
-          FROM mvt_subway_routes r, bounds b
-          WHERE ST_Intersects(r.geom, b.geom)
-        )
-        SELECT ST_AsMVT(mvtgeom.*, 'subway-routes', 4096, 'geom') AS mvt
-        FROM mvtgeom
-      `;
-
-      return result[0]?.mvt ?? null;
-    } catch (error) {
-      this.logger.error(
-        `Error generating subway routes tile (${z}/${x}/${y}):`,
-        error,
-      );
-      throw error;
-    }
-  }
-
   private getRailLineMetadataValues(): Prisma.Sql {
     return Prisma.join(
       RAIL_LINES.map(

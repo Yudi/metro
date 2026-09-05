@@ -45,9 +45,9 @@ export class VectorTilesController {
   @Header('Cache-Control', 'public, max-age=86400') // 24 hour cache
   @Header('Access-Control-Allow-Origin', '*')
   @ApiOperation({
-    summary: 'Get subway stations vector tile',
+    summary: 'Get rail stations vector tile',
     description:
-      'Returns a Mapbox Vector Tile (MVT) containing subway station points for the specified tile coordinates.',
+      'Returns a Mapbox Vector Tile (MVT) containing rail station points for the specified tile coordinates.',
   })
   @ApiParam({
     name: 'z',
@@ -92,9 +92,9 @@ export class VectorTilesController {
   @Header('Cache-Control', 'public, max-age=86400') // 24 hour cache
   @Header('Access-Control-Allow-Origin', '*')
   @ApiOperation({
-    summary: 'Get subway routes vector tile',
+    summary: 'Get rail routes vector tile',
     description:
-      'Returns a Mapbox Vector Tile (MVT) containing subway route lines for the specified tile coordinates.',
+      'Returns a Mapbox Vector Tile (MVT) containing rail route lines for the specified tile coordinates.',
   })
   @ApiParam({
     name: 'z',

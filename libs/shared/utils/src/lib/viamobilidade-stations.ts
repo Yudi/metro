@@ -262,25 +262,6 @@ export function getStationCodes(lineCode: NextTrainLineCode): string[] {
 }
 
 /**
- * Check if station code belongs to a next-train enabled line
- * Returns the line code if found, undefined otherwise
- */
-export function findLineForStation(
-  stationCode: string,
-): NextTrainLineCode | undefined {
-  if (L4_STATIONS.some((s) => s.code === stationCode)) {
-    return 'L4';
-  }
-  if (L8_STATIONS.some((s) => s.code === stationCode)) {
-    return 'L8';
-  }
-  if (L9_STATIONS.some((s) => s.code === stationCode)) {
-    return 'L9';
-  }
-  return undefined;
-}
-
-/**
  * Find station code by name (fuzzy match)
  * Useful when only the station name is known
  * Returns { lineCode, stationCode } or null if not found

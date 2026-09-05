@@ -111,31 +111,6 @@ export class ZipProcessingService {
     return fileInfos;
   }
 
-  async validateZipFile(zipFilePath: string): Promise<boolean> {
-    try {
-      await this.getValidatedZipEntries(zipFilePath);
-      return true;
-    } catch (error) {
-      this.logger.error(`ZIP validation failed for ${zipFilePath}:`, error);
-      return false;
-    }
-  }
-
-  async listZipContents(zipFilePath: string): Promise<string[]> {
-    try {
-      const entries = await this.getValidatedZipEntries(zipFilePath);
-      return entries.map((entry) => entry.fileName);
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(
-        `Failed to list ZIP contents for ${zipFilePath}:`,
-        errorMessage,
-      );
-      return [];
-    }
-  }
-
   private async getValidatedZipEntries(
     zipFilePath: string,
   ): Promise<ZipEntry[]> {

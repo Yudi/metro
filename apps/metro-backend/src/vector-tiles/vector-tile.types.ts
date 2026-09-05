@@ -7,9 +7,6 @@ export enum VectorTileLayer {
   BUS_ROUTES = 'bus-routes',
   BUS_STOPS = 'bus-stops',
   BIKE_STATIONS = 'bike-stations',
-  // Legacy layers (deprecated, kept for backwards compatibility)
-  SUBWAY_STATIONS = 'subway-stations',
-  SUBWAY_ROUTES = 'subway-routes',
 }
 
 export interface VectorTileOptions {

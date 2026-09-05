@@ -97,20 +97,6 @@ export class RailApiService {
     }
   }
 
-  /**
-   * Fetch from configured sources and merge results by priority order.
-   * - Source order defines priority (highest to lowest)
-   * - Prefer valid data over "DadosIndisponiveis"
-   * - If status matches, prefer longer description
-   * - Returns null if every source fails completely
-   */
-  async fetchMergedStatus(
-    cachedLines?: Map<number, RailLine>,
-  ): Promise<RailLinesStatus | null> {
-    const result = await this.fetchMergedStatusWithDiagnostics(cachedLines);
-    return result.status;
-  }
-
   async fetchMergedStatusWithDiagnostics(
     cachedLines?: Map<number, RailLine>,
   ): Promise<RailStatusFetchResult> {

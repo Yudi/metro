@@ -7,7 +7,7 @@ import {
 import express, { type Response } from 'express';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { collectPaths } from '@metro/shared/utils';
+import { collectPaths, getStaticAssetCacheControl } from '@metro/shared/utils';
 
 const serverDistFolder = dirname(fileURLToPath(import.meta.url));
 const browserDistFolder = resolve(serverDistFolder, '../browser');
@@ -15,18 +15,11 @@ const browserDistFolder = resolve(serverDistFolder, '../browser');
 const app = express();
 const angularApp = new AngularNodeAppEngine({ trustProxyHeaders: true });
 
-const HASHED_ASSET_PATTERN = /^(?:chunk|main|polyfills|styles)-[\w-]{8,}\.(?:css|js)$/i;
-
 function setStaticCacheHeaders(response: Response, filePath: string): void {
-  if (HASHED_ASSET_PATTERN.test(basename(filePath))) {
-    response.setHeader(
-      'Cache-Control',
-      'public, max-age=31536000, immutable',
-    );
-    return;
-  }
-
-  response.setHeader('Cache-Control', 'no-cache');
+  response.setHeader(
+    'Cache-Control',
+    getStaticAssetCacheControl(basename(filePath)),
+  );
 }
 
 import { routes as appRoutes } from './app/app.routes';

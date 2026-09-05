@@ -47,34 +47,6 @@ export interface CptmStationInfo {
   longitude: number;
 }
 
-export interface RailNextTrainArrival {
-  lineCode: string;
-  stationCode: string;
-  destinationCode: string;
-  destinationName: string;
-  trainCurrentStationCode: string;
-  trainCurrentStationName: string;
-  arrivalTime: string;
-  isAtPlatform: boolean | null;
-  updatedAt: string;
-}
-
-export interface StationNextTrains {
-  stationCode: string;
-  stationName: string;
-  lineCode: string;
-  trains: RailNextTrainArrival[];
-  operationClosed?: boolean;
-  outOfSchedule?: boolean;
-  fetchedAt?: string;
-}
-
-interface NextTrainsResponse {
-  data: {
-    nextTrains: StationNextTrains | null;
-  };
-}
-
 interface FindCptmStationResponse {
   data: {
     findCptmStation: CptmStationInfo | null;
@@ -415,48 +387,6 @@ export class RailGraphqlService {
    */
   isUnavailable(statusCode: RailStatusCode): boolean {
     return isStatusUnavailable(statusCode);
-  }
-
-  nextTrains(
-    lineCode: string,
-    stationCode: string,
-  ): Observable<StationNextTrains | null> {
-    const query = `
-      query NextTrains($lineCode: String!, $stationCode: String!) {
-        nextTrains(lineCode: $lineCode, stationCode: $stationCode) {
-          stationCode
-          stationName
-          lineCode
-          operationClosed
-          outOfSchedule
-          fetchedAt
-          trains {
-            lineCode
-            stationCode
-            destinationCode
-            destinationName
-            trainCurrentStationCode
-            trainCurrentStationName
-            arrivalTime
-            isAtPlatform
-            updatedAt
-          }
-        }
-      }
-    `;
-
-    return this.http
-      .post<NextTrainsResponse>(this.graphqlEndpoint, {
-        query,
-        variables: { lineCode, stationCode },
-      })
-      .pipe(
-        map((response) => response.data?.nextTrains ?? null),
-        catchError((err) => {
-          this.logger.error('Failed to fetch next trains', err);
-          return of(null);
-        }),
-      );
   }
 
   /**

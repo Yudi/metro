@@ -5,20 +5,6 @@ import {
 import { toTitleCase } from './station-name.utils';
 import { TRIVIATRENS_LIVE_DATA_ENABLED } from './transit-agency.utils';
 
-export type SearchTypes =
-  | 'busRoute'
-  | 'busStop'
-  | 'railLine'
-  | 'railStation'
-  | 'bikeStation';
-export const SearchTypes = [
-  'busRoute',
-  'busStop',
-  'railLine',
-  'railStation',
-  'bikeStation',
-] as const;
-
 export enum SearchTypesEnum {
   BusRoute = 'busRoute',
   BusStop = 'busStop',
@@ -26,6 +12,15 @@ export enum SearchTypesEnum {
   RailStation = 'railStation',
   BikeStation = 'bikeStation',
 }
+
+export type SearchTypes = `${SearchTypesEnum}`;
+export const SearchTypes = [
+  `${SearchTypesEnum.BusRoute}`,
+  `${SearchTypesEnum.BusStop}`,
+  `${SearchTypesEnum.RailLine}`,
+  `${SearchTypesEnum.RailStation}`,
+  `${SearchTypesEnum.BikeStation}`,
+] as const;
 
 export type StopsAndStations = Exclude<
   SearchTypesEnum,

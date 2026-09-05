@@ -328,22 +328,6 @@ export function extractLineCodeFromAgency(agency: string): number | undefined {
 }
 
 /**
- * Parse agencies array to get line codes
- * @param agencies - Array of agency strings from stop data
- * @returns Array of unique line codes
- */
-export function getLineCodesFromAgencies(agencies: string[]): number[] {
-  const codes = new Set<number>();
-  for (const agency of agencies) {
-    const code = extractLineCodeFromAgency(agency);
-    if (code !== undefined && RAIL_LINE_BY_CODE.has(code)) {
-      codes.add(code);
-    }
-  }
-  return Array.from(codes).sort((a, b) => a - b);
-}
-
-/**
  * Get line code by Portuguese color name (case-insensitive)
  * @param colorName - Portuguese color name (e.g., "AMARELA", "Azul")
  * @returns Line code number or undefined if not found
@@ -409,14 +393,6 @@ export function getContrastColor(hexColor: string): string {
   const b = parseInt(hex.slice(4, 6), 16);
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   return luminance > 0.5 ? '#000000' : '#ffffff';
-}
-
-export function getStationByCode(
-  lineCode: number,
-  stationCode: string,
-): StaticRailStation | undefined {
-  const line = getRailLineByCode(lineCode);
-  return line?.stations.find((s) => s.code === stationCode);
 }
 
 export function getStationByName(
@@ -490,14 +466,3 @@ export function getLineColors(code: number): LineColorInfo {
   }
   return { bg: '#666666', text: '#FFFFFF' };
 }
-
-/**
- * Pre-built map of line codes to colors for quick lookup
- * This is a convenience export for components that need all colors
- */
-export const LINE_COLORS: Record<number, LineColorInfo> = Object.fromEntries(
-  RAIL_LINES.map((line) => [
-    line.code,
-    { bg: line.colorHex, text: getContrastColor(line.colorHex) },
-  ]),
-);

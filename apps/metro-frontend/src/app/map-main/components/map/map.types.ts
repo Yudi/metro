@@ -126,19 +126,3 @@ export enum FeatureCreationSource {
   BIKE = 'bike', // Feature created for bike layer
   EXPLORE = 'explore', // Feature created for manually selected explore location
 }
-
-/**
- * Type of selection that caused a feature to be created
- */
-export type SourceSelectionType = 'route' | 'stop';
-
-/**
- * Tracks which selection(s) caused a feature to be created.
- * Used for efficient cleanup when deselecting items.
- */
-export interface FeatureSourceInfo {
-  /** The type of selection (route or stop) */
-  type: SourceSelectionType;
-  /** The ID of the selection (routeId or stopId) */
-  id: string;
-}

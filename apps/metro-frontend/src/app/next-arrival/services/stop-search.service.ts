@@ -65,16 +65,6 @@ export class StopSearchService {
   private readonly searchSubject = new Subject<string>();
   private searchTypes = signal<SearchTypes[]>([]);
 
-  // L8/L9 line keywords for prioritization
-  private readonly L8_L9_KEYWORDS = [
-    'l8',
-    'l9',
-    'linha 8',
-    'linha 9',
-    'diamante',
-    'esmeralda',
-  ];
-
   constructor() {
     this.setupSearchPipeline();
   }

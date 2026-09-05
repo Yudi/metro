@@ -5,7 +5,6 @@ import {
   getRailLinesByAgency,
   LINE_AGENCY_MAPPING,
 } from './rail-line.utils';
-import { getAgencyLogoForRoute } from './agency-logo.utils';
 import {
   getLiveTrainTrackingApiIds,
   hasLiveTrainTrackingLine,
@@ -42,8 +41,6 @@ describe('Motiva agency', () => {
     expect(getRouteAgency('L5')).toBe(TransitAgency.MOTIVA);
     expect(LINE_AGENCY_MAPPING[4]).toBe(TransitAgency.MOTIVA);
     expect(LINE_AGENCY_MAPPING[5]).toBe(TransitAgency.MOTIVA);
-    expect(getAgencyLogoForRoute('L4')).toBe('/app/shared/agencies/motiva.svg');
-    expect(getAgencyLogoForRoute('L5')).toBe('/app/shared/agencies/motiva.svg');
   });
 
   it('does not treat Linha 5 as a live train tracking line', () => {
@@ -82,9 +79,6 @@ describe('LinhaUni agency', () => {
         (line) => line.code === 6,
       ),
     ).toBe(true);
-    expect(getAgencyLogoForRoute('L6')).toBe(
-      '/app/shared/agencies/linhauni.svg',
-    );
   });
 });
 
@@ -96,9 +90,6 @@ describe('Trivia Trens agency', () => {
       );
       expect(getRouteAgency(`L${lineCode}`)).toBe(TransitAgency.TRIVIATRENS);
       expect(LINE_AGENCY_MAPPING[lineCode]).toBe(TransitAgency.TRIVIATRENS);
-      expect(getAgencyLogoForRoute(`L${lineCode}`)).toBe(
-        '/app/shared/agencies/triviatrens.svg',
-      );
     }
 
     expect(AGENCIES_DATA[TransitAgency.TRIVIATRENS].contact).toEqual(

@@ -62,6 +62,7 @@ test('searches for a bus stop and opens its detail view', async ({ page }) => {
 
   await page.goto('/sp/proxima-chegada');
   await page.locator('input[type="search"]').fill('Terminal');
+  await page.getByRole('button', { name: 'Buscar' }).click();
   await expect(
     page.locator('.stop-name').filter({ hasText: 'Terminal Central' }),
   ).toBeVisible();

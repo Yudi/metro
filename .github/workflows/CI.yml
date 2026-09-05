@@ -22,10 +22,14 @@ env:
   NX_NO_CLOUD: true
 
 jobs:
-  verify:
-    name: Nx affected checks
+  nx-checks:
+    name: Nx affected (${{ matrix.target }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [lint, test, build, build-storybook]
 
     steps:
       - name: Checkout trusted source
@@ -50,8 +54,40 @@ jobs:
         run: bunx nx run metro-backend:prisma-generate
 
       - name: Verify rail integration protobuf contract
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        if: matrix.target == 'lint' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         run: node tools/verify-rail-integration-contract.mjs
+
+      - name: Set Nx SHAs
+        uses: nrwl/nx-set-shas@v5
+        with:
+          main-branch-name: main
+
+      - name: Lint affected projects
+        if: matrix.target == 'lint'
+        run: bunx nx affected -t lint --parallel=3
+
+      - name: Test affected projects
+        if: matrix.target == 'test'
+        run: bunx nx affected -t test --configuration=ci --parallel=3
+
+      - name: Build affected projects
+        if: matrix.target == 'build'
+        run: bunx nx affected -t build --parallel=3
+
+      - name: Build affected Storybooks
+        if: matrix.target == 'build-storybook'
+        run: bunx nx affected -t build-storybook --parallel=1
+
+  rust:
+    name: Rust importer checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Verify Rust importer
         run: |
@@ -60,27 +96,29 @@ jobs:
           cargo test --manifest-path dataset-handling/Cargo.toml --locked
           cargo build --manifest-path dataset-handling/Cargo.toml --release --locked
 
-      - name: Set Nx SHAs
-        uses: nrwl/nx-set-shas@v5
-        with:
-          main-branch-name: main
+  # Keep the existing required-check name while checking every parallel lane.
+  verify:
+    name: Nx affected checks
+    needs: [nx-checks, rust]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify all lanes succeeded
+        env:
+          NX_RESULT: ${{ needs.nx-checks.result }}
+          RUST_RESULT: ${{ needs.rust.result }}
+        run: test "$NX_RESULT" = success && test "$RUST_RESULT" = success
 
-      - name: Lint affected projects
-        run: bunx nx affected -t lint --parallel=3
-
-      - name: Test affected projects
-        run: bunx nx affected -t test --configuration=ci --parallel=3
-
-      - name: Build affected projects
-        run: bunx nx affected -t build --parallel=3
-
-      - name: Build affected Storybooks
-        run: bunx nx affected -t build-storybook --parallel=1
-
-  browser-e2e:
-    name: Browser smoke flows
+  browser-e2e-projects:
+    name: Browser smoke (${{ matrix.project }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # Each suite starts its own server on port 4200, so use separate runners.
+        project: [metro-frontend-e2e, metro-frontend-lite-e2e]
 
     steps:
       - name: Checkout trusted source
@@ -101,7 +139,19 @@ jobs:
         run: bunx playwright install --with-deps chromium
 
       - name: Run browser product flows
-        run: bunx nx run-many -t e2e -p metro-frontend-e2e,metro-frontend-lite-e2e --parallel=1
+        run: bunx nx run ${{ matrix.project }}:e2e
+
+  browser-e2e:
+    name: Browser smoke flows
+    needs: browser-e2e-projects
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify both browser suites succeeded
+        env:
+          BROWSER_RESULT: ${{ needs.browser-e2e-projects.result }}
+        run: test "$BROWSER_RESULT" = success
 
   backend-e2e:
     name: Backend HTTP smoke flows

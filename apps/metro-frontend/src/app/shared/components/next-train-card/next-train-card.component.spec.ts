@@ -236,6 +236,59 @@ describe('NextTrainCardComponent', () => {
     expect(renderedLocation()).toBe('');
   });
 
+  it('renders the live location after processing data replaces the static state', () => {
+    const key = 'L10:MOC' as StationKey;
+    fixture.componentRef.setInput('lineCode', 'L10');
+    fixture.componentRef.setInput('stationCode', 'MOC');
+    stationData.set(
+      new Map([
+        [
+          key,
+          {
+            trains: [],
+            hasError: false,
+            dataReceived: false,
+            processing: true,
+            operationClosed: false,
+            outOfSchedule: false,
+          },
+        ],
+      ]),
+    );
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.next-train-prominent')).toBeNull();
+    expect(
+      fixture.nativeElement.querySelectorAll('.train-composition-card'),
+    ).toHaveLength(2);
+
+    stationData.set(
+      new Map([
+        [
+          key,
+          {
+            trains: [
+              createArrival({
+                destinationCode: 'RGS',
+                destinationName: 'Rio Grande da Serra',
+                trainLastPassedStationName: 'Brás',
+              }),
+            ],
+            hasError: false,
+            dataReceived: true,
+            processing: false,
+            operationClosed: false,
+            outOfSchedule: false,
+          },
+        ],
+      ]),
+    );
+    fixture.detectChanges();
+
+    expect(renderedLocation()).toBe('Passou por Brás');
+    expect(fixture.nativeElement.querySelector('.loading-state')).toBeNull();
+  });
+
   it('keeps static composition and door guidance visible when operation is closed', () => {
     stationData.set(
       new Map([

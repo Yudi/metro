@@ -1,4 +1,6 @@
 <div class="next-train-card">
+  @let state = viewModel();
+
   <div class="card-header">
     @if (showLineName() && lineInfo(); as info) {
       <div class="line-badge" [style.background-color]="info.colorHex">
@@ -13,7 +15,7 @@
       <span class="header-title"> Próximos trens </span>
     }
 
-    @if (connected() && !operationClosed()) {
+    @if (connected() && !state.operationClosed) {
       <span
         class="live-indicator"
         [matTooltip]="'Última mudança às ' + getLastUpdateDisplay(lastUpdate())"
@@ -27,9 +29,21 @@
     }
   </div>
 
-  @if (hasTrains()) {
+  @if (state.outOfSchedule) {
+    <div class="operation-closed-state">
+      <mat-icon>schedule</mat-icon>
+      <span>Fora do horário de operação</span>
+    </div>
+  } @else if (state.operationClosed) {
+    <div class="operation-closed-state">
+      <mat-icon>nightlight</mat-icon>
+      <span>Operação Encerrada</span>
+    </div>
+  }
+
+  @if (state.directions.length > 0) {
     <div class="directions-container">
-      @for (direction of trainsByDirection(); track direction.terminal) {
+      @for (direction of state.directions; track direction.terminal) {
         <div class="direction-group">
           <div class="direction-header">
             <mat-icon>arrow_forward</mat-icon>
@@ -46,8 +60,7 @@
             }
           </div>
 
-          <!-- Next train (prominent display) -->
-          @if (direction.trains[0]; as nextTrain) {
+          @if (direction.nextTrain; as nextTrain) {
             <div
               class="next-train-prominent"
               [class.at-platform]="nextTrain.isAtPlatform"
@@ -74,61 +87,14 @@
                   {{ getTrainLocation(nextTrain) }}
                 </span>
               </div>
-              <!-- @if (isCptm() && nextTrain.trainPositionStatus) {
-                <div
-                  class="position-indicator"
-                  [class]="getPositionStatusClass(nextTrain)"
-                >
-                  @switch (nextTrain.trainPositionStatus) {
-                    @case ('at_station') {
-                      <mat-icon>location_on</mat-icon>
-                    }
-                    @case ('approaching') {
-                      <mat-icon>trending_up</mat-icon>
-                    }
-                    @case ('departing') {
-                      <mat-icon>trending_flat</mat-icon>
-                    }
-                    @default {
-                      <mat-icon>directions_transit</mat-icon>
-                    }
-                  }
-                </div>
-              } -->
             </div>
 
-            @if (direction.composition; as composition) {
-              <lib-train-composition
-                [composition]="composition"
-                [compactContext]="true"
-              />
-            }
-
-            <!-- Following trains as chips -->
-            @if (direction.trains.length > 1) {
+            @if (direction.followingTrains.length > 0) {
               <div class="following-trains">
                 <span class="following-label">Próximos:</span>
                 <div class="train-chips">
-                  <!-- @for (
-                    train of direction.trains.slice(1, 6);
-                    track train.arrivalTime
-                  ) {
-                    <span
-                      class="train-chip"
-                      [class.at-platform]="train.isAtPlatform"
-                      [matTooltip]="getTrainLocation(train)"
-                    >
-                      {{ getChipArrivalText(train) }}
-                    </span>
-                  } -->
-                  <!-- @if (direction.trains.length > 5) {
-                    <span class="more-trains">
-                      +{{ direction.trains.length - 5 }}
-                    </span>
-                  } -->
-
                   @for (
-                    train of getSortedFollowingTrains(direction.trains);
+                    train of direction.followingTrains;
                     track train.arrivalTime
                   ) {
                     <span
@@ -143,91 +109,45 @@
               </div>
             }
           }
-        </div>
-      }
 
-      @for (
-        direction of staticCompositionDirections();
-        track direction.terminal
-      ) {
-        <div class="direction-group">
-          <div class="direction-header">
-            <mat-icon>arrow_forward</mat-icon>
-            <span class="direction-label">{{ direction.terminal }}</span>
-          </div>
-
-          <lib-train-composition
-            [composition]="direction.composition"
-            [compactContext]="true"
-          />
+          @if (direction.composition; as composition) {
+            <lib-train-composition
+              [composition]="composition"
+              [compactContext]="true"
+            />
+          }
         </div>
       }
     </div>
-  } @else if (outOfSchedule()) {
-    <div class="operation-closed-state">
-      <mat-icon>schedule</mat-icon>
-      <span>Fora do horário de operação</span>
+  }
+
+  @if (state.processing || state.loading) {
+    <div class="loading-state" role="status">
+      <mat-spinner diameter="24"></mat-spinner>
+      <span>
+        {{ state.processing ? "Em processamento" : "Carregando horários..." }}
+      </span>
     </div>
-  } @else if (staticCompositionDirections().length > 0) {
-    @if (operationClosed()) {
-      <div class="operation-closed-state">
-        <mat-icon>nightlight</mat-icon>
-        <span>Operação Encerrada</span>
+  }
+
+  @if (
+    state.directions.length === 0 &&
+    !state.processing &&
+    !state.loading &&
+    !state.outOfSchedule &&
+    !state.operationClosed
+  ) {
+    @if (state.hasApiError) {
+      <div class="error-state">
+        <mat-icon>error_outline</mat-icon>
+        <span>Não foi possível obter dados</span>
+      </div>
+    } @else {
+      <div class="empty-state">
+        <mat-icon>train</mat-icon>
+        <span>Nenhum trem previsto no momento</span>
       </div>
     }
-
-    <div class="directions-container">
-      @for (
-        direction of staticCompositionDirections();
-        track direction.terminal
-      ) {
-        <div class="direction-group">
-          <div class="direction-header">
-            <mat-icon>arrow_forward</mat-icon>
-            <span class="direction-label">{{ direction.terminal }}</span>
-          </div>
-
-          <lib-train-composition
-            [composition]="direction.composition"
-            [compactContext]="true"
-          />
-        </div>
-      }
-    </div>
-
-    @if (processing() || loading()) {
-      <div class="loading-state" role="status">
-        <mat-spinner diameter="24"></mat-spinner>
-        <span>
-          {{ processing() ? "Em processamento" : "Carregando horários..." }}
-        </span>
-      </div>
-    }
-  } @else if (operationClosed()) {
-    <div class="operation-closed-state">
-      <mat-icon>nightlight</mat-icon>
-      <span>Operação Encerrada</span>
-    </div>
-  } @else if (processing()) {
-    <div class="loading-state">
-      <mat-spinner diameter="24"></mat-spinner>
-      <span>Em processamento</span>
-    </div>
-  } @else if (loading()) {
-    <div class="loading-state">
-      <mat-spinner diameter="24"></mat-spinner>
-      <span>Carregando horários...</span>
-    </div>
-  } @else if (hasApiError()) {
-    <div class="error-state">
-      <mat-icon>error_outline</mat-icon>
-      <span>Não foi possível obter dados</span>
-    </div>
-  } @else {
-    <div class="empty-state">
-      <mat-icon>train</mat-icon>
-      <span>Nenhum trem previsto no momento</span>
-    </div>
   }
   @if (lastUpdate()) {
     <div class="last-update"></div>

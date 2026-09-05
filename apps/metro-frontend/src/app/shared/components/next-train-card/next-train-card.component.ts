@@ -6,8 +6,6 @@ import {
   inject,
   OnInit,
   OnDestroy,
-  signal,
-  effect,
 } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -38,6 +36,23 @@ import {
   TrainCompositionComponent,
 } from '@metro/shared/train-composition';
 import { BreathingAnimationService } from '../../services/breathing-animation.service';
+
+interface TrainDirectionView {
+  readonly terminal: string;
+  readonly nextTrain: NextTrainArrival | undefined;
+  readonly followingTrains: readonly NextTrainArrival[];
+  readonly headway: DirectionHeadway | undefined;
+  readonly composition: TrainCompositionView | undefined;
+}
+
+interface NextTrainCardViewModel {
+  readonly directions: readonly TrainDirectionView[];
+  readonly loading: boolean;
+  readonly processing: boolean;
+  readonly hasApiError: boolean;
+  readonly operationClosed: boolean;
+  readonly outOfSchedule: boolean;
+}
 
 /**
  * Component to display real-time next train arrivals for supported rail stations
@@ -82,12 +97,6 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
   /** Whether to show the line name in the header (for multi-line stations) */
   readonly showLineName = input(false);
 
-  /** Loading state */
-  readonly loading = signal(true);
-
-  /** Error state */
-  readonly error = signal<string | null>(null);
-
   /** Connected to WebSocket */
   readonly connected = this.nextTrainService.connected;
 
@@ -118,37 +127,10 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
     return this.stationData()?.trains ?? [];
   });
 
-  /** Check if API returned an error */
-  readonly hasApiError = computed(() => {
-    return this.stationData()?.hasError ?? false;
-  });
-
-  /** Check if we've received data from backend (even if empty) */
-  readonly dataReceived = computed(() => {
-    return this.stationData()?.dataReceived ?? false;
-  });
-
-  /** Check if the backend request is queued or running */
-  readonly processing = computed(() => {
-    return this.stationData()?.processing ?? false;
-  });
-
-  /** Operation is closed and no station arrival data remains relevant */
-  readonly operationClosed = computed(() => {
-    return this.stationData()?.operationClosed ?? false;
-  });
-
-  readonly outOfSchedule = computed(() => {
-    return this.stationData()?.outOfSchedule ?? false;
-  });
-
   /** Headway data per direction */
   readonly headway = computed(() => {
     return this.stationData()?.headway ?? [];
   });
-
-  /** Check if any trains are available */
-  readonly hasTrains = computed(() => this.trains().length > 0);
 
   readonly staticCompositions = computed(() =>
     resolveStationTrainCompositionViews(
@@ -189,8 +171,8 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
     );
   });
 
-  /** Group trains by terminal direction, including pre-computed headway */
-  readonly trainsByDirection = computed(() => {
+  /** Group live trains by terminal direction, including pre-computed headway. */
+  readonly trainsByDirection = computed<readonly TrainDirectionView[]>(() => {
     const trains = this.trains();
     const terminals = this.terminals();
     const lineCode = this.lineCode();
@@ -221,68 +203,92 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
     }
 
     // Build directions array with sorted trains and matched headway
-    const directions: {
-      terminal: string;
-      trains: NextTrainArrival[];
-      headway: DirectionHeadway | undefined;
-      composition: TrainCompositionView | undefined;
-    }[] = [];
+    const directions: TrainDirectionView[] = [];
 
     for (const [terminal, dirTrains] of grouped) {
       // Match headway by destination names in this group, since the backend
       // keys headway by destinationName (e.g. "Vila Olímpia") while the
       // frontend groups by terminal (e.g. "Varginha").
       const destinationNames = new Set(dirTrains.map((t) => t.destinationName));
+      const sortedTrains = [...dirTrains].sort((a, b) =>
+        this.compareArrivalTimes(a, b),
+      );
       directions.push({
         terminal,
-        trains: [...dirTrains].sort((a, b) => this.compareArrivalTimes(a, b)),
+        nextTrain: sortedTrains[0],
+        followingTrains: sortedTrains.slice(1),
         headway: headwayData.find(
           (h) => h.direction === terminal || destinationNames.has(h.direction),
         ),
-        composition: this.getCompositionForDirection(terminal, dirTrains[0]),
+        composition: this.getCompositionForDirection(terminal, sortedTrains[0]),
       });
     }
 
-    // Sort directions: terminal 1 first, terminal 2 second
-    directions.sort((a, b) => {
-      const aIndex = terminals.indexOf(
-        a.terminal as (typeof terminals)[number],
-      );
-      const bIndex = terminals.indexOf(
-        b.terminal as (typeof terminals)[number],
-      );
-      return aIndex - bIndex;
-    });
-
-    return directions;
+    return this.sortDirections(directions, terminals);
   });
 
-  readonly staticCompositionDirections = computed(() => {
-    const visibleDirections = new Set(
-      this.trainsByDirection().map((direction) =>
-        hardNormalizeString(direction.terminal),
-      ),
+  /**
+   * One render model for both states: static layouts remain available for
+   * every configured direction while live arrivals fill in as they arrive.
+   */
+  readonly directionViews = computed<readonly TrainDirectionView[]>(() => {
+    const staticCompositions = this.staticCompositions();
+    const staticByDirection = new Map(
+      staticCompositions.map((composition) => [
+        hardNormalizeString(composition.directionName),
+        composition,
+      ]),
+    );
+    const liveDirections = this.trainsByDirection();
+    const directions = liveDirections.map((direction) => ({
+      ...direction,
+      composition:
+        direction.composition ??
+        staticByDirection.get(hardNormalizeString(direction.terminal)),
+    }));
+    const liveDirectionKeys = new Set(
+      liveDirections.map((direction) => hardNormalizeString(direction.terminal)),
     );
 
-    return this.staticCompositions()
-      .filter(
-        (composition) =>
-          !visibleDirections.has(
-            hardNormalizeString(composition.directionName),
-          ),
-      )
-      .map((composition) => ({
+    for (const composition of staticCompositions) {
+      const directionKey = hardNormalizeString(composition.directionName);
+      if (liveDirectionKeys.has(directionKey)) {
+        continue;
+      }
+
+      directions.push({
         terminal: composition.directionName,
+        nextTrain: undefined,
+        followingTrains: [],
+        headway: undefined,
         composition,
-      }));
+      });
+    }
+
+    return this.sortDirections(directions, this.terminals());
   });
 
-  constructor() {
-    // Effect to update loading state when data is received from backend
-    effect(() => {
-      if (this.dataReceived()) {
-        this.loading.set(false);
-      }
+  readonly viewModel = computed<NextTrainCardViewModel>(() => {
+    const data = this.stationData();
+
+    return {
+      directions: this.directionViews(),
+      loading: !(data?.dataReceived ?? false),
+      processing: data?.processing ?? false,
+      hasApiError: data?.hasError ?? false,
+      operationClosed: data?.operationClosed ?? false,
+      outOfSchedule: data?.outOfSchedule ?? false,
+    };
+  });
+
+  private sortDirections(
+    directions: readonly TrainDirectionView[],
+    terminals: readonly string[],
+  ): TrainDirectionView[] {
+    return [...directions].sort((a, b) => {
+      const aIndex = terminals.indexOf(a.terminal);
+      const bIndex = terminals.indexOf(b.terminal);
+      return aIndex - bIndex;
     });
   }
 
@@ -313,19 +319,6 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
     return formatTransitTime(train.arrivalTime, {
       timeZone: this.transitTimeZone,
     });
-  }
-
-  /**
-   * Returns a new array containing the trains after the first one, sorted by
-   * their actual upcoming arrival order. Used in template to avoid complex
-   * expressions that the Angular parser can't handle.
-   */
-  getSortedFollowingTrains(trains: NextTrainArrival[]): NextTrainArrival[] {
-    if (!trains || trains.length <= 1) {
-      return [];
-    }
-    // copy slice to avoid mutating original
-    return [...trains.slice(1)].sort((a, b) => this.compareArrivalTimes(a, b));
   }
 
   private compareArrivalTimes(

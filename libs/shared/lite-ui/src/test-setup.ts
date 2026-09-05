@@ -1,6 +1,37 @@
-import { setupZonelessTestEnv } from 'jest-preset-angular/setup-env/zoneless';
+import {
+  COMPILER_OPTIONS,
+  ErrorHandler,
+  NgModule,
+  provideZonelessChangeDetection,
+} from '@angular/core';
+import { getTestBed } from '@angular/core/testing';
+import {
+  BrowserTestingModule,
+  platformBrowserTesting,
+} from '@angular/platform-browser/testing';
 
-setupZonelessTestEnv({
-  errorOnUnknownElements: true,
-  errorOnUnknownProperties: true,
-});
+class ZonelessTestModule {}
+NgModule({
+  providers: [
+    provideZonelessChangeDetection(),
+    {
+      provide: ErrorHandler,
+      useValue: {
+        handleError: (error: unknown) => {
+          throw error;
+        },
+      },
+    },
+  ],
+})(ZonelessTestModule);
+
+getTestBed().initTestEnvironment(
+  [BrowserTestingModule, ZonelessTestModule],
+  platformBrowserTesting([
+    { provide: COMPILER_OPTIONS, useValue: {}, multi: true },
+  ]),
+  {
+    errorOnUnknownElements: true,
+    errorOnUnknownProperties: true,
+  },
+);

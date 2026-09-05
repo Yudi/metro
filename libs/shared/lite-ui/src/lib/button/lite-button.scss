@@ -1,6 +1,15 @@
 // Lite Button Styles
 // Uses CSS custom properties for theming
 
+:host {
+  display: inline-flex;
+  vertical-align: middle;
+}
+
+:host(.lite-button--full-width) {
+  width: 100%;
+}
+
 .lite-button {
   display: inline-flex;
   align-items: center;

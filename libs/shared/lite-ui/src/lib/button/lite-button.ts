@@ -1,10 +1,9 @@
 import {
   Component,
   ChangeDetectionStrategy,
+  computed,
   input,
   output,
-  HostBinding,
-  HostListener,
 } from '@angular/core';
 
 export type LiteButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost';
@@ -13,15 +12,26 @@ export type LiteButtonSize = 'sm' | 'md' | 'lg';
 @Component({
   selector: 'lite-button',
   template: `
-    <span class="lite-button-content">
-      @if (loading()) {
-        <span class="lite-button-spinner"></span>
-      }
-      <ng-content></ng-content>
-    </span>
+    <button
+      [class]="buttonClass()"
+      [type]="type()"
+      [disabled]="isDisabled()"
+      [attr.aria-busy]="loading() ? 'true' : null"
+      (click)="onClick($event)"
+    >
+      <span class="lite-button-content">
+        @if (loading()) {
+          <span class="lite-button-spinner" aria-hidden="true"></span>
+        }
+        <ng-content></ng-content>
+      </span>
+    </button>
   `,
   styleUrl: './lite-button.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '[class.lite-button--full-width]': 'fullWidth()',
+  },
 })
 export class LiteButton {
   readonly variant = input<LiteButtonVariant>('primary');
@@ -32,32 +42,21 @@ export class LiteButton {
   readonly type = input<'button' | 'submit' | 'reset'>('button');
   readonly buttonClick = output<MouseEvent>();
 
-  @HostBinding('class')
-  get hostClass(): string {
-    return [
+  readonly isDisabled = computed(() => this.disabled() || this.loading());
+  readonly buttonClass = computed(() =>
+    [
       'lite-button',
       `lite-button--${this.variant()}`,
       `lite-button--${this.size()}`,
       this.fullWidth() ? 'lite-button--full-width' : '',
-      this.disabled() || this.loading() ? 'lite-button--disabled' : '',
+      this.isDisabled() ? 'lite-button--disabled' : '',
     ]
       .filter(Boolean)
-      .join(' ');
-  }
+      .join(' '),
+  );
 
-  @HostBinding('attr.disabled')
-  get isDisabled(): boolean | null {
-    return this.disabled() || this.loading() ? true : null;
-  }
-
-  @HostBinding('attr.type')
-  get buttonType(): string {
-    return this.type();
-  }
-
-  @HostListener('click', ['$event'])
   onClick(event: MouseEvent): void {
-    if (!this.disabled() && !this.loading()) {
+    if (!this.isDisabled()) {
       this.buttonClick.emit(event);
     }
   }

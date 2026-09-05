@@ -235,4 +235,35 @@ describe('NextTrainCardComponent', () => {
     );
     expect(renderedLocation()).toBe('');
   });
+
+  it('keeps static composition and door guidance visible when operation is closed', () => {
+    stationData.set(
+      new Map([
+        [
+          'L9:PIN',
+          {
+            trains: [],
+            hasError: false,
+            dataReceived: true,
+            processing: false,
+            operationClosed: true,
+            outOfSchedule: false,
+          },
+        ],
+      ]),
+    );
+    fixture.componentRef.setInput('lineCode', 'L9');
+    fixture.componentRef.setInput('stationCode', 'PIN');
+    fixture.detectChanges();
+
+    expect(
+      fixture.nativeElement.querySelector('.operation-closed-state'),
+    ).not.toBeNull();
+    expect(
+      fixture.nativeElement.querySelectorAll('.train-composition-card'),
+    ).toHaveLength(2);
+    expect(
+      fixture.nativeElement.querySelectorAll('.train-composition__feature'),
+    ).not.toHaveLength(0);
+  });
 });

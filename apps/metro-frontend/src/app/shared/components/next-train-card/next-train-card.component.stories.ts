@@ -477,7 +477,8 @@ export const NoTrains: Story = {
 };
 
 /**
- * Operation closed: no relevant cached arrival data remains after service hours.
+ * Operation closed: the status is shown while hardcoded composition and door
+ * guidance remain available after service hours.
  */
 export const OperationClosed: Story = {
   args: {

@@ -168,12 +168,14 @@
       <mat-icon>schedule</mat-icon>
       <span>Fora do horário de operação</span>
     </div>
-  } @else if (operationClosed()) {
-    <div class="operation-closed-state">
-      <mat-icon>nightlight</mat-icon>
-      <span>Operação Encerrada</span>
-    </div>
   } @else if (staticCompositionDirections().length > 0) {
+    @if (operationClosed()) {
+      <div class="operation-closed-state">
+        <mat-icon>nightlight</mat-icon>
+        <span>Operação Encerrada</span>
+      </div>
+    }
+
     <div class="directions-container">
       @for (
         direction of staticCompositionDirections();
@@ -201,6 +203,11 @@
         </span>
       </div>
     }
+  } @else if (operationClosed()) {
+    <div class="operation-closed-state">
+      <mat-icon>nightlight</mat-icon>
+      <span>Operação Encerrada</span>
+    </div>
   } @else if (processing()) {
     <div class="loading-state">
       <mat-spinner diameter="24"></mat-spinner>

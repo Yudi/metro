@@ -93,7 +93,10 @@ describe('LinhaUni agency', () => {
       colorHex: '#F47322',
       carCount: 6,
       carDoorCount: 4,
-      stations: [],
+      stations: expect.arrayContaining([
+        expect.objectContaining({ code: 'BRA', name: 'Brasilândia' }),
+        expect.objectContaining({ code: 'JQM', name: 'São Joaquim' }),
+      ]),
     });
     expect(getRouteAgency('L6')).toBe(TransitAgency.LINHAUNI);
     expect(LINE_AGENCY_MAPPING[6]).toBe(TransitAgency.LINHAUNI);
@@ -115,9 +118,15 @@ describe('Trivia Trens agency', () => {
       expect(LINE_AGENCY_MAPPING[lineCode]).toBe(TransitAgency.TRIVIATRENS);
     }
 
-    expect(AGENCIES_DATA[TransitAgency.TRIVIATRENS].contact).toEqual(
-      AGENCIES_DATA[TransitAgency.TICTRENS].contact,
-    );
+    expect(AGENCIES_DATA[TransitAgency.TRIVIATRENS].contact).toMatchObject({
+      phones: [
+        {
+          number: '08000746733',
+          whatsapp: true,
+        },
+      ],
+      site: 'https://triviatrens.com.br/',
+    });
   });
 
   it('keeps Trivia Trens live data controlled by one switch', () => {

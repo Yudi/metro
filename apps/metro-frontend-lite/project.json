@@ -5,6 +5,9 @@
   "prefix": "app",
   "sourceRoot": "apps/metro-frontend-lite/src",
   "tags": [],
+  "namedInputs": {
+    "default": ["{projectRoot}/**/*", "sharedGlobals", "{workspaceRoot}/libs/shared/styles/**/*.scss"]
+  },
   "targets": {
     "build": {
       "executor": "@angular/build:application",
@@ -171,6 +174,7 @@
         "outputDir": "dist/storybook/metro-frontend-lite",
         "configDir": "apps/metro-frontend-lite/.storybook",
         "browserTarget": "metro-frontend-lite:build-storybook",
+        "styles": ["apps/metro-frontend-lite/src/styles.scss"],
         "compodoc": true,
         "compodocArgs": [
           "-e",

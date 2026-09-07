@@ -5,10 +5,12 @@ import { SubwayStationProcessorService } from '../../vector-tiles/services/subwa
 import { VectorTilesService } from '../../vector-tiles/vector-tiles.service';
 import { TransitDataPrecomputeService } from '../../transit-data/transit-data-precompute.service';
 import { RouteStopMappingService } from '../../realtime/services/route-stop-mapping.service';
+import { GTFSFeed } from '../config/gtfs.config';
 
 export interface DataImportHookOptions {
   readonly dataChanged?: boolean;
   readonly sourceSignature?: string;
+  readonly feeds?: readonly GTFSFeed[];
 }
 
 @Injectable()
@@ -27,6 +29,7 @@ export class DataImportHooksService {
   async onDataImportComplete(options: DataImportHookOptions = {}): Promise<void> {
     const dataChanged = options.dataChanged ?? true;
     const sourceSignature = options.sourceSignature;
+    const feeds = options.feeds ?? ['sptrans'];
 
     if (
       !dataChanged &&
@@ -52,7 +55,9 @@ export class DataImportHooksService {
 
     if (dataChanged || sourceSignature) {
       this.logger.debug('Analyzing replaced GTFS tables...');
-      await this.gtfsDatabaseService.analyzeImportedTables();
+      for (const feed of feeds) {
+        await this.gtfsDatabaseService.analyzeImportedTables(feed);
+      }
     }
 
     this.logger.debug('Processing subway stations...');

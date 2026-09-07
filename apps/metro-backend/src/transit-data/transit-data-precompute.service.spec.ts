@@ -13,6 +13,7 @@ describe('TransitDataPrecomputeService', () => {
     $executeRawUnsafe: jest.Mock;
   };
   let service: TransitDataPrecomputeService;
+  const physicalStops = { refresh: jest.fn().mockResolvedValue(undefined) };
 
   beforeEach(() => {
     prisma = {
@@ -20,7 +21,7 @@ describe('TransitDataPrecomputeService', () => {
       $executeRaw: jest.fn().mockResolvedValue(1),
       $executeRawUnsafe: jest.fn().mockResolvedValue(1),
     };
-    service = new TransitDataPrecomputeService(prisma as never);
+    service = new TransitDataPrecomputeService(prisma as never, physicalStops as never);
   });
 
   it('refreshes both GTFS-derived views and records their source signatures', async () => {
@@ -46,12 +47,12 @@ describe('TransitDataPrecomputeService', () => {
   it('skips refreshes when the imported GTFS and merged GeoSampa data are unchanged', async () => {
     prisma.$queryRaw
       .mockResolvedValueOnce([{ source_signature: 'gtfs-hash' }])
-      .mockResolvedValueOnce([{ source_signature: 'v1:gtfs-hash' }])
+      .mockResolvedValueOnce([{ source_signature: 'v2:gtfs-hash' }])
       .mockResolvedValueOnce([{ source_signature: 'rail-hash' }])
       .mockResolvedValueOnce([
         {
           source_signature:
-            'v1:radius=200:gtfs=gtfs-hash:rail=rail-hash',
+            'v2:radius=200:gtfs=gtfs-hash:rail=rail-hash',
         },
       ]);
 

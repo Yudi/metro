@@ -13,6 +13,24 @@ describe('BusVectorTileService', () => {
     ).rejects.toBe(databaseError);
   });
 
+  it('reads normalized feed views and emits one physical stop marker per tile', async () => {
+    const query = jest.fn().mockResolvedValue([{ mvt: Buffer.from('tile') }]);
+    const service = new BusVectorTileService({ $queryRaw: query } as never);
+
+    await expect(
+      service.generateBusStopsTile(12, 1000, 1000, {
+        stopIds: ['artesp:2'],
+      }),
+    ).resolves.toEqual(Buffer.from('tile'));
+
+    const sql = (query.mock.calls[0][0] as TemplateStringsArray).join('?');
+    expect(sql).toContain('Gtfs_Stop');
+    expect(sql).toContain('Gtfs_StopTime');
+    expect(sql).toContain('Gtfs_Route');
+    expect(sql).toContain('physical_stop_members');
+    expect(sql).toContain('canonical_stops');
+  });
+
   it('rejects invalid proximity values rather than treating them as absent', () => {
     const service = new BusVectorTileService({} as never);
 

@@ -1,6 +1,10 @@
 import { Service, inject } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { LoggerService } from '@metro/shared/api';
+import {
+  formatBusFare,
+  type BusFare,
+} from '@metro/shared/utils';
 import { Feature } from 'ol';
 import { FeatureLike } from 'ol/Feature';
 import { BikeStationsService } from '../../services/bike-stations.service';
@@ -13,6 +17,7 @@ import { MapDetailsDialogService } from './map-details-dialog.service';
 import { MapDisplayService } from './map-display.service';
 import { MapSelectionService } from './map-selection.service';
 import { MapStateService } from './map-state.service';
+import { GeographyGraphQLService } from '../../services/geography-graphql.service';
 
 @Service()
 export class MapFeatureInteractionService {
@@ -25,6 +30,9 @@ export class MapFeatureInteractionService {
   private readonly vectorTileService = inject(VectorTileLayerService);
   private readonly detailsService = inject(MapDetailsDialogService);
   private readonly selectionService = inject(MapSelectionService);
+  private readonly geographyService = inject(GeographyGraphQLService, {
+    optional: true,
+  });
 
   handleFeatureSelection(feature: Feature | FeatureLike): void {
     const clusterMembers = this.getClusterMembers(feature as Feature);
@@ -174,11 +182,27 @@ export class MapFeatureInteractionService {
       return;
     }
 
-    this.showRouteDetails(routeData.routeId, {
+    const properties = {
       shortName: routeData.shortName,
       longName: routeData.longName,
       color: routeData.color,
       textColor: routeData.textColor,
+    };
+
+    if (!this.geographyService) {
+      this.showRouteDetails(routeData.routeId, properties);
+      return;
+    }
+
+    this.geographyService.getBusRoute(routeData.routeId).subscribe({
+      next: (route) => {
+        this.showRouteDetails(routeData.routeId, {
+          ...properties,
+          sourceAgency: route?.sourceAgency,
+          fares: route?.fares,
+        });
+      },
+      error: () => this.showRouteDetails(routeData.routeId, properties),
     });
   }
 
@@ -254,13 +278,37 @@ export class MapFeatureInteractionService {
     const routeName = properties['shortName']
       ? `${properties['shortName']} - ${properties['longName']}`
       : properties['longName'] || routeId;
+    const fareLabel = this.getFareLabel(properties['fares']);
+    const fareSuffix = fareLabel ? ` · ${fareLabel}` : '';
 
     this.snackBar
-      .open(`Rota: ${routeName}`, 'Adicionar', { duration: 5000 })
+      .open(`Rota: ${routeName}${fareSuffix}`, 'Adicionar', { duration: 5000 })
       .onAction()
       .subscribe(() => {
         this.selectionService.addRouteToSelection(routeId, true);
       });
+  }
+
+  private getFareLabel(value: unknown): string | null {
+    if (!Array.isArray(value)) {
+      return null;
+    }
+
+    const fares = value.filter((fare): fare is BusFare => {
+      if (!fare || typeof fare !== 'object') {
+        return false;
+      }
+
+      const candidate = fare as Record<string, unknown>;
+      return (
+        typeof candidate['price'] === 'number' &&
+        typeof candidate['currency'] === 'string'
+      );
+    });
+
+    return fares.length > 0
+      ? fares.map((fare) => formatBusFare(fare)).join(' · ')
+      : null;
   }
 
   private showShapeDetails(shapeId: string): void {

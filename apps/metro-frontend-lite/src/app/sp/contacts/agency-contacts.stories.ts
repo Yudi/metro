@@ -96,7 +96,7 @@ export const WhatsApp: Story = {
 
 export const Onibus: Story = {
   args: {
-    agencyKey: TransitAgency.EMTU,
+    agencyKey: TransitAgency.ARTESP,
     contactMode: 'telefone',
     showAdditionalInformation: true,
   },

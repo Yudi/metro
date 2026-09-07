@@ -33,6 +33,10 @@ export class FeatureFactoryService {
       name: stop.name,
       isSubwayStation: stop.isSubwayStation,
       agencies: stop.agencies || [],
+      sourceAgency: stop.sourceAgency,
+      sourceId: stop.sourceId,
+      platformCode: stop.platformCode,
+      mergedStopIds: stop.mergedStopIds,
       type: 'stop',
       creationSource,
     });
@@ -67,6 +71,10 @@ export class FeatureFactoryService {
       properties['routeId'] = shape.routeInfo.routeId;
       properties['shortName'] = shape.routeInfo.shortName;
       properties['longName'] = shape.routeInfo.longName;
+      properties['sourceAgency'] = shape.routeInfo.sourceAgency;
+      properties['sourceId'] = shape.routeInfo.sourceId;
+      properties['supportsRealtime'] = shape.routeInfo.supportsRealtime;
+      properties['fares'] = shape.routeInfo.fares;
       properties['isSubwayRoute'] = isSubwayRoute(shape.routeInfo);
     }
 

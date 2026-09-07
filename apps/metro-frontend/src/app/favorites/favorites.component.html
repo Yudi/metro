@@ -40,15 +40,19 @@
               @if (busStops().length === 0) {
                 <span class="empty-category">Nenhum ponto salvo.</span>
               } @else {
-                @for (stop of busStops(); track stop.stopId) {
+                @for (stop of busStops(); track stop.favoriteId || stop.stopId) {
                   <div class="config-item">
                     <mat-chip-set aria-label="Ponto favorito">
                       <mat-chip
                         removable
-                        (removed)="removeFavorite(stop.stopId, 'busStop')"
+                        (removed)="removeFavorite(stop.favoriteId || stop.stopId, 'busStop')"
                       >
                         <mat-icon matChipAvatar>directions_bus</mat-icon>
                         {{ stop.name }}
+                        <span class="favorite-stop-id">ID: {{ stopDisplayId(stop) }}</span>
+                        @if (stop.platformCode) {
+                          <span class="favorite-stop-id">Plataforma {{ stop.platformCode }}</span>
+                        }
                         <button
                           matChipRemove
                           matTooltip="Remover dos favoritos"
@@ -70,8 +74,11 @@
                         @for (route of routes; track route.routeId) {
                           <button
                             type="button"
-                            class="choice-button"
+                            class="choice-button route-choice-button"
                             [class.selected]="
+                              isBusStopRouteSelected(stop.stopId, route)
+                            "
+                            [attr.aria-pressed]="
                               isBusStopRouteSelected(stop.stopId, route)
                             "
                             (click)="toggleBusStopRoute(stop.stopId, route)"
@@ -82,6 +89,35 @@
                               [style.color]="routeTextColor(route)"
                             >
                               {{ route.shortName }}
+                            </span>
+                            <span class="choice-copy">
+                              <span class="choice-title">{{ route.longName }}</span>
+                              <span class="choice-meta">
+                                @if (agencyIdentity(route); as agency) {
+                                  <span class="agency-identity">
+                                    @if (agency.iconPath; as iconPath) {
+                                      <img
+                                        [ngSrc]="iconPath"
+                                        width="18"
+                                        height="18"
+                                        alt=""
+                                      />
+                                    } @else {
+                                      <mat-icon aria-hidden="true">business</mat-icon>
+                                    }
+                                    <span>{{ agency.name }}</span>
+                                  </span>
+                                }
+                                @if (routeFareLabel(route); as fareLabel) {
+                                  <span
+                                    class="route-fare"
+                                    [class.missing-fare]="fareLabel === 'Tarifa não informada'"
+                                  >
+                                    <mat-icon>payments</mat-icon>
+                                    {{ fareLabel }}
+                                  </span>
+                                }
+                              </span>
                             </span>
                           </button>
                         }
@@ -106,11 +142,48 @@
               } @else {
                 @for (route of busRoutes(); track route.routeId) {
                   <mat-chip
+                    class="route-favorite-chip"
                     removable
                     (removed)="removeFavorite(route.routeId, 'busRoute')"
                   >
-                    <mat-icon matChipAvatar>route</mat-icon>
-                    {{ route.shortName }} - {{ route.longName }}
+                    <span class="route-favorite-content">
+                      <span
+                        class="route-badge"
+                        [style.backgroundColor]="routeColor(route)"
+                        [style.color]="routeTextColor(route)"
+                      >
+                        {{ route.shortName }}
+                      </span>
+                      <span class="route-favorite-copy">
+                        <strong>{{ route.longName }}</strong>
+                        <span class="route-favorite-meta">
+                          @if (agencyIdentity(route); as agency) {
+                            <span class="agency-identity">
+                              @if (agency.iconPath; as iconPath) {
+                                <img
+                                  [ngSrc]="iconPath"
+                                  width="18"
+                                  height="18"
+                                  alt=""
+                                />
+                              } @else {
+                                <mat-icon aria-hidden="true">business</mat-icon>
+                              }
+                              <span>{{ agency.name }}</span>
+                            </span>
+                          }
+                          @if (routeFareLabel(route); as fareLabel) {
+                            <span
+                              class="route-fare"
+                              [class.missing-fare]="fareLabel === 'Tarifa não informada'"
+                            >
+                              <mat-icon>payments</mat-icon>
+                              {{ fareLabel }}
+                            </span>
+                          }
+                        </span>
+                      </span>
+                    </span>
                     <button
                       matChipRemove
                       matTooltip="Remover dos favoritos"

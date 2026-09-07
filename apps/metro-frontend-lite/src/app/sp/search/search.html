@@ -74,6 +74,26 @@
         <div class="stop-info">
           <h3 class="stop-name">{{ stop.name }}</h3>
           <p class="stop-type">{{ getStopType(stop) }}</p>
+          @if (getStopAgencies(stop).length > 0) {
+          <div class="agency-list" aria-label="Operadora">
+            @for (agency of getStopAgencies(stop); track agency.label) {
+            <span class="agency-lockup">
+              @if (agency.key; as agencyKey) {
+              <img
+                [ngSrc]="getAgencyLogoPath(agencyKey)"
+                width="18"
+                height="18"
+                alt=""
+              />
+              }
+              <span>{{ agency.label }}</span>
+            </span>
+            }
+          </div>
+          }
+          @if (stop.kind === 'busStop' && getPlatformLabel(stop); as platformLabel) {
+          <p class="stop-type">{{ platformLabel }}</p>
+          }
           @if (stop.kind === 'bikeStation') {
           <p class="stop-type">{{ getBikeSummary(stop) }}</p>
           } @if (stop.lineCodes.length > 0) {
@@ -122,6 +142,26 @@
     <div class="detail-title">
       <h2>{{ stop.name }}</h2>
       <span class="detail-type">{{ getStopType(stop) }}</span>
+      @if (getStopAgencies(stop).length > 0) {
+      <div class="agency-list" aria-label="Operadora">
+        @for (agency of getStopAgencies(stop); track agency.label) {
+        <span class="agency-lockup">
+          @if (agency.key; as agencyKey) {
+          <img
+            [ngSrc]="getAgencyLogoPath(agencyKey)"
+            width="18"
+            height="18"
+            alt=""
+          />
+          }
+          <span>{{ agency.label }}</span>
+        </span>
+        }
+      </div>
+      }
+      @if (stop.kind === 'busStop' && getPlatformLabel(stop); as platformLabel) {
+      <span class="detail-type">{{ platformLabel }}</span>
+      }
     </div>
   </header>
 
@@ -156,6 +196,9 @@
       [railConnections]="railConnections()"
       [railConnectionsLoading]="railConnectionsLoading()"
       [railConnectionsError]="railConnectionsError()"
+      [scheduledDepartures]="scheduledDepartures()"
+      [scheduledDeparturesLoading]="scheduledDeparturesLoading()"
+      [scheduledDeparturesError]="scheduledDeparturesError()"
     />
     } @if (stop.kind === 'bikeStation') {
     <app-lite-bike-availability [station]="stop" />

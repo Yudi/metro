@@ -3,7 +3,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
 import * as fs from 'fs';
-import { GTFSConfig } from '../config/gtfs.config';
+import { GTFSConfig, GTFSFeed } from '../config/gtfs.config';
 
 const execFileAsync = promisify(execFile);
 
@@ -76,6 +76,7 @@ export class RustGtfsService {
     shapesFilePath: string,
     dbUrl: string,
     srid = 4326,
+    feed: GTFSFeed = 'sptrans',
   ): Promise<void> {
     try {
       this.logger.debug(
@@ -91,7 +92,9 @@ export class RustGtfsService {
           '--srid',
           srid.toString(),
           '--schema',
-          'external_gtfs',
+          GTFSConfig.EXTERNAL_SCHEMA,
+          '--table-prefix',
+          GTFSConfig.getFeedDefinition(feed).tablePrefix,
         ],
         {
           timeout: GTFSConfig.PROCESSING_TIMEOUT_MS,

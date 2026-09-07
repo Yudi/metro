@@ -128,6 +128,31 @@ describe('DataImportService', () => {
     jest.useRealTimers();
   });
 
+  it('refreshes changed feeds before reporting a cross-feed failure', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(service as never, 'performImport' as never).mockResolvedValue({
+      success: false,
+      filesProcessed: 2,
+      recordsImported: 20,
+      skippedFiles: [],
+      errors: ['artesp: download failed'],
+      dataChanged: true,
+      sourceSignature: 'sptrans:current|artesp:candidate',
+      changedFeeds: ['sptrans', 'artesp'],
+    } as never);
+
+    await expect(service.startImport()).rejects.toThrow(
+      'GTFS import failed: artesp: download failed',
+    );
+    expect(hooks.onDataImportComplete).toHaveBeenCalledWith({
+      dataChanged: true,
+      sourceSignature: 'sptrans:current|artesp:candidate',
+      feeds: ['sptrans', 'artesp'],
+    });
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
+  });
+
   it('aborts timed-out operations and clears the timeout after success', async () => {
     jest.useFakeTimers();
     const signalState: { signal?: AbortSignal } = {};

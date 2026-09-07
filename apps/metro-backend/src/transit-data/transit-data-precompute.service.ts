@@ -1,13 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { GTFSConfig } from '../data-import/config/gtfs.config';
+import { PhysicalStopService } from './physical-stop.service';
 
 export const ROUTE_RAIL_CONNECTION_RADIUS_METERS = 200;
 
 const GTFS_STOP_SUMMARY_STATE_KEY = 'gtfs-stop-service-summary';
-const GTFS_STOP_SUMMARY_VERSION = 1;
+const GTFS_STOP_SUMMARY_VERSION = 2;
 const ROUTE_RAIL_CONNECTION_STATE_KEY = 'route-rail-connections';
-const ROUTE_RAIL_CONNECTION_VERSION = 1;
+const ROUTE_RAIL_CONNECTION_VERSION = 2;
 const GTFS_POST_PROCESSING_STATE_KEY = 'gtfs-post-processing';
 const GTFS_POST_PROCESSING_COMPLETE_PREFIX = 'complete:';
 const GTFS_POST_PROCESSING_PENDING_PREFIX = 'pending:';
@@ -26,7 +27,10 @@ type PrecomputedView =
 export class TransitDataPrecomputeService {
   private readonly logger = new Logger(TransitDataPrecomputeService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly physicalStops: PhysicalStopService,
+  ) {}
 
   /** Skip hooks only after the full GTFS post-processing chain completes. */
   async isGtfsPostProcessingCurrent(sourceSignature: string): Promise<boolean> {
@@ -67,6 +71,7 @@ export class TransitDataPrecomputeService {
       summarySignature,
       'gtfs_stop_service_summary',
     );
+    await this.physicalStops.refresh(gtfsSignature);
     await this.refreshRouteRailConnections(gtfsSignature);
   }
 
@@ -153,7 +158,10 @@ export class TransitDataPrecomputeService {
         STRING_AGG(
           file."fileName" || ':' || file."fileHash",
           '|' ORDER BY file."fileName"
-        )
+        ) || ':artesp:' || COALESCE((
+          SELECT feed.file_hash FROM public.gtfs_feed_datasets feed
+          WHERE feed.source = 'artesp' AND feed.completed
+        ), 'absent')
       ) AS source_signature
       FROM complete_dataset dataset
       INNER JOIN "public"."gtfs_files" file

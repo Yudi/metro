@@ -1,3 +1,4 @@
+import { BusFare } from '../../geography/entities/geography.entity';
 import {
   createUnionType,
   ObjectType,
@@ -48,6 +49,10 @@ export class SearchBusRoute implements SearchResult {
   // concrete fields
   @Field() type!: 'busRoute';
   @Field() route_id!: string;
+  @Field() sourceAgency!: string;
+  @Field() sourceId!: string;
+  @Field(() => Boolean) supportsRealtime!: boolean;
+  @Field(() => [BusFare]) fares!: BusFare[];
   @Field() route_short_name!: string;
   @Field() route_long_name!: string;
   @Field(() => Int) route_type!: number;
@@ -73,6 +78,11 @@ export class SearchBusStop implements SearchResult {
   // concrete fields
   @Field() type!: 'busStop';
   @Field() stop_id!: string;
+  @Field() sourceAgency!: string;
+  @Field() sourceId!: string;
+  @Field({ nullable: true }) platformCode?: string;
+  @Field(() => [String]) mergedStopIds!: string[];
+  @Field(() => [String]) agencies!: string[];
   @Field() stop_name!: string;
   @Field({ nullable: true }) stop_desc?: string;
 

@@ -222,6 +222,10 @@ export class StopSearchService {
         lineCodes: [],
         routes,
         source: 'gtfs',
+        sourceAgency: stop.sourceAgency || undefined,
+        sourceId: stop.sourceId || undefined,
+        platformCode: stop.platformCode || undefined,
+        mergedStopIds: stop.mergedStopIds || undefined,
       };
     }
 
@@ -400,7 +404,12 @@ export class StopSearchService {
           stop_desc
           stop_lat
           stop_lon
+          sourceAgency
+          sourceId
+          platformCode
+          mergedStopIds
           routes {
+            route_id
             route_short_name
           }
           highlights {
@@ -481,7 +490,12 @@ interface BusStopResult extends NextArrivalSearchItemBase {
   stop_desc: string | null;
   stop_lat: number;
   stop_lon: number;
+  sourceAgency?: string | null;
+  sourceId?: string | null;
+  platformCode?: string | null;
+  mergedStopIds?: string[] | null;
   routes: {
+    route_id?: string;
     route_short_name: string;
   }[];
 }

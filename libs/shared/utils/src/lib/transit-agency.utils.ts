@@ -11,7 +11,7 @@ export enum TransitAgency {
   TRIVIATRENS = 'triviatrens',
   CPTM = 'cptm',
   SPTRANS = 'sptrans',
-  EMTU = 'emtu',
+  ARTESP = 'artesp',
 }
 
 /**
@@ -238,21 +238,20 @@ export const AGENCIES_DATA: AgenciesData = {
       site: 'https://www.sptrans.com.br/',
     },
   },
-  [TransitAgency.EMTU]: {
-    name: 'Empresa Metropolitana de Transportes Urbanos de São Paulo',
-    shortName: 'EMTU',
+  [TransitAgency.ARTESP]: {
+    name: 'Agência de Transporte do Estado de São Paulo',
+    shortName: 'Artesp',
     type: 'bus',
     contact: {
       phones: [
         {
-          number: '08007701234',
-          title: 'Fale conosco',
-          description: '7h às 19h',
+          number: '08007278377',
+          title: 'Central de atendimento',
           whatsapp: false,
           sms: false,
         },
       ],
-      site: 'https://www.emtu.sp.gov.br/',
+      site: 'https://www.artesp.sp.gov.br/',
     },
   },
 };

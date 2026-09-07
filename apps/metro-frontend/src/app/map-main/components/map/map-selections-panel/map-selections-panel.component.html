@@ -19,9 +19,45 @@
         <span class="category-label">Linhas</span>
         <mat-chip-set class="chip-list" aria-label="Linhas selecionadas">
           @for (route of routes; track route.id) {
-            <mat-chip removable (removed)="removeRoute.emit(route.id)">
-              <mat-icon matChipAvatar>directions_bus</mat-icon>
-              {{ getRouteDisplayName(route) }}
+            <mat-chip
+              class="route-chip"
+              removable
+              (removed)="removeRoute.emit(route.id)"
+            >
+              <span class="route-chip-content">
+                <span
+                  class="route-badge"
+                  [style.backgroundColor]="routeColor(route)"
+                  [style.color]="routeTextColor(route)"
+                >
+                  {{ route.shortName }}
+                </span>
+                @if (getAgencyIdentity(route); as agency) {
+                  <span class="agency-identity">
+                    @if (agency.iconPath; as iconPath) {
+                      <img
+                        [ngSrc]="iconPath"
+                        width="16"
+                        height="16"
+                        alt=""
+                      />
+                    } @else {
+                      <mat-icon aria-hidden="true">business</mat-icon>
+                    }
+                    <span>{{ agency.name }}</span>
+                  </span>
+                }
+                @if (getRouteFareLabel(route); as fareLabel) {
+                  <span
+                    class="route-fare"
+                    [class.missing-fare]="fareLabel === 'Tarifa não informada'"
+                    [attr.aria-label]="'Tarifa ' + fareLabel"
+                  >
+                    <mat-icon>payments</mat-icon>
+                    {{ fareLabel }}
+                  </span>
+                }
+              </span>
               <button
                 matChipRemove
                 aria-label="Remover rota {{ route.shortName }}"

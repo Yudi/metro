@@ -7,6 +7,7 @@ import type {
   BikeVehicleAvailability,
 } from '@metro/shared/bike-contracts';
 import { OLHOVIVO_POLL_INTERVAL_MS } from '@metro/shared/utils';
+import type { BusFare } from '@metro/shared/utils';
 
 export type { BikePricingPlan, BikeVehicleAvailability };
 
@@ -22,6 +23,10 @@ export interface BusStopGraphQL {
   isSubwayStation: boolean;
   agencies?: string[];
   routeShortNames?: string[];
+  sourceAgency?: string;
+  sourceId?: string;
+  platformCode?: string;
+  mergedStopIds?: string[];
 }
 
 export interface BusRouteGraphQL {
@@ -32,6 +37,21 @@ export interface BusRouteGraphQL {
   routeType: number;
   color: string;
   textColor: string;
+  sourceAgency?: string;
+  sourceId?: string;
+  supportsRealtime?: boolean;
+  fares?: BusFare[];
+}
+
+export interface ScheduledBusDepartureGraphQL {
+  routeId: string;
+  routeShortName: string;
+  tripId: string;
+  headsign: string;
+  directionId: number;
+  departureTime: string;
+  sourceAgency: string;
+  platformCode?: string;
 }
 
 export interface RouteRailConnectionStationGraphQL {
@@ -164,6 +184,40 @@ export const CONSOLACAO_BUS_STOP: BusStopGraphQL = {
   routeShortNames: ['875A-10', '875I-10', '875P-10', '6291-10', '7181-10'],
 };
 
+/** Shared physical stop: SPTrans remains the canonical realtime identity. */
+export const SHARED_SPTRANS_ARTESP_BUS_STOP: BusStopGraphQL = {
+  id: '340015325',
+  stopId: '340015325',
+  name: 'Av. Brigadeiro Faria Lima, 1234',
+  description: 'Ponto compartilhado com a Artesp',
+  latitude: -23.5669,
+  longitude: -46.6918,
+  isSubwayStation: false,
+  agencies: ['SPTRANS', 'ARTESP'],
+  routeShortNames: ['477A-10', '001'],
+  sourceAgency: 'SPTRANS',
+  sourceId: '340015325',
+  platformCode: 'B',
+  mergedStopIds: ['340015325', 'artesp:42'],
+};
+
+/** Standalone Artesp stop: schedules are available, but realtime is not. */
+export const ARTESP_ONLY_BUS_STOP: BusStopGraphQL = {
+  id: 'artesp:terminal-regional-42',
+  stopId: 'artesp:42',
+  name: 'Terminal Regional',
+  description: 'Plataforma 1',
+  latitude: -23.55,
+  longitude: -46.63,
+  isSubwayStation: false,
+  agencies: ['ARTESP'],
+  routeShortNames: ['001', '02Verde'],
+  sourceAgency: 'ARTESP',
+  sourceId: '42',
+  platformCode: '1',
+  mergedStopIds: ['artesp:42'],
+};
+
 /** Subway station that is also a bus stop */
 export const SE_SUBWAY_STATION: BusStopGraphQL = {
   id: 'station-se-1',
@@ -201,7 +255,80 @@ export const ROUTE_477A: BusRouteGraphQL = {
   routeType: 3,
   color: '0066CC',
   textColor: 'FFFFFF',
+  sourceAgency: 'SPTRANS',
+  sourceId: '477A-10',
+  supportsRealtime: true,
+  fares: [{ price: 5, currency: 'BRL' }],
 };
+
+/** Artesp route with a published fare and no realtime support. */
+export const ROUTE_ARTESP_001: BusRouteGraphQL = {
+  id: 'artesp:001',
+  routeId: 'artesp:001',
+  shortName: '001',
+  longName: 'Terminal Regional – Centro',
+  routeType: 3,
+  color: 'C90C0F',
+  textColor: 'FFFFFF',
+  sourceAgency: 'ARTESP',
+  sourceId: '001',
+  supportsRealtime: false,
+  fares: [{ price: 5.5, currency: 'BRL' }],
+};
+
+/** Artesp route whose feed does not publish a fare-rule mapping. */
+export const ROUTE_ARTESP_WITHOUT_FARE: BusRouteGraphQL = {
+  id: 'artesp:02Verde',
+  routeId: 'artesp:02Verde',
+  shortName: '02Verde',
+  longName: 'Terminal Metropolitano – Bairro Verde',
+  routeType: 3,
+  color: '16803C',
+  textColor: 'FFFFFF',
+  sourceAgency: 'ARTESP',
+  sourceId: '02Verde',
+  supportsRealtime: false,
+  fares: [],
+};
+
+// Relative fixtures keep today's departures free of a weekday label in Storybook.
+const scheduledFixtureNow = new Date();
+scheduledFixtureNow.setSeconds(0, 0);
+const scheduledFixtureTomorrow = new Date(scheduledFixtureNow.getTime() + 86_400_000)
+  .toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+
+export const SCHEDULED_ARTESP_DEPARTURES: ScheduledBusDepartureGraphQL[] = [
+  ...[10, 25, 40, 55, 70, 85].map((minutes, index) => ({
+    routeId: ROUTE_ARTESP_001.routeId,
+    routeShortName: ROUTE_ARTESP_001.shortName,
+    tripId: `artesp:trip-001-${index}`,
+    headsign: index % 2 === 0 ? 'Centro' : 'Terminal Regional',
+    directionId: index % 2,
+    departureTime: new Date(scheduledFixtureNow.getTime() + minutes * 60_000).toISOString(),
+    sourceAgency: 'ARTESP',
+    platformCode: '1',
+  })),
+  ...[15, 35, 55, 75].map((minutes, index) => ({
+    routeId: ROUTE_ARTESP_WITHOUT_FARE.routeId,
+    routeShortName: ROUTE_ARTESP_WITHOUT_FARE.shortName,
+    tripId: `artesp:trip-02Verde-${index}`,
+    headsign: 'Bairro Verde',
+    directionId: 0,
+    departureTime: new Date(scheduledFixtureNow.getTime() + minutes * 60_000).toISOString(),
+    sourceAgency: 'ARTESP',
+    platformCode: '2',
+  })),
+  {
+    routeId: ROUTE_ARTESP_WITHOUT_FARE.routeId,
+    routeShortName: ROUTE_ARTESP_WITHOUT_FARE.shortName,
+    tripId: 'artesp:trip-02Verde-tomorrow',
+    headsign: 'Bairro Verde',
+    directionId: 0,
+    departureTime: `${scheduledFixtureTomorrow}T07:00:00-03:00`,
+    sourceAgency: 'ARTESP',
+    platformCode: '2',
+  },
+];
 
 export const ROUTE_775A: BusRouteGraphQL = {
   id: 'route-775a',
@@ -245,6 +372,8 @@ export const ROUTE_875I: BusRouteGraphQL = {
 
 export const ALL_ROUTES: BusRouteGraphQL[] = [
   ROUTE_477A,
+  ROUTE_ARTESP_001,
+  ROUTE_ARTESP_WITHOUT_FARE,
   ROUTE_775A,
   ROUTE_177H,
   ROUTE_875A,

@@ -27,6 +27,9 @@ pub struct DatabaseImporterArgs {
     /// PostgreSQL schema containing the GTFS tables
     #[arg(long, default_value = "external_gtfs")]
     schema: String,
+    /// Prefix used for the raw GTFS tables (for example SPTrans or ARTESP)
+    #[arg(long, default_value = "SPTrans")]
+    table_prefix: String,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -44,6 +47,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 &db_url,
                 import_args.srid,
                 &import_args.schema,
+                &import_args.table_prefix,
             ))?;
         }
     }

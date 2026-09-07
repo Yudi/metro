@@ -1,3 +1,4 @@
+import { formatBusStopDocument } from '../services/bus-search-document';
 import { Args, Query, Resolver } from '@nestjs/graphql';
 import { NearbyStopsInput } from '../dto/search.input';
 import { SearchResultUnion } from '../entities/search.entity';
@@ -43,6 +44,8 @@ export class NearbyResolver {
   }
 
   private formatNearbyDocument(document: NearbySearchDocument) {
+    if (document.type === 'busStop') return formatBusStopDocument(document);
+
     if (document.type === 'bikeStation') {
       return {
         ...document,

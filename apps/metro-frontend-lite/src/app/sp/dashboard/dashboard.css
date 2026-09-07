@@ -114,6 +114,7 @@ small {
 }
 
 .content-grid {
+  display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: start;
 }
@@ -142,6 +143,42 @@ small {
 
 .item-row > div {
   min-width: 0;
+}
+
+.stop-summary {
+  flex: 1;
+}
+
+.stop-identifiers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.65rem;
+}
+
+.agency-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.65rem;
+  margin-top: 0.45rem;
+}
+
+.agency-lockup {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 0.35rem;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.agency-lockup img {
+  display: block;
+  flex: 0 0 auto;
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 50%;
+  object-fit: contain;
 }
 
 .item-row strong {
@@ -181,8 +218,31 @@ small {
 }
 
 .route-chip.large {
+  align-self: start;
   min-width: 68px;
   min-height: 34px;
+}
+
+.route-fare {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+  color: #1d4ed8;
+  white-space: nowrap;
+}
+
+.route-fare.fare-missing {
+  color: #64748b;
+}
+
+.route-fare.fare-missing strong {
+  font-weight: 400;
+}
+
+.route-fare strong {
+  font-size: 0.8125rem;
 }
 
 .soft-chip {
@@ -191,6 +251,7 @@ small {
 }
 
 .status-grid {
+  display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -215,11 +276,167 @@ small {
 }
 
 .train-box,
-.arrival-box {
+.arrival-box,
+.scheduled-box {
   margin-top: 0.65rem;
   padding: 0.7rem;
   border-radius: 8px;
   background: #f8fafc;
+}
+
+.scheduled-box {
+  display: grid;
+  gap: 0.35rem;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.scheduled-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  color: #334155;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.scheduled-heading .agency-lockup {
+  color: #334155;
+  font-weight: 750;
+}
+
+.scheduled-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+  padding-top: 0.35rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.scheduled-row time {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  color: #1f2937;
+  white-space: nowrap;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.scheduled-row time small {
+  color: #64748b;
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.scheduled-route-group {
+  display: grid;
+}
+
+.scheduled-route {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.scheduled-route span,
+.scheduled-route strong {
+  overflow-wrap: anywhere;
+}
+
+.scheduled-route span {
+  color: #64748b;
+  font-size: 0.8125rem;
+}
+
+.scheduled-route-code {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  background: #f1f5f9;
+  color: #1f2937;
+  font-size: 0.78rem;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+.scheduled-platform {
+  justify-self: end;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  color: #64748b;
+  font-size: 0.7rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.schedule-toggle {
+  min-height: 44px;
+  justify-self: start;
+  margin: 0.2rem 0 0.35rem;
+  padding: 0.25rem 0;
+  border: 0;
+  color: #1d4ed8;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.schedule-toggle:hover,
+.schedule-toggle:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.schedule-toggle:focus-visible {
+  outline: 2px solid #1d4ed8;
+  outline-offset: 2px;
+}
+
+.route-selection-list {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 0.45rem;
+}
+
+.dashboard-route {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.route-copy,
+.route-summary {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.route-copy strong,
+.route-summary strong {
+  overflow-wrap: anywhere;
+  font-size: 0.86rem;
+  line-height: 1.25;
+}
+
+.route-agency {
+  line-height: 1;
+}
+
+.route-id {
+  color: #64748b;
+  font-size: 0.72rem;
 }
 
 .train-row,
@@ -292,5 +509,35 @@ small {
   .content-grid,
   .status-grid {
     grid-template-columns: 1fr;
+  }
+
+  .dashboard-route {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .dashboard-route .route-fare {
+    grid-column: 2;
+    align-items: flex-start;
+    justify-self: start;
+  }
+
+  .route-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .route-row .route-fare {
+    grid-column: 2;
+    align-items: flex-start;
+    justify-self: start;
+  }
+
+  .scheduled-row {
+    grid-template-columns: 6.5rem minmax(0, 1fr);
+  }
+
+  .scheduled-platform {
+    grid-column: 2;
+    justify-self: start;
   }
 }

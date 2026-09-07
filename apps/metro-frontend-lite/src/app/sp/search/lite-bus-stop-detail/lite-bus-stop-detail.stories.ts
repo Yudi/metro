@@ -1,4 +1,11 @@
 import type { Meta, StoryObj } from '@storybook/angular';
+import {
+  ARTESP_ONLY_BUS_STOP,
+  ROUTE_ARTESP_001,
+  ROUTE_ARTESP_WITHOUT_FARE,
+  SCHEDULED_ARTESP_DEPARTURES,
+  SHARED_SPTRANS_ARTESP_BUS_STOP,
+} from '@metro/storybook-mocks';
 import { LiteBusStopDetail } from './lite-bus-stop-detail';
 import {
   LiteBusRoute,
@@ -161,6 +168,27 @@ const railConnections: LiteRouteRailConnection[] = [
   },
 ];
 
+const artespRoute: LiteBusRoute = { ...ROUTE_ARTESP_001 };
+const artespRouteWithoutFare: LiteBusRoute = {
+  ...ROUTE_ARTESP_WITHOUT_FARE,
+};
+
+const artespStop: LiteSearchStop = {
+  ...ARTESP_ONLY_BUS_STOP,
+  kind: 'busStop',
+  isSubway: false,
+  lineCodes: [],
+  routes: [artespRoute, artespRouteWithoutFare],
+};
+
+const sharedStop: LiteSearchStop = {
+  ...SHARED_SPTRANS_ARTESP_BUS_STOP,
+  kind: 'busStop',
+  isSubway: false,
+  lineCodes: [],
+  routes: [routes[0], artespRoute],
+};
+
 const meta: Meta<LiteBusStopDetail> = {
   title: 'Lite/Search/Bus stop detail',
   component: LiteBusStopDetail,
@@ -214,5 +242,59 @@ export const NoPredictionPayload: Story = {
       ...arrivals,
       p: null,
     },
+  },
+};
+
+export const ArtespScheduledDepartures: Story = {
+  args: {
+    stop: artespStop,
+    arrivals: undefined,
+    connected: false,
+    railConnections: [],
+    scheduledDepartures: SCHEDULED_ARTESP_DEPARTURES,
+    scheduledDeparturesLoading: false,
+  },
+};
+
+export const ArtespMissingFare: Story = {
+  args: {
+    stop: { ...artespStop, routes: [artespRouteWithoutFare] },
+    arrivals: undefined,
+    connected: false,
+    railConnections: [],
+    scheduledDepartures: [],
+  },
+};
+
+export const ArtespScheduleLoading: Story = {
+  args: {
+    stop: artespStop,
+    arrivals: undefined,
+    connected: false,
+    railConnections: [],
+    scheduledDepartures: [],
+    scheduledDeparturesLoading: true,
+  },
+};
+
+export const ArtespScheduleError: Story = {
+  args: {
+    stop: artespStop,
+    arrivals: undefined,
+    connected: false,
+    railConnections: [],
+    scheduledDepartures: [],
+    scheduledDeparturesLoading: false,
+    scheduledDeparturesError: true,
+  },
+};
+
+export const SharedSptransAndArtesp: Story = {
+  args: {
+    stop: sharedStop,
+    arrivals,
+    connected: true,
+    scheduledDepartures: SCHEDULED_ARTESP_DEPARTURES,
+    scheduledDeparturesLoading: false,
   },
 };

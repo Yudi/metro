@@ -121,6 +121,10 @@ export class VectorTileFeatureExtractorService {
       name: String(name),
       latitude: Number(properties['stop_lat'] ?? 0),
       longitude: Number(properties['stop_lon'] ?? 0),
+      sourceAgency: this.toOptionalString(properties['source_agency']),
+      sourceId: this.toOptionalString(properties['source_id']),
+      platformCode: this.toOptionalString(properties['platform_code']),
+      mergedStopIds: this.toStringArray(properties['merged_stop_ids']),
     };
   }
 
@@ -138,6 +142,12 @@ export class VectorTileFeatureExtractorService {
       longName: String(properties['route_long_name'] ?? ''),
       color: String(properties['route_color'] ?? ''),
       textColor: String(properties['route_text_color'] ?? ''),
+      sourceAgency: this.toOptionalString(properties['source_agency']),
+      sourceId: this.toOptionalString(properties['source_id']),
+      supportsRealtime:
+        typeof properties['supports_realtime'] === 'boolean'
+          ? properties['supports_realtime']
+          : undefined,
     };
   }
 
@@ -216,5 +226,36 @@ export class VectorTileFeatureExtractorService {
 
   private toNullableNumber(raw: unknown): number | null {
     return raw === null || raw === undefined ? null : Number(raw);
+  }
+
+  private toOptionalString(raw: unknown): string | undefined {
+    return typeof raw === 'string' && raw.trim() ? raw.trim() : undefined;
+  }
+
+  private toStringArray(raw: unknown): string[] | undefined {
+    if (Array.isArray(raw)) {
+      const values = raw.filter((value): value is string => typeof value === 'string');
+      return values.length > 0 ? values : undefined;
+    }
+
+    if (typeof raw === 'string' && raw.trim()) {
+      try {
+        const parsed: unknown = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          const values = parsed.filter(
+            (value): value is string => typeof value === 'string',
+          );
+          return values.length > 0 ? values : undefined;
+        }
+      } catch {
+        const values = raw
+          .split(',')
+          .map((value) => value.trim())
+          .filter(Boolean);
+        return values.length > 0 ? values : undefined;
+      }
+    }
+
+    return undefined;
   }
 }

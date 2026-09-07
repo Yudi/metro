@@ -14,6 +14,10 @@ import {
   FavoritesService,
 } from '@metro/shared/api';
 import {
+  ARTESP_ONLY_BUS_STOP,
+  ROUTE_ARTESP_001,
+  ROUTE_ARTESP_WITHOUT_FARE,
+  SCHEDULED_ARTESP_DEPARTURES,
   createRailStatusResponse,
   LINES_WITH_ISSUES,
 } from '@metro/storybook-mocks';
@@ -21,7 +25,11 @@ import { FavoriteList, emptyFavorites } from '@metro/shared/utils';
 import { LiteRealtimeService } from '../../services/lite-realtime.service';
 import { Dashboard } from './dashboard';
 
-type DashboardScenario = 'comFavoritos' | 'semFavoritos' | 'erroParcial';
+type DashboardScenario =
+  | 'comFavoritos'
+  | 'semFavoritos'
+  | 'erroParcial'
+  | 'artesp';
 
 const favoriteList: FavoriteList = {
   ...emptyFavorites,
@@ -40,17 +48,37 @@ const dashboardSelections: DashboardFavoriteSelections = {
   },
 };
 
+const artespFavoriteList: FavoriteList = {
+  ...emptyFavorites,
+  busStop: [ARTESP_ONLY_BUS_STOP.stopId],
+  busRoute: [ROUTE_ARTESP_001.routeId, ROUTE_ARTESP_WITHOUT_FARE.routeId],
+};
+
+const artespDashboardSelections: DashboardFavoriteSelections = {
+  busStopRoutes: {
+    [ARTESP_ONLY_BUS_STOP.stopId]: [
+      ROUTE_ARTESP_001.routeId,
+      ROUTE_ARTESP_WITHOUT_FARE.routeId,
+    ],
+  },
+  railStationLines: {},
+};
+
 function createFavoritesService(scenario: DashboardScenario) {
+  const favorites =
+    scenario === 'semFavoritos'
+      ? { ...emptyFavorites }
+      : scenario === 'artesp'
+        ? artespFavoriteList
+        : favoriteList;
+  const selections =
+    scenario === 'artesp' ? artespDashboardSelections : dashboardSelections;
+
   return {
-    favorites: signal(
-      scenario === 'semFavoritos' ? { ...emptyFavorites } : favoriteList,
-    ).asReadonly(),
-    dashboardSelections: signal(dashboardSelections).asReadonly(),
-    readFavoritesSnapshot: () =>
-      Promise.resolve(
-        scenario === 'semFavoritos' ? { ...emptyFavorites } : favoriteList,
-      ),
-    readDashboardSelectionsSnapshot: () => Promise.resolve(dashboardSelections),
+    favorites: signal(favorites).asReadonly(),
+    dashboardSelections: signal(selections).asReadonly(),
+    readFavoritesSnapshot: () => Promise.resolve(favorites),
+    readDashboardSelectionsSnapshot: () => Promise.resolve(selections),
   };
 }
 
@@ -113,6 +141,18 @@ function createHttpClient(
       }
 
       if (query.includes('LiteDashboardBusFavorites')) {
+        if (scenario === 'artesp') {
+          return of({
+            data: {
+              multipleBusRoutes: [
+                ROUTE_ARTESP_001,
+                ROUTE_ARTESP_WITHOUT_FARE,
+              ],
+              multipleBusStops: [ARTESP_ONLY_BUS_STOP],
+            },
+          } as T);
+        }
+
         return of({
           data: {
             multipleBusRoutes: [
@@ -176,6 +216,17 @@ function createHttpClient(
       }
 
       if (query.includes('LiteDashboardRoutesForStop')) {
+        if (scenario === 'artesp') {
+          return of({
+            data: {
+              routesForStop: [
+                ROUTE_ARTESP_001,
+                ROUTE_ARTESP_WITHOUT_FARE,
+              ],
+            },
+          } as T);
+        }
+
         return of({
           data: {
             routesForStop: [
@@ -223,6 +274,15 @@ function createHttpClient(
                 },
               ],
             },
+          },
+        } as T);
+      }
+
+      if (query.includes('LiteDashboardScheduledBusDepartures')) {
+        return of({
+          data: {
+            scheduledBusDepartures:
+              scenario === 'artesp' ? SCHEDULED_ARTESP_DEPARTURES : [],
           },
         } as T);
       }
@@ -287,6 +347,14 @@ export const ErroParcial: Story = {
   decorators: [
     applicationConfig({
       providers: createDashboardProviders('erroParcial'),
+    }),
+  ],
+};
+
+export const ArtespScheduledOnly: Story = {
+  decorators: [
+    applicationConfig({
+      providers: createDashboardProviders('artesp'),
     }),
   ],
 };

@@ -1,3 +1,4 @@
+@use "../../../../../../../libs/shared/styles/rail-line-badge" as lineBadge;
 @use "../../../shared/styles/rail-status" as rail;
 
 .container {
@@ -55,17 +56,8 @@
 // }
 
 .line-card .badge {
-  width: 60px;
-  height: 60px;
+  @include lineBadge.circle(60px, 1.5rem);
   color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  border-radius: 50%;
-  text-align: center;
-  line-height: 60px;
-  font-size: 1.5rem;
   margin-bottom: 0.5rem;
 }
 

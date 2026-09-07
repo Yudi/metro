@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { QueryOptimizationService } from './query-optimization.service';
 import { BusStop, BusRoute, Trip } from '../entities/geography.entity';
+import { mapBusStop } from './bus-catalog.utils';
 
 /**
  * Optimized Trip Service
@@ -37,7 +38,7 @@ export class TripServiceOptimized {
     >`
       SELECT DISTINCT ON (direction_id, trip_headsign, shape_id)
         id, route_id, service_id, trip_id, trip_headsign, direction_id, shape_id
-      FROM "SPTrans_Trip"
+      FROM "public"."Gtfs_Trip"
       WHERE route_id = ${route.route_id}
       ORDER BY direction_id, trip_headsign, shape_id, trip_id
     `;
@@ -70,23 +71,13 @@ export class TripServiceOptimized {
       return [];
     }
 
-    const stopIdList = stops.map((s) => s.stop_id);
+    const stopIdList = stops.map((s) => s.physical_stop_id || s.stop_id);
     const serviceInfo =
       await this.queryOptimization.batchGetStopServiceInfo(stopIdList);
 
     return stops.map((stop) => {
-      const info = serviceInfo.get(stop.stop_id);
-      return {
-        id: stop.stop_id,
-        stopId: stop.stop_id,
-        name: stop.stop_name,
-        description: stop.stop_desc || undefined,
-        latitude: stop.stop_lat,
-        longitude: stop.stop_lon,
-        isSubwayStation: info?.servesRail ?? false,
-        agencies: info?.agencies,
-        routeShortNames: info?.railRouteShortNames,
-      };
+      const physicalStopId = stop.physical_stop_id || stop.stop_id;
+      return mapBusStop(stop, serviceInfo.get(physicalStopId));
     });
   }
 
@@ -103,15 +94,7 @@ export class TripServiceOptimized {
       stop.stop_id,
     );
 
-    return routes.map((route) => ({
-      id: route.route_id,
-      routeId: route.route_id,
-      shortName: route.route_short_name,
-      longName: route.route_long_name,
-      routeType: route.route_type,
-      color: route.route_color,
-      textColor: route.route_text_color,
-    }));
+    return routes;
   }
 
   /**

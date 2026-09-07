@@ -8,16 +8,23 @@ import {
   effect,
   ViewChild,
 } from '@angular/core';
+import { NgOptimizedImage } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import {
   LiteSearchService,
   LiteSearchStop,
   LiteRouteRailConnection,
+  type LiteScheduledBusDeparture,
 } from '../../services/lite-search.service';
 import { LiteRealtimeService } from '../../services/lite-realtime.service';
 import { GeolocationService } from '@metro/shared/geolocation';
-import { getLineColors } from '@metro/shared/utils';
+import {
+  getLineColors,
+  getSptransStopCode,
+  hasArtespStopData,
+  getBusRouteIdentity,
+} from '@metro/shared/utils';
 import {
   LiteButton,
   LiteInput,
@@ -35,6 +42,12 @@ import { LiteBusStopDetail } from './lite-bus-stop-detail/lite-bus-stop-detail';
 import { LiteBikeAvailability } from './lite-bike-availability/lite-bike-availability';
 
 type ViewState = 'search' | 'results' | 'detail';
+type LiteAgencyKey = 'artesp' | 'sptrans';
+
+interface LiteAgencyDisplay {
+  key: LiteAgencyKey | null;
+  label: string;
+}
 
 @Component({
   selector: 'app-search',
@@ -45,6 +58,7 @@ type ViewState = 'search' | 'results' | 'detail';
     LiteChip,
     LiteSpinner,
     LiteIconButton,
+    NgOptimizedImage,
     LiteRailNextTrains,
     LiteBusStopDetail,
     LiteBikeAvailability,
@@ -85,12 +99,18 @@ export class Search {
   readonly railConnections = signal<LiteRouteRailConnection[]>([]);
   readonly railConnectionsLoading = signal(false);
   readonly railConnectionsError = signal(false);
+  readonly scheduledDepartures = signal<LiteScheduledBusDeparture[]>([]);
+  readonly scheduledDeparturesLoading = signal(false);
+  readonly scheduledDeparturesError = signal(false);
   readonly busArrivals = computed(() => {
     const stop = this.selectedStop();
     if (!stop || stop.kind !== 'busStop') {
       return undefined;
     }
-    return this.realtimeService.stopArrivals().get(stop.stopId);
+    const stopCode = getSptransStopCode(stop);
+    return stopCode
+      ? this.realtimeService.stopArrivals().get(stopCode)
+      : undefined;
   });
 
   constructor() {
@@ -132,8 +152,13 @@ export class Search {
         return;
       }
 
+      const stopCode = getSptransStopCode(stop);
+      if (!stopCode) {
+        return;
+      }
+
       const releaseStopSubscription = this.realtimeService.subscribeToStop(
-        stop.stopId,
+        stopCode,
       );
       onCleanup(() => releaseStopSubscription());
     });
@@ -218,6 +243,7 @@ export class Search {
       this.loadNextTrains(stop);
     } else if (stop.kind === 'busStop') {
       this.loadBusRailConnections(stop);
+      this.loadBusSchedules(stop);
     }
   }
 
@@ -228,6 +254,9 @@ export class Search {
     this.railConnections.set([]);
     this.railConnectionsLoading.set(false);
     this.railConnectionsError.set(false);
+    this.scheduledDepartures.set([]);
+    this.scheduledDeparturesLoading.set(false);
+    this.scheduledDeparturesError.set(false);
   }
 
   private loadNextTrains(stop: LiteSearchStop): void {
@@ -275,7 +304,7 @@ export class Search {
     const routeIds = this.getUniqueRouteIds(stop.routes ?? []);
     if (routeIds.length === 0) {
       return;
-    }
+          }
 
     this.railConnectionsLoading.set(true);
     this.railConnectionsError.set(false);
@@ -296,13 +325,37 @@ export class Search {
       });
   }
 
+  private loadBusSchedules(stop: LiteSearchStop): void {
+    if (!hasArtespStopData(stop)) {
+      return;
+    }
+
+    this.scheduledDeparturesLoading.set(true);
+    this.scheduledDeparturesError.set(false);
+
+    this.searchService
+      .getScheduledBusDepartures(stop.stopId, 5)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (departures) => {
+          this.scheduledDepartures.set(departures);
+          this.scheduledDeparturesLoading.set(false);
+        },
+        error: () => {
+          this.scheduledDepartures.set([]);
+          this.scheduledDeparturesLoading.set(false);
+          this.scheduledDeparturesError.set(true);
+        },
+      });
+  }
+
   private getUniqueRouteIds(
     routes: NonNullable<LiteSearchStop['routes']>,
   ): string[] {
     return Array.from(
       new Set(
         routes
-          .flatMap((route) => [route.routeId, route.shortName])
+          .map((route) => getBusRouteIdentity(route))
           .map((routeId) => routeId.trim())
           .filter(Boolean),
       ),
@@ -329,6 +382,48 @@ export class Search {
     }
 
     return 'Ponto de ônibus';
+  }
+
+  getStopAgencies(stop: LiteSearchStop): LiteAgencyDisplay[] {
+    if (stop.kind !== 'busStop') {
+      return [];
+    }
+
+    const sourceAgency = stop.sourceAgency?.trim();
+    const normalizedAgency = sourceAgency?.toLowerCase();
+    const hasArtesp =
+      normalizedAgency === 'artesp' ||
+      (stop.mergedStopIds ?? []).some((id) => /^artesp[:/]/i.test(id));
+    const hasSptrans =
+      normalizedAgency === 'sptrans' ||
+      (stop.mergedStopIds ?? []).some((id) => /^sptrans[:/]/i.test(id));
+    const agencies: LiteAgencyDisplay[] = [];
+
+    if (hasSptrans) {
+      agencies.push({ key: 'sptrans', label: 'SPTrans' });
+    }
+    if (hasArtesp) {
+      agencies.push({ key: 'artesp', label: 'Artesp' });
+    }
+    if (
+      agencies.length === 0 &&
+      sourceAgency &&
+      normalizedAgency !== 'sptrans' &&
+      normalizedAgency !== 'artesp'
+    ) {
+      agencies.push({ key: null, label: sourceAgency });
+    }
+
+    return agencies;
+  }
+
+  getAgencyLogoPath(agency: LiteAgencyKey): string {
+    return `/public/shared/agencies/${agency}.svg`;
+  }
+
+  getPlatformLabel(stop: LiteSearchStop): string | null {
+    const platform = stop.platformCode?.trim();
+    return platform ? `Plataforma ${platform}` : null;
   }
 
   getLineColor(code: number): { bg: string; text: string } {

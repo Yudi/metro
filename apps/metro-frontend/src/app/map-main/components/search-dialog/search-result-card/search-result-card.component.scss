@@ -56,8 +56,23 @@
       }
 
       &.route {
-        background-color: var(--mat-sys-primary-container);
-        color: var(--mat-sys-on-primary-container);
+        width: 64px;
+        background-color: var(--mat-sys-surface-container-high);
+        color: var(--mat-sys-on-surface);
+
+        .route-badge {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 48px;
+          min-height: 26px;
+          padding: 0 7px;
+          border-radius: 6px;
+          font-size: 0.78rem;
+          font-weight: 800;
+          line-height: 1;
+          white-space: nowrap;
+        }
       }
     }
 
@@ -77,6 +92,24 @@
         margin: 0;
         font-size: 0.8125rem;
         color: var(--mat-sys-on-surface-variant);
+      }
+
+      .agency-identity {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 6px;
+        color: var(--mat-sys-on-surface-variant);
+        font-size: 0.75rem;
+        font-weight: 600;
+
+        img,
+        mat-icon {
+          width: 20px;
+          height: 20px;
+          font-size: 20px;
+          object-fit: contain;
+        }
       }
     }
 
@@ -174,6 +207,33 @@
   }
 }
 
+.result-fare,
+.result-platform {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.65rem 0 0 52px;
+  color: var(--mat-sys-on-surface);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+
+.result-fare {
+  color: var(--mat-sys-primary);
+}
+
+.result-fare.missing-fare {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.result-fare mat-icon,
+.result-platform mat-icon {
+  width: 1rem;
+  height: 1rem;
+  font-size: 1rem;
+  flex: 0 0 auto;
+}
+
 // Mobile responsive styles
 @media (max-width: 600px) {
   .result-card {
@@ -191,6 +251,11 @@
     }
 
     .result-description {
+      margin-left: 48px;
+    }
+
+    .result-fare,
+    .result-platform {
       margin-left: 48px;
     }
 

@@ -89,6 +89,37 @@ describe('GTFSDatabaseService', () => {
 
       await expect(service.isCurrentHash('current-hash')).resolves.toBe(true);
     });
+
+    it('keeps ARTESP hash and shape checks isolated from SPTrans metadata', async () => {
+      queryRaw
+        .mockResolvedValueOnce([
+          {
+            source: 'artesp',
+            file_hash: 'artesp-hash',
+            file_size: 100,
+            version: '2026-06-10',
+            last_updated: new Date('2026-09-05T00:00:00Z'),
+            completed: true,
+          },
+        ])
+        .mockResolvedValueOnce(
+          [
+            ...completeFiles(100),
+            { fileName: 'fare_attributes.txt', recordCount: 100 },
+            { fileName: 'fare_rules.txt', recordCount: 100 },
+          ].map((file) => ({
+            file_name: file.fileName,
+            record_count: file.recordCount,
+          })),
+        )
+        .mockResolvedValueOnce([{ count: BigInt(8) }]);
+
+      await expect(
+        service.isCurrentHash('artesp-hash', 'artesp'),
+      ).resolves.toBe(true);
+      expect(findMany).not.toHaveBeenCalled();
+      expect(queryRaw.mock.calls[2][0][0]).toContain('ARTESP_Shape');
+    });
   });
 
   it('keeps previous dataset metadata when creating a candidate dataset', async () => {
@@ -109,6 +140,22 @@ describe('GTFSDatabaseService', () => {
     ).resolves.toMatchObject({ id: 'candidate', fileHash: 'new-hash' });
     expect(upsert).toHaveBeenCalledWith(
       expect.objectContaining({ where: { fileHash: 'new-hash' } }),
+    );
+  });
+
+  it('writes ARTESP candidates to isolated feed metadata', async () => {
+    await expect(
+      service.createOrUpdateDataset(
+        { fileHash: 'artesp-hash', fileSize: 42, version: '2026-06-10' },
+        'artesp',
+      ),
+    ).resolves.toMatchObject({ id: 'artesp', fileHash: 'artesp-hash' });
+    expect(executeRawUnsafe).toHaveBeenCalledWith(
+      expect.stringContaining('gtfs_feed_datasets'),
+      'artesp',
+      'artesp-hash',
+      42,
+      '2026-06-10',
     );
   });
 
@@ -160,5 +207,33 @@ describe('GTFSDatabaseService', () => {
       where: { datasetId: 'dataset-id' },
       data: { recordCount: null },
     });
+  });
+
+  it('clears absent ARTESP optional relations without touching SPTrans tables', async () => {
+    await service.clearOptionalTables('artesp', [
+      'agency.txt',
+      'calendar.txt',
+      'routes.txt',
+      'stops.txt',
+      'shapes.txt',
+      'trips.txt',
+      'stop_times.txt',
+      'fare_attributes.txt',
+      'fare_rules.txt',
+    ]);
+
+    const statements = executeRawUnsafe.mock.calls.map(([statement]) =>
+      String(statement),
+    );
+    expect(statements).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('ARTESP_CalendarDate'),
+        expect.stringContaining('ARTESP_Frequency'),
+        expect.stringContaining('ARTESP_FeedInfo'),
+      ]),
+    );
+    expect(statements.some((statement) => statement.includes('SPTrans_'))).toBe(
+      false,
+    );
   });
 });

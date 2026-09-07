@@ -145,22 +145,65 @@
         <div class="item-list">
           @for (stop of busStops(); track stop.stopId) {
           <article class="item-row">
-            <div>
+            <div class="stop-summary">
               <strong>{{ stop.name }}</strong>
-              <small>{{ stop.stopId }}</small>
+              <div class="stop-identifiers">
+                <small>{{ stop.sourceId || stop.stopId }}</small>
+              @if (stop.platformCode) {
+              <small>Plataforma {{ stop.platformCode }}</small>
+              }
+              </div>
+              @if (getBusStopAgencies(stop).length > 0) {
+              <div class="agency-list" aria-label="Operadora">
+                @for (agency of getBusStopAgencies(stop); track agency.label) {
+                <span class="agency-lockup">
+                  @if (agency.key; as agencyKey) {
+                  <img
+                    [ngSrc]="getAgencyLogoPath(agencyKey)"
+                    width="18"
+                    height="18"
+                    alt=""
+                  />
+                  }
+                  <span>{{ agency.label }}</span>
+                </span>
+                }
+              </div>
+              }
             </div>
 
             @let selectedRoutes = getSelectedBusRoutes(stop.stopId); @if
             (selectedRoutes.length > 0) {
-            <div class="chip-row">
+            <div class="route-selection-list">
               @for (route of selectedRoutes; track route.routeId) {
-              <span
-                class="route-chip"
-                [style.background-color]="routeColor(route)"
-                [style.color]="routeTextColor(route)"
-              >
-                {{ route.shortName }}
-              </span>
+              <div class="dashboard-route">
+                <span
+                  class="route-chip"
+                  [style.background-color]="routeColor(route)"
+                  [style.color]="routeTextColor(route)"
+                >
+                  {{ route.shortName }}
+                </span>
+                <div class="route-copy">
+                  <strong>{{ route.longName }}</strong>
+                  <span class="agency-lockup route-agency">
+                    @if (getBusRouteAgencyKey(route); as agencyKey) {
+                    <img
+                      [ngSrc]="getAgencyLogoPath(agencyKey)"
+                      width="18"
+                      height="18"
+                      alt=""
+                    />
+                    }
+                    <span>{{ getBusRouteAgencyLabel(route) }}</span>
+                  </span>
+                </div>
+                @if (routeFareLabel(route); as fareLabel) {
+                <span class="route-fare" [class.fare-missing]="!route.fares?.length" [attr.aria-label]="'Tarifa: ' + fareLabel">
+                  <strong>{{ fareLabel }}</strong>
+                </span>
+                }
+              </div>
               }
             </div>
             } @else if (stop.routeShortNames.length > 0) {
@@ -187,8 +230,69 @@
               </div>
               }
             </div>
-            } @else if (!loading()) {
+            } @else if (!loading() && hasSptransRealtimeData(stop)) {
             <small>Sem previsão de chegada no último carregamento.</small>
+            }
+
+            @let scheduledRouteGroups = getBusScheduledRouteGroups(stop.stopId);
+            @if (hasArtespScheduleData(stop)) {
+            <div class="scheduled-box">
+              <div class="scheduled-heading">
+                <span class="agency-lockup">
+                  <img
+                    [ngSrc]="getAgencyLogoPath('artesp')"
+                    width="20"
+                    height="20"
+                    alt=""
+                  />
+                  <strong>Artesp</strong>
+                </span>
+                <span>Horários programados</span>
+              </div>
+              <small>Estes horários não são previsões em tempo real.</small>
+              @if (scheduledRouteGroups.length > 0) {
+              @for (group of scheduledRouteGroups; track group.routeId) {
+              <div class="scheduled-route-group">
+                @for (departure of getVisibleScheduledDepartures(stop.stopId, group); track getScheduledDepartureKey(departure)) {
+                @let scheduleTime = departure.timeParts;
+                @let scheduleRoute = getBusRouteForScheduledDeparture(stop.stopId, departure.routeId);
+                <div class="scheduled-row">
+                  <time [attr.datetime]="departure.departureTime">
+                    <span>{{ scheduleTime.time }}</span>
+                    @if (scheduleTime.day) {
+                    <small>{{ scheduleTime.day }}</small>
+                    }
+                  </time>
+                  <div class="scheduled-route">
+                    <strong
+                      class="scheduled-route-code"
+                      [style.background-color]="scheduleRoute ? routeColor(scheduleRoute) : null"
+                      [style.color]="scheduleRoute ? routeTextColor(scheduleRoute) : null"
+                    >{{ departure.routeShortName }}</strong>
+                    <span>{{ departure.headsign }}</span>
+                  </div>
+                  @if (departure.platformCode) {
+                  <small class="scheduled-platform">Plataforma {{ departure.platformCode }}</small>
+                  }
+                </div>
+                }
+                @if (group.departures.length > 1) {
+                <button
+                  type="button"
+                  class="schedule-toggle"
+                  [attr.aria-expanded]="isScheduledRouteExpanded(stop.stopId, group.routeId)"
+                  [attr.aria-label]="getScheduledRouteToggleLabel(stop.stopId, group.routeId, group.departures.length) + ' da linha ' + group.departures[0].routeShortName"
+                  (click)="toggleScheduledRoute(stop.stopId, group.routeId)"
+                >
+                  {{ getScheduledRouteToggleLabel(stop.stopId, group.routeId, group.departures.length) }}
+                </button>
+                }
+              </div>
+              }
+              } @else if (!loading()) {
+              <small>Nenhum horário programado disponível.</small>
+              }
+            </div>
             }
           </article>
           }
@@ -207,10 +311,26 @@
             >
               {{ route.shortName }}
             </span>
-            <div>
+            <div class="route-summary">
               <strong>{{ route.longName }}</strong>
-              <small>{{ route.routeId }}</small>
+              <span class="agency-lockup route-agency">
+                @if (getBusRouteAgencyKey(route); as agencyKey) {
+                <img
+                  [ngSrc]="getAgencyLogoPath(agencyKey)"
+                  width="18"
+                  height="18"
+                  alt=""
+                />
+                }
+                <span>{{ getBusRouteAgencyLabel(route) }}</span>
+              </span>
+              <small class="route-id">{{ routeDisplayId(route) }}</small>
             </div>
+            @if (routeFareLabel(route); as fareLabel) {
+            <span class="route-fare" [class.fare-missing]="!route.fares?.length" [attr.aria-label]="'Tarifa: ' + fareLabel">
+              <strong>{{ fareLabel }}</strong>
+            </span>
+            }
           </article>
           }
         </div>

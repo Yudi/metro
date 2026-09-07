@@ -8,6 +8,11 @@ import type {
   SelectedStop,
   SelectedBikeStation,
 } from '../map.types';
+import {
+  ROUTE_477A,
+  ROUTE_ARTESP_001,
+  ROUTE_ARTESP_WITHOUT_FARE,
+} from '@metro/storybook-mocks';
 
 const meta: Meta<MapSelectionsPanelComponent> = {
   title: 'Bus/Map/MapSelectionsPanel',
@@ -55,6 +60,24 @@ type Story = StoryObj<MapSelectionsPanelComponent>;
 
 function route(id: string, shortName: string, longName: string): SelectedRoute {
   return { id, shortName, longName };
+}
+
+function selectedRoute(
+  fixture:
+    | typeof ROUTE_477A
+    | typeof ROUTE_ARTESP_001
+    | typeof ROUTE_ARTESP_WITHOUT_FARE,
+): SelectedRoute {
+  return {
+    id: fixture.routeId,
+    shortName: fixture.shortName,
+    longName: fixture.longName,
+    color: fixture.color,
+    textColor: fixture.textColor,
+    sourceAgency: fixture.sourceAgency,
+    supportsRealtime: fixture.supportsRealtime,
+    fares: fixture.fares,
+  };
 }
 
 function stop(id: string, name: string): SelectedStop {
@@ -113,6 +136,21 @@ export const WithRoutes: Story = {
     const removeBtn = routeCategory.querySelector('button[matChipRemove]');
     if (!removeBtn) throw new Error('Remove button not found on chip');
     (removeBtn as HTMLElement).click();
+  },
+};
+
+export const WithSptransAndArtespRoutes: Story = {
+  args: {
+    selectedRoutes: new Map<string, SelectedRoute>([
+      [ROUTE_ARTESP_001.routeId, selectedRoute(ROUTE_ARTESP_001)],
+      [ROUTE_477A.routeId, selectedRoute(ROUTE_477A)],
+      [
+        ROUTE_ARTESP_WITHOUT_FARE.routeId,
+        selectedRoute(ROUTE_ARTESP_WITHOUT_FARE),
+      ],
+    ]),
+    selectedStops: new Map<string, SelectedStop>(),
+    selectedBikeStations: new Map<string, SelectedBikeStation>(),
   },
 };
 

@@ -194,6 +194,52 @@ describe('MapSelectionService', () => {
     expect(snackBar.open).not.toHaveBeenCalled();
   });
 
+  it('keeps rail vehicle tracking when the route disables bus realtime', async () => {
+    cache.getRoute.mockReturnValue(
+      of({
+        routeId: 'rail:L10',
+        shortName: 'CPTM L10',
+        longName: 'Linha 10-Turquesa',
+        color: 'A3A3A3',
+        textColor: 'FFFFFF',
+        routeType: 2,
+        sourceAgency: 'CPTM',
+        supportsRealtime: false,
+      }),
+    );
+
+    await service.addRouteToSelection('rail:L10', false);
+
+    expect(
+      TestBed.inject(CptmVehicleLayerService).subscribeToLine,
+    ).toHaveBeenCalledWith('L10');
+    expect(
+      TestBed.inject(RealtimeWebsocketService).subscribeToRoute,
+    ).not.toHaveBeenCalled();
+  });
+
+  it.each(['001', 'CPTM L10'])('never tracks an Artesp route with short name %s', async (shortName) => {
+    cache.getRoute.mockReturnValue(
+      of({
+        routeId: 'artesp:001',
+        shortName,
+        longName: 'Terminal Regional - Centro',
+        color: 'C90C0F',
+        textColor: 'FFFFFF',
+        routeType: 3,
+        sourceAgency: 'ARTESP',
+        supportsRealtime: true,
+      }),
+    );
+
+    await service.addRouteToSelection('artesp:001', false);
+
+    expect(TestBed.inject(CptmVehicleLayerService).subscribeToLine).not.toHaveBeenCalled();
+    expect(
+      TestBed.inject(RealtimeWebsocketService).subscribeToRoute,
+    ).not.toHaveBeenCalled();
+  });
+
   it('subscribes and releases estimated rail markers for a selected L8 line', () => {
     service.addRailLineToSelection('L8', false);
 

@@ -73,6 +73,6 @@ export class StopSearchInput {
   @IsOptional()
   @IsNumber()
   @Min(1)
-  @Max(25_000)
+  @Max(100_000)
   limit?: number;
 }

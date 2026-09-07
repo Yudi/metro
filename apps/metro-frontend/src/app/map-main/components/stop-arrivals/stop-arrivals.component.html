@@ -1,5 +1,5 @@
 <mat-card class="stop-arrivals-card" [class.compact-card]="compact()">
-  @if (!compact()) {
+  @if (!compact() && hasRealtimeSupport()) {
     <mat-card-header>
       <mat-card-title>
         <mat-icon>schedule</mat-icon>
@@ -12,122 +12,216 @@
   }
 
   <mat-card-content>
-    @if (isLoading()) {
-      <div class="loading-state">
-        <mat-spinner [diameter]="compact() ? 24 : 40"></mat-spinner>
-        <p>{{ compact() ? "Carregando..." : "Carregando previsões..." }}</p>
-      </div>
-    } @else if (hasArrivals()) {
-      <div class="arrivals-list">
-        @for (line of arrivalLines(); track getArrivalLineKey(line)) {
-          <div class="arrival-line">
-            <div class="line-header">
-              <div class="line-info">
-                <span
-                  class="line-code"
-                  [style.background-color]="getLineRouteColor(line)"
-                  [style.color]="getLineRouteTextColor(line)"
-                  >{{ line.c }}</span
-                >
-                <span class="line-destination">
-                  <mat-icon class="small-icon">arrow_forward</mat-icon>
-                  {{ getLineDestination(line) }}
-                </span>
+    @if (hasRealtimeSupport()) {
+      @if (isLoading()) {
+        <div class="loading-state">
+          <mat-spinner [diameter]="compact() ? 24 : 40"></mat-spinner>
+          <p>{{ compact() ? "Carregando..." : "Carregando previsões..." }}</p>
+        </div>
+      } @else if (hasArrivals()) {
+        <div class="arrivals-list">
+          @for (line of arrivalLines(); track getArrivalLineKey(line)) {
+            <div class="arrival-line">
+              <div class="line-header">
+                <div class="line-info">
+                  <span
+                    class="line-code"
+                    [style.background-color]="getLineRouteColor(line)"
+                    [style.color]="getLineRouteTextColor(line)"
+                    >{{ line.c }}</span
+                  >
+                  <span class="line-destination">
+                    <mat-icon class="small-icon">arrow_forward</mat-icon>
+                    {{ getLineDestination(line) }}
+                  </span>
+                </div>
+                @if (!compact() && line.qv > 0) {
+                  <span class="vehicle-count">{{ line.qv }} veículo(s)</span>
+                }
               </div>
-              @if (!compact() && line.qv > 0) {
-                <span class="vehicle-count">{{ line.qv }} veículo(s)</span>
-              }
-            </div>
 
-            <div class="vehicles-list">
-              @for (vehicle of getVisibleVehicles(line); track vehicle.p) {
-                <div class="vehicle-arrival">
-                  <div class="vehicle-info">
-                    <span class="vehicle-id">
-                      {{ compact() ? vehicle.p : "Veículo " + vehicle.p }}
-                    </span>
-                    @if (vehicle.a) {
-                      <mat-icon class="accessible-icon" title="Acessível">
-                        accessible
-                      </mat-icon>
-                    }
-                  </div>
-                  <div class="arrival-info">
-                    @if (vehicle.t) {
-                      <span class="arrival-countdown">{{
-                        getMinutesUntilArrival(vehicle.t)
-                      }}</span>
-                      <span class="arrival-time">{{
-                        formatArrivalTime(vehicle.t)
-                      }}</span>
-                    }
-                  </div>
-                </div>
-              }
-            </div>
-
-            @if (hasHiddenVehicles(line)) {
-              <button
-                mat-button
-                type="button"
-                class="show-vehicles-button"
-                (click)="toggleArrivalLineVehicles(line)"
-              >
-                <mat-icon>{{
-                  isArrivalLineExpanded(line) ? "expand_less" : "expand_more"
-                }}</mat-icon>
-                {{
-                  isArrivalLineExpanded(line)
-                    ? "Mostrar menos veículos"
-                    : getHiddenVehiclesLabel(line)
-                }}
-              </button>
-            }
-
-            @if (!compact() && getLineRailStations(line).length > 0) {
-              <div class="rail-service">
-                <div class="rail-service-header">
-                  <mat-icon>train</mat-icon>
-                  <span>Atende estação sobre trilhos neste sentido</span>
-                </div>
-
-                <div class="rail-stations">
-                  @for (
-                    station of getLineRailStations(line);
-                    track station.id
-                  ) {
-                    <div class="rail-station">
-                      <span class="rail-station-name">{{ station.name }}</span>
-                      <span class="rail-station-meta">{{
-                        formatStationMeta(station)
-                      }}</span>
-                      @if (formatStationDistance(station); as distanceText) {
-                        <span class="rail-station-meta rail-station-distance">{{
-                          distanceText
+              <div class="vehicles-list">
+                @for (vehicle of getVisibleVehicles(line); track vehicle.p) {
+                  <div class="vehicle-arrival">
+                    <div class="vehicle-info">
+                      <span class="vehicle-id">
+                        {{ compact() ? vehicle.p : "Veículo " + vehicle.p }}
+                      </span>
+                      @if (vehicle.a) {
+                        <mat-icon class="accessible-icon" title="Acessível">
+                          accessible
+                        </mat-icon>
+                      }
+                    </div>
+                    <div class="arrival-info">
+                      @if (vehicle.t) {
+                        <span class="arrival-countdown">{{
+                          getMinutesUntilArrival(vehicle.t)
+                        }}</span>
+                        <span class="arrival-time">{{
+                          formatArrivalTime(vehicle.t)
                         }}</span>
                       }
                     </div>
+                  </div>
+                }
+              </div>
+
+              @if (hasHiddenVehicles(line)) {
+                <button
+                  mat-button
+                  type="button"
+                  class="show-vehicles-button"
+                  (click)="toggleArrivalLineVehicles(line)"
+                >
+                  <mat-icon>{{
+                    isArrivalLineExpanded(line) ? "expand_less" : "expand_more"
+                  }}</mat-icon>
+                  {{
+                    isArrivalLineExpanded(line)
+                      ? "Mostrar menos veículos"
+                      : getHiddenVehiclesLabel(line)
+                  }}
+                </button>
+              }
+
+              @if (!compact() && getLineRailStations(line).length > 0) {
+                <div class="rail-service">
+                  <div class="rail-service-header">
+                    <mat-icon>train</mat-icon>
+                    <span>Atende estação sobre trilhos neste sentido</span>
+                  </div>
+
+                  <div class="rail-stations">
+                    @for (
+                      station of getLineRailStations(line);
+                      track station.id
+                    ) {
+                      <div class="rail-station">
+                        <span class="rail-station-heading">
+                          <span class="rail-station-name">{{ station.name }}</span>
+                          <span class="station-line-badges">
+                            @for (line of stationLineBadges().get(station.id) ?? []; track line.code) {
+                              <span class="station-line-badge" [style.background-color]="line.bg" [style.color]="line.text" [attr.aria-label]="'Linha ' + line.code">{{ line.code }}</span>
+                            }
+                          </span>
+                        </span>
+                        @if (formatStationDistance(station); as distanceText) {
+                          <span class="rail-station-meta rail-station-distance">{{
+                            distanceText
+                          }}</span>
+                        }
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+      } @else {
+        <div class="no-data-state">
+          <mat-icon>info</mat-icon>
+          <p>
+            {{
+              compact()
+                ? "Sem previsão para esta linha no momento"
+                : "Nenhuma previsão disponível no momento"
+            }}
+          </p>
+          @if (!compact()) {
+            <p class="hint">Os dados são atualizados a cada 30 segundos</p>
+          }
+        </div>
+      }
+    }
+
+    @if (hasArtespSchedules()) {
+      <section class="scheduled-section" aria-label="Horários programados" [attr.aria-busy]="scheduledDeparturesLoading()">
+        <div class="route-rail-header scheduled-header">
+          <div>
+            <div class="scheduled-title">
+              <h4><mat-icon>schedule</mat-icon> Horários programados</h4>
+              <span class="agency-identity">
+                <img [ngSrc]="artespLogo" width="24" height="24" alt="" />
+                Artesp
+              </span>
+            </div>
+            <p>Estes horários não são previsões em tempo real.</p>
+          </div>
+        </div>
+
+        @if (scheduledGroups().length > 0) {
+          <ul class="scheduled-list">
+            @for (group of scheduledGroups(); track group.routeId) {
+              <li class="scheduled-group">
+                <div class="scheduled-row">
+                  <time class="scheduled-time" [attr.datetime]="group.next.departureTime">
+                    <span>{{ group.next.timeLabel }}</span>
+                    @if (group.next.dayLabel) {
+                      <small>{{ group.next.dayLabel }}</small>
+                    }
+                  </time>
+                  <div class="scheduled-route">
+                    <span class="route-badge" [style.background-color]="group.next.color" [style.color]="group.next.textColor">{{ group.next.routeShortName }}</span>
+                    <span class="scheduled-destination">
+                      <span>{{ group.next.headsign }}</span>
+                      @if (group.next.platformCode) {
+                        <small>Plataforma {{ group.next.platformCode }}</small>
+                      }
+                    </span>
+                  </div>
+                  @if (group.remaining.length > 0) {
+                    <button mat-button type="button" class="schedule-toggle"
+                      [attr.aria-expanded]="group.expanded"
+                      [matTooltip]="group.expanded ? 'Mostrar menos' : 'Ver ' + group.departures.length + ' horários'"
+                      [attr.aria-label]="(group.expanded ? 'Recolher horários da linha ' : 'Ver ' + group.departures.length + ' horários da linha ') + group.next.routeShortName"
+                      (click)="toggleScheduleRoute(group.routeId)">
+                      <mat-icon>{{ group.expanded ? 'expand_less' : 'expand_more' }}</mat-icon>
+                      <span class="schedule-toggle-label">{{ group.expanded ? 'Mostrar menos' : 'Ver ' + group.departures.length + ' horários' }}</span>
+                    </button>
                   }
                 </div>
-              </div>
+                @if (group.expanded) {
+                  <ul class="scheduled-following" [attr.aria-label]="'Mais horários da linha ' + group.next.routeShortName">
+                    @for (departure of group.remaining; track departure.key) {
+                      <li class="scheduled-following-row">
+                        <time class="scheduled-time" [attr.datetime]="departure.departureTime">
+                          <span>{{ departure.timeLabel }}</span>
+                          @if (departure.dayLabel) {
+                            <small>{{ departure.dayLabel }}</small>
+                          }
+                        </time>
+                        <span class="scheduled-destination">
+                          <span>{{ departure.headsign }}</span>
+                          @if (departure.platformCode) {
+                            <small>Plataforma {{ departure.platformCode }}</small>
+                          }
+                        </span>
+                      </li>
+                    }
+                  </ul>
+                }
+              </li>
             }
+          </ul>
+        } @else if (scheduledDeparturesLoading()) {
+          <div class="route-detail-state scheduled-state" role="status">
+            <mat-spinner diameter="24"></mat-spinner>
+            <span>Carregando horários programados...</span>
+          </div>
+        } @else if (scheduledDeparturesError()) {
+          <div class="route-detail-state scheduled-state" role="status">
+            <mat-icon>error_outline</mat-icon>
+            <span>Não foi possível carregar os horários programados.</span>
+          </div>
+        } @else {
+          <div class="route-detail-state scheduled-state" role="status">
+            <mat-icon>event_busy</mat-icon>
+            <span>Nenhum horário programado disponível.</span>
           </div>
         }
-      </div>
-    } @else {
-      <div class="no-data-state">
-        <mat-icon>info</mat-icon>
-        <p>
-          {{
-            compact()
-              ? "Sem previsão para esta linha no momento"
-              : "Nenhuma previsão disponível no momento"
-          }}
-        </p>
-        @if (!compact()) {
-          <p class="hint">Os dados são atualizados a cada 30 segundos</p>
-        }
-      </div>
+      </section>
     }
 
     @if (!compact() && routes().length > 0) {
@@ -146,36 +240,38 @@
           }
         </div>
 
-        <div class="route-chip-list">
-          @for (route of routes(); track route.id) {
-            <div class="route-chip-item">
-              <button
-                type="button"
-                class="route-chip"
-                [class.route-chip-expanded]="isRouteExpanded(route)"
-                (click)="toggleRoute(route)"
-              >
-                <span
-                  class="route-badge"
-                  [style.background-color]="'#' + route.color"
-                  [style.color]="'#' + route.textColor"
-                  >{{ route.shortName }}</span
-                >
-                <span class="route-label">{{ route.longName }}</span>
-
-                @if (!railConnectionsLoading() && routeServesRail(route)) {
-                  <span class="rail-count">
-                    <mat-icon>train</mat-icon>
-                    {{ getRouteRailStationCount(route) }}
+        <mat-accordion class="route-chip-list" multi>
+          @for (route of displayRoutes(); track route.routeId) {
+            <mat-expansion-panel class="route-panel mat-elevation-z0"
+              [expanded]="isRouteExpanded(route)"
+              (opened)="setRouteExpanded(route, true)"
+              (closed)="setRouteExpanded(route, false)">
+              <mat-expansion-panel-header class="route-panel-header">
+                <mat-panel-title class="route-summary">
+                  <span class="route-badge" [style.background-color]="'#' + route.color" [style.color]="'#' + route.textColor">{{ route.shortName }}</span>
+                  <span class="route-label">{{ route.longName }}</span>
+                  <span class="route-meta">
+                    <span class="agency-identity">
+                      @if (route.agencyLogo; as logo) {
+                        <img [ngSrc]="logo" width="24" height="24" alt="" />
+                      }
+                      {{ route.agencyName }}
+                    </span>
+                    @if (route.fareLabel; as fareLabel) {
+                      <span class="route-fare" [class.fare-missing]="route.fareMissing" [attr.aria-label]="'Tarifa: ' + fareLabel">
+                        <mat-icon>payments</mat-icon>
+                        <span>{{ fareLabel }}</span>
+                      </span>
+                    }
+                    @if (!railConnectionsLoading() && routeServesRail(route)) {
+                      <span class="rail-count" [attr.aria-label]="getRouteRailStationCount(route) + ' estações de metrô ou trem'">
+                        <mat-icon>train</mat-icon>
+                        {{ getRouteRailStationCount(route) }}
+                      </span>
+                    }
                   </span>
-                } @else if (!railConnectionsLoading()) {
-                  <span class="no-rail-count">sem trilhos</span>
-                }
-
-                <mat-icon class="expand-icon">{{
-                  isRouteExpanded(route) ? "expand_less" : "expand_more"
-                }}</mat-icon>
-              </button>
+                </mat-panel-title>
+              </mat-expansion-panel-header>
 
               @if (isRouteExpanded(route)) {
                 <div class="route-rail-details">
@@ -212,12 +308,14 @@
                             track station.id
                           ) {
                             <div class="rail-station detail-station">
-                              <span class="rail-station-name">{{
-                                station.name
-                              }}</span>
-                              <span class="rail-station-meta">{{
-                                formatStationMeta(station)
-                              }}</span>
+                              <span class="rail-station-heading">
+                                <span class="rail-station-name">{{ station.name }}</span>
+                                <span class="station-line-badges">
+                                  @for (line of stationLineBadges().get(station.id) ?? []; track line.code) {
+                                    <span class="station-line-badge" [style.background-color]="line.bg" [style.color]="line.text" [attr.aria-label]="'Linha ' + line.code">{{ line.code }}</span>
+                                  }
+                                </span>
+                              </span>
                               @if (
                                 formatStationDistance(station);
                                 as distanceText
@@ -261,9 +359,9 @@
                   }
                 </div>
               }
-            </div>
+            </mat-expansion-panel>
           }
-        </div>
+        </mat-accordion>
       </section>
     }
   </mat-card-content>

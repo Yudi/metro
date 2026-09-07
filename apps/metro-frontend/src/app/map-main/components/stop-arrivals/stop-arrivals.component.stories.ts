@@ -19,13 +19,18 @@ import {
   ROUTE_477A,
   ROUTE_775A,
   ROUTE_875A,
+  ARTESP_ONLY_BUS_STOP,
+  ROUTE_ARTESP_001,
+  ROUTE_ARTESP_WITHOUT_FARE,
+  SCHEDULED_ARTESP_DEPARTURES,
+  SHARED_SPTRANS_ARTESP_BUS_STOP,
   MOCK_ROUTE_RAIL_CONNECTIONS,
   createMockArrivals,
   createEmptyArrivals,
 } from '@metro/storybook-mocks';
 import { signal } from '@angular/core';
 import { OLHOVIVO_POLL_INTERVAL_MS } from '@metro/shared/utils';
-import { of } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 
 // Mock Service with Dynamic Arrivals
 
@@ -33,6 +38,8 @@ interface StopArrivalsProviderOptions {
   stop: BusStopGraphQL;
   arrivals?: StopArrivalUpdate;
   isLoading?: boolean;
+  scheduledDepartures?: typeof SCHEDULED_ARTESP_DEPARTURES;
+  scheduledState?: 'loaded' | 'loading' | 'error';
 }
 
 function createProviders(opts: StopArrivalsProviderOptions) {
@@ -43,11 +50,19 @@ function createProviders(opts: StopArrivalsProviderOptions) {
     arrivalsMap.set(stop.stopId, arrivals);
   }
 
+  const scheduledDepartures$ =
+    opts.scheduledState === 'loading'
+      ? NEVER
+      : opts.scheduledState === 'error'
+        ? throwError(() => new Error('Falha simulada ao carregar horários'))
+        : of(opts.scheduledDepartures ?? []);
+
   return [
     {
       provide: GeographyGraphQLService,
       useValue: {
         getRouteRailConnectionsForStop: () => of(MOCK_ROUTE_RAIL_CONNECTIONS),
+        getScheduledBusDepartures: () => scheduledDepartures$,
       },
     },
     {
@@ -338,6 +353,134 @@ export const BusyStop: Story = {
           },
           cacheTimestamp: Date.now(),
         },
+      }),
+    }),
+  ],
+};
+
+/** Shared stop state: SPTrans realtime and Artesp scheduled departures coexist. */
+export const ArtespScheduledSharedStop: Story = {
+  args: {
+    stop: SHARED_SPTRANS_ARTESP_BUS_STOP,
+    routes: [ROUTE_477A, ROUTE_ARTESP_001],
+  },
+  decorators: [
+    applicationConfig({
+      providers: createProviders({
+        stop: SHARED_SPTRANS_ARTESP_BUS_STOP,
+        arrivals: createMockArrivals(SHARED_SPTRANS_ARTESP_BUS_STOP.stopId),
+        scheduledDepartures: SCHEDULED_ARTESP_DEPARTURES,
+      }),
+    }),
+  ],
+};
+
+/** Standalone Artesp stop: scheduled departures replace realtime predictions. */
+export const ArtespScheduledOnly: Story = {
+  args: {
+    stop: ARTESP_ONLY_BUS_STOP,
+    routes: [ROUTE_ARTESP_001, ROUTE_ARTESP_WITHOUT_FARE],
+  },
+  decorators: [
+    applicationConfig({
+      providers: createProviders({
+        stop: ARTESP_ONLY_BUS_STOP,
+        scheduledDepartures: SCHEDULED_ARTESP_DEPARTURES,
+      }),
+    }),
+  ],
+};
+
+/** Long destinations, multiple fares and platform names remain readable on phones. */
+export const ArtespLongRoute: Story = {
+  ...ArtespScheduledOnly,
+  args: {
+    ...ArtespScheduledOnly.args,
+    showMapActions: true,
+    routes: [
+      {
+        ...ROUTE_ARTESP_001,
+        longName: 'Terminal Metropolitano de São Bernardo do Campo – São Paulo (Terminal Sacomã)',
+        fares: [
+          { price: 5.5, currency: 'BRL' },
+          { price: 8.75, currency: 'BRL' },
+        ],
+      },
+      ROUTE_ARTESP_WITHOUT_FARE,
+    ],
+  },
+};
+
+export const ArtespCompact: Story = {
+  ...ArtespScheduledOnly,
+  args: { ...ArtespScheduledOnly.args, compact: true },
+};
+
+/** Busy stop: the overview stays at one next departure per route. */
+export const ArtespSeveralRoutes: Story = {
+  args: {
+    stop: ARTESP_ONLY_BUS_STOP,
+    routes: [
+      ROUTE_ARTESP_001,
+      ROUTE_ARTESP_WITHOUT_FARE,
+      { ...ROUTE_ARTESP_001, id: 'artesp:003', routeId: 'artesp:003', shortName: '003', longName: 'Terminal Regional – Vila Nova' },
+      { ...ROUTE_ARTESP_WITHOUT_FARE, id: 'artesp:004', routeId: 'artesp:004', shortName: '004', longName: 'Terminal Regional – Jardim das Flores' },
+    ],
+  },
+  decorators: [
+    applicationConfig({
+      providers: createProviders({
+        stop: ARTESP_ONLY_BUS_STOP,
+        scheduledDepartures: [
+          ...SCHEDULED_ARTESP_DEPARTURES,
+          ...SCHEDULED_ARTESP_DEPARTURES.filter((departure) => departure.routeId === ROUTE_ARTESP_001.routeId)
+            .flatMap((departure) => [
+              { ...departure, routeId: 'artesp:003', routeShortName: '003', tripId: `${departure.tripId}-003`, headsign: 'Vila Nova' },
+              { ...departure, routeId: 'artesp:004', routeShortName: '004', tripId: `${departure.tripId}-004`, headsign: 'Jardim das Flores' },
+            ]),
+        ],
+      }),
+    }),
+  ],
+};
+
+export const ArtespNoScheduledDepartures: Story = {
+  args: {
+    stop: ARTESP_ONLY_BUS_STOP,
+    routes: [ROUTE_ARTESP_001],
+  },
+  decorators: [
+    applicationConfig({
+      providers: createProviders({ stop: ARTESP_ONLY_BUS_STOP }),
+    }),
+  ],
+};
+
+export const ArtespScheduleLoading: Story = {
+  args: {
+    stop: ARTESP_ONLY_BUS_STOP,
+    routes: [ROUTE_ARTESP_001],
+  },
+  decorators: [
+    applicationConfig({
+      providers: createProviders({
+        stop: ARTESP_ONLY_BUS_STOP,
+        scheduledState: 'loading',
+      }),
+    }),
+  ],
+};
+
+export const ArtespScheduleError: Story = {
+  args: {
+    stop: ARTESP_ONLY_BUS_STOP,
+    routes: [ROUTE_ARTESP_WITHOUT_FARE],
+  },
+  decorators: [
+    applicationConfig({
+      providers: createProviders({
+        stop: ARTESP_ONLY_BUS_STOP,
+        scheduledState: 'error',
       }),
     }),
   ],

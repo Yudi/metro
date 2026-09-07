@@ -12,7 +12,10 @@ $primary: var(--mat-sys-primary, #6750a4);
 }
 
 .selections-panel {
+  display: flex;
+  flex-direction: column;
   flex-shrink: 0;
+  min-height: 0;
   background: $surface-container;
   border-bottom: 1px solid $outline-variant;
   max-height: 200px;
@@ -48,8 +51,10 @@ $primary: var(--mat-sys-primary, #6750a4);
 }
 
 .panel-content {
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 10px 12px;
-  max-height: 150px;
+  max-height: none;
   overflow-y: auto;
   scrollbar-width: thin;
 
@@ -87,7 +92,84 @@ $primary: var(--mat-sys-primary, #6750a4);
   letter-spacing: 0.5px;
 }
 
-// Responsive
+.route-chip {
+  max-width: 100%;
+  min-height: 36px;
+  height: auto;
+  padding: 4px 6px 4px 4px;
+}
+
+.route-chip-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.route-chip-content .route-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  min-height: 26px;
+  padding: 0 7px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.route-chip-content .agency-identity {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  color: $on-surface-variant;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+
+  img,
+  mat-icon {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+    font-size: 16px;
+    object-fit: contain;
+  }
+
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.route-chip-content .route-fare {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: $primary;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+
+  mat-icon {
+    width: 15px;
+    height: 15px;
+    font-size: 15px;
+  }
+}
+
+.route-chip-content .route-fare.missing-fare {
+  color: $on-surface-variant;
+  font-weight: 600;
+}
+
+/* Responsive */
 @media (max-width: 768px) {
   .selections-panel {
     max-height: 160px;
@@ -99,7 +181,6 @@ $primary: var(--mat-sys-primary, #6750a4);
 
   .panel-content {
     padding: 8px 10px;
-    max-height: 110px;
   }
 
   .chip-list {
@@ -114,6 +195,5 @@ $primary: var(--mat-sys-primary, #6750a4);
 
   .panel-content {
     padding: 6px 8px;
-    max-height: 90px;
   }
 }

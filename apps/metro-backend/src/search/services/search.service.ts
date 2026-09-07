@@ -20,25 +20,7 @@ import {
 } from '@metro/shared/utils';
 import { BikePollingService } from '../../bike/services/bike-polling.service';
 
-interface GtfsRouteRow {
-  id: number;
-  route_id: string;
-  agency_id: string;
-  route_short_name: string;
-  route_long_name: string;
-  route_type: number;
-  route_color: string;
-  route_text_color: string;
-}
-
-interface GtfsStopRow {
-  id: number;
-  stop_id: string;
-  stop_name: string;
-  stop_desc: string | null;
-  stop_lat: number;
-  stop_lon: number;
-}
+import { BusRouteRow, BusStopRow, mapBusRoute, mapBusStop } from '../../geography/services/bus-catalog.utils';
 
 @Injectable()
 export class SearchService {
@@ -77,23 +59,40 @@ export class SearchService {
     try {
       // Exclude GTFS rail routes (METRÔ% and CPTM%)
       // These are now handled by GeoSampa rail data
-      const routes = await this.prisma.$queryRaw<GtfsRouteRow[]>`
-        SELECT id, route_id, agency_id, route_short_name, route_long_name, route_type, route_color, route_text_color
-        FROM "SPTrans_Route"
-        WHERE route_id NOT LIKE 'METRÔ%'
-        AND route_id NOT LIKE 'CPTM%'
+      const routes = await this.prisma.$queryRaw<BusRouteRow[]>`
+        SELECT r.*,
+          COALESCE((
+            SELECT jsonb_agg(fare ORDER BY fare->>'currency', (fare->>'price')::numeric)
+            FROM (
+              SELECT DISTINCT jsonb_build_object('price', fa.price, 'currency', fa.currency_type) AS fare
+              FROM public."Gtfs_FareRule" fr
+              JOIN public."Gtfs_FareAttribute" fa ON fa.fare_id = fr.fare_id
+              WHERE fr.route_id = r.route_id
+            ) fares
+          ), '[]'::jsonb) AS fares
+        FROM public."Gtfs_Route" r
+        WHERE r.route_type NOT IN (1, 2)
+          AND r.route_id NOT LIKE 'METRÔ%' AND r.route_id NOT LIKE 'CPTM%'
+        ORDER BY CASE r.source_agency WHEN 'sptrans' THEN 0 ELSE 1 END, r.route_id
       `;
 
-      const routeDocuments: RouteDocument[] = routes.map((route) => ({
-        id: route.route_id,
-        route_id: route.route_id,
-        agency_id: route.agency_id,
-        route_short_name: route.route_short_name,
-        route_long_name: route.route_long_name,
-        route_type: route.route_type,
-        route_color: route.route_color,
-        route_text_color: route.route_text_color,
-      }));
+      const routeDocuments: RouteDocument[] = routes.map((row) => {
+        const route = mapBusRoute(row);
+        return {
+          id: route.routeId,
+          route_id: route.routeId,
+          agency_id: row.agency_id ?? '',
+          sourceAgency: route.sourceAgency,
+          sourceId: route.sourceId,
+          supportsRealtime: route.supportsRealtime,
+          faresJson: JSON.stringify(route.fares),
+          route_short_name: route.shortName,
+          route_long_name: route.longName,
+          route_type: route.routeType,
+          route_color: route.color,
+          route_text_color: route.textColor,
+        };
+      });
 
       await this.typesenseService.indexRoutes(routeDocuments);
       this.logger.debug(
@@ -109,9 +108,16 @@ export class SearchService {
 
   async indexStops(): Promise<void> {
     try {
-      const stops = await this.prisma.$queryRaw<GtfsStopRow[]>`
-        SELECT id, stop_id, stop_name, stop_desc, stop_lat, stop_lon
-        FROM "SPTrans_Stop"
+      const stops = await this.prisma.$queryRaw<BusStopRow[]>`
+        SELECT s.*, COALESCE(members.ids, ARRAY[s.stop_id]) AS merged_stop_ids
+        FROM public."Gtfs_Stop" s
+        LEFT JOIN public.physical_stop_members membership ON membership.source_stop_id = s.stop_id
+        LEFT JOIN LATERAL (
+          SELECT array_agg(member.source_stop_id ORDER BY member.source_stop_id) AS ids
+          FROM public.physical_stop_members member
+          WHERE member.physical_stop_id = s.stop_id
+        ) members ON true
+        WHERE membership.physical_stop_id IS NULL OR membership.physical_stop_id = s.stop_id
       `;
 
       const stopIds = stops.map((s) => s.stop_id);
@@ -124,16 +130,23 @@ export class SearchService {
         return !(info?.servesRail && !info.servesBus);
       });
 
-      const stopDocuments: StopDocument[] = stopsToIndex.map((stop) => ({
-        id: stop.stop_id,
-        stop_id: stop.stop_id,
-        stop_name: stop.stop_name,
-        stop_desc: stop.stop_desc || undefined,
-        stop_lat: stop.stop_lat,
-        stop_lon: stop.stop_lon,
-        is_subway_station:
-          serviceInfo.get(stop.stop_id)?.servesRail ?? false,
-      }));
+      const stopDocuments: StopDocument[] = stopsToIndex.map((row) => {
+        const stop = mapBusStop(row, serviceInfo.get(row.stop_id));
+        return {
+          id: stop.stopId,
+          stop_id: stop.stopId,
+          sourceAgency: stop.sourceAgency,
+          sourceId: stop.sourceId,
+          platformCode: stop.platformCode,
+          mergedStopIds: stop.mergedStopIds,
+          agencies: stop.agencies ?? [],
+          stop_name: stop.name,
+          stop_desc: stop.description,
+          stop_lat: stop.latitude,
+          stop_lon: stop.longitude,
+          is_subway_station: stop.isSubwayStation,
+        };
+      });
 
       await this.typesenseService.indexStops(stopDocuments);
       this.logger.debug(

@@ -17,6 +17,12 @@ import { SearchDialogComponent } from './search-dialog.component';
 import { TypesenseSearchService } from '../../../services/typesense-search.service';
 import { GeographyGraphQLService } from '../../services/geography-graphql.service';
 import { of, delay } from 'rxjs';
+import {
+  ARTESP_ONLY_BUS_STOP,
+  ROUTE_ARTESP_001,
+  ROUTE_ARTESP_WITHOUT_FARE,
+  SHARED_SPTRANS_ARTESP_BUS_STOP,
+} from '@metro/storybook-mocks';
 
 // Mock Data
 
@@ -136,6 +142,65 @@ const MOCK_ROUTE_RESULTS = {
   ],
 };
 
+function toSearchRouteDocument(
+  route: typeof ROUTE_ARTESP_001,
+) {
+  return {
+    id: route.id,
+    route_id: route.routeId,
+    agency_id: route.sourceAgency ?? '',
+    route_short_name: route.shortName,
+    route_long_name: route.longName,
+    route_color: route.color,
+    route_text_color: route.textColor,
+    route_type: route.routeType,
+    sourceAgency: route.sourceAgency,
+    sourceId: route.sourceId,
+    supportsRealtime: route.supportsRealtime,
+    fares: route.fares,
+  };
+}
+
+function toSearchStopDocument(
+  stop:
+    | typeof ARTESP_ONLY_BUS_STOP
+    | typeof SHARED_SPTRANS_ARTESP_BUS_STOP,
+) {
+  return {
+    id: stop.id,
+    stop_id: stop.stopId,
+    stop_name: stop.name,
+    stop_desc: stop.description,
+    stop_lat: stop.latitude,
+    stop_lon: stop.longitude,
+    sourceAgency: stop.sourceAgency,
+    sourceId: stop.sourceId,
+    platformCode: stop.platformCode,
+    mergedStopIds: stop.mergedStopIds,
+  };
+}
+
+const MOCK_ARTESP_RESULTS = {
+  results: [
+    {
+      type: 'stop',
+      document: toSearchStopDocument(ARTESP_ONLY_BUS_STOP),
+    },
+    {
+      type: 'stop',
+      document: toSearchStopDocument(SHARED_SPTRANS_ARTESP_BUS_STOP),
+    },
+    {
+      type: 'route',
+      document: toSearchRouteDocument(ROUTE_ARTESP_001),
+    },
+    {
+      type: 'route',
+      document: toSearchRouteDocument(ROUTE_ARTESP_WITHOUT_FARE),
+    },
+  ],
+};
+
 // Mock Services
 
 type SearchScenario =
@@ -144,7 +209,8 @@ type SearchScenario =
   | 'loading'
   | 'error'
   | 'nearby'
-  | 'routes';
+  | 'routes'
+  | 'artesp';
 
 function createMockTypesenseService(scenario: SearchScenario, delayMs = 0) {
   return {
@@ -158,6 +224,9 @@ function createMockTypesenseService(scenario: SearchScenario, delayMs = 0) {
       }
       if (scenario === 'routes') {
         return of(MOCK_ROUTE_RESULTS).pipe(delay(delayMs));
+      }
+      if (scenario === 'artesp') {
+        return of(MOCK_ARTESP_RESULTS).pipe(delay(delayMs));
       }
       return of(MOCK_SEARCH_RESULTS).pipe(delay(delayMs));
     },
@@ -174,6 +243,14 @@ function createMockTypesenseService(scenario: SearchScenario, delayMs = 0) {
 
 function createMockGeographyService() {
   return {
+    getBatchRoutesForStops: (stopIds: string[]) => of(new Map(
+      stopIds.map((stopId) => [
+        stopId,
+        stopId === ARTESP_ONLY_BUS_STOP.stopId
+          ? [ROUTE_ARTESP_001.shortName, ROUTE_ARTESP_WITHOUT_FARE.shortName]
+          : ['477A', ROUTE_ARTESP_001.shortName],
+      ]),
+    )),
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     getRoutesForStop: (stopId: string) => {
       // Return mock routes for any stop
@@ -333,6 +410,22 @@ export const RouteResults: Story = {
     const input = canvasElement.querySelector('input') as HTMLInputElement;
     if (input) {
       input.value = '477';
+      input.dispatchEvent(new Event('input'));
+    }
+  },
+};
+
+/** Artesp-only/shared stops and routes with both known and missing fares. */
+export const ArtespResults: Story = {
+  decorators: [
+    applicationConfig({
+      providers: createProviders('artesp', 300),
+    }),
+  ],
+  play: async ({ canvasElement }) => {
+    const input = canvasElement.querySelector('input') as HTMLInputElement;
+    if (input) {
+      input.value = 'Artesp';
       input.dispatchEvent(new Event('input'));
     }
   },

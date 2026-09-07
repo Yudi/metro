@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import {
   MatDialogModule,
   MatDialogRef,
@@ -14,7 +14,13 @@ import {
 } from '../../services/geography-graphql.service';
 import { FavoritesService, LoggerService } from '@metro/shared/api';
 import { StopArrivalsComponent } from '../stop-arrivals/stop-arrivals.component';
-import { getContrastColor } from '@metro/shared/utils';
+import {
+  getBusAgencyOrder,
+  getBusStopDisplayId,
+  getBusStopIdentityAliases,
+  getBusRouteIdentity,
+  getContrastColor,
+} from '@metro/shared/utils';
 import { DialogHeaderComponent } from '../../../shared/components/dialog-header/dialog-header.component';
 
 export interface BusStopDialogData {
@@ -37,14 +43,24 @@ export interface BusStopDialogData {
   ],
   templateUrl: './bus-stop-dialog.component.html',
   styleUrls: ['./bus-stop-dialog.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BusStopDialogComponent {
   readonly dialogRef = inject(MatDialogRef<BusStopDialogComponent>);
   readonly data = inject<BusStopDialogData>(MAT_DIALOG_DATA);
+  readonly stopDescription =
+    this.data.stop.description?.trim() === `Plataforma ${this.data.stop.platformCode}`
+      ? null
+      : this.data.stop.description;
   private logger = inject(LoggerService);
   private favoriteService = inject(FavoritesService);
+  readonly favoriteStopIds = computed(() =>
+    getBusStopIdentityAliases(this.data.stop).filter((stopId) =>
+      this.favoriteService.isFavorite(stopId, 'busStop'),
+    ),
+  );
   readonly isFavorite = computed(() =>
-    this.favoriteService.isFavorite(this.data.stop.stopId, 'busStop'),
+    this.favoriteStopIds().length > 0,
   );
   readonly routesSortedByFavorite = computed(() => {
     const favoriteRouteIds = new Set(
@@ -59,11 +75,14 @@ export class BusStopDialogComponent {
         const aIsFavorite = this.isFavoriteRoute(a.route, favoriteRouteIds);
         const bIsFavorite = this.isFavoriteRoute(b.route, favoriteRouteIds);
 
-        if (aIsFavorite === bIsFavorite) {
-          return a.index - b.index;
+        if (aIsFavorite !== bIsFavorite) {
+          return aIsFavorite ? -1 : 1;
         }
 
-        return aIsFavorite ? -1 : 1;
+        return (
+          getBusAgencyOrder(a.route) - getBusAgencyOrder(b.route) ||
+          a.index - b.index
+        );
       })
       .map(({ route }) => route);
   });
@@ -92,17 +111,20 @@ export class BusStopDialogComponent {
     return this.data.showMapActions !== false;
   }
 
+  get stopDisplayId(): string {
+    return getBusStopDisplayId(this.data.stop);
+  }
+
   get selectedRoutes(): BusRouteGraphQL[] {
     return this.routesSortedByFavorite().filter((route) => {
-      const routeIdToCheck = route.shortName || route.routeId;
-      return this.data.selectedRoutes.has(routeIdToCheck);
+      return this.data.selectedRoutes.has(getBusRouteIdentity(route));
     });
   }
 
   get availableRoutes(): BusRouteGraphQL[] {
     return this.routesSortedByFavorite().filter(
       (route) =>
-        !this.data.selectedRoutes.has(route.shortName || route.routeId),
+        !this.data.selectedRoutes.has(getBusRouteIdentity(route)),
     );
   }
 
@@ -123,11 +145,14 @@ export class BusStopDialogComponent {
   }
 
   removeFromFavorites(): void {
-    if (!this.data.stop.stopId) {
+    const savedStopIds = this.favoriteStopIds();
+    if (savedStopIds.length === 0) {
       return;
     }
 
-    this.favoriteService.removeFavorite(this.data.stop.stopId, 'busStop');
+    for (const stopId of savedStopIds) {
+      this.favoriteService.removeFavorite(stopId, 'busStop');
+    }
   }
 
   toggleFavorite(): void {
@@ -143,7 +168,7 @@ export class BusStopDialogComponent {
   }
 
   selectRoute(route: BusRouteGraphQL): void {
-    const routeId = route.shortName || route.routeId;
+    const routeId = getBusRouteIdentity(route);
     if (this.data.selectedRoutes.has(routeId)) {
       return;
     }
@@ -166,8 +191,7 @@ export class BusStopDialogComponent {
     favoriteRouteIds: Set<string>,
   ): boolean {
     return (
-      favoriteRouteIds.has(this.normalizeRouteCode(route.routeId)) ||
-      favoriteRouteIds.has(this.normalizeRouteCode(route.shortName))
+      favoriteRouteIds.has(this.normalizeRouteCode(getBusRouteIdentity(route)))
     );
   }
 

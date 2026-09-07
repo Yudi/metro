@@ -4,15 +4,7 @@ import { PostGISService } from './postgis.service';
 import { BusStop } from '../entities/geography.entity';
 import { BoundingBoxInput, StopSearchInput } from '../dto/geography.input';
 import { QueryOptimizationService } from './query-optimization.service';
-
-interface GtfsStopRow {
-  id: number;
-  stop_id: string;
-  stop_name: string;
-  stop_desc: string | null;
-  stop_lat: number;
-  stop_lon: number;
-}
+import { mapBusStop } from './bus-catalog.utils';
 
 @Injectable()
 export class BusStopService {
@@ -53,11 +45,15 @@ export class BusStopService {
     return stops.map((stop) => ({
       id: stop.stop_id,
       stopId: stop.stop_id,
+      sourceAgency: 'sptrans' as const,
+      sourceId: stop.stop_id,
       name: stop.stop_name,
       description: stop.stop_desc || undefined,
       latitude: stop.stop_lat,
       longitude: stop.stop_lon,
       isSubwayStation: subwayStopIds.has(stop.stop_id),
+      platformCode: undefined,
+      mergedStopIds: [stop.stop_id],
       agencies: stopAgencies.get(stop.stop_id),
       geometry: {
         type: 'Point',
@@ -76,54 +72,15 @@ export class BusStopService {
 
   async getBusStop(id: string): Promise<BusStop | null> {
     this.logger.debug(`getBusStop called with stop_id: "${id}"`);
-    this.logger.debug(`Trying to find by GTFS stop_id: "${id}"`);
-    const stopsByStopId = await this.prisma.$queryRaw<GtfsStopRow[]>`
-      SELECT id, stop_id, stop_name, stop_desc, stop_lat, stop_lon
-      FROM "SPTrans_Stop"
-      WHERE stop_id = ${id}
-      LIMIT 1
-    `;
-    const stop = stopsByStopId[0];
-    if (stop) {
-      this.logger.debug(
-        `Found by GTFS stop_id - stop_id: ${stop.stop_id}, name: "${stop.stop_name}"`,
-      );
-    }
-
+    const stop = await this.queryOptimization.findStopByMultipleCriteria(id);
     if (!stop) {
       return null;
     }
 
-    // Determine if this is a subway station by checking if it serves subway routes
-    const isSubwayStation = await this.isStopSubwayStation(stop.stop_id);
-
-    // Get agencies and route short names if it's a subway station
-    let agencies: string[] | undefined;
-    let routeShortNames: string[] | undefined;
-    if (isSubwayStation) {
-      const routeInfoMap = await this.batchGetStopRouteInfo([stop.stop_id]);
-      const info = routeInfoMap.get(stop.stop_id);
-      if (info) {
-        agencies = info.agencies;
-        routeShortNames = info.routeShortNames;
-      }
-    }
-
-    return {
-      id: stop.stop_id,
-      stopId: stop.stop_id,
-      name: stop.stop_name,
-      description: stop.stop_desc || undefined,
-      latitude: stop.stop_lat,
-      longitude: stop.stop_lon,
-      isSubwayStation,
-      agencies,
-      routeShortNames,
-      geometry: {
-        type: 'Point',
-        coordinates: [[stop.stop_lon, stop.stop_lat]],
-      },
-    };
+    const physicalStopId = stop.physical_stop_id || stop.stop_id;
+    const serviceInfo =
+      await this.queryOptimization.batchGetStopServiceInfo([physicalStopId]);
+    return mapBusStop(stop, serviceInfo.get(physicalStopId));
   }
 
   async isStopSubwayStation(stopId: string): Promise<boolean> {

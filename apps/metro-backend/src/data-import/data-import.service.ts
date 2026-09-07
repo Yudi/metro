@@ -7,8 +7,12 @@ import { GTFSDatabaseService } from './services/gtfs-database.service';
 import { CsvProcessingService } from './services/csv-processing.service';
 import { RustGtfsService } from './services/rust-gtfs.service';
 import { DataImportHooksService } from './services/data-import-hooks.service';
-import { GTFSConfig } from './config/gtfs.config';
-import { ImportProgress, GTFSProcessingResult } from './types/gtfs.types';
+import { GTFSConfig, GTFSFeed } from './config/gtfs.config';
+import {
+  GTFSFileInfo,
+  ImportProgress,
+  GTFSProcessingResult,
+} from './types/gtfs.types';
 import { ImportStatusDto } from './dto/gtfs-dataset.dto';
 import {
   ImportLockService,
@@ -171,6 +175,17 @@ export class DataImportService implements OnModuleInit {
     try {
       const result = await this.performImport(forceReimport);
       if (!result.success) {
+        // A feed can fail after another feed has already published new raw
+        // rows. Refresh derived data for the feeds that did change so a
+        // failed optional provider does not leave successful catalog updates
+        // invisible. The overall run remains failed and is retried later.
+        if (result.dataChanged) {
+          await this.dataImportHooksService.onDataImportComplete({
+            dataChanged: true,
+            sourceSignature: result.sourceSignature,
+            feeds: result.changedFeeds,
+          });
+        }
         throw new ImportFailureError(result);
       }
 
@@ -179,6 +194,7 @@ export class DataImportService implements OnModuleInit {
       await this.dataImportHooksService.onDataImportComplete({
         dataChanged: result.dataChanged,
         sourceSignature: result.sourceSignature,
+        feeds: result.changedFeeds,
       });
       this.updateImportStatus(
         'completed',
@@ -263,46 +279,194 @@ export class DataImportService implements OnModuleInit {
   private async performImport(
     forceReimport = false,
   ): Promise<GTFSProcessingResult> {
-    const zipFileName = 'gtfs.zip';
-    const zipFilePath = path.join(this.tempDir, zipFileName);
-    const extractDir = path.join(this.tempDir, 'extracted');
+    const feeds: GTFSFeed[] = ['sptrans', 'artesp'];
+    const results: GTFSProcessingResult[] = [];
+
+    for (const feed of feeds) {
+      try {
+        results.push(await this.performFeedImport(feed, forceReimport));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        this.logger.error(`${feed} GTFS import failed: ${message}`);
+        results.push({
+          success: false,
+          filesProcessed: 0,
+          recordsImported: 0,
+          skippedFiles: [],
+          errors: [`${feed}: ${message}`],
+          dataChanged: false,
+          feed,
+        });
+      }
+    }
+
+    const changedFeeds = results
+      .filter((result) => result.dataChanged)
+      .map((result) => result.feed)
+      .filter((feed): feed is GTFSFeed => feed !== undefined);
+    const signatures = results
+      .filter((result) => result.success && result.sourceSignature)
+      .map((result) => `${result.feed ?? 'sptrans'}:${result.sourceSignature}`)
+      .sort();
+
+    // If a feed failed before returning a successful result, include the last
+    // completed metadata hash when available. This keeps post-processing
+    // signatures representative of the catalog that is actually published.
+    for (const feed of feeds) {
+      if (signatures.some((signature) => signature.startsWith(`${feed}:`))) {
+        continue;
+      }
+      try {
+        const current = await this.gtfsDatabaseService.getCurrentDataset(feed);
+        if (current) {
+          signatures.push(`${feed}:${current.fileHash}`);
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Unable to read last completed ${feed} dataset signature: ${errorMessage(error)}`,
+        );
+      }
+    }
+    signatures.sort();
+
+    return {
+      success: results.every((result) => result.success),
+      filesProcessed: results.reduce(
+        (total, result) => total + result.filesProcessed,
+        0,
+      ),
+      recordsImported: results.reduce(
+        (total, result) => total + result.recordsImported,
+        0,
+      ),
+      skippedFiles: results.flatMap((result) =>
+        result.feed
+          ? result.skippedFiles.map((file) => `${result.feed}:${file}`)
+          : result.skippedFiles,
+      ),
+      errors: results.flatMap((result) => result.errors),
+      dataChanged: changedFeeds.length > 0,
+      sourceSignature: signatures.length > 0 ? signatures.join('|') : undefined,
+      changedFeeds,
+    };
+  }
+
+  private async performFeedImport(
+    feed: GTFSFeed,
+    forceReimport = false,
+  ): Promise<GTFSProcessingResult> {
+    const feedDefinition = GTFSConfig.getFeedDefinition(feed);
+    const feedTempDir = path.join(this.tempDir, feed);
+    const zipFileName = `${feed}.zip`;
+    const zipFilePath = path.join(feedTempDir, zipFileName);
+    const extractDir = path.join(feedTempDir, 'extracted');
+    let sourceDir: string | undefined;
+    let shouldCleanupTemp = true;
+    let catalogMutationStarted = false;
+    let candidateSignature: string | undefined;
 
     try {
-      // Step 1: Download GTFS file
-      this.updateImportStatus('downloading', 10, 'Downloading GTFS data...');
-      await this.withTimeout(
-        (signal) =>
-          this.fileOperationsService.downloadFile(
-            GTFSConfig.SPTRANS_GTFS_URL,
-            zipFilePath,
-            GTFSConfig.DOWNLOAD_TIMEOUT_MS,
-            GTFSConfig.MAX_GTFS_ZIP_BYTES,
-            signal,
-          ),
-        GTFSConfig.DOWNLOAD_TIMEOUT_MS,
-        'Download timeout',
-      );
+      // Prefer an explicitly configured local snapshot when present. The
+      // default production path resolves the remote feed each run.
+      const localSnapshotPath = feedDefinition.localSnapshotPath;
+      const hasLocalSnapshot = localSnapshotPath
+        ? await this.fileOperationsService.fileExists(
+            path.join(localSnapshotPath, 'agency.txt'),
+          )
+        : false;
+      if (localSnapshotPath && !hasLocalSnapshot) {
+        throw new Error(
+          `Configured ${feed} GTFS snapshot is missing agency.txt: ${localSnapshotPath}`,
+        );
+      }
 
-      // Step 2: Calculate file hash
-      this.updateImportStatus('processing', 20, 'Calculating file hash...');
-      const [fileHash, fileSize] = await Promise.all([
-        this.fileOperationsService.calculateFileHash(zipFilePath),
-        this.fileOperationsService.getFileSize(zipFilePath),
-      ]);
+      let fileHash: string;
+      let fileSize: number;
+      let extractedFiles: GTFSFileInfo[];
+
+      if (hasLocalSnapshot && localSnapshotPath) {
+        sourceDir = localSnapshotPath;
+        shouldCleanupTemp = false;
+        this.updateImportStatus(
+          'processing',
+          10,
+          `Reading ${feed} GTFS snapshot...`,
+        );
+        [fileHash, fileSize, extractedFiles] = await Promise.all([
+          this.fileOperationsService.calculateDirectoryHash(sourceDir),
+          this.fileOperationsService.getDirectorySize(sourceDir),
+          this.zipProcessingService.analyzeDirectory(sourceDir),
+        ]);
+      } else {
+        const downloadUrl =
+          feed === 'artesp'
+            ? await this.fileOperationsService.resolveCkanResourceUrl(
+                GTFSConfig.ARTESP_CKAN_PACKAGE_URL,
+              )
+            : feedDefinition.downloadUrl;
+        if (!downloadUrl) {
+          throw new Error(`No GTFS download URL configured for ${feed}`);
+        }
+
+        // Step 1: Download GTFS file
+        this.updateImportStatus(
+          'downloading',
+          10,
+          `Downloading ${feed} GTFS data...`,
+        );
+        await this.withTimeout(
+          (signal) =>
+            this.fileOperationsService.downloadFile(
+              downloadUrl,
+              zipFilePath,
+              GTFSConfig.DOWNLOAD_TIMEOUT_MS,
+              GTFSConfig.MAX_GTFS_ZIP_BYTES,
+              signal,
+            ),
+          GTFSConfig.DOWNLOAD_TIMEOUT_MS,
+          `${feed} download timeout`,
+        );
+
+        // Step 2: Calculate file hash
+        this.updateImportStatus(
+          'processing',
+          20,
+          `Calculating ${feed} GTFS file hash...`,
+        );
+        [fileHash, fileSize] = await Promise.all([
+          this.fileOperationsService.calculateFileHash(zipFilePath),
+          this.fileOperationsService.getFileSize(zipFilePath),
+        ]);
+
+        // Step 3: Extract and analyze files
+        this.updateImportStatus(
+          'processing',
+          40,
+          `Extracting ${feed} GTFS ZIP file...`,
+        );
+        extractedFiles = await this.zipProcessingService.extractAndAnalyzeFiles(
+          zipFilePath,
+          extractDir,
+        );
+        sourceDir = extractDir;
+      }
 
       this.logger.debug(
-        `Downloaded GTFS file: ${(fileSize / 1024 / 1024).toFixed(
+        `${feed} GTFS source: ${(fileSize / 1024 / 1024).toFixed(
           2,
         )} MB, hash: ${fileHash.substring(0, 8)}...`,
       );
+      candidateSignature = fileHash;
 
-      // Step 3: Check if we already have this version
+      // Step 4: Check if we already have this version
       const isCurrentHash = forceReimport
         ? false
-        : await this.gtfsDatabaseService.isCurrentHash(fileHash);
+        : await this.gtfsDatabaseService.isCurrentHash(fileHash, feed);
       if (isCurrentHash) {
-        this.logger.debug('GTFS data unchanged, skipping import');
-        await this.fileOperationsService.cleanup(zipFilePath);
+        this.logger.debug(`${feed} GTFS data unchanged, skipping import`);
+        if (shouldCleanupTemp) {
+          await this.fileOperationsService.cleanup(zipFilePath, extractDir);
+        }
 
         return {
           success: true,
@@ -312,60 +476,91 @@ export class DataImportService implements OnModuleInit {
           errors: [],
           dataChanged: false,
           sourceSignature: fileHash,
+          feed,
         };
       }
 
-      // Step 4: Create/update dataset record (replace existing)
-      this.updateImportStatus('processing', 30, 'Updating dataset record...');
+      // Step 5: Create/update dataset record before mutating raw tables.
+      this.updateImportStatus(
+        'processing',
+        30,
+        `Updating ${feed} dataset record...`,
+      );
       const dataset = await this.gtfsDatabaseService.createOrUpdateDataset({
         fileHash,
         fileSize,
         version: new Date().toISOString().split('T')[0], // Use date as version
-      });
-
-      // Step 5: Extract and analyze files
-      this.updateImportStatus('processing', 40, 'Extracting ZIP file...');
-      const extractedFiles =
-        await this.zipProcessingService.extractAndAnalyzeFiles(
-          zipFilePath,
-          extractDir,
-        );
+      }, feed);
+      catalogMutationStarted = true;
 
       await this.gtfsDatabaseService.prepareDatasetForImport(
         dataset.id,
         extractedFiles.map((file) => file.fileName),
+        feed,
       );
 
       // Save file information to database
       await this.gtfsDatabaseService.upsertDatasetFiles(
         dataset.id,
         extractedFiles,
+        feed,
+      );
+      await this.gtfsDatabaseService.clearOptionalTables(
+        feed,
+        extractedFiles.map((file) => file.fileName),
       );
 
       // Step 6: Process files intelligently
-      this.updateImportStatus('processing', 50, 'Processing GTFS files...');
+      this.updateImportStatus(
+        'processing',
+        50,
+        `Processing ${feed} GTFS files...`,
+      );
       const result = await this.processGTFSFiles(
         dataset.id,
-        extractDir,
+        sourceDir ?? extractDir,
         extractedFiles,
+        feed,
       );
 
       result.dataChanged = true;
       result.sourceSignature = fileHash;
+      result.feed = feed;
+
+      if (result.success) {
+        await this.gtfsDatabaseService.completeDataset(feed);
+      }
 
       // Step 7: Cleanup
-      this.updateImportStatus(
-        'processing',
-        90,
-        'Cleaning up temporary files...',
-      );
-      await this.fileOperationsService.cleanup(zipFilePath, extractDir);
+      if (shouldCleanupTemp) {
+        this.updateImportStatus(
+          'processing',
+          90,
+          `Cleaning up ${feed} temporary files...`,
+        );
+        await this.fileOperationsService.cleanup(zipFilePath, extractDir);
+      }
 
-      this.logger.debug('GTFS import completed successfully');
+      this.logger.debug(`${feed} GTFS import completed successfully`);
       return result;
     } catch (error) {
       // Cleanup on error
-      await this.fileOperationsService.cleanup(zipFilePath, extractDir);
+      if (shouldCleanupTemp) {
+        await this.fileOperationsService.cleanup(zipFilePath, extractDir);
+      }
+      if (catalogMutationStarted) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return {
+          success: false,
+          filesProcessed: 0,
+          recordsImported: 0,
+          skippedFiles: [],
+          errors: [`${feed}: ${message}`],
+          dataChanged: true,
+          sourceSignature: candidateSignature,
+          feed,
+        };
+      }
       throw error;
     }
   }
@@ -377,6 +572,7 @@ export class DataImportService implements OnModuleInit {
     datasetId: string,
     extractDir: string,
     extractedFiles: { fileName: string; fileHash: string; fileSize: number }[],
+    feed: GTFSFeed = 'sptrans',
   ): Promise<GTFSProcessingResult> {
     const result: GTFSProcessingResult = {
       success: true,
@@ -395,7 +591,7 @@ export class DataImportService implements OnModuleInit {
     const extractedFileNames = new Set(
       extractedFiles.map((file) => file.fileName),
     );
-    for (const requiredFile of GTFSConfig.getRequiredFiles()) {
+    for (const requiredFile of GTFSConfig.getRequiredFiles(feed)) {
       if (!extractedFileNames.has(requiredFile)) {
         result.success = false;
         result.errors.push(`Missing required GTFS file: ${requiredFile}`);
@@ -404,7 +600,7 @@ export class DataImportService implements OnModuleInit {
 
     this.currentImportStatus.totalFiles =
       filesToProcess.length +
-      GTFSConfig.getRequiredFiles().filter(
+      GTFSConfig.getRequiredFiles(feed).filter(
         (fileName) => !extractedFileNames.has(fileName),
       ).length;
     this.currentImportStatus.processedFiles = 0;
@@ -446,7 +642,7 @@ export class DataImportService implements OnModuleInit {
           const rustDbUrl = this.getRustDatabaseUrl(dbUrl);
 
           // Process shapes with Rust tool directly to PostGIS
-          await this.rustGtfsService.processShapes(filePath, rustDbUrl);
+          await this.rustGtfsService.processShapes(filePath, rustDbUrl, 4326, feed);
 
           // Count records in the file for reporting
           recordCount =
@@ -460,6 +656,7 @@ export class DataImportService implements OnModuleInit {
           recordCount = await this.csvProcessingService.processCsvFile(
             filePath,
             fileName,
+            feed,
           );
         }
 
@@ -468,6 +665,7 @@ export class DataImportService implements OnModuleInit {
           datasetId,
           fileName,
           recordCount,
+          feed,
         );
 
         result.filesProcessed++;
@@ -478,7 +676,7 @@ export class DataImportService implements OnModuleInit {
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : 'Unknown error';
-        if (GTFSConfig.isRequiredFile(fileName)) {
+        if (GTFSConfig.isRequiredFile(fileName, feed)) {
           this.logger.error(`Failed to process ${fileName}:`, errorMessage);
           result.errors.push(`${fileName}: ${errorMessage}`);
           result.success = false;
@@ -486,7 +684,19 @@ export class DataImportService implements OnModuleInit {
           this.logger.warn(
             `Skipping optional ${fileName} after processing failure: ${errorMessage}`,
           );
-          result.skippedFiles.push(fileName);
+          try {
+            await this.gtfsDatabaseService.clearOptionalTable(fileName, feed);
+            result.skippedFiles.push(fileName);
+          } catch (clearError) {
+            const clearMessage =
+              clearError instanceof Error
+                ? clearError.message
+                : 'Unknown clear error';
+            result.success = false;
+            result.errors.push(
+              `${fileName}: failed to clear stale optional table: ${clearMessage}`,
+            );
+          }
         }
       }
     }

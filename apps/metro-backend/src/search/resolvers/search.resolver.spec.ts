@@ -63,3 +63,17 @@ describe('SearchResolver', () => {
     ).resolves.toHaveLength(2);
   });
 });
+
+describe('SearchResolver bus feed priority', () => {
+  it('places SPTrans before Artesp while preserving both qualified identities', async () => {
+    const resolver = new SearchResolver({
+      search: jest.fn().mockResolvedValue([
+        { type: 'busRoute', document: { route_id: 'artesp:001', route_type: 3 }, score: 20 },
+        { type: 'busRoute', document: { route_id: '001', route_type: 3 }, score: 10 },
+      ]),
+    } as unknown as TypesenseService, {} as SearchService);
+    const result = await resolver.search({ query: '001' });
+    expect(result.map((route) => route.id)).toEqual(['001', 'artesp:001']);
+    expect(result[1]).toMatchObject({ sourceAgency: 'artesp', supportsRealtime: false });
+  });
+});

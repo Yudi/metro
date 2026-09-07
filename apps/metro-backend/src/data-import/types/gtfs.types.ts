@@ -1,3 +1,5 @@
+import type { GTFSFeed } from '../config/gtfs.config';
+
 export interface GTFSFileInfo {
   fileName: string;
   fileHash: string;
@@ -6,6 +8,7 @@ export interface GTFSFileInfo {
 }
 
 export interface GTFSDatasetInfo {
+  feed?: GTFSFeed;
   fileHash: string;
   fileSize: number;
   version?: string;
@@ -30,14 +33,18 @@ export interface GTFSProcessingResult {
   errors: string[];
   dataChanged?: boolean;
   sourceSignature?: string;
+  feed?: GTFSFeed;
+  changedFeeds?: GTFSFeed[];
 }
 
 export type GTFSFileType =
   | 'agency.txt'
   | 'calendar.txt'
+  | 'calendar_dates.txt'
   | 'fare_attributes.txt'
   | 'fare_rules.txt'
   | 'frequencies.txt'
+  | 'feed_info.txt'
   | 'routes.txt'
   | 'shapes.txt'
   | 'stop_times.txt'
@@ -49,6 +56,7 @@ export interface StopRecord {
   stop_id: string;
   stop_name: string;
   stop_desc?: string;
+  platform_code?: string;
   stop_lat: number;
   stop_lon: number;
 }
@@ -61,9 +69,11 @@ export interface ValidationResult<T> {
 export const GTFS_EXPECTED_FILES: GTFSFileType[] = [
   'agency.txt',
   'calendar.txt',
+  'calendar_dates.txt',
   'fare_attributes.txt',
   'fare_rules.txt',
   'frequencies.txt',
+  'feed_info.txt',
   'routes.txt',
   'shapes.txt',
   'stop_times.txt',
@@ -76,9 +86,11 @@ export const GTFS_RUST_PROCESSED_FILES: GTFSFileType[] = ['shapes.txt'];
 export const GTFS_CSV_PROCESSED_FILES: GTFSFileType[] = [
   'agency.txt',
   'calendar.txt',
+  'calendar_dates.txt',
   'fare_attributes.txt',
   'fare_rules.txt',
   'frequencies.txt',
+  'feed_info.txt',
   'routes.txt',
   'stop_times.txt',
   'stops.txt',

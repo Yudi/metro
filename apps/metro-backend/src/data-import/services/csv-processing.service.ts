@@ -3,7 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import csv from 'csv-parser';
 import { randomUUID } from 'crypto';
 import { createReadStream } from 'fs';
-import { GTFSConfig } from '../config/gtfs.config';
+import { GTFSConfig, GTFSFeed } from '../config/gtfs.config';
 import { StopRecord, ValidationResult } from '../types/gtfs.types';
 
 interface CsvRecord {
@@ -29,7 +29,10 @@ export class CsvProcessingService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  private readonly rawGtfsTables = new Set(GTFSConfig.getRawTables());
+  private readonly rawGtfsTables = new Set([
+    ...GTFSConfig.getRawTables('sptrans'),
+    ...GTFSConfig.getRawTables('artesp'),
+  ]);
 
   private requiredText(record: CsvRecord, field: string): string {
     const value = record[field]?.trim();
@@ -178,8 +181,12 @@ export class CsvProcessingService {
   /**
    * Process a single CSV file and sync to database using transaction
    */
-  async processCsvFile(filePath: string, fileName: string): Promise<number> {
-    const tableName = GTFSConfig.getTableName(fileName);
+  async processCsvFile(
+    filePath: string,
+    fileName: string,
+    feed: GTFSFeed = 'sptrans',
+  ): Promise<number> {
+    const tableName = GTFSConfig.getTableName(fileName, feed);
     this.logger.debug(`Processing ${fileName} -> ${tableName}`);
 
     try {
@@ -187,6 +194,7 @@ export class CsvProcessingService {
         tableName,
         fileName,
         filePath,
+        feed,
       );
 
       this.logger.debug(
@@ -237,6 +245,7 @@ export class CsvProcessingService {
     tableName: string,
     fileName: string,
     filePath: string,
+    feed: GTFSFeed,
   ): Promise<number> {
     return await this.prisma.$transaction(
       async (tx) => {
@@ -249,16 +258,17 @@ export class CsvProcessingService {
             tableName,
             fileName,
             records,
+            feed,
           );
         }
 
-        if (recordCount === 0 && !GTFSConfig.isEmptyAllowedFile(fileName)) {
+        if (recordCount === 0 && !GTFSConfig.isEmptyAllowedFile(fileName, feed)) {
           this.logger.warn(`No records found in ${fileName}`);
           throw new Error(`${fileName} contains no usable records`);
         }
 
-        if (tableName === 'SPTrans_Stop' && recordCount > 0) {
-          await this.updateStopGeography(tx);
+        if (fileName === 'stops.txt' && recordCount > 0) {
+          await this.updateStopGeography(tx, feed);
         }
 
         this.logger.debug(
@@ -302,27 +312,32 @@ export class CsvProcessingService {
     tableName: string,
     fileName: string,
     records: CsvRecord[],
+    feed: GTFSFeed,
   ): Promise<number> {
-    switch (tableName) {
-      case 'SPTrans_Agency':
-        return this.importAgency(tx, records, fileName);
-      case 'SPTrans_Calendar':
-        return this.importCalendar(tx, records, fileName);
-      case 'SPTrans_Route':
-        return this.importRoutes(tx, records, fileName);
-      case 'SPTrans_Stop':
-        return this.importStops(tx, records, fileName);
-      case 'SPTrans_Trip':
-        return this.importTrips(tx, records, fileName);
-      case 'SPTrans_StopTime':
-        return this.importStopTimes(tx, records, fileName);
-      case 'SPTrans_Frequency':
-        return this.importFrequencies(tx, records, fileName);
-      case 'SPTrans_FareAttribute':
-        return this.importFareAttributes(tx, records, fileName);
-      case 'SPTrans_FareRule':
-        return this.importFareRules(tx, records, fileName);
-      case 'SPTrans_Shape':
+    switch (fileName) {
+      case 'agency.txt':
+        return this.importAgency(tx, records, fileName, feed);
+      case 'calendar.txt':
+        return this.importCalendar(tx, records, fileName, feed);
+      case 'calendar_dates.txt':
+        return this.importCalendarDates(tx, records, fileName, feed);
+      case 'routes.txt':
+        return this.importRoutes(tx, records, fileName, feed);
+      case 'stops.txt':
+        return this.importStops(tx, records, fileName, feed);
+      case 'trips.txt':
+        return this.importTrips(tx, records, fileName, feed);
+      case 'stop_times.txt':
+        return this.importStopTimes(tx, records, fileName, feed);
+      case 'frequencies.txt':
+        return this.importFrequencies(tx, records, fileName, feed);
+      case 'fare_attributes.txt':
+        return this.importFareAttributes(tx, records, fileName, feed);
+      case 'fare_rules.txt':
+        return this.importFareRules(tx, records, fileName, feed);
+      case 'feed_info.txt':
+        return this.importFeedInfo(tx, records, fileName, feed);
+      case 'shapes.txt':
         // Shapes are processed by Rust tool, skip here
         this.logger.debug(`Skipping ${fileName} - processed by Rust tool`);
         return 0;
@@ -339,6 +354,7 @@ export class CsvProcessingService {
     tx: SqlExecutor,
     records: CsvRecord[],
     fileName: string,
+    feed: GTFSFeed = 'sptrans',
   ): Promise<number> {
     const rows = this.mapRows(fileName, records, (record) => [
       record.agency_id?.trim() || '',
@@ -348,10 +364,11 @@ export class CsvProcessingService {
       record.agency_lang?.trim() || null,
       record.agency_phone?.trim() || null,
       record.agency_fare_url?.trim() || null,
+      record.agency_email?.trim() || null,
     ]);
     await this.insertRows(
       tx,
-      'SPTrans_Agency',
+      GTFSConfig.getTableName('agency.txt', feed),
       [
         'agency_id',
         'agency_name',
@@ -360,6 +377,7 @@ export class CsvProcessingService {
         'agency_lang',
         'agency_phone',
         'agency_fare_url',
+        'agency_email',
       ],
       rows,
     );
@@ -374,6 +392,7 @@ export class CsvProcessingService {
     tx: SqlExecutor,
     records: CsvRecord[],
     fileName: string,
+    feed: GTFSFeed = 'sptrans',
   ): Promise<number> {
     const rows = this.mapRows(fileName, records, (record) => [
       this.requiredText(record, 'service_id'),
@@ -389,7 +408,7 @@ export class CsvProcessingService {
     ]);
     await this.insertRows(
       tx,
-      'SPTrans_Calendar',
+      GTFSConfig.getTableName('calendar.txt', feed),
       [
         'service_id',
         'monday',
@@ -408,6 +427,28 @@ export class CsvProcessingService {
     return rows.length;
   }
 
+  /** Import optional service exceptions from calendar_dates.txt. */
+  private async importCalendarDates(
+    tx: SqlExecutor,
+    records: CsvRecord[],
+    fileName: string,
+    feed: GTFSFeed = 'sptrans',
+  ): Promise<number> {
+    const rows = this.mapRows(fileName, records, (record) => [
+      this.requiredText(record, 'service_id'),
+      this.strictDate(record, 'date'),
+      this.strictInt(record, 'exception_type', { min: 1, max: 2 }),
+    ]);
+    await this.insertRows(
+      tx,
+      GTFSConfig.getTableName('calendar_dates.txt', feed),
+      ['service_id', 'date', 'exception_type'],
+      rows,
+    );
+
+    return rows.length;
+  }
+
   /**
    * Import route records
    */
@@ -415,6 +456,7 @@ export class CsvProcessingService {
     tx: SqlExecutor,
     records: CsvRecord[],
     fileName: string,
+    feed: GTFSFeed = 'sptrans',
   ): Promise<number> {
     const rows = this.mapRows(fileName, records, (record) => [
       this.requiredText(record, 'route_id'),
@@ -427,7 +469,7 @@ export class CsvProcessingService {
     ]);
     await this.insertRows(
       tx,
-      'SPTrans_Route',
+      GTFSConfig.getTableName('routes.txt', feed),
       [
         'route_id',
         'agency_id',
@@ -450,6 +492,7 @@ export class CsvProcessingService {
     tx: SqlExecutor,
     records: CsvRecord[],
     fileName: string,
+    feed: GTFSFeed = 'sptrans',
   ): Promise<number> {
     // Step 1: Validate and transform records with type safety
     const validationResult = this.validateStopRecords(records);
@@ -464,12 +507,20 @@ export class CsvProcessingService {
     // Step 2: Import CSV data using raw SQL into the external GTFS schema
     await this.insertRows(
       tx,
-      'SPTrans_Stop',
-      ['stop_id', 'stop_name', 'stop_desc', 'stop_lat', 'stop_lon'],
+      GTFSConfig.getTableName('stops.txt', feed),
+      [
+        'stop_id',
+        'stop_name',
+        'stop_desc',
+        'platform_code',
+        'stop_lat',
+        'stop_lon',
+      ],
       validationResult.valid.map((record: StopRecord) => [
         record.stop_id,
         record.stop_name,
         record.stop_desc || null,
+        record.platform_code || null,
         record.stop_lat,
         record.stop_lon,
       ]),
@@ -521,9 +572,14 @@ export class CsvProcessingService {
         invalid.push({ record, errors });
       } else {
         valid.push({
-          stop_id: record.stop_id,
-          stop_name: record.stop_name,
-          stop_desc: record.stop_desc || undefined,
+          stop_id: record.stop_id.trim(),
+          stop_name: record.stop_name.trim(),
+          stop_desc: record.stop_desc?.trim() || undefined,
+          platform_code:
+            record.platform_code?.trim() ||
+            record.stop_platform_code?.trim() ||
+            record.platform?.trim() ||
+            undefined,
           stop_lat: lat,
           stop_lon: lon,
         });
@@ -536,12 +592,17 @@ export class CsvProcessingService {
   /**
    * Update PostGIS geography column for all stops in a single batch operation
    */
-  private async updateStopGeography(tx: SqlExecutor): Promise<void> {
-    await tx.$executeRaw`
-      UPDATE external_gtfs."SPTrans_Stop" 
-      SET location = ST_SetSRID(ST_MakePoint(stop_lon, stop_lat), 4326)::geography 
-      WHERE location IS NULL
-    `;
+  private async updateStopGeography(
+    tx: SqlExecutor,
+    feed: GTFSFeed = 'sptrans',
+  ): Promise<void> {
+    const tableName = GTFSConfig.getTableName('stops.txt', feed);
+    const qualifiedTable = this.getQualifiedGtfsTable(tableName);
+    await tx.$executeRawUnsafe(
+      `UPDATE ${qualifiedTable}
+       SET location = ST_SetSRID(ST_MakePoint(stop_lon, stop_lat), 4326)::geography
+       WHERE location IS NULL`,
+    );
   }
 
   /**
@@ -551,6 +612,7 @@ export class CsvProcessingService {
     tx: SqlExecutor,
     records: CsvRecord[],
     fileName: string,
+    feed: GTFSFeed = 'sptrans',
   ): Promise<number> {
     const rows = this.mapRows(fileName, records, (record) => [
       this.requiredText(record, 'route_id'),
@@ -564,7 +626,7 @@ export class CsvProcessingService {
     ]);
     await this.insertRows(
       tx,
-      'SPTrans_Trip',
+      GTFSConfig.getTableName('trips.txt', feed),
       [
         'route_id',
         'service_id',
@@ -586,17 +648,20 @@ export class CsvProcessingService {
     tx: SqlExecutor,
     records: CsvRecord[],
     fileName: string,
+    feed: GTFSFeed = 'sptrans',
   ): Promise<number> {
     const rows = this.mapRows(fileName, records, (record) => [
       this.requiredText(record, 'trip_id'),
       this.strictTime(record, 'arrival_time'),
       this.strictTime(record, 'departure_time'),
       this.requiredText(record, 'stop_id'),
-      this.strictInt(record, 'stop_sequence', { min: 1 }),
+      // GTFS permits either zero- or one-based stop sequences; ARTESP uses
+      // zero-based values while SPTrans currently starts at one.
+      this.strictInt(record, 'stop_sequence', { min: 0 }),
     ]);
     await this.insertRows(
       tx,
-      'SPTrans_StopTime',
+      GTFSConfig.getTableName('stop_times.txt', feed),
       ['trip_id', 'arrival_time', 'departure_time', 'stop_id', 'stop_sequence'],
       rows,
     );
@@ -611,6 +676,7 @@ export class CsvProcessingService {
     tx: SqlExecutor,
     records: CsvRecord[],
     fileName: string,
+    feed: GTFSFeed = 'sptrans',
   ): Promise<number> {
     const rows = this.mapRows(fileName, records, (record) => [
       this.requiredText(record, 'trip_id'),
@@ -620,7 +686,7 @@ export class CsvProcessingService {
     ]);
     await this.insertRows(
       tx,
-      'SPTrans_Frequency',
+      GTFSConfig.getTableName('frequencies.txt', feed),
       ['trip_id', 'start_time', 'end_time', 'headway_secs'],
       rows,
     );
@@ -635,6 +701,7 @@ export class CsvProcessingService {
     tx: SqlExecutor,
     records: CsvRecord[],
     fileName: string,
+    feed: GTFSFeed = 'sptrans',
   ): Promise<number> {
     const rows = this.mapRows(fileName, records, (record) => [
       this.requiredText(record, 'fare_id'),
@@ -645,10 +712,11 @@ export class CsvProcessingService {
       record.transfer_duration?.trim()
         ? this.strictInt(record, 'transfer_duration', { min: 0 })
         : null,
+      record.agency_id?.trim() || null,
     ]);
     await this.insertRows(
       tx,
-      'SPTrans_FareAttribute',
+      GTFSConfig.getTableName('fare_attributes.txt', feed),
       [
         'fare_id',
         'price',
@@ -656,6 +724,7 @@ export class CsvProcessingService {
         'payment_method',
         'transfers',
         'transfer_duration',
+        'agency_id',
       ],
       rows,
     );
@@ -670,6 +739,7 @@ export class CsvProcessingService {
     tx: SqlExecutor,
     records: CsvRecord[],
     fileName: string,
+    feed: GTFSFeed = 'sptrans',
   ): Promise<number> {
     const rows = this.mapRows(fileName, records, (record) => [
       this.requiredText(record, 'fare_id'),
@@ -680,8 +750,45 @@ export class CsvProcessingService {
     ]);
     await this.insertRows(
       tx,
-      'SPTrans_FareRule',
+      GTFSConfig.getTableName('fare_rules.txt', feed),
       ['fare_id', 'route_id', 'origin_id', 'destination_id', 'contains_id'],
+      rows,
+    );
+
+    return rows.length;
+  }
+
+  private async importFeedInfo(
+    tx: SqlExecutor,
+    records: CsvRecord[],
+    fileName: string,
+    feed: GTFSFeed = 'sptrans',
+  ): Promise<number> {
+    const rows = this.mapRows(fileName, records, (record) => [
+      this.requiredText(record, 'feed_publisher_name'),
+      record.feed_publisher_url?.trim() || null,
+      record.feed_lang?.trim() || null,
+      record.feed_start_date?.trim()
+        ? this.strictDate(record, 'feed_start_date')
+        : null,
+      record.feed_end_date?.trim()
+        ? this.strictDate(record, 'feed_end_date')
+        : null,
+      record.feed_version?.trim() || null,
+      record.feed_contact_email?.trim() || null,
+    ]);
+    await this.insertRows(
+      tx,
+      GTFSConfig.getTableName('feed_info.txt', feed),
+      [
+        'feed_publisher_name',
+        'feed_publisher_url',
+        'feed_lang',
+        'feed_start_date',
+        'feed_end_date',
+        'feed_version',
+        'feed_contact_email',
+      ],
       rows,
     );
 

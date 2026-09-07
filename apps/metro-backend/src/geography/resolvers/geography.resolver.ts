@@ -29,7 +29,7 @@ import { SubwayStationProcessorService } from '../../vector-tiles/services/subwa
 import { RailStationProcessorService } from '../../vector-tiles/services/rail-station-processor.service';
 import { DevelopmentOnlyGuard } from '../../shared/guards/development-only.guard';
 
-const DEFAULT_BUS_STOP_LIMIT = 25_000;
+const DEFAULT_BUS_STOP_LIMIT = 50_000;
 const DEFAULT_BUS_ROUTE_LIMIT = 10_000;
 const DEFAULT_BUS_SHAPE_LIMIT = 500;
 const MAX_BATCH_IDS = 500;

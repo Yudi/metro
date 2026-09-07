@@ -40,6 +40,10 @@ export interface BusStopTileData {
   name: string;
   latitude: number;
   longitude: number;
+  sourceAgency?: string;
+  sourceId?: string;
+  platformCode?: string;
+  mergedStopIds?: string[];
 }
 
 export interface BusRouteTileData {
@@ -48,4 +52,7 @@ export interface BusRouteTileData {
   longName: string;
   color: string;
   textColor: string;
+  sourceAgency?: string;
+  sourceId?: string;
+  supportsRealtime?: boolean;
 }

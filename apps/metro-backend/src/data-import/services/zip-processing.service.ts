@@ -66,6 +66,18 @@ export class ZipProcessingService {
   ): Promise<GTFSFileInfo[]> {
     await this.extractZipFile(zipFilePath, extractDir);
 
+    return this.analyzeExtractedFiles(extractDir);
+  }
+
+  /** Analyze a mounted GTFS snapshot without copying it to a temporary dir. */
+  async analyzeDirectory(dirPath: string): Promise<GTFSFileInfo[]> {
+    return this.analyzeExtractedFiles(dirPath);
+  }
+
+  private async analyzeExtractedFiles(
+    extractDir: string,
+  ): Promise<GTFSFileInfo[]> {
+
     const files = await this.fileOperationsService.listFiles(extractDir);
     const fileInfos: GTFSFileInfo[] = [];
     const analysisErrors: string[] = [];
@@ -75,6 +87,7 @@ export class ZipProcessingService {
 
     for (const fileName of files) {
       try {
+        this.validateEntryName(fileName);
         const filePath = path.join(extractDir, fileName);
         const [fileHash, fileSize] = await Promise.all([
           this.fileOperationsService.calculateFileHash(filePath),

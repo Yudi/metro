@@ -182,15 +182,18 @@ pub async fn process_gtfs_shapes(
     db_url: &str,
     srid: i32,
     schema: &str,
+    table_prefix: &str,
 ) -> Result<(), GtfsError> {
-    if schema.is_empty()
-        || !schema
-            .chars()
-            .all(|character| character.is_ascii_alphanumeric() || character == '_')
-    {
+    if !is_valid_identifier(schema) {
         return Err(GtfsError::InvalidData(format!(
             "Invalid PostgreSQL schema name: {}",
             schema
+        )));
+    }
+    if !is_valid_identifier(table_prefix) {
+        return Err(GtfsError::InvalidData(format!(
+            "Invalid GTFS table prefix: {}",
+            table_prefix
         )));
     }
 
@@ -206,17 +209,18 @@ pub async fn process_gtfs_shapes(
     let mut client = connect_and_check_postgis(db_url).await?;
     info!("Successfully connected to PostGIS");
 
+    let shape_table = format!("{}_Shape", table_prefix);
     let create_table_query = format!(
-        "CREATE TABLE IF NOT EXISTS \"{}\".\"SPTrans_Shape\" (
+        "CREATE TABLE IF NOT EXISTS \"{}\".\"{}\" (
         shape_id text PRIMARY KEY,
         geom GEOMETRY(LINESTRING, {}) NOT NULL
     )",
-        schema, srid
+        schema, shape_table, srid
     );
     client.execute(&create_table_query, &[]).await?;
     info!(
-        "Created SPTrans_Shape table if not exists with SRID {}",
-        srid
+        "Created {} table if not exists with SRID {}",
+        shape_table, srid
     );
 
     // Start transaction
@@ -233,8 +237,8 @@ pub async fn process_gtfs_shapes(
 
     // Prepare insert statement for batching
     let insert_query = format!(
-        "INSERT INTO \"{}\".\"SPTrans_Shape\" (shape_id, geom) VALUES ($1, ST_GeomFromText($2, $3)) ON CONFLICT (shape_id) DO UPDATE SET geom = EXCLUDED.geom",
-        schema
+        "INSERT INTO \"{}\".\"{}\" (shape_id, geom) VALUES ($1, ST_GeomFromText($2, $3)) ON CONFLICT (shape_id) DO UPDATE SET geom = EXCLUDED.geom",
+        schema, shape_table
     );
     let insert_stmt = tx.prepare(&insert_query).await?;
     let staging_stmt = tx
@@ -262,8 +266,8 @@ pub async fn process_gtfs_shapes(
 
     // Delete missing shapes
     let delete_query = format!(
-        "DELETE FROM \"{}\".\"SPTrans_Shape\" WHERE shape_id NOT IN (SELECT shape_id FROM staging_shapes)",
-        schema
+        "DELETE FROM \"{}\".\"{}\" WHERE shape_id NOT IN (SELECT shape_id FROM staging_shapes)",
+        schema, shape_table
     );
     let delete_result = tx.execute(&delete_query, &[]).await?;
     let deleted_count = delete_result as usize;
@@ -272,6 +276,13 @@ pub async fn process_gtfs_shapes(
     tx.commit().await?;
     info!("Transaction committed successfully. Synced {} shapes to PostGIS (inserted: {}, deleted: {}).", linestrings.len(), inserted_count, deleted_count);
     Ok(())
+}
+
+fn is_valid_identifier(value: &str) -> bool {
+    !value.is_empty()
+        && value
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || character == '_')
 }
 
 #[cfg(test)]
@@ -350,5 +361,13 @@ mod tests {
         let lines = shapes_to_linestrings(&shapes);
         assert!(!lines.contains_key("incomplete"));
         assert!(lines.contains_key("valid"));
+    }
+
+    #[test]
+    fn table_prefix_must_be_a_safe_sql_identifier() {
+        assert!(is_valid_identifier("SPTrans"));
+        assert!(is_valid_identifier("ARTESP_2026"));
+        assert!(!is_valid_identifier("ARTESP\";DROP TABLE"));
+        assert!(!is_valid_identifier(""));
     }
 }

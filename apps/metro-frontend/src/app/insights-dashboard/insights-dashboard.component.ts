@@ -1,4 +1,4 @@
-import { isPlatformBrowser } from '@angular/common';
+import { isPlatformBrowser, NgOptimizedImage } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
@@ -17,9 +17,12 @@ import { MatIconModule } from '@angular/material/icon';
 import { RouterLink } from '@angular/router';
 import { FavoritesService } from '@metro/shared/api';
 import {
+  AGENCIES_DATA,
   FavoriteRailLineOption,
   createFavoriteRailLineOptions,
   getContrastColor,
+  getAgencyIconPath,
+  getRouteAgency,
   getRailLineFavorites,
   getRailLineByCode,
   getRailStationIdentityKey,
@@ -31,6 +34,13 @@ import {
   toTitleCase,
   ExtendedNextTrainLineCode,
   uniqueIds,
+  formatBusFare,
+  getBusStopDisplayId,
+  getBusRouteDisplayId,
+  getBusStopIdentityAliases,
+  isArtespRoute,
+  sortBusRoutesByAgency,
+  TransitAgency,
 } from '@metro/shared/utils';
 import { catchError, of, Subscription } from 'rxjs';
 import { LineStatusGridComponent } from '../home/components/line-status-grid/line-status-grid.component';
@@ -48,6 +58,10 @@ interface BusRouteInsight {
   longName: string;
   color?: string;
   textColor?: string;
+  sourceAgency?: string;
+  sourceId?: string;
+  supportsRealtime?: boolean;
+  fares?: Array<{ price: number; currency: string }>;
 }
 
 interface BusStopInsight extends BusStopGraphQL {
@@ -67,6 +81,11 @@ interface MergedRailStationInsight {
   lines: string[];
 }
 
+interface AgencyIdentity {
+  name: string;
+  iconPath: string | null;
+}
+
 interface BusFavoritesLookupResponse {
   data: {
     multipleBusRoutes: BusRouteInsight[];
@@ -79,6 +98,10 @@ interface BusFavoritesLookupResponse {
       isSubwayStation: boolean;
       agencies?: string[];
       routeShortNames?: string[];
+      sourceAgency?: string;
+      sourceId?: string;
+      platformCode?: string;
+      mergedStopIds?: string[];
     }>;
   };
 }
@@ -93,6 +116,7 @@ interface BusFavoritesLookupResponse {
     LineStatusGridComponent,
     NextTrainCardComponent,
     StopArrivalsComponent,
+    NgOptimizedImage,
   ],
   templateUrl: './insights-dashboard.component.html',
   styleUrl: './insights-dashboard.component.scss',
@@ -114,7 +138,9 @@ export class InsightsDashboardComponent {
   readonly loadingBusDetails = signal(false);
   readonly lookupError = signal<string | null>(null);
 
-  readonly busRoutes = computed(() => [...this.busRoutesById().values()]);
+  readonly busRoutes = computed(() =>
+    sortBusRoutesByAgency([...this.busRoutesById().values()]),
+  );
   readonly busStops = computed(() => [...this.busStopsById().values()]);
 
   readonly railStations = computed(() => {
@@ -234,12 +260,63 @@ export class InsightsDashboardComponent {
     });
   }
 
-  routeColor(route: BusRouteInsight): string {
+  routeFareLabel(route: BusRouteInsight | BusRouteGraphQL): string | null {
+    if (route.fares && route.fares.length > 0) {
+      return route.fares.map((fare) => formatBusFare(fare)).join(' · ');
+    }
+
+    return isArtespRoute(route)
+      ? 'Tarifa não informada'
+      : null;
+  }
+
+  stopDisplayId(stop: BusStopInsight): string {
+    return getBusStopDisplayId(stop);
+  }
+
+  routeDisplayId(route: BusRouteInsight): string {
+    return getBusRouteDisplayId(route);
+  }
+
+  routeColor(route: { color?: string }): string {
     return normalizeHexColor(route.color, '5f6368');
   }
 
-  routeTextColor(route: BusRouteInsight): string {
+  routeTextColor(route: { textColor?: string }): string {
     return normalizeHexColor(route.textColor, 'ffffff');
+  }
+
+  agencyIdentity(route: {
+    routeId: string;
+    shortName?: string;
+    sourceAgency?: string;
+  }): AgencyIdentity | null {
+    let agency: TransitAgency | undefined;
+    const sourceAgency = route.sourceAgency?.trim().toLowerCase();
+
+    if (isArtespRoute({ routeId: route.routeId, sourceAgency })) {
+      agency = TransitAgency.ARTESP;
+    } else if (sourceAgency && this.isTransitAgency(sourceAgency)) {
+      agency = sourceAgency;
+    } else if (!sourceAgency) {
+      agency = route.shortName
+        ? getRouteAgency(route.shortName)
+        : undefined;
+      if (!agency) {
+        agency = TransitAgency.SPTRANS;
+      }
+    }
+
+    if (agency) {
+      return {
+        name: AGENCIES_DATA[agency].shortName,
+        iconPath: getAgencyIconPath(agency),
+      };
+    }
+
+    return sourceAgency
+      ? { name: sourceAgency.toUpperCase(), iconPath: null }
+      : null;
   }
 
   lineName(code: number): string {
@@ -263,7 +340,7 @@ export class InsightsDashboardComponent {
   }
 
   getRoutesForStop(stopId: string): BusRouteGraphQL[] {
-    return this.busRoutesByStopId().get(stopId) ?? [];
+    return sortBusRoutesByAgency(this.busRoutesByStopId().get(stopId) ?? []);
   }
 
   getSelectedBusRoutes(stopId: string): BusRouteGraphQL[] {
@@ -273,11 +350,7 @@ export class InsightsDashboardComponent {
       routes.map((route) => this.getBusRouteSelectionKey(route));
     const selectedRouteKeySet = new Set(selectedRouteKeys);
 
-    return routes.filter((route) =>
-      [route.routeId, route.shortName].some((routeKey) =>
-        selectedRouteKeySet.has(routeKey),
-      ),
-    );
+    return routes.filter((route) => selectedRouteKeySet.has(route.routeId));
   }
 
   getSelectedBusRouteKeys(stopId: string): string[] {
@@ -321,6 +394,13 @@ export class InsightsDashboardComponent {
               longName
               color
               textColor
+              sourceAgency
+              sourceId
+              supportsRealtime
+              fares {
+                price
+                currency
+              }
             }
             multipleBusStops(ids: $stopIds) {
               id
@@ -331,6 +411,10 @@ export class InsightsDashboardComponent {
               isSubwayStation
               agencies
               routeShortNames
+              sourceAgency
+              sourceId
+              platformCode
+              mergedStopIds
             }
           }
         `,
@@ -361,21 +445,26 @@ export class InsightsDashboardComponent {
             route,
           ]),
         );
-        const stopsById = new Map(
-          response.data.multipleBusStops.map((stop) => [
-            stop.stopId,
-            {
-              id: stop.id,
-              stopId: stop.stopId,
-              name: stop.name,
-              latitude: stop.latitude,
-              longitude: stop.longitude,
-              isSubwayStation: stop.isSubwayStation,
-              agencies: stop.agencies,
-              routeShortNames: stop.routeShortNames ?? [],
-            } satisfies BusStopInsight,
-          ]),
-        );
+        const stopsById = new Map<string, BusStopInsight>();
+        for (const stop of response.data.multipleBusStops) {
+          const mappedStop = {
+            id: stop.id,
+            stopId: stop.stopId,
+            name: stop.name,
+            latitude: stop.latitude,
+            longitude: stop.longitude,
+            isSubwayStation: stop.isSubwayStation,
+            agencies: stop.agencies,
+            routeShortNames: stop.routeShortNames ?? [],
+            sourceAgency: stop.sourceAgency,
+            sourceId: stop.sourceId,
+            platformCode: stop.platformCode,
+            mergedStopIds: stop.mergedStopIds,
+          } satisfies BusStopInsight;
+          for (const alias of getBusStopIdentityAliases(mappedStop)) {
+            stopsById.set(alias, mappedStop);
+          }
+        }
 
         this.busRoutesById.set(
           new Map(
@@ -473,12 +562,16 @@ export class InsightsDashboardComponent {
 
   private loadRoutesForBusStops(stopIds: string[], lookupKey: string): void {
     for (const stopId of stopIds) {
-      if (this.busRoutesByStopId().has(stopId)) {
+      const resolvedStopId = this.busStopsById().get(stopId)?.stopId ?? stopId;
+      if (
+        this.busRoutesByStopId().has(stopId) ||
+        this.busRoutesByStopId().has(resolvedStopId)
+      ) {
         continue;
       }
 
       this.geographyService
-        .getRoutesForStop(stopId)
+        .getRoutesForStop(resolvedStopId)
         .pipe(
           catchError(() => of([])),
           takeUntilDestroyed(this.destroyRef),
@@ -490,12 +583,17 @@ export class InsightsDashboardComponent {
 
           const nextRoutes = new Map(this.busRoutesByStopId());
           nextRoutes.set(stopId, routes);
+          nextRoutes.set(resolvedStopId, routes);
           this.busRoutesByStopId.set(nextRoutes);
         });
     }
   }
 
   private getBusRouteSelectionKey(route: BusRouteGraphQL): string {
-    return route.shortName || route.routeId;
+    return route.routeId;
+  }
+
+  private isTransitAgency(value: string): value is TransitAgency {
+    return Object.values(TransitAgency).includes(value as TransitAgency);
   }
 }

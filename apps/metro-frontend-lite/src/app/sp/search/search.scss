@@ -114,6 +114,10 @@
       color: var(--lite-text-muted, #6b7280);
     }
 
+    .agency-list {
+      margin-top: 0.45rem;
+    }
+
     .stop-lines {
       display: flex;
       gap: 0.375rem;
@@ -121,6 +125,29 @@
       margin-top: 0.5rem;
     }
   }
+}
+
+.agency-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.65rem;
+}
+
+.agency-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--lite-text-muted, #6b7280);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.agency-lockup img {
+  display: block;
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 50%;
+  object-fit: contain;
 }
 
 .no-results {
@@ -165,6 +192,10 @@
     .detail-type {
       font-size: 0.875rem;
       color: var(--lite-text-muted, #6b7280);
+    }
+
+    .agency-list {
+      margin-top: 0.35rem;
     }
   }
 }

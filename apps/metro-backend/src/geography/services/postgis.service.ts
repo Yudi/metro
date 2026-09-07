@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { BusRouteRow } from './bus-catalog.utils';
 
 export interface GeometryData {
   type: string;
@@ -23,7 +24,7 @@ export class PostGISService {
       }>
     >`
       SELECT ST_AsGeoJSON(geom)::json->'coordinates' as coordinates
-      FROM "SPTrans_Shape" 
+      FROM "public"."Gtfs_Shape"
       WHERE shape_id = ${shapeId}
       AND geom IS NOT NULL
     `;
@@ -46,8 +47,8 @@ export class PostGISService {
       }>
     >`
       SELECT DISTINCT t.route_id, r.route_short_name, COUNT(*) as count
-      FROM "SPTrans_Trip" t
-      JOIN "SPTrans_Route" r ON t.route_id = r.route_id
+      FROM "public"."Gtfs_Trip" t
+      JOIN "public"."Gtfs_Route" r ON t.route_id = r.route_id
       WHERE t.shape_id = ${shapeId}
       GROUP BY t.route_id, r.route_short_name
     `;
@@ -76,7 +77,7 @@ export class PostGISService {
     try {
       // Test if tables exist and have data
       const stopsResult = await this.prisma.$queryRaw<Array<{ count: number }>>`
-        SELECT COUNT(*) as count FROM "SPTrans_Stop"
+        SELECT COUNT(*) as count FROM "public"."Gtfs_Stop"
       `;
       const stopsCount = Number(stopsResult[0]?.count || 0);
 
@@ -86,7 +87,7 @@ export class PostGISService {
         await this.prisma.$queryRaw`
           SELECT column_name 
           FROM information_schema.columns 
-          WHERE table_name = 'SPTrans_Stop' 
+          WHERE table_name = 'Gtfs_Stop'
           AND column_name IN ('location', 'geom')
         `;
         hasGeometry = true;
@@ -140,7 +141,7 @@ export class PostGISService {
       }>
     >`
       SELECT id, stop_id, stop_name, stop_desc, stop_lat, stop_lon
-      FROM "SPTrans_Stop"
+      FROM "public"."Gtfs_Stop"
       WHERE stop_lat BETWEEN ${minLat} AND ${maxLat}
       AND stop_lon BETWEEN ${minLng} AND ${maxLng}
       ORDER BY stop_name
@@ -177,7 +178,7 @@ export class PostGISService {
       }>
     >`
       SELECT id, stop_id, stop_name, stop_desc, stop_lat, stop_lon
-      FROM "SPTrans_Stop"
+      FROM "public"."Gtfs_Stop"
       WHERE stop_name ILIKE ${`%${searchTerm}%`}
       OR stop_id ILIKE ${`%${searchTerm}%`}
       ORDER BY 
@@ -196,31 +197,38 @@ export class PostGISService {
   /**
    * Get all bus routes
    */
-  async getAllRoutes(limit = 10_000): Promise<
-    Array<{
-      id: number;
-      route_id: string;
-      route_short_name: string;
-      route_long_name: string;
-      route_type: number;
-      route_color: string;
-      route_text_color: string;
-    }>
-  > {
-    const result = await this.prisma.$queryRaw<
-      Array<{
-        id: number;
-        route_id: string;
-        route_short_name: string;
-        route_long_name: string;
-        route_type: number;
-        route_color: string;
-        route_text_color: string;
-      }>
-    >`
-      SELECT id, route_id, route_short_name, route_long_name, route_type, route_color, route_text_color
-      FROM "SPTrans_Route"
-      ORDER BY route_short_name
+  async getAllRoutes(limit = 10_000): Promise<BusRouteRow[]> {
+    const result = await this.prisma.$queryRaw<BusRouteRow[]>`
+      SELECT
+        route.id,
+        route.route_id,
+        route.agency_id,
+        route.route_short_name,
+        route.route_long_name,
+        route.route_type,
+        route.route_color,
+        route.route_text_color,
+        route.source_agency,
+        route.source_id,
+        COALESCE(fares.fares, '[]'::jsonb) AS fares
+      FROM "public"."Gtfs_Route" route
+      LEFT JOIN LATERAL (
+        SELECT jsonb_agg(
+          jsonb_build_object('price', fare.price, 'currency', fare.currency_type)
+          ORDER BY fare.price, fare.currency_type
+        ) AS fares
+        FROM (
+          SELECT DISTINCT attribute.price, attribute.currency_type
+          FROM "public"."Gtfs_FareRule" rule
+          INNER JOIN "public"."Gtfs_FareAttribute" attribute
+            ON attribute.fare_id = rule.fare_id
+          WHERE rule.route_id = route.route_id
+        ) fare
+      ) fares ON TRUE
+      ORDER BY
+        CASE WHEN LOWER(COALESCE(route.source_agency, '')) = 'sptrans' THEN 0 ELSE 1 END,
+        route.route_short_name,
+        route.route_id
       LIMIT ${limit}
     `;
 
@@ -238,7 +246,7 @@ export class PostGISService {
   > {
     const shapes = await this.prisma.$queryRaw<Array<{ shape_id: string }>>`
       SELECT DISTINCT t.shape_id
-      FROM "SPTrans_Trip" t
+      FROM "public"."Gtfs_Trip" t
       WHERE t.route_id = ${routeId}
       AND t.shape_id IS NOT NULL
       AND t.shape_id != ''
@@ -278,7 +286,7 @@ export class PostGISService {
         MAX(stop_lat) as max_lat,
         MIN(stop_lon) as min_lng,
         MAX(stop_lon) as max_lng
-      FROM "SPTrans_Stop"
+      FROM "public"."Gtfs_Stop"
       WHERE stop_lat IS NOT NULL 
       AND stop_lon IS NOT NULL
     `;

@@ -140,6 +140,30 @@ mat-card-content {
   align-items: center;
 }
 
+.route-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 8px 2px 2px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 8px;
+  background: var(--mat-sys-surface-container-low);
+}
+
+.route-summary-copy,
+.route-meta {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.route-meta {
+  margin-top: 4px;
+}
+
 .soft-chip,
 .line-chip {
   display: inline-flex;
@@ -177,6 +201,45 @@ mat-card-content {
   padding: 0 7px;
   border-radius: 6px;
   font-size: 0.78rem;
+}
+
+.route-fare {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--mat-sys-primary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.route-fare mat-icon {
+  width: 15px;
+  height: 15px;
+  font-size: 15px;
+}
+
+.route-fare.missing-fare {
+  color: var(--mat-sys-on-surface-variant);
+  font-weight: 600;
+}
+
+.agency-identity {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.agency-identity img,
+.agency-identity mat-icon {
+  width: 18px;
+  height: 18px;
+  font-size: 18px;
+  object-fit: contain;
 }
 
 .muted-state {

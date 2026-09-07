@@ -20,6 +20,20 @@ describe('RouteStopMappingService', () => {
     await expect(service.getApiStopCode('123junk')).resolves.toBeNull();
   });
 
+  it('rejects Artesp identifiers before any SPTrans lookup', async () => {
+    const service = new RouteStopMappingService(
+      prisma as never,
+      olhoVivo as never,
+    );
+
+    await expect(service.getApiStopCode('artesp:2')).resolves.toBeNull();
+    await expect(service.isKnownRealtimeStop('artesp:2')).resolves.toBe(false);
+    await expect(service.getApiLineCodes('artesp:001')).resolves.toBeNull();
+    await expect(service.isKnownRealtimeRoute('artesp:001')).resolves.toBe(false);
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    expect(olhoVivo.searchLines).not.toHaveBeenCalled();
+  });
+
   it('expires mappings so an updated feed can be observed without restart', async () => {
     jest.useFakeTimers();
     jest.setSystemTime(0);

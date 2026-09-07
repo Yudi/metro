@@ -5,6 +5,7 @@ import {
   input,
   output,
 } from '@angular/core';
+import { NgOptimizedImage } from '@angular/common';
 
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
@@ -12,10 +13,22 @@ import { MatIconModule } from '@angular/material/icon';
 
 import { TypesenseRoute } from '../../../../services/typesense-search.service';
 import {
+  AGENCIES_DATA,
+  getAgencyIconPath,
+  getRouteAgency,
   getLineColors,
+  isArtespRoute,
   LiveTrainTrackingApiId,
+  normalizeHexColor,
   SpecialRailService,
+  TransitAgency,
+  formatBusFare,
 } from '@metro/shared/utils';
+
+interface AgencyIdentity {
+  name: string;
+  iconPath: string | null;
+}
 
 /** Search result type */
 export type SearchResultType =
@@ -42,12 +55,16 @@ export interface SearchResult {
   lineCodes?: number[];
   /** Data source: gtfs (bus), rail (rail lines), gpkg (rail stations), or bike */
   source?: 'gtfs' | 'rail' | 'gpkg' | 'bike';
+  sourceAgency?: string;
+  sourceId?: string;
+  platformCode?: string;
+  mergedStopIds?: string[];
   specialService?: SpecialRailService;
 }
 
 @Component({
   selector: 'app-search-result-card',
-  imports: [MatCardModule, MatChipsModule, MatIconModule],
+  imports: [MatCardModule, MatChipsModule, MatIconModule, NgOptimizedImage],
   templateUrl: './search-result-card.component.html',
   styleUrl: './search-result-card.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -66,6 +83,44 @@ export class SearchResultCardComponent {
       code,
       colors: getLineColors(code),
     }));
+  });
+
+  readonly routeAgency = computed(() => {
+    const route = this.result().routeData;
+    return route ? this.getAgencyIdentity(route) : null;
+  });
+
+  readonly routeFareLabel = computed(() => {
+    const route = this.result().routeData;
+    if (!route || this.result().type !== 'route') {
+      return null;
+    }
+
+    const fares = route.fares ?? [];
+    if (fares.length > 0) {
+      return fares.map((fare) => formatBusFare(fare)).join(' · ');
+    }
+
+    return isArtespRoute({
+      routeId: route.route_id,
+      sourceAgency: route.sourceAgency,
+    })
+      ? 'Tarifa não informada'
+      : null;
+  });
+
+  readonly stopPlatformLabel = computed(() => {
+    const platform = this.result().platformCode?.trim();
+    return platform ? `Plataforma ${platform}` : null;
+  });
+
+  readonly resultDescription = computed(() => {
+    const result = this.result();
+    if (result.source !== 'gtfs' || result.type === 'route') {
+      return null;
+    }
+    const description = result.description?.trim();
+    return description && description !== this.stopPlatformLabel() ? description : null;
   });
 
   onCardClick(): void {
@@ -106,6 +161,14 @@ export class SearchResultCardComponent {
     }
   }
 
+  routeColor(route: TypesenseRoute): string {
+    return normalizeHexColor(route.route_color, '5f6368');
+  }
+
+  routeTextColor(route: TypesenseRoute): string {
+    return normalizeHexColor(route.route_text_color, 'ffffff');
+  }
+
   formatDistance(distance: number): string {
     if (distance < 1000) {
       return `${Math.round(distance)}m`;
@@ -129,5 +192,36 @@ export class SearchResultCardComponent {
     return (
       result.type === 'bus_stop' && !!result.routes && result.routes.length > 0
     );
+  }
+
+  private getAgencyIdentity(route: TypesenseRoute): AgencyIdentity | null {
+    let agency: TransitAgency | undefined;
+    const sourceAgency = route.sourceAgency?.trim().toLowerCase();
+
+    if (isArtespRoute({ routeId: route.route_id, sourceAgency })) {
+      agency = TransitAgency.ARTESP;
+    } else if (sourceAgency && this.isTransitAgency(sourceAgency)) {
+      agency = sourceAgency;
+    } else if (route.source === 'rail' && !sourceAgency) {
+      agency = getRouteAgency(route.route_short_name);
+    } else if (!sourceAgency) {
+      // Older SPTrans search records predate sourceAgency in the index.
+      agency = TransitAgency.SPTRANS;
+    }
+
+    if (agency) {
+      return {
+        name: AGENCIES_DATA[agency].shortName,
+        iconPath: getAgencyIconPath(agency),
+      };
+    }
+
+    return sourceAgency
+      ? { name: sourceAgency.toUpperCase(), iconPath: null }
+      : null;
+  }
+
+  private isTransitAgency(value: string): value is TransitAgency {
+    return Object.values(TransitAgency).includes(value as TransitAgency);
   }
 }

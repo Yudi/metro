@@ -1,12 +1,40 @@
 <mat-card class="result-card" (click)="onCardClick()" tabindex="0">
   <mat-card-content>
     <div class="result-header">
-      <div class="result-icon-wrapper" [class]="result().type">
-        <mat-icon>{{ getResultIcon(result().type) }}</mat-icon>
-      </div>
+      @if (result().type === "route" && result().routeData; as route) {
+        <div class="result-icon-wrapper route">
+          <span
+            class="route-badge"
+            [style.backgroundColor]="routeColor(route)"
+            [style.color]="routeTextColor(route)"
+          >
+            {{ route.route_short_name }}
+          </span>
+        </div>
+      } @else {
+        <div class="result-icon-wrapper" [class]="result().type">
+          <mat-icon>{{ getResultIcon(result().type) }}</mat-icon>
+        </div>
+      }
       <div class="result-info">
-        <h4 class="result-title">{{ result().name }}</h4>
+        <h4 class="result-title">
+          @if (result().type === "route" && result().routeData; as route) {
+            {{ route.route_long_name }}
+          } @else {
+            {{ result().name }}
+          }
+        </h4>
         <p class="result-type">{{ formatResultType() }}</p>
+        @if (routeAgency(); as agency) {
+          <div class="agency-identity">
+            @if (agency.iconPath; as iconPath) {
+              <img [ngSrc]="iconPath" width="20" height="20" alt="" />
+            } @else {
+              <mat-icon aria-hidden="true">business</mat-icon>
+            }
+            <span>{{ agency.name }}</span>
+          </div>
+        }
       </div>
       @if (result().liveTrainTrackingApiIds?.length) {
         <mat-chip class="realtime-chip">
@@ -20,8 +48,25 @@
       }
     </div>
 
-    @if (result().source === "gtfs" && result().description) {
-      <p class="result-description">{{ result().description }}</p>
+    @if (resultDescription(); as description) {
+      <p class="result-description">{{ description }}</p>
+    }
+
+    @if (result().type === "route" && routeFareLabel(); as fareLabel) {
+      <p
+        class="result-fare"
+        [class.missing-fare]="fareLabel === 'Tarifa não informada'"
+      >
+        <mat-icon>payments</mat-icon>
+        <strong>{{ fareLabel }}</strong>
+      </p>
+    }
+
+    @if (result().type === "bus_stop" && stopPlatformLabel(); as platformLabel) {
+      <p class="result-platform">
+        <mat-icon>place</mat-icon>
+        {{ platformLabel }}
+      </p>
     }
 
     @if (shouldShowLineCodes()) {

@@ -1,11 +1,25 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { GTFSFileInfo } from '../types/gtfs.types';
-import { GTFSConfig } from '../config/gtfs.config';
+import { GTFSConfig, GTFSFeed } from '../config/gtfs.config';
 import {
   CreateGTFSDatasetDto,
   GTFSDatasetResponseDto,
 } from '../dto/gtfs-dataset.dto';
+
+interface FeedDatasetRow {
+  source: string;
+  file_hash: string;
+  file_size: number;
+  version: string | null;
+  last_updated: Date;
+  completed: boolean;
+}
+
+interface FeedFileRow {
+  file_name: string;
+  record_count: number | null;
+}
 
 @Injectable()
 export class GTFSDatabaseService {
@@ -16,8 +30,10 @@ export class GTFSDatabaseService {
   /**
    * Get current dataset (there should only be one)
    */
-  async getCurrentDataset(): Promise<GTFSDatasetResponseDto | null> {
-    const dataset = await this.findLatestCompleteDataset();
+  async getCurrentDataset(
+    feed: GTFSFeed = 'sptrans',
+  ): Promise<GTFSDatasetResponseDto | null> {
+    const dataset = await this.findLatestCompleteDataset(feed);
     if (!dataset) return null;
 
     return this.toDatasetResponse(dataset);
@@ -26,7 +42,14 @@ export class GTFSDatabaseService {
   /**
    * Check if current dataset hash matches the provided hash
    */
-  async isCurrentHash(fileHash: string): Promise<boolean> {
+  async isCurrentHash(
+    fileHash: string,
+    feed: GTFSFeed = 'sptrans',
+  ): Promise<boolean> {
+    if (feed === 'artesp') {
+      return this.isCurrentArtespHash(fileHash);
+    }
+
     const dataset = await this.findLatestCompleteDataset();
     if (!dataset || dataset.fileHash !== fileHash) {
       return false;
@@ -63,7 +86,34 @@ export class GTFSDatabaseService {
    */
   async createOrUpdateDataset(
     dto: CreateGTFSDatasetDto,
+    feed: GTFSFeed = 'sptrans',
   ): Promise<GTFSDatasetResponseDto> {
+    if (feed === 'artesp') {
+      await this.prisma.$executeRawUnsafe(
+        `INSERT INTO public.gtfs_feed_datasets
+          (source, file_hash, file_size, version, completed, last_updated)
+         VALUES ($1, $2, $3, $4, false, now())
+         ON CONFLICT (source) DO UPDATE SET
+           file_hash = EXCLUDED.file_hash,
+           file_size = EXCLUDED.file_size,
+           version = EXCLUDED.version,
+           completed = false,
+           last_updated = now()`,
+        feed,
+        dto.fileHash,
+        dto.fileSize,
+        dto.version ?? null,
+      );
+
+      return {
+        id: feed,
+        lastUpdated: new Date(),
+        fileHash: dto.fileHash,
+        fileSize: dto.fileSize,
+        version: dto.version,
+      };
+    }
+
     const dataset = await this.prisma.gTFSDataset.upsert({
       where: { fileHash: dto.fileHash },
       update: {
@@ -84,7 +134,21 @@ export class GTFSDatabaseService {
   /**
    * Find GTFS file by dataset ID and filename
    */
-  async findFileByDatasetAndName(datasetId: string, fileName: string) {
+  async findFileByDatasetAndName(
+    datasetId: string,
+    fileName: string,
+    feed: GTFSFeed = 'sptrans',
+  ) {
+    if (feed === 'artesp') {
+      const files = await this.prisma.$queryRaw<FeedFileRow[]>`
+        SELECT file_name, record_count
+        FROM public.gtfs_feed_files
+        WHERE source = ${feed} AND file_name = ${fileName}
+        LIMIT 1
+      `;
+      return files[0] ?? null;
+    }
+
     return await this.prisma.gTFSFile.findUnique({
       where: {
         datasetId_fileName: {
@@ -99,7 +163,26 @@ export class GTFSDatabaseService {
   async prepareDatasetForImport(
     datasetId: string,
     fileNames?: string[],
+    feed: GTFSFeed = 'sptrans',
   ): Promise<void> {
+    if (feed === 'artesp') {
+      if (fileNames) {
+        await this.prisma.$executeRawUnsafe(
+          `DELETE FROM public.gtfs_feed_files
+           WHERE source = $1 AND NOT (file_name = ANY($2::text[]))`,
+          feed,
+          fileNames,
+        );
+      }
+      await this.prisma.$executeRawUnsafe(
+        `UPDATE public.gtfs_feed_files
+         SET record_count = NULL, last_updated = now()
+         WHERE source = $1`,
+        feed,
+      );
+      return;
+    }
+
     if (fileNames) {
       await this.prisma.gTFSFile.deleteMany({
         where: {
@@ -115,13 +198,76 @@ export class GTFSDatabaseService {
   }
 
   /**
+   * Optional relations are provider-scoped. Clear absent files before a
+   * replacement so a newer feed cannot inherit stale exceptions, frequencies
+   * or fare rows from its previous version.
+   */
+  async clearOptionalTables(
+    feed: GTFSFeed,
+    presentFileNames: readonly string[],
+  ): Promise<void> {
+    const present = new Set(presentFileNames);
+    for (const fileName of GTFSConfig.getExpectedFiles()) {
+      if (
+        !GTFSConfig.isRequiredFile(fileName, feed) &&
+        !present.has(fileName)
+      ) {
+        await this.clearOptionalTable(fileName, feed);
+      }
+    }
+  }
+
+  /** Clear one optional relation after a malformed optional file. */
+  async clearOptionalTable(
+    fileName: string,
+    feed: GTFSFeed = 'sptrans',
+  ): Promise<void> {
+    if (
+      !GTFSConfig.getExpectedFiles().includes(fileName) ||
+      GTFSConfig.isRequiredFile(fileName, feed)
+    ) {
+      throw new Error(`Cannot clear required or unknown GTFS file: ${fileName}`);
+    }
+
+    const table = GTFSConfig.getTableName(fileName, feed);
+    await this.prisma.$executeRawUnsafe(
+      `TRUNCATE TABLE "${GTFSConfig.EXTERNAL_SCHEMA}"."${table}" RESTART IDENTITY CASCADE`,
+    );
+  }
+
+  /**
    * Create or update GTFS file records for a dataset
    */
   async upsertDatasetFiles(
     datasetId: string,
     files: GTFSFileInfo[],
+    feed: GTFSFeed = 'sptrans',
   ): Promise<void> {
     try {
+      if (feed === 'artesp') {
+        for (const file of files) {
+          await this.prisma.$executeRawUnsafe(
+            `INSERT INTO public.gtfs_feed_files
+              (source, file_name, file_hash, file_size, record_count, last_updated)
+             VALUES ($1, $2, $3, $4, $5, now())
+             ON CONFLICT (source, file_name) DO UPDATE SET
+               file_hash = EXCLUDED.file_hash,
+               file_size = EXCLUDED.file_size,
+               record_count = EXCLUDED.record_count,
+               last_updated = now()`,
+            feed,
+            file.fileName,
+            file.fileHash,
+            file.fileSize,
+            file.recordCount ?? null,
+          );
+        }
+        this.logger.debug(
+          `Upserted ${files.length} ${feed} file records for dataset ${datasetId}`,
+        );
+        return;
+      }
+
       for (const file of files) {
         await this.prisma.gTFSFile.upsert({
           where: {
@@ -167,8 +313,21 @@ export class GTFSDatabaseService {
     datasetId: string,
     fileName: string,
     recordCount?: number,
+    feed: GTFSFeed = 'sptrans',
   ): Promise<void> {
     try {
+      if (feed === 'artesp') {
+        await this.prisma.$executeRawUnsafe(
+          `UPDATE public.gtfs_feed_files
+           SET record_count = $1, last_updated = now()
+           WHERE source = $2 AND file_name = $3`,
+          recordCount ?? null,
+          feed,
+          fileName,
+        );
+        return;
+      }
+
       await this.prisma.gTFSFile.update({
         where: {
           datasetId_fileName: {
@@ -192,19 +351,54 @@ export class GTFSDatabaseService {
   }
 
   /** Refresh planner statistics after replacing GTFS tables and before rebuilds. */
-  async analyzeImportedTables(): Promise<void> {
-    for (const table of GTFSConfig.getAnalyzeTables()) {
+  async analyzeImportedTables(feed: GTFSFeed = 'sptrans'): Promise<void> {
+    for (const table of GTFSConfig.getAnalyzeTables(feed)) {
       await this.prisma.$executeRawUnsafe(
         `ANALYZE "${GTFSConfig.EXTERNAL_SCHEMA}"."${table}"`,
       );
     }
 
     this.logger.debug(
-      `Analyzed ${GTFSConfig.getAnalyzeTables().length} large GTFS tables`,
+      `Analyzed ${GTFSConfig.getAnalyzeTables(feed).length} ${feed} GTFS tables`,
     );
   }
 
-  private async findLatestCompleteDataset() {
+  /** Publish an ARTESP candidate only after every required file succeeded. */
+  async completeDataset(feed: GTFSFeed = 'sptrans'): Promise<void> {
+    if (feed === 'artesp') {
+      await this.prisma.$executeRawUnsafe(
+        `UPDATE public.gtfs_feed_datasets
+         SET completed = true, last_updated = now()
+         WHERE source = $1`,
+        feed,
+      );
+    }
+  }
+
+  private async findLatestCompleteDataset(feed: GTFSFeed = 'sptrans') {
+    if (feed === 'artesp') {
+      const rows = await this.prisma.$queryRaw<FeedDatasetRow[]>`
+        SELECT source, file_hash, file_size, version, last_updated, completed
+        FROM public.gtfs_feed_datasets
+        WHERE source = ${feed} AND completed = true
+        ORDER BY last_updated DESC
+        LIMIT 1
+      `;
+      const dataset = rows[0];
+      if (!dataset) {
+        return null;
+      }
+
+      return {
+        id: dataset.source,
+        fileHash: dataset.file_hash,
+        fileSize: dataset.file_size,
+        version: dataset.version,
+        lastUpdated: dataset.last_updated,
+        gtfsFiles: [],
+      };
+    }
+
     const datasets = await this.prisma.gTFSDataset.findMany({
       include: { gtfsFiles: true },
       orderBy: { lastUpdated: 'desc' },
@@ -230,6 +424,51 @@ export class GTFSDatabaseService {
 
       return requiredFilesComplete && presentFilesComplete;
     });
+  }
+
+  private async isCurrentArtespHash(fileHash: string): Promise<boolean> {
+    const dataset = await this.findLatestCompleteDataset('artesp');
+    if (!dataset || dataset.fileHash !== fileHash) {
+      return false;
+    }
+
+    const files = await this.prisma.$queryRaw<FeedFileRow[]>`
+      SELECT file_name, record_count
+      FROM public.gtfs_feed_files
+      WHERE source = 'artesp'
+    `;
+    const filesByName = new Map(
+      files.map((file) => [file.file_name, file.record_count]),
+    );
+    if (files.some((file) => file.record_count === null)) {
+      this.logger.warn(
+        'Current ARTESP dataset contains an incomplete file record; forcing reimport',
+      );
+      return false;
+    }
+    const requiredFilesComplete = GTFSConfig.getRequiredFiles('artesp').every(
+      (fileName) => (filesByName.get(fileName) ?? 0) > 0,
+    );
+    if (!requiredFilesComplete) {
+      this.logger.warn(
+        'Current ARTESP dataset is missing a successfully imported required file',
+      );
+      return false;
+    }
+
+    const [shapeCount] = await this.prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*) AS count
+      FROM "external_gtfs"."ARTESP_Shape"
+      WHERE geom IS NOT NULL
+    `;
+    if (!shapeCount || Number(shapeCount.count) === 0) {
+      this.logger.warn(
+        'Current ARTESP dataset has no imported shape geometries; forcing reimport',
+      );
+      return false;
+    }
+
+    return true;
   }
 
   private toDatasetResponse(dataset: {
@@ -265,11 +504,18 @@ export class GTFSDatabaseService {
       // Clear all GTFS datasets and files (cascade will handle files)
       await this.prisma.gTFSDataset.deleteMany({});
 
-      for (const table of GTFSConfig.getRawTables()) {
-        await this.prisma.$executeRawUnsafe(
-          `TRUNCATE TABLE "${GTFSConfig.EXTERNAL_SCHEMA}"."${table}" RESTART IDENTITY CASCADE`,
-        );
-        this.logger.debug(`Cleared ${table}`);
+      await this.prisma.$executeRawUnsafe(
+        'DELETE FROM public.gtfs_feed_datasets WHERE source = $1',
+        'artesp',
+      );
+
+      for (const feed of ['sptrans', 'artesp'] as const) {
+        for (const table of GTFSConfig.getRawTables(feed)) {
+          await this.prisma.$executeRawUnsafe(
+            `TRUNCATE TABLE "${GTFSConfig.EXTERNAL_SCHEMA}"."${table}" RESTART IDENTITY CASCADE`,
+          );
+          this.logger.debug(`Cleared ${table}`);
+        }
       }
 
       this.logger.debug('All GTFS data and tracking cleared');

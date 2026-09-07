@@ -1,6 +1,7 @@
 export * from './lib/station-name.utils';
 export * from './lib/station-merge.utils';
 export * from './lib/transit-agency.utils';
+export * from './lib/bus.utils';
 export * from './lib/date-time.utils';
 export * from './lib/rail-line.utils';
 export { getStaticRailStationsByLine } from './lib/rail-stations.entity';

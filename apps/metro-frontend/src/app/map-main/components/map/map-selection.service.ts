@@ -4,7 +4,9 @@ import { firstValueFrom } from 'rxjs';
 import {
   extractTrackedRailVehicleLineCode,
   getRailLineById,
+  isArtespRoute,
   SpecialRailService,
+  supportsSptransRealtime,
 } from '@metro/shared/utils';
 import { LoggerService } from '@metro/shared/api';
 import { BikeStationsService } from '../../services/bike-stations.service';
@@ -79,6 +81,9 @@ export class MapSelectionService {
       longName: route.longName,
       color: route.color ?? undefined,
       textColor: route.textColor ?? undefined,
+      sourceAgency: route.sourceAgency,
+      supportsRealtime: route.supportsRealtime,
+      fares: route.fares,
     };
     this.mapState.addRouteToSelection(selectedRoute);
 
@@ -88,7 +93,7 @@ export class MapSelectionService {
 
     this.dataLoader.syncVectorTileFilters();
     void this.dataLoader.loadRouteData(routeId, shouldDisplaySnackbar);
-    this.subscribeToRouteRealtime(route.shortName);
+    this.subscribeToRouteRealtime(route);
 
     if (shouldDisplaySnackbar) {
       this.snackBar.open(`Rota adicionada`, 'Fechar', { duration: 2000 });
@@ -230,7 +235,7 @@ export class MapSelectionService {
 
   removeRouteFromSelection(routeId: string): void {
     const route = this.mapState.selectedRoutes().get(routeId);
-    this.unsubscribeFromRouteRealtime(route?.shortName);
+    this.unsubscribeFromRouteRealtime(route);
 
     this.mapState.removeRouteFromSelection(routeId);
     this.dataLoader.removeRouteDisplayData(routeId);
@@ -278,7 +283,7 @@ export class MapSelectionService {
 
   clearAllSelections(shouldDisplaySnackbar = true): void {
     for (const route of this.mapState.selectedRoutes().values()) {
-      this.unsubscribeFromRouteRealtime(route.shortName);
+      this.unsubscribeFromRouteRealtime(route);
     }
 
     this.mapState.clearAllSelections();
@@ -291,8 +296,15 @@ export class MapSelectionService {
     }
   }
 
-  private subscribeToRouteRealtime(shortName: string | null | undefined): void {
-    if (!shortName) {
+  private subscribeToRouteRealtime(
+    route: SelectedRoute | { routeId: string; shortName: string },
+  ): void {
+    const shortName = route.shortName;
+    const routeId = 'routeId' in route ? route.routeId : route.id;
+    if (!shortName || isArtespRoute({
+      routeId,
+      sourceAgency: 'sourceAgency' in route ? route.sourceAgency : undefined,
+    })) {
       return;
     }
 
@@ -304,19 +316,33 @@ export class MapSelectionService {
       );
     } else if (isRailRouteReference(shortName)) {
       this.logger.debug(`Tracked rail vehicles are unavailable for route: ${shortName}`);
-    } else if (
-      !shortName.startsWith('METRÔ') &&
-      !shortName.startsWith('CPTM')
+      return;
+    }
+
+    if (
+      !supportsSptransRealtime({
+        routeId,
+        sourceAgency: 'sourceAgency' in route ? route.sourceAgency : undefined,
+        supportsRealtime:
+          'supportsRealtime' in route ? route.supportsRealtime : undefined,
+      })
     ) {
+      this.logger.debug(`Realtime unavailable for bus route: ${routeId}`);
+      return;
+    }
+
+    if (!shortName.startsWith('METRÔ') && !shortName.startsWith('CPTM')) {
       this.realtimeService.subscribeToRoute(shortName);
       this.logger.info(`Subscribed to real-time for route: ${shortName}`);
     }
   }
 
   private unsubscribeFromRouteRealtime(
-    shortName: string | null | undefined,
+    route: SelectedRoute | undefined,
   ): void {
-    if (!shortName) {
+    const shortName = route?.shortName;
+    const routeId = route?.id ?? '';
+    if (!shortName || isArtespRoute({ routeId, sourceAgency: route?.sourceAgency })) {
       return;
     }
 
@@ -328,10 +354,20 @@ export class MapSelectionService {
       );
     } else if (isRailRouteReference(shortName)) {
       this.logger.debug(`Tracked rail vehicles were unavailable for route: ${shortName}`);
-    } else if (
-      !shortName.startsWith('METRÔ') &&
-      !shortName.startsWith('CPTM')
+      return;
+    }
+
+    if (
+      !supportsSptransRealtime({
+        routeId,
+        sourceAgency: route?.sourceAgency,
+        supportsRealtime: route?.supportsRealtime,
+      })
     ) {
+      return;
+    }
+
+    if (!shortName.startsWith('METRÔ') && !shortName.startsWith('CPTM')) {
       this.realtimeService.unsubscribeFromRoute(shortName);
       this.logger.info(`Unsubscribed from real-time for route: ${shortName}`);
     }

@@ -6,6 +6,7 @@ import {
   BusStopGraphQL,
   GeographyGraphQLService,
   RouteRailConnectionGraphQL,
+  ScheduledBusDepartureGraphQL,
 } from '../../services/geography-graphql.service';
 import {
   LineWithVehicles,
@@ -69,7 +70,17 @@ describe('StopArrivalsComponent', () => {
       unsubscribeFromStop: jest.fn(),
     };
     const geographyService = {
-      getRouteRailConnectionsForStop: jest.fn(() => of([connection])),
+      getScheduledBusDepartures: jest.fn(() => of([])),
+      getRouteRailConnectionsForStop: jest.fn(() =>
+        of([
+          connection,
+          {
+            ...connection,
+            routeId: `artesp:${connection.routeId}`,
+            routeLongName: 'Artesp duplicate short name',
+          },
+        ]),
+      ),
     };
 
     await TestBed.configureTestingModule({
@@ -88,6 +99,38 @@ describe('StopArrivalsComponent', () => {
 
   afterEach(() => fixture.destroy());
 
+  it('shows one departure per route and expands only that route to five', () => {
+    const departures: ScheduledBusDepartureGraphQL[] = Array.from({ length: 7 }, (_, index) => ({
+      routeId: 'artesp:001',
+      routeShortName: '001',
+      tripId: `artesp:trip-${index}`,
+      headsign: 'Centro',
+      directionId: 0,
+      departureTime: `2026-09-07T14:${String(index * 5).padStart(2, '0')}:00-03:00`,
+      sourceAgency: 'ARTESP',
+    }));
+    departures.push({ ...departures[0], routeId: 'artesp:002', tripId: 'artesp:other-trip', routeShortName: '002' });
+    const getDepartures = jest.spyOn(TestBed.inject(GeographyGraphQLService), 'getScheduledBusDepartures')
+      .mockReturnValue(of(departures));
+    fixture.componentRef.setInput('stop', { ...stop, stopId: 'artesp:42', sourceAgency: 'ARTESP' });
+    fixture.detectChanges();
+    fixture.detectChanges();
+
+    expect(getDepartures).toHaveBeenCalledWith('artesp:42', 5);
+    expect(fixture.nativeElement.querySelectorAll('.scheduled-group')).toHaveLength(2);
+    expect(fixture.nativeElement.querySelectorAll('.scheduled-time')).toHaveLength(2);
+    const toggle = fixture.nativeElement.querySelector('.schedule-toggle') as HTMLButtonElement;
+    expect(toggle.textContent).toContain('Ver 5 horários');
+    toggle.click();
+    fixture.detectChanges();
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(fixture.nativeElement.querySelectorAll('.scheduled-group')[0].querySelectorAll('.scheduled-time')).toHaveLength(5);
+    expect(fixture.nativeElement.querySelectorAll('.scheduled-group')[1].querySelectorAll('.scheduled-time')).toHaveLength(1);
+    toggle.click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('.scheduled-time')).toHaveLength(2);
+  });
+
   it('renders the destination selected by the OlhoVivo direction', () => {
     const destination = fixture.nativeElement.querySelector(
       '.line-destination',
@@ -105,14 +148,16 @@ describe('StopArrivalsComponent', () => {
     ).toEqual(['Vila Madalena']);
   });
 
-  it('renders the station distance while preserving agency and line metadata', () => {
+  it('renders circular line numbers beside the station name and preserves distance', () => {
     const station = fixture.nativeElement.querySelector(
       '.rail-service .rail-station',
     ) as HTMLElement;
 
     expect(
-      station.querySelector('.rail-station-meta')?.textContent?.trim(),
-    ).toBe('metro · Verde');
+      station.querySelector('.station-line-badge')?.textContent?.trim(),
+    ).toBe('2');
+    expect(station.querySelector('.station-line-badge')?.getAttribute('aria-label')).toBe('Linha 2');
+    expect(station.querySelector('.rail-station-name')?.textContent?.trim()).toBe('Vila Madalena');
     expect(
       station.querySelector('.rail-station-distance')?.textContent?.trim(),
     ).toBe('Parada da linha a 131 m da estação');
@@ -140,6 +185,40 @@ describe('StopArrivalsComponent', () => {
         distanceMeters: 0,
       }),
     ).toBe('Parada da linha a 0 m da estação');
+  });
+
+  it('keeps route rail connections namespaced when short names collide', () => {
+    const sptransRoute = { ...route, routeId: '001', shortName: '001' };
+    const artespRoute = {
+      ...route,
+      routeId: 'artesp:001',
+      shortName: '001',
+    };
+    const sptransConnection = {
+      ...connection,
+      routeId: sptransRoute.routeId,
+      routeShortName: sptransRoute.shortName,
+    };
+    const artespConnection = {
+      ...connection,
+      routeId: artespRoute.routeId,
+      routeShortName: artespRoute.shortName,
+      routeLongName: 'Artesp duplicate short name',
+    };
+    fixture.componentInstance.railConnections.set(
+      new Map([
+        [sptransConnection.routeId, sptransConnection],
+        [artespConnection.routeId, artespConnection],
+        [sptransConnection.shortName, sptransConnection],
+      ]),
+    );
+
+    expect(fixture.componentInstance.getRouteConnection(sptransRoute)).toBe(
+      sptransConnection,
+    );
+    expect(fixture.componentInstance.getRouteConnection(artespRoute)).toBe(
+      artespConnection,
+    );
   });
 });
 

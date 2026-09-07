@@ -34,14 +34,23 @@ input BoundingBoxInput {
   minLng: Float!
 }
 
+type BusFare {
+  currency: String!
+  price: Float!
+}
+
 type BusRoute {
   color: String!
+  fares: [BusFare!]!
   geometry: GeometryData
   id: ID!
   longName: String!
   routeId: String!
   routeType: Int!
   shortName: String!
+  sourceAgency: String!
+  sourceId: String!
+  supportsRealtime: Boolean!
   textColor: String!
 }
 
@@ -52,7 +61,7 @@ type BusShape {
 }
 
 type BusStop {
-  """Normalized agency identifiers (metro, cptm) for icon display"""
+  """Normalized bus and rail agency identifiers, including sptrans and artesp, for icon display"""
   agencies: [String!]
   description: String
   geometry: GeometryData
@@ -60,25 +69,15 @@ type BusStop {
   isSubwayStation: Boolean!
   latitude: Float!
   longitude: Float!
+  mergedStopIds: [String!]!
   name: String!
+  platformCode: String
 
   """Raw route short names (METRÔ L1-AZUL) containing line codes"""
   routeShortNames: [String!]
+  sourceAgency: String!
+  sourceId: String!
   stopId: String!
-}
-
-type Calendar {
-  end_date: String!
-  friday: Int!
-  id: ID!
-  monday: Int!
-  saturday: Int!
-  service_id: String!
-  start_date: String!
-  sunday: Int!
-  thursday: Int!
-  tuesday: Int!
-  wednesday: Int!
 }
 
 """CPTM station from the public station list"""
@@ -103,8 +102,6 @@ type CptmStationInfo {
 A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
 """
 scalar DateTime
-
-scalar JSON
 
 """Average headway for a direction"""
 type DirectionHeadwayEntity {
@@ -143,6 +140,19 @@ input FavoriteListInput {
   busStop: [String!]!
   railLine: [String!]!
   railStation: [String!]!
+}
+
+type FavoriteSnapshot {
+  favorites: FavoriteList!
+  revision: Int!
+}
+
+type FavoriteSyncResponse {
+  conflict: Boolean!
+  favorites: FavoriteList!
+  message: String
+  revision: Int!
+  success: Boolean!
 }
 
 """Type of favorite item"""
@@ -208,6 +218,9 @@ input HistoricalDataFilterInput {
 
 """Historical average headway snapshot for a station direction"""
 type HistoricalHeadwaySnapshotEntity {
+  """Transit agency recorded when this snapshot was generated"""
+  agency: String!
+
   """Average headway in seconds, null when unavailable"""
   averageSeconds: Float
 
@@ -237,9 +250,6 @@ type HistoricalHeadwaySnapshotEntity {
   """Rail line code, such as L9"""
   lineCode: String!
 
-  """Transit agency recorded when this snapshot was generated"""
-  agency: String!
-
   """Structured metadata for diagnostics and future analysis"""
   metadata: JSON
 
@@ -258,23 +268,24 @@ type HistoricalHeadwaySnapshotEntity {
   source: String!
 
   """Internal station key used by the headway calculation"""
-  @deprecated(reason: "Use stationName for user-facing historical data.")
-  stationCode: String!
+  stationCode: String! @deprecated(reason: "Use stationName for user-facing historical data.")
 
   """User-facing station name"""
   stationName: String
 }
 
-"""Historical incident or transparency event for rail operations and backend availability"""
+"""
+Historical incident or transparency event for rail operations and backend availability
+"""
 type HistoricalIncidentEventEntity {
+  """Transit agency recorded when this event was generated"""
+  agency: String
+
   """When this history row was created"""
   createdAt: DateTime!
 
   """Detailed event description"""
   description: String
-
-  """Incident category reported by the source, when available"""
-  incidentCategory: String
 
   """Additional operational details"""
   detail: String
@@ -291,14 +302,14 @@ type HistoricalIncidentEventEntity {
   """Historical event identifier"""
   id: String!
 
+  """Incident category reported by the source, when available"""
+  incidentCategory: String
+
   """Rail line code, such as L9"""
   lineCode: String
 
   """Rail line display name"""
   lineName: String
-
-  """Transit agency recorded when this event was generated"""
-  agency: String
 
   """Numeric rail line code"""
   lineNumber: Int
@@ -343,6 +354,11 @@ enum HistoricalIncidentEventType {
   RAIL_STATUS_RECOVERED
   RETRIEVAL_ISSUE
 }
+
+"""
+The `JSON` scalar type represents JSON values as specified by [ECMA-404](http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf).
+"""
+scalar JSON
 
 """
 Merged rail station combining Metro and CPTM stations at the same location
@@ -395,9 +411,10 @@ type MergedSubwayStation {
 
 type Mutation {
   addFavorite(code: String!, type: FavoriteType!): MutationResponse!
+  clearSearchIndex: Boolean!
   reindexSearch: Boolean!
   removeFavorite(code: String!, type: FavoriteType!): MutationResponse!
-  syncFavorites(favorites: FavoriteListInput!): MutationResponse!
+  syncFavorites(expectedRevision: Int!, favorites: FavoriteListInput!): FavoriteSyncResponse!
 }
 
 type MutationResponse {
@@ -410,6 +427,7 @@ input NearbyStopsInput {
   limit: Int = 20
   longitude: Float!
   radiusMeters: Int = 1000
+  type: SearchType
 }
 
 """Next train arrival information"""
@@ -450,12 +468,12 @@ type Query {
   """
   bikeStationsSummary: BikeStationsSummaryPayloadDto!
   busRoute(id: ID!): BusRoute
-  busRoutes: [BusRoute!]!
+  busRoutes(limit: Int = 10000): [BusRoute!]!
   busShape(shapeId: String!): BusShape
-  busShapes: [BusShape!]!
+  busShapes(limit: Int = 500): [BusShape!]!
   busStop(id: ID!): BusStop
-  busStops: [BusStop!]!
-  busStopsInBounds(bounds: BoundingBoxInput!): [BusStop!]!
+  busStops(limit: Int = 50000): [BusStop!]!
+  busStopsInBounds(bounds: BoundingBoxInput!, limit: Int = 50000): [BusStop!]!
 
   """Find a CPTM station by name and line code"""
   findCptmStation(
@@ -481,7 +499,7 @@ type Query {
   ): HistoricalDataEntity!
 
   """Get a merged rail station by any of its IDs"""
-  mergedRailStation(id: Float!): MergedRailStation
+  mergedRailStation(id: Int!): MergedRailStation
 
   """Get all merged rail stations (pre-processed for deduplication)"""
   mergedRailStations: [MergedRailStation!]!
@@ -493,7 +511,7 @@ type Query {
   mergedSubwayStations: [MergedSubwayStation!]!
   multipleBusRoutes(ids: [ID!]!): [BusRoute!]!
   multipleBusStops(ids: [ID!]!): [BusStop!]!
-  nearbyStops(input: NearbyStopsInput!): [Stop!]!
+  nearbyStops(input: NearbyStopsInput!): [SearchResultUnion!]!
 
   """
   Get next train arrivals for a station (L4/L8/L9/L10/L11/L12/L13/EA/10X). Prefer WebSocket for real-time updates.
@@ -521,6 +539,19 @@ type Query {
   """Get status of all rail lines (cached, refreshed every 5 minutes)"""
   railLinesStatus: RailLinesStatus!
 
+  """Get informational rail cards displayed with special services"""
+  railSpecialInfoCardsStatus: [SpecialRailInfoCard!]!
+
+  """
+  Get status of special rail services with fixed schedules (EA, 10X, GRU)
+  """
+  railSpecialLinesStatus: [SpecialRailLine!]!
+
+  """
+  List special rail services currently registered by the upstream provider
+  """
+  railSpecialServices: [SpecialRailService!]!
+
   """Get a single rail station by ID from GeoSampa data"""
   railStation(id: ID!): RailStation
 
@@ -529,23 +560,27 @@ type Query {
 
   """Get rail stations within bounding box from GeoSampa data"""
   railStationsInBounds(bounds: BoundingBoxInput!): [RailStation!]!
-  routeDetails(routeId: String!): RouteDetails
 
   """
   Get complete route data (route info, trips, shapes, stops) in a single request
   """
   routeFullData(routeId: String!): RouteFullData
 
-  """Find GeoSampa rail stations within 200m of future stops for bus routes serving a stop"""
+  """
+  Find GeoSampa rail stations within 200m of future stops for bus routes serving a stop
+  """
   routeRailConnectionsForStop(routeIds: [String!]!, stopId: String!): [RouteRailConnection!]!
-  routeShape(routeId: String!): [RouteShape!]!
   routesForStop(stopId: String!): [BusRoute!]!
-  search(input: SearchFiltersInput!): SearchResults!
+
+  """
+  Upcoming published Artesp departures within seven days, in America/Sao_Paulo service time. These are schedules, not live arrival predictions.
+  """
+  scheduledBusDepartures(limit: Int! = 12, perRouteLimit: Int, stopId: String!): [ScheduledBusDeparture!]!
+  search(input: SearchFiltersInput!): [SearchResultUnion!]!
   searchBusStops(input: StopSearchInput): [BusStop!]!
 
   """Search rail stations by name from GeoSampa data"""
-  searchRailStations(limit: Float = 20, searchTerm: String!): [RailStation!]!
-  stopDetails(stopId: String!): StopDetails
+  searchRailStations(limit: Int = 20, searchTerm: String!): [RailStation!]!
 
   """
   Get complete stop data with all routes passing through it in a single request
@@ -560,6 +595,9 @@ type Query {
 
   """Get user favorites (requires authentication)"""
   userFavorites: FavoriteList!
+
+  """Get user favorites and their synchronization revision"""
+  userFavoritesSnapshot: FavoriteSnapshot!
   validateToken: Boolean!
 }
 
@@ -577,11 +615,11 @@ type RailLine {
   """Description of any issues or alerts"""
   description: String
 
-  """Incident category reported by the source, when available"""
-  incidentCategory: String
-
   """Additional details for the status"""
   detail: String
+
+  """Incident category reported by the source, when available"""
+  incidentCategory: String
 
   """Line identifier (e.g., L1-Azul)"""
   line: String!
@@ -616,7 +654,7 @@ type RailLinesStatus {
 """Rail station from GeoSampa data (Metro or CPTM)"""
 type RailStation {
   """Transit agency (METRO or CPTM)"""
-  agency: String!
+  agencies: [String!]!
   geometry: GeometryData
   id: ID!
 
@@ -636,24 +674,6 @@ type RailStation {
   status: String
 }
 
-type Route {
-  agency_id: String!
-  id: ID!
-  route_color: String!
-  route_id: String!
-  route_long_name: String!
-  route_short_name: String!
-  route_text_color: String!
-  route_type: Int!
-}
-
-type RouteDetails {
-  calendars: [Calendar!]!
-  route: Route!
-  totalTrips: Int!
-  trips: [SearchTrip!]!
-}
-
 type RouteFullData {
   """The route information"""
   route: BusRoute!
@@ -664,7 +684,9 @@ type RouteFullData {
   """All stops along this route"""
   stops: [BusStop!]!
 
-  """All trips for this route"""
+  """
+  Representative trip for each direction, headsign, and shape pattern on this route
+  """
   trips: [Trip!]!
 }
 
@@ -684,7 +706,9 @@ type RouteRailConnectionDirection {
 type RouteRailConnectionStation {
   agencies: [String!]!
 
-  """Straight-line distance in metres between the downstream bus stop and the GeoSampa rail station"""
+  """
+  Straight-line distance in metres between the downstream bus stop and the GeoSampa rail station
+  """
   distanceMeters: Float!
   id: ID!
   lines: [String!]!
@@ -694,23 +718,73 @@ type RouteRailConnectionStation {
   stopSequence: Int!
 }
 
-type RouteSearchResult {
+type ScheduledBusDeparture {
+  departureTime: String!
+  directionId: Int!
+  headsign: String!
+  platformCode: String
+  routeId: String!
+  routeShortName: String!
+  sourceAgency: String!
+  tripId: String!
+}
+
+type SearchBikeStation implements SearchResult {
   highlights: [SearchHighlight!]
-  route: Route!
+  id: ID!
+  latitude: Float!
+  longitude: Float!
+  routes: [SearchBusRoute!]!
+  score: Float
+  station_id: String!
+  station_name: String!
   type: String!
 }
 
-type RouteShape {
-  geometry: String!
-  shape_id: String!
+type SearchBusRoute implements SearchResult {
+  fares: [BusFare!]!
+  highlights: [SearchHighlight!]
+  id: ID!
+  route_color: String
+  route_id: String!
+  route_long_name: String!
+  route_short_name: String!
+  route_text_color: String
+  route_type: Int!
+  routes: [SearchBusRoute!]!
+  score: Float
+  sourceAgency: String!
+  sourceId: String!
+  supportsRealtime: Boolean!
+  type: String!
+}
+
+type SearchBusStop implements SearchResult {
+  agencies: [String!]!
+  highlights: [SearchHighlight!]
+  id: ID!
+  mergedStopIds: [String!]!
+  platformCode: String
+
+  """Resolved route objects (use ResolveField to populate)"""
+  routes: [SearchBusRoute!]!
+  score: Float
+  sourceAgency: String!
+  sourceId: String!
+  stop_desc: String
+  stop_id: String!
+  stop_lat: Float!
+  stop_lon: Float!
+  stop_name: String!
+  type: String!
 }
 
 input SearchFiltersInput {
-  includeBikeStations: Boolean = false
-  includeBusRoutes: Boolean = false
-  includeBusStops: Boolean = false
-  includeRailLines: Boolean = false
-  includeRailStations: Boolean = false
+  includeBikeStations: Boolean = true
+  includeBusRoutes: Boolean = true
+  includeBusStops: Boolean = true
+  includeRailLines: Boolean = true
+  includeRailStations: Boolean = true
   limit: Int = 10
   query: String!
 }
@@ -720,20 +794,137 @@ type SearchHighlight {
   snippet: String!
 }
 
-type SearchResults {
-  routes: [RouteSearchResult!]!
-  stops: [StopSearchResult!]!
-  total: Int!
+type SearchRailLine implements SearchResult {
+  agency: String!
+  highlights: [SearchHighlight!]
+  id: ID!
+  line_code: String!
+  line_fullname: String!
+  routes: [SearchBusRoute!]!
+  score: Float
+  type: String!
 }
 
-type SearchTrip {
-  direction_id: Int!
+type SearchRailStation implements SearchResult {
+  highlights: [SearchHighlight!]
   id: ID!
-  route_id: String!
-  service_id: String!
-  shape_id: String!
-  trip_headsign: String!
-  trip_id: String!
+  latitude: Float
+  longitude: Float
+  routes: [SearchBusRoute!]!
+  score: Float
+  station_aliases: [String!]
+  station_code: String!
+  station_name: String!
+  type: String!
+}
+
+interface SearchResult {
+  highlights: [SearchHighlight!]
+  id: ID!
+  routes: [SearchBusRoute!]!
+  score: Float
+}
+
+union SearchResultUnion = SearchBikeStation | SearchBusRoute | SearchBusStop | SearchRailLine | SearchRailStation
+
+enum SearchType {
+  BikeStation
+  BusRoute
+  BusStop
+  RailLine
+  RailStation
+}
+
+"""Next departure data for a special rail service"""
+type SpecialRailDeparture {
+  """Departure origin label"""
+  label: String!
+
+  """Departure time in HH:mm format"""
+  time: String!
+}
+
+"""Informational card shown alongside special services"""
+type SpecialRailInfoCard {
+  """Badge background color in hex"""
+  badgeColorHex: String!
+
+  """Material icon name used in badge"""
+  badgeIcon: String!
+
+  """Unique card identifier"""
+  id: String!
+
+  """Current status code"""
+  statusCode: String!
+
+  """Current status label"""
+  statusLabel: String!
+
+  """Card subtitle"""
+  subtitle: String!
+
+  """Card title"""
+  title: String!
+}
+
+"""Related rail line issue affecting a special service"""
+type SpecialRailIssue {
+  """Regular rail line code"""
+  code: Int!
+
+  """Issue description from the regular line status"""
+  description: String!
+
+  """Regular rail line display name"""
+  line: String!
+}
+
+"""Special rail service status item"""
+type SpecialRailLine {
+  """Special service code (EA, 10X, GRU)"""
+  code: String!
+
+  """Service color in hex format"""
+  colorHex: String!
+
+  """Service color name"""
+  colorName: String!
+
+  """Detected issue descriptions affecting this service"""
+  issues: [SpecialRailIssue!]!
+
+  """Service display name"""
+  line: String!
+
+  """Next departures for services with fixed schedules"""
+  nextDepartures: [SpecialRailDeparture!]!
+
+  """Current operation status code"""
+  statusCode: String!
+
+  """Status indicator color"""
+  statusColor: String!
+
+  """Human-readable status label"""
+  statusLabel: String!
+}
+
+"""Special rail service currently available from the upstream provider"""
+type SpecialRailService {
+  code: String!
+  colorHex: String!
+  name: String!
+  stations: [SpecialRailServiceStation!]!
+  textColorHex: String!
+}
+
+"""Station served by a runtime-discovered special service"""
+type SpecialRailServiceStation {
+  latitude: Float!
+  longitude: Float!
+  name: String!
+  stationCode: String!
 }
 
 """Next trains arriving at a station"""
@@ -747,8 +938,14 @@ type StationNextTrains {
   """Line code (L4, L8, or L9)"""
   lineCode: String!
 
+  """
+  Whether operation is closed and no station arrival data remains relevant
+  """
   operationClosed: Boolean
 
+  """
+  Whether a special service has no scheduled departure within its operating margin
+  """
   outOfSchedule: Boolean
 
   """Station code"""
@@ -759,31 +956,6 @@ type StationNextTrains {
 
   """List of arriving trains"""
   trains: [NextTrainArrival!]!
-}
-
-type Stop {
-  """For GeoSampa rail: METRO or CPTM"""
-  agency: String
-  id: ID!
-
-  """For GeoSampa rail: line name"""
-  line: String
-
-  """Source: gtfs or gpkg"""
-  source: String
-  stop_desc: String
-  stop_id: String!
-  stop_lat: Float!
-  stop_lon: Float!
-  stop_name: String!
-}
-
-type StopDetails {
-  calendars: [Calendar!]!
-  routes: [Route!]!
-  stop: Stop!
-  stopTimes: [StopTime!]!
-  trips: [SearchTrip!]!
 }
 
 type StopFullData {
@@ -803,21 +975,6 @@ input StopSearchInput {
   bounds: BoundingBoxInput
   limit: Float
   searchTerm: String
-}
-
-type StopSearchResult {
-  highlights: [SearchHighlight!]
-  stop: Stop!
-  type: String!
-}
-
-type StopTime {
-  arrival_time: String!
-  departure_time: String!
-  id: ID!
-  stop_id: String!
-  stop_sequence: Int!
-  trip_id: String!
 }
 
 type Trip {

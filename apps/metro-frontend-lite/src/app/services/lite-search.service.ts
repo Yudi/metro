@@ -8,6 +8,7 @@ import {
   RAIL_LINES,
   hardNormalizeString,
   SpecialRailService,
+  type BusFare,
 } from '@metro/shared/utils';
 
 /**
@@ -23,6 +24,10 @@ export interface LiteBusRoute {
   routeType: number;
   color: string;
   textColor: string;
+  sourceAgency?: string;
+  sourceId?: string;
+  supportsRealtime?: boolean;
+  fares?: BusFare[];
 }
 
 export interface LiteBikeAvailability {
@@ -48,6 +53,10 @@ export interface LiteSearchStop {
   bikeAvailability?: LiteBikeAvailability;
   stationAliases?: string[];
   stationCode?: string;
+  sourceAgency?: string;
+  sourceId?: string;
+  platformCode?: string;
+  mergedStopIds?: string[];
 }
 
 /**
@@ -109,6 +118,10 @@ interface SearchGraphQLResult {
   stop_lat?: number;
   stop_lon?: number;
   routes?: LiteBusRouteGraphQL[];
+  sourceAgency?: string;
+  sourceId?: string;
+  platformCode?: string;
+  mergedStopIds?: string[];
   station_code?: string;
   station_name?: string;
   station_aliases?: string[] | null;
@@ -127,6 +140,21 @@ interface LiteBusRouteGraphQL {
   route_type: number;
   route_color?: string | null;
   route_text_color?: string | null;
+  sourceAgency?: string | null;
+  sourceId?: string | null;
+  supportsRealtime?: boolean | null;
+  fares?: BusFare[] | null;
+}
+
+export interface LiteScheduledBusDeparture {
+  routeId: string;
+  routeShortName: string;
+  tripId: string;
+  headsign: string;
+  directionId: number;
+  departureTime: string;
+  sourceAgency: string;
+  platformCode?: string;
 }
 
 interface BikeStationsSummaryPayload {
@@ -464,6 +492,44 @@ export class LiteSearchService {
       );
   }
 
+  getScheduledBusDepartures(
+    stopId: string,
+    limit = 5,
+  ): Observable<LiteScheduledBusDeparture[]> {
+    const query = `
+      query LiteScheduledBusDepartures($stopId: String!, $limit: Int!) {
+        scheduledBusDepartures(
+          stopId: $stopId
+          limit: $limit
+          perRouteLimit: $limit
+        ) {
+          routeId
+          routeShortName
+          tripId
+          headsign
+          directionId
+          departureTime
+          sourceAgency
+          platformCode
+        }
+      }
+    `;
+
+    return this.http
+      .post<
+        GraphQLResponse<{
+          scheduledBusDepartures: LiteScheduledBusDeparture[];
+        }>
+      >(`${this.baseUrl}/graphql`, {
+        query,
+        variables: { stopId, limit },
+      })
+      .pipe(
+        map((response) => response.data?.scheduledBusDepartures ?? []),
+        catchError(() => of([])),
+      );
+  }
+
   /**
    * Select a stop for detail view
    */
@@ -511,7 +577,15 @@ export class LiteSearchService {
             routeType: route.route_type,
             color: route.route_color || '2563eb',
             textColor: route.route_text_color || 'ffffff',
+            sourceAgency: route.sourceAgency || undefined,
+            sourceId: route.sourceId || undefined,
+            supportsRealtime: route.supportsRealtime ?? undefined,
+            fares: route.fares || undefined,
           })),
+          sourceAgency: result.sourceAgency || undefined,
+          sourceId: result.sourceId || undefined,
+          platformCode: result.platformCode || undefined,
+          mergedStopIds: result.mergedStopIds || undefined,
         });
         continue;
       }
@@ -591,6 +665,10 @@ export class LiteSearchService {
           stop_name
           stop_lat
           stop_lon
+          sourceAgency
+          sourceId
+          platformCode
+          mergedStopIds
           routes {
             id
             route_id
@@ -599,6 +677,13 @@ export class LiteSearchService {
             route_type
             route_color
             route_text_color
+            sourceAgency
+            sourceId
+            supportsRealtime
+            fares {
+              price
+              currency
+            }
           }
         }
         ... on SearchRailStation {
@@ -633,6 +718,10 @@ export class LiteSearchService {
           stop_name
           stop_lat
           stop_lon
+          sourceAgency
+          sourceId
+          platformCode
+          mergedStopIds
           routes {
             id
             route_id
@@ -641,6 +730,13 @@ export class LiteSearchService {
             route_type
             route_color
             route_text_color
+            sourceAgency
+            sourceId
+            supportsRealtime
+            fares {
+              price
+              currency
+            }
           }
         }
         ... on SearchRailStation {

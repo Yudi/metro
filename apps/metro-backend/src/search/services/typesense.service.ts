@@ -20,6 +20,10 @@ export interface RouteDocument {
   type?: 'busRoute';
   route_id: string;
   agency_id: string;
+  sourceAgency?: string;
+  sourceId?: string;
+  supportsRealtime?: boolean;
+  faresJson?: string;
   route_short_name: string;
   route_long_name: string;
   route_type: number;
@@ -36,6 +40,11 @@ export interface StopDocument {
   stop_lat: number;
   stop_lon: number;
   is_subway_station: boolean;
+  sourceAgency?: string;
+  sourceId?: string;
+  platformCode?: string;
+  mergedStopIds?: string[];
+  agencies?: string[];
 }
 
 export interface LineDocument {
@@ -112,6 +121,10 @@ const GTFS_ROUTES_SCHEMA = {
   fields: [
     { name: 'route_id', type: 'string', sort: true },
     { name: 'agency_id', type: 'string' },
+    { name: 'sourceAgency', type: 'string', optional: true },
+    { name: 'sourceId', type: 'string', optional: true },
+    { name: 'supportsRealtime', type: 'bool', optional: true, index: false },
+    { name: 'faresJson', type: 'string', optional: true, index: false },
     { name: 'route_short_name', type: 'string' },
     { name: 'route_long_name', type: 'string' },
     { name: 'route_type', type: 'int32' },
@@ -131,6 +144,11 @@ const GTFS_STOPS_SCHEMA = {
     { name: 'stop_lon', type: 'float' },
     { name: 'location', type: 'geopoint' },
     { name: 'is_subway_station', type: 'bool' },
+    { name: 'sourceAgency', type: 'string', optional: true },
+    { name: 'sourceId', type: 'string', optional: true },
+    { name: 'platformCode', type: 'string', optional: true },
+    { name: 'mergedStopIds', type: 'string[]', optional: true },
+    { name: 'agencies', type: 'string[]', optional: true },
   ],
   default_sorting_field: 'stop_id',
 };
@@ -711,6 +729,10 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
         id: route.id,
         route_id: route.route_id,
         agency_id: route.agency_id,
+        sourceAgency: route.sourceAgency,
+        sourceId: route.sourceId,
+        supportsRealtime: route.supportsRealtime,
+        faresJson: route.faresJson,
         route_short_name: route.route_short_name,
         route_long_name: route.route_long_name,
         route_type: route.route_type,
@@ -756,6 +778,11 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
         stop_lon: stop.stop_lon,
         location: [stop.stop_lat, stop.stop_lon],
         is_subway_station: stop.is_subway_station,
+        sourceAgency: stop.sourceAgency,
+        sourceId: stop.sourceId,
+        platformCode: stop.platformCode,
+        mergedStopIds: stop.mergedStopIds,
+        agencies: stop.agencies,
       }));
 
       // Use upsert to replace existing documents or add new ones

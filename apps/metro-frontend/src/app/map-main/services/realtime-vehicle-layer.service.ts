@@ -13,6 +13,7 @@ import { LoggerService } from '@metro/shared/api';
 import {
   getOlhoVivoDestination,
   getOlhoVivoOrigin,
+  supportsSptransRealtime,
 } from '@metro/shared/utils';
 import { MapStateService } from '../components/map/map-state.service';
 
@@ -240,10 +241,15 @@ export class RealtimeVehicleLayerService {
       this.mapState.selectedRoutes().values(),
     ).find(
       (route) =>
-        route.shortName === routeShortName ||
-        route.shortName === routeCode ||
-        route.id === routeShortName ||
-        route.id === routeCode,
+        supportsSptransRealtime({
+          routeId: route.id,
+          sourceAgency: route.sourceAgency,
+          supportsRealtime: route.supportsRealtime,
+        }) &&
+        (route.shortName === routeShortName ||
+          route.shortName === routeCode ||
+          route.id === routeShortName ||
+          route.id === routeCode),
     );
 
     return this.normalizeHexColor(matchingRoute?.color);

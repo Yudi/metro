@@ -34,6 +34,14 @@ export class RouteStopMappingService {
    */
   async getApiLineCodes(routeShortName: string): Promise<number[] | null> {
     this.expireCachesIfNeeded();
+    if (isArtespIdentifier(routeShortName)) {
+      return null;
+    }
+
+    routeShortName = routeShortName.trim();
+    if (!this.isSafeRouteShortName(routeShortName)) {
+      return null;
+    }
     // Check cache first
     if (this.routeCodeCache.has(routeShortName)) {
       return this.routeCodeCache.get(routeShortName) ?? null;
@@ -104,6 +112,11 @@ export class RouteStopMappingService {
 
   async isKnownRealtimeRoute(routeShortName: string): Promise<boolean> {
     this.expireCachesIfNeeded();
+    if (isArtespIdentifier(routeShortName)) {
+      return false;
+    }
+
+    routeShortName = routeShortName.trim();
     if (!this.isSafeRouteShortName(routeShortName)) {
       return false;
     }
@@ -142,6 +155,11 @@ export class RouteStopMappingService {
    */
   async getApiStopCode(stopId: string): Promise<number | null> {
     this.expireCachesIfNeeded();
+    if (isArtespIdentifier(stopId)) {
+      return null;
+    }
+
+    stopId = stopId.trim();
     // Check cache first
     if (this.stopCodeCache.has(stopId)) {
       return this.stopCodeCache.get(stopId) ?? null;
@@ -204,6 +222,11 @@ export class RouteStopMappingService {
 
   async isKnownRealtimeStop(stopId: string): Promise<boolean> {
     this.expireCachesIfNeeded();
+    if (isArtespIdentifier(stopId)) {
+      return false;
+    }
+
+    stopId = stopId.trim();
     if (!this.isSafeStopCode(stopId)) {
       return false;
     }
@@ -242,4 +265,8 @@ export class RouteStopMappingService {
   private isSafeStopCode(stopCode: string): boolean {
     return /^[A-Za-z0-9_-]{1,64}$/.test(stopCode);
   }
+}
+
+function isArtespIdentifier(value: string): boolean {
+  return /^artesp[:/]/i.test(value.trim());
 }

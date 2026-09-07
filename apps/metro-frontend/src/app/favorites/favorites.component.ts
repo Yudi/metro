@@ -1,4 +1,4 @@
-import { isPlatformBrowser } from '@angular/common';
+import { isPlatformBrowser, NgOptimizedImage } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
@@ -18,10 +18,13 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { FavoritesService } from '@metro/shared/api';
 import {
+  AGENCIES_DATA,
   FavoriteTypes,
   FavoriteRailLineOption,
   createFavoriteRailLineOptions,
   getContrastColor,
+  getAgencyIconPath,
+  getRouteAgency,
   getRailLineByCode,
   getRailLineById,
   getRailStationIdentityFromFavoriteKey,
@@ -29,6 +32,12 @@ import {
   normalizeHexColor,
   toTitleCase,
   CPTM_LINE_CONFIG,
+  getBusStopDisplayId,
+  formatBusFare,
+  getBusStopIdentityAliases,
+  isArtespRoute,
+  sortBusRoutesByAgency,
+  TransitAgency,
 } from '@metro/shared/utils';
 import { catchError, of } from 'rxjs';
 import { BikeStationsService } from '../map-main/services/bike-stations.service';
@@ -50,6 +59,11 @@ interface MergedRailStationFavorite {
   lines: string[];
 }
 
+interface AgencyIdentity {
+  name: string;
+  iconPath: string | null;
+}
+
 @Component({
   selector: 'app-favorites',
   imports: [
@@ -58,6 +72,7 @@ interface MergedRailStationFavorite {
     MatChipsModule,
     MatIconModule,
     MatTooltipModule,
+    NgOptimizedImage,
   ],
   templateUrl: './favorites.component.html',
   styleUrl: './favorites.component.scss',
@@ -74,10 +89,31 @@ export class FavoritesComponent {
 
   readonly favorites = this.favoritesService.favorites;
   readonly busRoutesById = signal(
-    new Map<string, { routeId: string; shortName: string; longName: string }>(),
+    new Map<
+      string,
+      {
+        routeId: string;
+        shortName: string;
+        longName: string;
+        sourceAgency?: string;
+        color?: string;
+        textColor?: string;
+        fares?: Array<{ price: number; currency: string }>;
+      }
+    >(),
   );
   readonly busStopsById = signal(
-    new Map<string, { stopId: string; name: string }>(),
+    new Map<
+      string,
+      {
+        stopId: string;
+        name: string;
+        sourceId?: string;
+        platformCode?: string;
+        favoriteId?: string;
+        mergedStopIds?: string[];
+      }
+    >(),
   );
   readonly busRoutesByStopId = signal(new Map<string, BusRouteGraphQL[]>());
   readonly railLinesById = signal(
@@ -85,7 +121,9 @@ export class FavoritesComponent {
   );
   readonly mergedRailStations = signal<MergedRailStationFavorite[]>([]);
 
-  readonly busRoutes = computed(() => [...this.busRoutesById().values()]);
+  readonly busRoutes = computed(() =>
+    sortBusRoutesByAgency([...this.busRoutesById().values()]),
+  );
   readonly busStops = computed(() => [...this.busStopsById().values()]);
   readonly railLines = computed(() => [...this.railLinesById().values()]);
   readonly syncError = this.favoritesService.syncError;
@@ -176,10 +214,17 @@ export class FavoritesComponent {
               routeId: string;
               shortName: string;
               longName: string;
+              sourceAgency?: string;
+              color?: string;
+              textColor?: string;
+              fares?: Array<{ price: number; currency: string }>;
             }>;
             multipleBusStops: Array<{
               stopId: string;
               name: string;
+              sourceId?: string;
+              platformCode?: string;
+              mergedStopIds?: string[];
             }>;
           };
         }>('/api/graphql', {
@@ -189,10 +234,20 @@ export class FavoritesComponent {
                 routeId
                 shortName
                 longName
+                sourceAgency
+                color
+                textColor
+                fares {
+                  price
+                  currency
+                }
               }
               multipleBusStops(ids: $stopIds) {
                 stopId
                 name
+                sourceId
+                platformCode
+                mergedStopIds
               }
             }
           `,
@@ -215,9 +270,21 @@ export class FavoritesComponent {
               route,
             ]),
           );
-          const stopsById = new Map(
-            response.data.multipleBusStops.map((stop) => [stop.stopId, stop]),
-          );
+          const stopsById = new Map<
+            string,
+            {
+              stopId: string;
+              name: string;
+              sourceId?: string;
+              platformCode?: string;
+              mergedStopIds?: string[];
+            }
+          >();
+          for (const stop of response.data.multipleBusStops) {
+            for (const alias of getBusStopIdentityAliases(stop)) {
+              stopsById.set(alias, stop);
+            }
+          }
 
           this.busRoutesById.set(
             new Map(
@@ -233,13 +300,15 @@ export class FavoritesComponent {
           );
           this.busStopsById.set(
             new Map(
-              stopIds.map((id) => [
-                id,
-                stopsById.get(id) ?? {
-                  stopId: id,
-                  name: id,
-                },
-              ]),
+              stopIds.map((id) => {
+                const stop = stopsById.get(id);
+                return [
+                  id,
+                  stop
+                    ? { ...stop, favoriteId: id }
+                    : { stopId: id, name: id, favoriteId: id },
+                ];
+              }),
             ),
           );
           this.pruneBusRouteState(stopIds);
@@ -301,7 +370,7 @@ export class FavoritesComponent {
   }
 
   getRoutesForStop(stopId: string): BusRouteGraphQL[] {
-    return this.busRoutesByStopId().get(stopId) ?? [];
+    return sortBusRoutesByAgency(this.busRoutesByStopId().get(stopId) ?? []);
   }
 
   isRailStationLineSelected(
@@ -332,11 +401,11 @@ export class FavoritesComponent {
     return getContrastColor(colorHex);
   }
 
-  routeColor(route: BusRouteGraphQL): string {
+  routeColor(route: { color?: string }): string {
     return normalizeHexColor(route.color, '5f6368');
   }
 
-  routeTextColor(route: BusRouteGraphQL): string {
+  routeTextColor(route: { textColor?: string }): string {
     return normalizeHexColor(route.textColor, 'ffffff');
   }
 
@@ -360,7 +429,64 @@ export class FavoritesComponent {
   }
 
   private getBusRouteSelectionKey(route: BusRouteGraphQL): string {
-    return route.shortName || route.routeId;
+    return route.routeId;
+  }
+
+  private isTransitAgency(value: string): value is TransitAgency {
+    return Object.values(TransitAgency).includes(value as TransitAgency);
+  }
+
+  routeFareLabel(
+    route: BusRouteGraphQL | {
+      routeId: string;
+      sourceAgency?: string;
+      fares?: Array<{ price: number; currency: string }>;
+    },
+  ): string | null {
+    if (route.fares && route.fares.length > 0) {
+      return route.fares.map((fare) => formatBusFare(fare)).join(' · ');
+    }
+
+    return isArtespRoute(route)
+      ? 'Tarifa não informada'
+      : null;
+  }
+
+  stopDisplayId(stop: { stopId: string; sourceId?: string }): string {
+    return getBusStopDisplayId(stop);
+  }
+
+  agencyIdentity(route: {
+    routeId: string;
+    shortName?: string;
+    sourceAgency?: string;
+  }): AgencyIdentity | null {
+    let agency: TransitAgency | undefined;
+    const sourceAgency = route.sourceAgency?.trim().toLowerCase();
+
+    if (isArtespRoute({ routeId: route.routeId, sourceAgency })) {
+      agency = TransitAgency.ARTESP;
+    } else if (sourceAgency && this.isTransitAgency(sourceAgency)) {
+      agency = sourceAgency;
+    } else if (!sourceAgency) {
+      agency = route.shortName
+        ? getRouteAgency(route.shortName)
+        : undefined;
+      if (!agency) {
+        agency = TransitAgency.SPTRANS;
+      }
+    }
+
+    if (agency) {
+      return {
+        name: AGENCIES_DATA[agency].shortName,
+        iconPath: getAgencyIconPath(agency),
+      };
+    }
+
+    return sourceAgency
+      ? { name: sourceAgency.toUpperCase(), iconPath: null }
+      : null;
   }
 
   private pruneBusRouteState(stopIds: string[]): void {
@@ -376,12 +502,16 @@ export class FavoritesComponent {
 
   private loadRoutesForBusStops(stopIds: string[], lookupKey: string): void {
     for (const stopId of stopIds) {
-      if (this.busRoutesByStopId().has(stopId)) {
+      const resolvedStopId = this.busStopsById().get(stopId)?.stopId ?? stopId;
+      if (
+        this.busRoutesByStopId().has(stopId) ||
+        this.busRoutesByStopId().has(resolvedStopId)
+      ) {
         continue;
       }
 
       this.geographyService
-        .getRoutesForStop(stopId)
+        .getRoutesForStop(resolvedStopId)
         .pipe(
           catchError(() => of([])),
           takeUntilDestroyed(this.destroyRef),
@@ -393,6 +523,7 @@ export class FavoritesComponent {
 
           const next = new Map(this.busRoutesByStopId());
           next.set(stopId, routes);
+          next.set(resolvedStopId, routes);
           this.busRoutesByStopId.set(next);
         });
     }

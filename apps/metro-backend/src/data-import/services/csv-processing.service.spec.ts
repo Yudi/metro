@@ -90,7 +90,7 @@ describe('CsvProcessingService', () => {
     expect(executeRaw).toHaveBeenCalled();
   });
 
-  it('skips invalid stop sequences rather than storing zero', async () => {
+  it('skips negative stop sequences while accepting zero-based feeds', async () => {
     await expect(
       (
         service as never as {
@@ -115,6 +115,35 @@ describe('CsvProcessingService', () => {
       ),
     ).resolves.toBe(0);
     expect(executeRaw).not.toHaveBeenCalled();
+  });
+
+  it('accepts the zero-based stop sequence used by the ARTESP snapshot', async () => {
+    await expect(
+      (
+        service as never as {
+          importStopTimes: (
+            tx: unknown,
+            rows: Record<string, string>[],
+            fileName: string,
+            feed: 'sptrans' | 'artesp',
+          ) => Promise<number>;
+        }
+      ).importStopTimes(
+        { $executeRawUnsafe: executeRaw, $executeRaw: executeRaw },
+        [
+          {
+            trip_id: 'trip',
+            arrival_time: '08:00:00',
+            departure_time: '08:01:00',
+            stop_id: 'stop',
+            stop_sequence: '0',
+          },
+        ],
+        'stop_times.txt',
+        'artesp',
+      ),
+    ).resolves.toBe(1);
+    expect(executeRaw.mock.calls[0][0]).toContain('ARTESP_StopTime');
   });
 
   it('keeps a route when only its optional color is malformed', async () => {
@@ -142,6 +171,37 @@ describe('CsvProcessingService', () => {
 
     expect(count).toBe(1);
     expect(executeRaw.mock.calls[0]).toContain('');
+  });
+
+  it('writes optional stop platform codes to the selected feed table', async () => {
+    const count = await (
+      service as never as {
+        importStops: (
+          tx: unknown,
+          rows: Record<string, string>[],
+          fileName: string,
+          feed: 'sptrans' | 'artesp',
+        ) => Promise<number>;
+      }
+    ).importStops(
+      { $executeRawUnsafe: executeRaw, $executeRaw: executeRaw },
+      [
+        {
+          stop_id: 'artesp-stop',
+          stop_name: 'Terminal',
+          stop_lat: '-23.5',
+          stop_lon: '-46.6',
+          platform_code: 'A',
+        },
+      ],
+      'stops.txt',
+      'artesp',
+    );
+
+    expect(count).toBe(1);
+    expect(executeRaw.mock.calls[0][0]).toContain('ARTESP_Stop');
+    expect(executeRaw.mock.calls[0][0]).toContain('platform_code');
+    expect(executeRaw.mock.calls[0]).toContain('A');
   });
 
   it('propagates CSV counter errors instead of returning an authoritative zero', async () => {

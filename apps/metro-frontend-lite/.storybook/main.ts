@@ -4,6 +4,9 @@ import type { StorybookConfig } from '@storybook/angular';
 
 const config: StorybookConfig = {
   stories: ['../src/app/**/*.@(mdx|stories.@(js|jsx|ts|tsx))'],
+  staticDirs: [
+    { from: '../../../libs/shared/assets', to: '/public/shared' },
+  ],
   addons: [],
   framework: {
     name: getAbsolutePath('@storybook/angular'),

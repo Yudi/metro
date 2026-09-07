@@ -1,0 +1,13 @@
+@mixin circle($size: 24px, $font-size: 12px) {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: $size;
+  height: $size;
+  border-radius: 50%;
+  font-size: $font-size;
+  font-weight: 700;
+  line-height: $size;
+  text-align: center;
+}

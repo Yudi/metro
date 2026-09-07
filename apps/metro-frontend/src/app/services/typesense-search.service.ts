@@ -7,6 +7,7 @@ import {
   getLineCodeByColorName,
   getRailLineByCode,
 } from '@metro/shared/utils';
+import type { BusFare } from '@metro/shared/utils';
 
 // Types for Typesense search responses
 export interface TypesenseRoute {
@@ -19,6 +20,10 @@ export interface TypesenseRoute {
   route_color: string;
   route_text_color: string;
   source?: 'gtfs' | 'rail'; // Data source: GTFS (bus) or static rail
+  sourceAgency?: string;
+  sourceId?: string;
+  supportsRealtime?: boolean;
+  fares?: BusFare[];
 }
 
 export interface TypesenseStop {
@@ -30,6 +35,11 @@ export interface TypesenseStop {
   stop_lon: number;
   is_subway_station?: boolean;
   source?: 'gtfs' | 'gpkg' | 'bike'; // Data source: GTFS, GeoSampa rail, or GBFS bike
+  sourceAgency?: string;
+  sourceId?: string;
+  platformCode?: string;
+  mergedStopIds?: string[];
+  routes?: TypesenseRoute[];
 }
 
 export interface TypesenseSearchResult {
@@ -79,6 +89,10 @@ interface SearchGraphQLBusStop extends SearchGraphQLResultBase {
   stop_lat: number;
   stop_lon: number;
   routes?: SearchGraphQLBusRoute[] | null;
+  sourceAgency?: string | null;
+  sourceId?: string | null;
+  platformCode?: string | null;
+  mergedStopIds?: string[] | null;
 }
 
 interface SearchGraphQLRailLine extends SearchGraphQLResultBase {
@@ -209,6 +223,10 @@ export class TypesenseSearchService {
               route_color: result.route_color || '',
               route_text_color: result.route_text_color || '',
               source: 'gtfs',
+              sourceAgency: result.sourceAgency || undefined,
+              sourceId: result.sourceId || undefined,
+              supportsRealtime: result.supportsRealtime ?? undefined,
+              fares: result.fares || undefined,
             },
             highlights,
             text_match,
@@ -227,6 +245,24 @@ export class TypesenseSearchService {
               stop_lon: result.stop_lon,
               is_subway_station: false,
               source: 'gtfs',
+              sourceAgency: result.sourceAgency || undefined,
+              sourceId: result.sourceId || undefined,
+              platformCode: result.platformCode || undefined,
+              mergedStopIds: result.mergedStopIds || undefined,
+              routes: (result.routes || []).map((route) => ({
+                id: route.id,
+                route_id: route.route_id,
+                agency_id: '',
+                route_short_name: route.route_short_name,
+                route_long_name: route.route_long_name,
+                route_type: route.route_type,
+                route_color: route.route_color || '',
+                route_text_color: route.route_text_color || '',
+                sourceAgency: route.sourceAgency || undefined,
+                sourceId: route.sourceId || undefined,
+                supportsRealtime: route.supportsRealtime ?? undefined,
+                fares: route.fares || undefined,
+              })),
             },
             highlights,
             text_match,
@@ -361,6 +397,13 @@ export class TypesenseSearchService {
           route_type
           route_color
           route_text_color
+          sourceAgency
+          sourceId
+          supportsRealtime
+          fares {
+            price
+            currency
+          }
           highlights {
             field
             snippet
@@ -375,6 +418,26 @@ export class TypesenseSearchService {
           stop_desc
           stop_lat
           stop_lon
+          sourceAgency
+          sourceId
+          platformCode
+          mergedStopIds
+          routes {
+            id
+            route_id
+            route_short_name
+            route_long_name
+            route_type
+            route_color
+            route_text_color
+            sourceAgency
+            sourceId
+            supportsRealtime
+            fares {
+              price
+              currency
+            }
+          }
           highlights {
             field
             snippet
@@ -485,6 +548,26 @@ export class TypesenseSearchService {
           stop_desc
           stop_lat
           stop_lon
+          sourceAgency
+          sourceId
+          platformCode
+          mergedStopIds
+          routes {
+            id
+            route_id
+            route_short_name
+            route_long_name
+            route_type
+            route_color
+            route_text_color
+            sourceAgency
+            sourceId
+            supportsRealtime
+            fares {
+              price
+              currency
+            }
+          }
           highlights {
             field
             snippet

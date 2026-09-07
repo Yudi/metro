@@ -40,35 +40,42 @@ export class BusVectorTileService {
         ),
         selected_routes AS (
           SELECT route_id
-          FROM "SPTrans_Route"
+          FROM "public"."Gtfs_Route"
           WHERE route_id = ANY(${routeIds}::text[])
         ),
         route_shapes AS (
-          SELECT DISTINCT ON (sh.shape_id)
+          SELECT DISTINCT ON (r.route_id, sh.shape_id)
             sh.shape_id,
             r.route_id,
             r.route_short_name,
             r.route_long_name,
             r.route_color,
             r.route_text_color,
+            r.source_agency,
+            r.source_id,
+            (LOWER(COALESCE(r.source_agency, 'sptrans')) = 'sptrans'
+              AND NOT (r.route_type IN (1, 2) OR r.route_id LIKE 'METRÔ%' OR r.route_id LIKE 'CPTM%')) AS supports_realtime,
             sh.geom
           FROM selected_routes sr
-          INNER JOIN "SPTrans_Trip" t ON t.route_id = sr.route_id
-          INNER JOIN "SPTrans_Shape" sh ON sh.shape_id = t.shape_id
-          INNER JOIN "SPTrans_Route" r ON r.route_id = t.route_id
+          INNER JOIN "public"."Gtfs_Trip" t ON t.route_id = sr.route_id
+          INNER JOIN "public"."Gtfs_Shape" sh ON sh.shape_id = t.shape_id
+          INNER JOIN "public"."Gtfs_Route" r ON r.route_id = t.route_id
           WHERE sh.geom IS NOT NULL
-            AND r.route_id NOT LIKE 'METRÔ%'
-            AND r.route_id NOT LIKE 'CPTM%'
+            AND NOT (r.route_type IN (1, 2) OR r.route_id LIKE 'METRÔ%' OR r.route_id LIKE 'CPTM%')
+          ORDER BY r.route_id, sh.shape_id, t.trip_id
         ),
         mvtgeom AS (
           SELECT
-            ('x' || substr(md5(shape_id), 1, 7))::bit(28)::integer AS id,
+            ('x' || substr(md5(route_id || ':' || shape_id), 1, 7))::bit(28)::integer AS id,
             shape_id,
             route_id,
             route_short_name,
             route_long_name,
             route_color,
             route_text_color,
+            source_agency,
+            source_id,
+            supports_realtime,
             ST_AsMVTGeom(
               ST_Transform(rs.geom, 3857),
               ST_MakeEnvelope(${minX}::float8, ${minY}::float8, ${maxX}::float8, ${maxY}::float8, 3857),
@@ -132,40 +139,86 @@ export class BusVectorTileService {
             4326
           ) AS geom
         ),
-        candidate_stops AS (
+        canonical_stops AS (
           SELECT
-            s.id,
-            s.stop_id,
-            s.stop_name,
-            s.stop_desc,
-            s.stop_lat,
-            s.stop_lon,
-            ST_SetSRID(ST_MakePoint(s.stop_lon, s.stop_lat), 4326) AS geom
-          FROM "SPTrans_Stop" s
+            COALESCE(member.physical_stop_id, stop.stop_id) AS physical_stop_id,
+            stop.*
+          FROM "public"."Gtfs_Stop" stop
+          LEFT JOIN "public"."physical_stop_members" member
+            ON member.source_stop_id = stop.stop_id
+          CROSS JOIN bounds
+          WHERE (member.physical_stop_id IS NULL OR member.physical_stop_id = stop.stop_id)
+            AND stop.location IS NOT NULL
+            AND stop.location && bounds.geom::geography
+        ),
+        grouped_stops AS (
+          SELECT canonical.physical_stop_id, canonical.stop_id
+          FROM canonical_stops canonical
+          UNION ALL
+          SELECT canonical.physical_stop_id, member_stop.stop_id
+          FROM canonical_stops canonical
+          INNER JOIN "public"."physical_stop_members" member
+            ON member.physical_stop_id = canonical.physical_stop_id
+          INNER JOIN "public"."Gtfs_Stop" member_stop
+            ON member_stop.stop_id = member.source_stop_id
+        ),
+        merged_ids AS (
+          SELECT
+            physical_stop_id,
+            ARRAY_AGG(DISTINCT stop_id ORDER BY stop_id) AS merged_stop_ids
+          FROM grouped_stops
+          GROUP BY physical_stop_id
+        ),
+        representatives AS (
+          SELECT
+            canonical.physical_stop_id,
+            canonical.id,
+            canonical.stop_id,
+            canonical.stop_name,
+            canonical.stop_desc,
+            canonical.stop_lat,
+            canonical.stop_lon,
+            canonical.source_agency,
+            canonical.source_id,
+            canonical.platform_code,
+            merged_ids.merged_stop_ids,
+            ST_SetSRID(ST_MakePoint(canonical.stop_lon, canonical.stop_lat), 4326) AS geom
+          FROM canonical_stops canonical
+          INNER JOIN merged_ids USING (physical_stop_id)
+        ),
+        candidate_stops AS (
+          SELECT representatives.*
+          FROM representatives
           WHERE (
             (
               ${hasRouteFilter}
               AND EXISTS (
                 SELECT 1
-                FROM "SPTrans_StopTime" st
-                INNER JOIN "SPTrans_Trip" t ON t.trip_id = st.trip_id
-                INNER JOIN "SPTrans_Route" r ON r.route_id = t.route_id
-                WHERE st.stop_id = s.stop_id
-                  AND (
-                    r.route_id = ANY(${routeIds}::text[])
-                  )
-                  AND r.route_id NOT LIKE 'METRÔ%'
-                  AND r.route_id NOT LIKE 'CPTM%'
+                FROM grouped_stops member_stop
+                INNER JOIN "public"."Gtfs_StopTime" st
+                  ON st.stop_id = member_stop.stop_id
+                INNER JOIN "public"."Gtfs_Trip" t
+                  ON t.trip_id = st.trip_id
+                INNER JOIN "public"."Gtfs_Route" r
+                  ON r.route_id = t.route_id
+                WHERE member_stop.physical_stop_id = representatives.physical_stop_id
+                  AND r.route_id = ANY(${routeIds}::text[])
+                  AND NOT (r.route_type IN (1, 2) OR r.route_id LIKE 'METRÔ%' OR r.route_id LIKE 'CPTM%')
               )
             )
             OR (
               ${hasStopFilter}
-              AND s.stop_id = ANY(${stopIds}::text[])
+              AND EXISTS (
+                SELECT 1
+                FROM grouped_stops member_stop
+                WHERE member_stop.physical_stop_id = representatives.physical_stop_id
+                  AND member_stop.stop_id = ANY(${stopIds}::text[])
+              )
             )
             OR (
               ${hasNearbyFilter}
               AND ST_DWithin(
-                ST_SetSRID(ST_MakePoint(s.stop_lon, s.stop_lat), 4326)::geography,
+                representatives.geom::geography,
                 ST_SetSRID(ST_MakePoint(${nearbyLongitude}::float8, ${nearbyLatitude}::float8), 4326)::geography,
                 ${nearbyRadiusMeters}::float8
               )
@@ -173,22 +226,28 @@ export class BusVectorTileService {
           )
           AND EXISTS (
             SELECT 1
-            FROM "SPTrans_StopTime" st
-            INNER JOIN "SPTrans_Trip" t ON t.trip_id = st.trip_id
-            INNER JOIN "SPTrans_Route" r ON r.route_id = t.route_id
-            WHERE st.stop_id = s.stop_id
-              AND r.route_id NOT LIKE 'METRÔ%'
-              AND r.route_id NOT LIKE 'CPTM%'
+            FROM grouped_stops member_stop
+            INNER JOIN "public"."Gtfs_StopTime" st
+              ON st.stop_id = member_stop.stop_id
+            INNER JOIN "public"."Gtfs_Trip" t ON t.trip_id = st.trip_id
+            INNER JOIN "public"."Gtfs_Route" r ON r.route_id = t.route_id
+            WHERE member_stop.physical_stop_id = representatives.physical_stop_id
+              AND NOT (r.route_type IN (1, 2) OR r.route_id LIKE 'METRÔ%' OR r.route_id LIKE 'CPTM%')
           )
         ),
         mvtgeom AS (
           SELECT
-            cs.id,
+            ('x' || substr(md5(cs.physical_stop_id), 1, 7))::bit(28)::integer AS id,
+            cs.physical_stop_id,
             cs.stop_id,
             cs.stop_name,
             cs.stop_desc,
             cs.stop_lat,
             cs.stop_lon,
+            cs.source_agency,
+            cs.source_id,
+            cs.platform_code,
+            array_to_string(cs.merged_stop_ids, ',') AS merged_stop_ids,
             ST_AsMVTGeom(
               ST_Transform(cs.geom, 3857),
               ST_MakeEnvelope(${minX}::float8, ${minY}::float8, ${maxX}::float8, ${maxY}::float8, 3857),

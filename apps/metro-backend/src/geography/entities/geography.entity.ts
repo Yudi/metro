@@ -1,6 +1,15 @@
 import { ObjectType, Field, ID, Int } from '@nestjs/graphql';
 
 @ObjectType()
+export class BusFare {
+  @Field(() => Number)
+  price!: number;
+
+  @Field()
+  currency!: string;
+}
+
+@ObjectType()
 export class GeometryData {
   @Field()
   type!: string;
@@ -16,6 +25,12 @@ export class BusStop {
 
   @Field()
   stopId!: string;
+
+  @Field()
+  sourceAgency!: 'sptrans' | 'artesp';
+
+  @Field()
+  sourceId!: string;
 
   @Field()
   name!: string;
@@ -35,9 +50,15 @@ export class BusStop {
   @Field(() => Boolean)
   isSubwayStation!: boolean;
 
+  @Field({ nullable: true })
+  platformCode?: string;
+
+  @Field(() => [String])
+  mergedStopIds!: string[];
+
   @Field(() => [String], {
     nullable: true,
-    description: 'Normalized agency identifiers (metro, cptm) for icon display',
+    description: 'Normalized bus and rail agency identifiers, including sptrans and artesp, for icon display',
   })
   agencies?: string[];
 
@@ -57,6 +78,12 @@ export class BusRoute {
   routeId!: string;
 
   @Field()
+  sourceAgency!: 'sptrans' | 'artesp';
+
+  @Field()
+  sourceId!: string;
+
+  @Field()
   shortName!: string;
 
   @Field()
@@ -70,6 +97,12 @@ export class BusRoute {
 
   @Field()
   textColor!: string;
+
+  @Field(() => Boolean)
+  supportsRealtime!: boolean;
+
+  @Field(() => [BusFare])
+  fares!: BusFare[];
 
   @Field(() => GeometryData, { nullable: true })
   geometry?: GeometryData;
@@ -109,6 +142,33 @@ export class Trip {
 
   @Field()
   shapeId!: string;
+}
+
+@ObjectType()
+export class ScheduledBusDeparture {
+  @Field()
+  routeId!: string;
+
+  @Field()
+  routeShortName!: string;
+
+  @Field()
+  tripId!: string;
+
+  @Field()
+  headsign!: string;
+
+  @Field(() => Int)
+  directionId!: number;
+
+  @Field()
+  departureTime!: string;
+
+  @Field()
+  sourceAgency!: 'sptrans' | 'artesp';
+
+  @Field({ nullable: true })
+  platformCode?: string;
 }
 
 @ObjectType()

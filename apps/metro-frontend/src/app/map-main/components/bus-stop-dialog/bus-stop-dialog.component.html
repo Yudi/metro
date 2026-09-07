@@ -1,12 +1,15 @@
 <app-dialog-header
   icon="directions_bus"
   [title]="data.stop.name"
-  [description]="'Ponto de ônibus · ID: ' + data.stop.stopId"
+  [description]="
+    'Ponto de ônibus · ID: ' + stopDisplayId +
+    (data.stop.platformCode ? ' · Plataforma: ' + data.stop.platformCode : '')
+  "
 />
 
 <mat-dialog-content class="stop-content">
-  @if (data.stop.description) {
-    <p class="stop-description">{{ data.stop.description }}</p>
+  @if (stopDescription) {
+    <p class="stop-description">{{ stopDescription }}</p>
     <mat-divider></mat-divider>
   }
 

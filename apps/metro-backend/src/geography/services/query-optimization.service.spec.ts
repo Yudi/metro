@@ -9,6 +9,7 @@ describe('QueryOptimizationService precomputed stop service data', () => {
           serves_rail: true,
           serves_bus: false,
           rail_route_short_names: ['METRÔ L1-AZUL'],
+          bus_agencies: ['artesp', 'sptrans'],
         },
       ]),
     };
@@ -30,6 +31,49 @@ describe('QueryOptimizationService precomputed stop service data', () => {
       agencies: [],
       railRouteShortNames: [],
     });
+  });
+
+  it('queries normalized feed views and expands matched stops for routes', async () => {
+    const prisma = {
+      $queryRaw: jest.fn().mockResolvedValue([
+        {
+          requested_stop_id: 'artesp:2',
+          route_id: 'artesp:001',
+          route_short_name: '001',
+          route_long_name: 'Terminal - Centro',
+          route_type: 3,
+          route_color: '#000000',
+          route_text_color: '#FFFFFF',
+          source_agency: 'artesp',
+          source_id: '001',
+          fares: [{ price: 5.4, currency: 'BRL' }],
+        },
+      ]),
+    };
+    const service = new QueryOptimizationService(prisma as never);
+
+    await expect(service.getRoutesForMultipleStops(['artesp:2'])).resolves.toEqual(
+      new Map([
+        [
+          'artesp:2',
+          [
+            expect.objectContaining({
+              routeId: 'artesp:001',
+              sourceAgency: 'artesp',
+              sourceId: '001',
+              supportsRealtime: false,
+              fares: [{ price: 5.4, currency: 'BRL' }],
+            }),
+          ],
+        ],
+      ]),
+    );
+
+    const sql = (prisma.$queryRaw.mock.calls[0][0] as TemplateStringsArray).join('?');
+    expect(sql).toContain('Gtfs_StopTime');
+    expect(sql).toContain('Gtfs_Trip');
+    expect(sql).toContain('Gtfs_Route');
+    expect(sql).toContain('physical_stop_members');
   });
 
   it('returns correct precomputed classification from the multiple-stop path', async () => {

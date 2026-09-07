@@ -70,11 +70,15 @@ export class SubwayStationService {
       return {
         id: stop.stop_id,
         stopId: stop.stop_id,
+        sourceAgency: 'sptrans',
+        sourceId: stop.stop_id,
         name: stop.stop_name,
         description: stop.stop_desc || undefined,
         latitude: stop.stop_lat,
         longitude: stop.stop_lon,
         isSubwayStation: true,
+        platformCode: undefined,
+        mergedStopIds: [stop.stop_id],
         agencies: info?.agencies,
         routeShortNames: info?.routeShortNames,
         geometry: {

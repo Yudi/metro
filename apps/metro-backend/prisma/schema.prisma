@@ -359,3 +359,37 @@ model Feriado {
   @@index([year])
   @@map("feriados")
 }
+
+// Display-level grouping only: imported GTFS stop/trip identities remain unchanged.
+model PhysicalStopMember {
+  sourceStopId   String @id @map("source_stop_id")
+  physicalStopId String @map("physical_stop_id")
+
+  @@index([physicalStopId], map: "physical_stop_members_physical_stop_id_idx")
+  @@map("physical_stop_members")
+}
+
+model GtfsFeedDataset {
+  source      String @id
+  fileHash    String @map("file_hash")
+  fileSize    Int @map("file_size")
+  version     String?
+  lastUpdated DateTime @default(now()) @map("last_updated") @db.Timestamptz
+  completed   Boolean @default(false)
+  files       GtfsFeedFile[]
+
+  @@map("gtfs_feed_datasets")
+}
+
+model GtfsFeedFile {
+  source      String
+  fileName    String @map("file_name")
+  fileHash    String @map("file_hash")
+  fileSize    Int @map("file_size")
+  recordCount Int? @map("record_count")
+  lastUpdated DateTime @default(now()) @map("last_updated") @db.Timestamptz
+  dataset     GtfsFeedDataset @relation(fields: [source], references: [source], onDelete: Cascade)
+
+  @@id([source, fileName])
+  @@map("gtfs_feed_files")
+}

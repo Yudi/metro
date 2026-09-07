@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { QueryOptimizationService } from './query-optimization.service';
 import { BusRoute, BusShape } from '../entities/geography.entity';
+import { mapBusRoute } from './bus-catalog.utils';
 
 /**
  * Optimized Bus Route Service
@@ -23,15 +24,7 @@ export class BusRouteServiceOptimized {
       return null;
     }
 
-    return {
-      id: route.route_id,
-      routeId: route.route_id,
-      shortName: route.route_short_name,
-      longName: route.route_long_name,
-      routeType: route.route_type,
-      color: route.route_color,
-      textColor: route.route_text_color,
-    };
+    return mapBusRoute(route);
   }
 
   async getMultipleBusRoutes(ids: string[]): Promise<BusRoute[]> {
@@ -70,21 +63,14 @@ export class BusRouteServiceOptimized {
       ORDER BY r.route_id, t.shape_id
     `;
 
-    return routesWithShapes.map((route) => ({
-      id: route.route_id,
-      routeId: route.route_id,
-      shortName: route.route_short_name,
-      longName: route.route_long_name,
-      routeType: route.route_type,
-      color: route.route_color,
-      textColor: route.route_text_color,
-      geometry: route.coordinates
-        ? {
-            type: 'LineString' as const,
-            coordinates: route.coordinates,
-          }
-        : undefined,
-    }));
+    return routesWithShapes.map((route) =>
+      mapBusRoute({
+        ...route,
+        source_agency: 'sptrans',
+        source_id: route.route_id,
+        fares: [],
+      }),
+    );
   }
 
   async getBusShape(shapeId: string): Promise<BusShape | null> {
@@ -94,7 +80,7 @@ export class BusRouteServiceOptimized {
       }>
     >`
       SELECT ST_AsGeoJSON(geom)::json->'coordinates' as coordinates
-      FROM "SPTrans_Shape" 
+      FROM "public"."Gtfs_Shape"
       WHERE shape_id = ${shapeId}
       AND geom IS NOT NULL
     `;

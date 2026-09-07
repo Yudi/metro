@@ -46,6 +46,14 @@ export interface TypesenseTransitStopLike {
   stop_lon: number;
   source?: string | null;
   is_subway_station?: boolean | null;
+  sourceAgency?: string | null;
+  sourceId?: string | null;
+  platformCode?: string | null;
+  mergedStopIds?: string[] | null;
+  routes?: Array<{
+    route_id: string;
+    route_short_name: string;
+  }> | null;
 }
 
 export interface TransitSearchStopResult {
@@ -59,6 +67,10 @@ export interface TransitSearchStopResult {
   source: TransitSearchStopSource;
   lineCodes?: number[];
   liveTrainTrackingApiIds: LiveTrainTrackingApiId[];
+  sourceAgency?: string;
+  sourceId?: string;
+  platformCode?: string;
+  mergedStopIds?: string[];
 }
 
 export interface MapTransitStopOptions {
@@ -163,6 +175,10 @@ export function mapTypesenseStopToTransitSearchResult(
       source,
       lineCodes: [],
       liveTrainTrackingApiIds: [],
+      sourceAgency: stop.sourceAgency || undefined,
+      sourceId: stop.sourceId || undefined,
+      platformCode: stop.platformCode || undefined,
+      mergedStopIds: stop.mergedStopIds || undefined,
     };
   }
 
@@ -186,6 +202,10 @@ export function mapTypesenseStopToTransitSearchResult(
       source: 'gpkg',
       lineCodes,
       liveTrainTrackingApiIds: getLiveTrainTrackingApiIds(lineCodes),
+      sourceAgency: stop.sourceAgency || undefined,
+      sourceId: stop.sourceId || undefined,
+      platformCode: stop.platformCode || undefined,
+      mergedStopIds: stop.mergedStopIds || undefined,
     };
   }
 
@@ -212,5 +232,9 @@ export function mapTypesenseStopToTransitSearchResult(
     source: 'gtfs',
     lineCodes,
     liveTrainTrackingApiIds: getLiveTrainTrackingApiIds(lineCodes),
+    sourceAgency: stop.sourceAgency || undefined,
+    sourceId: stop.sourceId || undefined,
+    platformCode: stop.platformCode || undefined,
+    mergedStopIds: stop.mergedStopIds || undefined,
   };
 }

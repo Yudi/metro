@@ -47,6 +47,7 @@ import {
   extractLineCodesFromRouteNames,
   getLiveTrainTrackingApiIds,
   mapTypesenseStopToTransitSearchResult,
+  getBusAgencyOrder,
 } from '@metro/shared/utils';
 import { GeographyGraphQLService } from '../../services/geography-graphql.service';
 import {
@@ -349,9 +350,36 @@ export class SearchDialogComponent implements AfterViewInit {
         (result): result is SearchResult => result !== null,
       ) as SearchResult[];
 
+    const orderedResults = results
+      .map((result, index) => ({ result, index }))
+      .sort((a, b) => {
+        if (a.result.type !== 'route' || b.result.type !== 'route') {
+          return a.index - b.index;
+        }
+
+        const aRoute = a.result.routeData;
+        const bRoute = b.result.routeData;
+        if (!aRoute || !bRoute) {
+          return a.index - b.index;
+        }
+
+        return (
+          getBusAgencyOrder({
+            routeId: aRoute.route_id,
+            sourceAgency: aRoute.sourceAgency,
+          }) -
+            getBusAgencyOrder({
+              routeId: bRoute.route_id,
+              sourceAgency: bRoute.sourceAgency,
+            }) ||
+          a.index - b.index
+        );
+      })
+      .map(({ result }) => result);
+
     this.logger.debug(
       '[processSearchResults] Before merge:',
-      results
+      orderedResults
         .filter((r) => r.type === 'subway_station')
         .map((r) => ({
           id: r.id,
@@ -365,7 +393,7 @@ export class SearchDialogComponent implements AfterViewInit {
     const specialResults = this.getMatchingSpecialServices(specialServices);
     const mergedResults = [
       ...specialResults,
-      ...this.mergeSubwayStationResults(results),
+      ...this.mergeSubwayStationResults(orderedResults),
     ];
 
     this.logger.debug(

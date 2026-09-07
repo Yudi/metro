@@ -43,7 +43,20 @@ export class Contacts implements OnInit {
       if (b.shortName === 'CPTM') return 1;
       return a.name.localeCompare(b.name);
     });
-    this.organizedAgencies.bus.sort((a, b) => a.name.localeCompare(b.name));
+    this.organizedAgencies.bus.sort((a, b) => {
+      const priority = ['SPTrans', 'Artesp'];
+      const aPriority = priority.indexOf(a.shortName);
+      const bPriority = priority.indexOf(b.shortName);
+
+      if (aPriority !== -1 || bPriority !== -1) {
+        return (
+          (aPriority === -1 ? priority.length : aPriority) -
+          (bPriority === -1 ? priority.length : bPriority)
+        );
+      }
+
+      return a.name.localeCompare(b.name, 'pt-BR');
+    });
     this.organizedAgencies.other.sort((a, b) => a.name.localeCompare(b.name));
   }
 }

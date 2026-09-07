@@ -10,6 +10,7 @@ import type {
   BikePricingPlan,
   BikeVehicleAvailability,
 } from '@metro/shared/bike-contracts';
+import type { BusFare } from '@metro/shared/utils';
 
 export type { BikePricingPlan, BikeVehicleAvailability };
 
@@ -24,6 +25,9 @@ export interface SelectedRoute {
   longName: string;
   color?: string;
   textColor?: string;
+  sourceAgency?: string;
+  supportsRealtime?: boolean;
+  fares?: BusFare[];
 }
 
 export interface SelectedStop {
@@ -65,6 +69,10 @@ export interface SearchResult {
     route_text_color: string;
     route_type: number;
     source?: 'gtfs' | 'rail'; // Data source: GTFS (bus) or rail (from RAIL_LINES)
+    sourceAgency?: string;
+    sourceId?: string;
+    supportsRealtime?: boolean;
+    fares?: BusFare[];
   };
   /** Private API IDs that can serve real-time train data for this station */
   liveTrainTrackingApiIds?: LiveTrainTrackingApiId[];
@@ -72,6 +80,10 @@ export interface SearchResult {
   lineCodes?: number[];
   /** Data source: gtfs (bus), rail (rail lines), gpkg (rail stations), or bike */
   source?: 'gtfs' | 'gpkg' | 'rail' | 'bike';
+  sourceAgency?: string;
+  sourceId?: string;
+  platformCode?: string;
+  mergedStopIds?: string[];
   specialService?: SpecialRailService;
 }
 

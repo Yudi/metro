@@ -16,8 +16,9 @@ import {
   RouteRailConnection,
 } from '../entities/geography.entity';
 import { BoundingBoxInput, StopSearchInput } from '../dto/geography.input';
+import { mapBusRoute } from './bus-catalog.utils';
 
-const MAX_BUS_STOP_LIMIT = 25_000;
+const MAX_BUS_STOP_LIMIT = 100_000;
 const MAX_BUS_ROUTE_LIMIT = 10_000;
 const MAX_BUS_SHAPE_LIMIT = 500;
 const MAX_BATCH_IDS = 500;
@@ -100,20 +101,7 @@ export class GeographyServiceOptimized {
       this.clampLimit(limit, MAX_BUS_ROUTE_LIMIT),
     );
 
-    const results: BusRoute[] = [];
-    for (const route of routes) {
-      results.push({
-        id: route.route_id,
-        routeId: route.route_id,
-        shortName: route.route_short_name,
-        longName: route.route_long_name,
-        routeType: route.route_type,
-        color: route.route_color,
-        textColor: route.route_text_color,
-      });
-    }
-
-    return results;
+    return routes.map((route) => mapBusRoute(route));
   }
 
   async getBusRoute(id: string): Promise<BusRoute | null> {
@@ -141,7 +129,7 @@ export class GeographyServiceOptimized {
       SELECT
         shape_id,
         ST_AsGeoJSON(geom)::json->'coordinates' as coordinates
-      FROM "SPTrans_Shape"
+      FROM "public"."Gtfs_Shape"
       WHERE geom IS NOT NULL
       ORDER BY shape_id
       LIMIT ${safeLimit}
@@ -325,6 +313,24 @@ export class GeographyServiceOptimized {
         distance_meters: number;
       }>
     >`
+      WITH resolved_stops AS (
+        SELECT COALESCE(member.physical_stop_id, ${normalizedStopId}) AS physical_stop_id
+        FROM "public"."physical_stop_members" member
+        WHERE member.source_stop_id = ${normalizedStopId}
+        UNION ALL
+        SELECT ${normalizedStopId}
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM "public"."physical_stop_members" member
+          WHERE member.source_stop_id = ${normalizedStopId}
+        )
+      ),
+      expanded_stops AS (
+        SELECT DISTINCT COALESCE(member.source_stop_id, resolved.physical_stop_id) AS source_stop_id
+        FROM resolved_stops resolved
+        LEFT JOIN "public"."physical_stop_members" member
+          ON member.physical_stop_id = resolved.physical_stop_id
+      )
       SELECT
         hit.route_id,
         hit.route_short_name,
@@ -340,10 +346,12 @@ export class GeographyServiceOptimized {
         hit.lines,
         hit.distance_meters
       FROM "public"."route_rail_connection_hits" hit
-      WHERE hit.from_stop_id = ${normalizedStopId}
-        AND hit.route_id = ANY(${uniqueRouteIds}::TEXT[])
+      INNER JOIN expanded_stops expanded
+        ON expanded.source_stop_id = hit.from_stop_id
+      WHERE hit.route_id = ANY(${uniqueRouteIds}::TEXT[])
       ORDER BY
         hit.route_short_name,
+        CASE WHEN hit.route_id LIKE 'artesp:%' THEN 1 ELSE 0 END,
         hit.direction_id,
         hit.trip_headsign,
         hit.near_stop_sequence

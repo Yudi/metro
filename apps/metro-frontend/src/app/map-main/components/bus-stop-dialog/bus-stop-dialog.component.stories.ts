@@ -34,6 +34,11 @@ import {
   ROUTE_177H,
   ROUTE_875A,
   ROUTE_875I,
+  ARTESP_ONLY_BUS_STOP,
+  ROUTE_ARTESP_001,
+  ROUTE_ARTESP_WITHOUT_FARE,
+  SCHEDULED_ARTESP_DEPARTURES,
+  SHARED_SPTRANS_ARTESP_BUS_STOP,
   MOCK_ROUTE_RAIL_CONNECTIONS,
   createMockArrivals,
   createMockRealtimeService,
@@ -90,6 +95,7 @@ function createProviders(opts: ProviderOptions) {
       provide: GeographyGraphQLService,
       useValue: {
         getRouteRailConnectionsForStop: () => of(MOCK_ROUTE_RAIL_CONNECTIONS),
+        getScheduledBusDepartures: () => of(SCHEDULED_ARTESP_DEPARTURES),
       },
     },
     {
@@ -173,7 +179,7 @@ export const WithSelectedRoutes: Story = {
         dialogData: createDialogData(
           PINHEIROS_BUS_STOP,
           [ROUTE_477A, ROUTE_775A, ROUTE_177H],
-          new Set(['477A', '177H']),
+          new Set([ROUTE_477A.routeId, ROUTE_177H.routeId]),
         ),
         realtimeKind: 'arrivals',
       }),
@@ -191,7 +197,11 @@ export const AllRoutesSelected: Story = {
         dialogData: createDialogData(
           PINHEIROS_BUS_STOP,
           [ROUTE_477A, ROUTE_775A, ROUTE_177H],
-          new Set(['477A', '775A', '177H']),
+          new Set([
+            ROUTE_477A.routeId,
+            ROUTE_775A.routeId,
+            ROUTE_177H.routeId,
+          ]),
         ),
         realtimeKind: 'arrivals',
       }),
@@ -209,9 +219,37 @@ export const ManyRoutes: Story = {
         dialogData: createDialogData(
           CONSOLACAO_BUS_STOP,
           [ROUTE_477A, ROUTE_775A, ROUTE_177H, ROUTE_875A, ROUTE_875I],
-          new Set(['875A']),
+          new Set([ROUTE_875A.routeId]),
         ),
         realtimeKind: 'arrivals',
+      }),
+    }),
+  ],
+};
+
+export const SharedSptransArtespStop: Story = {
+  decorators: [
+    applicationConfig({
+      providers: createProviders({
+        dialogData: createDialogData(SHARED_SPTRANS_ARTESP_BUS_STOP, [
+          ROUTE_477A,
+          ROUTE_ARTESP_001,
+        ]),
+        realtimeKind: 'arrivals',
+      }),
+    }),
+  ],
+};
+
+export const ArtespScheduledOnly: Story = {
+  decorators: [
+    applicationConfig({
+      providers: createProviders({
+        dialogData: createDialogData(ARTESP_ONLY_BUS_STOP, [
+          ROUTE_ARTESP_001,
+          ROUTE_ARTESP_WITHOUT_FARE,
+        ]),
+        realtimeKind: 'no-arrivals',
       }),
     }),
   ],

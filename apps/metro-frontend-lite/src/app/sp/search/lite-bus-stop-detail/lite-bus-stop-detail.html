@@ -1,3 +1,4 @@
+@if (hasRealtimeSupport()) {
 <section class="detail-section">
   <h3>Previsão de chegada</h3>
 
@@ -22,7 +23,9 @@
         @for (vehicle of line.vs; track vehicle.p) {
         <div class="vehicle-arrival">
           <span class="vehicle-id">
-            Veículo {{ vehicle.p }} @if (vehicle.a) { ♿ }
+            Veículo {{ vehicle.p }} @if (vehicle.a) {
+            <span class="accessible-marker">Acessível</span>
+            }
           </span>
           @if (vehicle.t) {
           <span class="arrival-countdown">
@@ -36,11 +39,17 @@
 
       @if (getLineRailStations(line).length > 0) {
       <div class="rail-service">
-        <strong>🚆 Atende estação sobre trilhos neste sentido</strong>
+        <strong>Integração com trilhos neste sentido</strong>
         @for (station of getLineRailStations(line); track station.id) {
         <div class="rail-station">
-          <span>{{ station.name }}</span>
-          <small>{{ formatStationMeta(station) }}</small>
+          <span class="rail-station-heading">
+            <span class="rail-station-name">{{ station.name }}</span>
+            <span class="station-line-badges">
+              @for (line of stationLineBadges().get(station.id) ?? []; track line.code) {
+                <span class="station-line-badge" [style.background-color]="line.bg" [style.color]="line.text" [attr.aria-label]="'Linha ' + line.code">{{ line.code }}</span>
+              }
+            </span>
+          </span>
           @if (formatStationDistance(station); as distanceText) {
           <small class="rail-station-distance">{{ distanceText }}</small>
           }
@@ -58,6 +67,80 @@
   </div>
   }
 </section>
+}
+
+@if (hasArtespSchedules()) {
+<section class="detail-section scheduled-section">
+  <div class="section-title-row">
+    <div>
+      <h3>Horários programados</h3>
+      <div class="agency-lockup">
+        <img
+          [ngSrc]="getAgencyLogoPath('artesp')"
+          width="20"
+          height="20"
+          alt=""
+        />
+        <span>Artesp</span>
+        <span class="section-note">Estes horários não são previsões em tempo real.</span>
+      </div>
+    </div>
+    @if (scheduledDeparturesLoading()) {
+    <lite-spinner size="sm"></lite-spinner>
+    }
+  </div>
+
+  @if (scheduledRouteGroups().length > 0) {
+  <div class="scheduled-list">
+    @for (group of scheduledRouteGroups(); track group.routeId) {
+    <div class="scheduled-route-group">
+      @for (departure of getVisibleScheduledDepartures(group); track getScheduledDepartureKey(departure)) {
+      <div class="scheduled-row">
+        <time class="scheduled-time" [attr.datetime]="departure.departureTime">
+          <span>{{ departure.timeLabel }}</span>
+          @if (departure.dayLabel) {
+          <small>{{ departure.dayLabel }}</small>
+          }
+        </time>
+        <div class="scheduled-route">
+          <strong class="scheduled-route-code" [style.background-color]="departure.color" [style.color]="departure.textColor">{{ departure.routeShortName }}</strong>
+          <span class="scheduled-destination">{{ departure.headsign }}</span>
+        </div>
+        @if (departure.platformCode) {
+        <span class="scheduled-platform">Plataforma {{ departure.platformCode }}</span>
+        }
+      </div>
+      }
+      @if (group.departures.length > 1) {
+      <button
+        type="button"
+        class="schedule-toggle"
+        [attr.aria-expanded]="isScheduledRouteExpanded(group.routeId)"
+        [attr.aria-label]="getScheduledRouteToggleLabel(group.routeId, group.departures.length) + ' da linha ' + group.departures[0].routeShortName"
+        (click)="toggleScheduledRoute(group.routeId)"
+      >
+        {{ getScheduledRouteToggleLabel(group.routeId, group.departures.length) }}
+      </button>
+      }
+    </div>
+    }
+  </div>
+  } @else if (scheduledDeparturesLoading()) {
+  <div class="empty-state">
+    <lite-spinner size="sm"></lite-spinner>
+    <p>Carregando horários programados...</p>
+  </div>
+  } @else if (scheduledDeparturesError()) {
+  <div class="empty-state">
+    <p>Não foi possível carregar os horários programados.</p>
+  </div>
+  } @else {
+  <div class="empty-state">
+    <p>Nenhum horário programado disponível.</p>
+  </div>
+  }
+</section>
+}
 
 @if (routes().length > 0) {
 <section class="detail-section">
@@ -69,34 +152,52 @@
   </div>
 
   <div class="routes-list">
-    @for (route of routes(); track route.id) {
+    @for (route of routes(); track route.routeId) {
     <article class="route-item">
       <button
         type="button"
         class="route-button"
         [class.expanded]="isRouteExpanded(route)"
+        [attr.aria-expanded]="isRouteExpanded(route)"
         (click)="toggleRoute(route)"
       >
-        <span
-          class="route-badge"
+          <span
+            class="route-badge"
           [style.background-color]="'#' + route.color"
           [style.color]="'#' + route.textColor"
         >
           {{ route.shortName }}
         </span>
-        <span class="route-name">{{ route.longName }}</span>
-
-        @if (!railConnectionsLoading() && routeServesRail(route)) {
-        <lite-chip size="sm" variant="primary">
-          🚆 {{ getRouteRailStationCount(route) }}
-        </lite-chip>
-        } @else if (!railConnectionsLoading()) {
-        <span class="route-meta">sem trilhos</span>
-        }
-
-        <span class="expand-icon">
-          {{ isRouteExpanded(route) ? '⌃' : '⌄' }}
+        <span class="route-main">
+          <span class="route-name">{{ route.longName }}</span>
+          <span class="agency-lockup route-agency">
+            @if (getRouteAgencyKey(route); as agencyKey) {
+            <img
+              [ngSrc]="getAgencyLogoPath(agencyKey)"
+              width="18"
+              height="18"
+              alt=""
+            />
+            }
+            <small>{{ getRouteAgencyLabel(route) }}</small>
+          </span>
         </span>
+
+        <span class="route-metadata">
+          @if (getRouteFareLabel(route); as fareLabel) {
+          <span class="route-fare" [class.fare-missing]="!route.fares?.length" [attr.aria-label]="'Tarifa: ' + fareLabel">
+            <strong>{{ fareLabel }}</strong>
+          </span>
+          }
+
+          @if (!railConnectionsLoading() && routeServesRail(route)) {
+          <lite-chip size="sm" variant="primary">
+            Integração · {{ getRouteRailStationCount(route) }}
+          </lite-chip>
+          }
+        </span>
+
+        <span class="expand-icon" aria-hidden="true"></span>
       </button>
 
       @if (isRouteExpanded(route)) {
@@ -117,8 +218,14 @@
           <strong>Sentido {{ direction.headsign }}</strong>
           @for (station of direction.stations; track station.id) {
           <div class="rail-station detail-station">
-            <span>{{ station.name }}</span>
-            <small>{{ formatStationMeta(station) }}</small>
+            <span class="rail-station-heading">
+              <span class="rail-station-name">{{ station.name }}</span>
+              <span class="station-line-badges">
+                @for (line of stationLineBadges().get(station.id) ?? []; track line.code) {
+                  <span class="station-line-badge" [style.background-color]="line.bg" [style.color]="line.text" [attr.aria-label]="'Linha ' + line.code">{{ line.code }}</span>
+                }
+              </span>
+            </span>
             @if (formatStationDistance(station); as distanceText) {
             <small class="rail-station-distance">{{ distanceText }}</small>
             }

@@ -1,3 +1,13 @@
+export type GTFSFeed = 'sptrans' | 'artesp';
+
+export interface GTFSFeedDefinition {
+  readonly id: GTFSFeed;
+  readonly tablePrefix: 'SPTrans' | 'ARTESP';
+  readonly sourceAgency: GTFSFeed;
+  readonly localSnapshotPath?: string;
+  readonly downloadUrl?: string;
+}
+
 export class GTFSConfig {
   /**
    * PostgreSQL schema for provider-shaped GTFS data.
@@ -10,6 +20,32 @@ export class GTFSConfig {
    */
   static readonly SPTRANS_GTFS_URL =
     'https://www.sptrans.com.br/umbraco/Surface/PerfilDesenvolvedor/BaixarGTFS?memberName=sptrans';
+
+  /** CKAN API endpoint used to resolve the current ARTESP resource. */
+  static readonly ARTESP_CKAN_PACKAGE_URL =
+    'https://dadosabertos.artesp.sp.gov.br/api/3/action/package_show?id=gtfs';
+
+  /** Local snapshots are useful for development and deterministic imports. */
+  static readonly SPTRANS_LOCAL_SNAPSHOT_PATH =
+    process.env.GTFS_SPTRANS_SNAPSHOT_PATH;
+  static readonly ARTESP_LOCAL_SNAPSHOT_PATH =
+    process.env.GTFS_ARTESP_SNAPSHOT_PATH;
+
+  static readonly FEEDS: Readonly<Record<GTFSFeed, GTFSFeedDefinition>> = {
+    sptrans: {
+      id: 'sptrans',
+      tablePrefix: 'SPTrans',
+      sourceAgency: 'sptrans',
+      localSnapshotPath: GTFSConfig.SPTRANS_LOCAL_SNAPSHOT_PATH,
+      downloadUrl: GTFSConfig.SPTRANS_GTFS_URL,
+    },
+    artesp: {
+      id: 'artesp',
+      tablePrefix: 'ARTESP',
+      sourceAgency: 'artesp',
+      localSnapshotPath: GTFSConfig.ARTESP_LOCAL_SNAPSHOT_PATH,
+    },
+  };
 
   /**
    * Temporary directory for file processing
@@ -46,46 +82,55 @@ export class GTFSConfig {
   /**
    * Get table name for GTFS file type
    */
-  static getTableName(fileName: string): string {
-    const baseNames: Record<string, string> = {
-      'agency.txt': 'SPTrans_Agency',
-      'calendar.txt': 'SPTrans_Calendar',
-      'fare_attributes.txt': 'SPTrans_FareAttribute',
-      'fare_rules.txt': 'SPTrans_FareRule',
-      'frequencies.txt': 'SPTrans_Frequency',
-      'routes.txt': 'SPTrans_Route',
-      'shapes.txt': 'SPTrans_Shape',
-      'stop_times.txt': 'SPTrans_StopTime',
-      'stops.txt': 'SPTrans_Stop',
-      'trips.txt': 'SPTrans_Trip',
-    };
-
-    return baseNames[fileName] || `SPTrans_${fileName.replace('.txt', '')}`;
+  static getFeedDefinition(feed: GTFSFeed): GTFSFeedDefinition {
+    return GTFSConfig.FEEDS[feed];
   }
 
-  static getRawTables(): string[] {
+  static getTableName(fileName: string, feed: GTFSFeed = 'sptrans'): string {
+    const baseNames: Record<string, string> = {
+      'agency.txt': 'Agency',
+      'calendar.txt': 'Calendar',
+      'calendar_dates.txt': 'CalendarDate',
+      'fare_attributes.txt': 'FareAttribute',
+      'fare_rules.txt': 'FareRule',
+      'feed_info.txt': 'FeedInfo',
+      'frequencies.txt': 'Frequency',
+      'routes.txt': 'Route',
+      'shapes.txt': 'Shape',
+      'stop_times.txt': 'StopTime',
+      'stops.txt': 'Stop',
+      'trips.txt': 'Trip',
+    };
+
+    const suffix = baseNames[fileName] || fileName.replace('.txt', '');
+    return `${GTFSConfig.getFeedDefinition(feed).tablePrefix}_${suffix}`;
+  }
+
+  static getRawTables(feed: GTFSFeed = 'sptrans'): string[] {
     return [
-      'SPTrans_Agency',
-      'SPTrans_Calendar',
-      'SPTrans_Route',
-      'SPTrans_Stop',
-      'SPTrans_Trip',
-      'SPTrans_StopTime',
-      'SPTrans_Frequency',
-      'SPTrans_FareAttribute',
-      'SPTrans_FareRule',
-      'SPTrans_Shape',
-    ];
+      'agency.txt',
+      'calendar.txt',
+      'calendar_dates.txt',
+      'routes.txt',
+      'stops.txt',
+      'trips.txt',
+      'stop_times.txt',
+      'frequencies.txt',
+      'fare_attributes.txt',
+      'fare_rules.txt',
+      'shapes.txt',
+      'feed_info.txt',
+    ].map((fileName) => GTFSConfig.getTableName(fileName, feed));
   }
 
   /** Tables that need fresh planner statistics before derived-data rebuilds. */
-  static getAnalyzeTables(): string[] {
+  static getAnalyzeTables(feed: GTFSFeed = 'sptrans'): string[] {
     return [
-      'SPTrans_Route',
-      'SPTrans_Stop',
-      'SPTrans_Trip',
-      'SPTrans_StopTime',
-      'SPTrans_Shape',
+      GTFSConfig.getTableName('routes.txt', feed),
+      GTFSConfig.getTableName('stops.txt', feed),
+      GTFSConfig.getTableName('trips.txt', feed),
+      GTFSConfig.getTableName('stop_times.txt', feed),
+      GTFSConfig.getTableName('shapes.txt', feed),
     ];
   }
 
@@ -100,6 +145,7 @@ export class GTFSConfig {
     return [
       'agency.txt',
       'calendar.txt',
+      'calendar_dates.txt',
       'routes.txt',
       'stops.txt',
       'shapes.txt', // Processed by Rust tool
@@ -108,11 +154,12 @@ export class GTFSConfig {
       'frequencies.txt',
       'fare_attributes.txt',
       'fare_rules.txt',
+      'feed_info.txt',
     ];
   }
 
-  static getRequiredFiles(): string[] {
-    return [
+  static getRequiredFiles(feed: GTFSFeed = 'sptrans'): string[] {
+    const requiredFiles = [
       'agency.txt',
       'calendar.txt',
       'routes.txt',
@@ -121,16 +168,24 @@ export class GTFSConfig {
       'trips.txt',
       'stop_times.txt',
     ];
+    if (feed === 'artesp') {
+      requiredFiles.push('fare_attributes.txt', 'fare_rules.txt');
+    }
+    return requiredFiles;
   }
 
-  static isRequiredFile(fileName: string): boolean {
-    return this.getRequiredFiles().includes(fileName);
+  static isRequiredFile(fileName: string, feed: GTFSFeed = 'sptrans'): boolean {
+    return this.getRequiredFiles(feed).includes(fileName);
   }
 
   /** Optional GTFS relations may be published as a valid header-only file. */
-  static isEmptyAllowedFile(fileName: string): boolean {
+  static isEmptyAllowedFile(
+    fileName: string,
+    feed: GTFSFeed = 'sptrans',
+  ): boolean {
     return (
-      this.getExpectedFiles().includes(fileName) && !this.isRequiredFile(fileName)
+      this.getExpectedFiles().includes(fileName) &&
+      !this.isRequiredFile(fileName, feed)
     );
   }
 

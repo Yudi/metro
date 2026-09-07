@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, BehaviorSubject, of } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { MapFeature } from './map.service';
+import type { BusFare } from '@metro/shared/utils';
 
 export interface BusStopGraphQL {
   id: string;
@@ -14,6 +15,10 @@ export interface BusStopGraphQL {
   isSubwayStation: boolean;
   agencies?: string[];
   routeShortNames?: string[];
+  sourceAgency?: string;
+  sourceId?: string;
+  platformCode?: string;
+  mergedStopIds?: string[];
   geometry?: {
     type: string;
     coordinates: number[][];
@@ -28,6 +33,10 @@ export interface BusRouteGraphQL {
   routeType: number;
   color: string;
   textColor: string;
+  sourceAgency?: string;
+  sourceId?: string;
+  supportsRealtime?: boolean;
+  fares?: BusFare[];
   geometry?: {
     type: string;
     coordinates: number[][];
@@ -88,6 +97,17 @@ export interface RouteRailConnectionGraphQL {
   directions: RouteRailConnectionDirectionGraphQL[];
 }
 
+export interface ScheduledBusDepartureGraphQL {
+  routeId: string;
+  routeShortName: string;
+  tripId: string;
+  headsign: string;
+  directionId: number;
+  departureTime: string;
+  sourceAgency: string;
+  platformCode?: string;
+}
+
 /**
  * Combined stop data from a single GraphQL query.
  * Reduces multiple roundtrips when loading a stop and its routes.
@@ -135,6 +155,10 @@ export class GeographyGraphQLService {
     isSubwayStation
     agencies
     routeShortNames
+    sourceAgency
+    sourceId
+    platformCode
+    mergedStopIds
   `;
 
   private executeGraphQL<T>(
@@ -221,6 +245,13 @@ export class GeographyGraphQLService {
           routeType
           color
           textColor
+          sourceAgency
+          sourceId
+          supportsRealtime
+          fares {
+            price
+            currency
+          }
         }
       }
     `;
@@ -244,6 +275,13 @@ export class GeographyGraphQLService {
           routeType
           color
           textColor
+          sourceAgency
+          sourceId
+          supportsRealtime
+          fares {
+            price
+            currency
+          }
         }
       }
     `;
@@ -361,6 +399,13 @@ export class GeographyGraphQLService {
           routeType
           color
           textColor
+          sourceAgency
+          sourceId
+          supportsRealtime
+          fares {
+            price
+            currency
+          }
         }
       }
     `;
@@ -407,6 +452,13 @@ export class GeographyGraphQLService {
     routeType
     color
     textColor
+    sourceAgency
+    sourceId
+    supportsRealtime
+    fares {
+      price
+      currency
+    }
   `;
 
   /**
@@ -502,6 +554,32 @@ export class GeographyGraphQLService {
     }).pipe(map((data) => data?.routeRailConnectionsForStop || []));
   }
 
+  getScheduledBusDepartures(
+    stopId: string,
+    limit = 5,
+  ): Observable<ScheduledBusDepartureGraphQL[]> {
+    const query = `
+      query ScheduledBusDepartures($stopId: String!, $limit: Int!) {
+        scheduledBusDepartures(stopId: $stopId, perRouteLimit: $limit) {
+          routeId
+          routeShortName
+          tripId
+          headsign
+          directionId
+          departureTime
+          sourceAgency
+          platformCode
+        }
+      }
+    `;
+
+    return this.executeGraphQL<{
+      scheduledBusDepartures: ScheduledBusDepartureGraphQL[];
+    }>(query, { stopId, limit }).pipe(
+      map((data) => data?.scheduledBusDepartures || []),
+    );
+  }
+
   // Convert from backend format to map service format
   convertToBusStop(graphqlStop: BusStopGraphQL): MapFeature {
     return {
@@ -516,6 +594,10 @@ export class GeographyGraphQLService {
         description: graphqlStop.description,
         latitude: graphqlStop.latitude,
         longitude: graphqlStop.longitude,
+        sourceAgency: graphqlStop.sourceAgency,
+        sourceId: graphqlStop.sourceId,
+        platformCode: graphqlStop.platformCode,
+        mergedStopIds: graphqlStop.mergedStopIds,
       },
     };
   }
@@ -534,6 +616,10 @@ export class GeographyGraphQLService {
         routeType: graphqlRoute.routeType,
         color: graphqlRoute.color,
         textColor: graphqlRoute.textColor,
+        sourceAgency: graphqlRoute.sourceAgency,
+        sourceId: graphqlRoute.sourceId,
+        supportsRealtime: graphqlRoute.supportsRealtime,
+        fares: graphqlRoute.fares,
       },
     };
   }

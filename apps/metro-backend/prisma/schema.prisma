@@ -393,3 +393,15 @@ model GtfsFeedFile {
   @@id([source, fileName])
   @@map("gtfs_feed_files")
 }
+
+// Claims survive restarts and are shared by replicas. Failed windows are not retried.
+model BusNoticeScrapeState {
+  id               String    @id
+  attemptedWindow  String    @default("")
+  successfulWindow String    @default("")
+  lastSuccessAt    DateTime?  @db.Timestamptz
+  notices          Json      @default("[]")
+  detailCache      Json      @default("{}")
+
+  @@map("bus_notice_scrape_state")
+}

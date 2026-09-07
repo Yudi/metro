@@ -1,0 +1,55 @@
+@for (notice of notices(); track notice.id) {
+  <div class="route-notice">
+    <button
+      mat-button
+      type="button"
+      class="notice-button"
+      [attr.aria-expanded]="expanded() === notice.id"
+      [attr.aria-label]="'Aviso da linha ' + routeCode() + ': ' + notice.title"
+      (click)="toggle(notice.id)"
+    >
+      <mat-icon>warning_amber</mat-icon>
+      {{ notice.title }}
+    </button>
+    @if (expanded() === notice.id) {
+      <div class="notice-details">
+        @if (stale()) {
+          <p class="source-note">
+            Consulta desatualizada. O aviso pode ter mudado.
+          </p>
+        }
+        <dl>
+          <dt>Período informado</dt>
+          <dd>
+            {{
+              notice.period ??
+                "Período não identificado. Confira o aviso na página da SPTrans."
+            }}
+          </dd>
+          @if (notice.reason) {
+            <dt>Motivo</dt>
+            <dd>{{ notice.reason }}</dd>
+          }
+          @for (direction of notice.directions; track $index) {
+            <dt>{{ direction.label }}</dt>
+            <dd>{{ direction.text }}</dd>
+          }
+        </dl>
+        @if (notice.details) {
+          <p class="route-details">{{ notice.details }}</p>
+        } @else if (!notice.directions.length) {
+          <p>Confira no aviso original os detalhes para esta linha.</p>
+        }
+        @if (notice.sourceUrl) {
+          <a
+            mat-button
+            [href]="notice.sourceUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Ver aviso no site da SPTrans <mat-icon>open_in_new</mat-icon></a
+          >
+        }
+      </div>
+    }
+  </div>
+}

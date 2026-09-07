@@ -1,3 +1,4 @@
+import { BusInformationService } from '../../services/bus-information.service';
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
@@ -86,6 +87,7 @@ describe('StopArrivalsComponent', () => {
     await TestBed.configureTestingModule({
       imports: [StopArrivalsComponent],
       providers: [
+        { provide: BusInformationService, useValue: { notices: jest.fn(() => of({ status: 'AVAILABLE', lastUpdated: null, notices: [] })) } },
         { provide: RealtimeWebsocketService, useValue: realtimeService },
         { provide: GeographyGraphQLService, useValue: geographyService },
       ],
@@ -98,6 +100,27 @@ describe('StopArrivalsComponent', () => {
   });
 
   afterEach(() => fixture.destroy());
+
+  it('places a warning only under the matching arrival item and does not refetch on arrival updates', () => {
+    const api = TestBed.inject(BusInformationService);
+    const query = api.notices as jest.Mock;
+    const result = { status: 'AVAILABLE', lastUpdated: '2026-09-07T07:30:00Z', notices: [{
+      sourceId: '1', sourceUrl: 'https://www.sptrans.com.br/informativos/oeste/exemplo/1/',
+      title: 'Desvio de itinerário', description: '07/09/2026\n847P-10 Destino\nIda: via alternativa.',
+      periodText: '07/09/2026', routes: ['847P-10'], listedDate: '7 de setembro', listing: 'RECENT',
+    }] };
+    fixture.componentInstance.busNotices.set(result);
+    fixture.componentInstance.arrivals.set({ hr: '12:00', p: { cp: 1, np: 'Ponto', py: 0, px: 0, l: [line, { ...line, c: '1234-10', cl: 999 }] } });
+    fixture.componentInstance.isLoading.set(false);
+    fixture.detectChanges();
+    const items = fixture.nativeElement.querySelectorAll('.arrival-line');
+    expect(items[0].querySelector('app-bus-information button')?.textContent).toContain('Desvio');
+    expect(items[1].querySelector('app-bus-information button')).toBeNull();
+    const count = query.mock.calls.length;
+    fixture.componentInstance.arrivals.update((value) => value ? { ...value, hr: '12:01' } : value);
+    fixture.detectChanges();
+    expect(query).toHaveBeenCalledTimes(count);
+  });
 
   it('shows one departure per route and expands only that route to five', () => {
     const departures: ScheduledBusDepartureGraphQL[] = Array.from({ length: 7 }, (_, index) => ({

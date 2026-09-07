@@ -20,7 +20,8 @@
         </div>
       } @else if (hasArrivals()) {
         <div class="arrivals-list">
-          @for (line of arrivalLines(); track getArrivalLineKey(line)) {
+          @for (arrival of arrivalRows(); track getArrivalLineKey(arrival.line)) {
+            @let line = arrival.line;
             <div class="arrival-line">
               <div class="line-header">
                 <div class="line-info">
@@ -85,6 +86,9 @@
                 </button>
               }
 
+              <app-bus-information [routeCode]="line.c" [notices]="arrival.notices"
+                [stale]="busNotices()?.status === 'STALE'" [lastUpdated]="busNotices()?.lastUpdated ?? null" />
+
               @if (!compact() && getLineRailStations(line).length > 0) {
                 <div class="rail-service">
                   <div class="rail-service-header">
@@ -134,6 +138,10 @@
           }
         </div>
       }
+    }
+
+    @if (noticesUnavailable()) {
+      <p class="hint" role="status">Avisos de alterações indisponíveis no momento.</p>
     }
 
     @if (hasArtespSchedules()) {

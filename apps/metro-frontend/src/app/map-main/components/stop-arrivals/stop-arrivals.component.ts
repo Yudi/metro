@@ -1,3 +1,6 @@
+import { BusInformationComponent } from '../bus-information/bus-information.component';
+import { routeNoticeView } from '../bus-information/bus-notice-view';
+import { BusInformationService, BusNoticesResult } from '../../services/bus-information.service';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -56,6 +59,7 @@ const VISIBLE_VEHICLE_COUNT = 2;
   selector: 'app-stop-arrivals',
   imports: [
     NgOptimizedImage,
+    BusInformationComponent,
     MatExpansionModule,
     MatTooltipModule,
     MatCardModule,
@@ -76,6 +80,23 @@ export class StopArrivalsComponent {
   selectedRouteKey = input<string | null>(null);
   selectedRouteKeys = input<string[]>([]);
   selectRoute = output<string>();
+
+  private readonly busInformation = inject(BusInformationService);
+  readonly busNotices = signal<BusNoticesResult | null>(null);
+  readonly noticesUnavailable = signal(false);
+  readonly noticeRouteCodes = computed(() => [...new Set(this.routes()
+    .filter((route) => supportsSptransRealtime(route))
+    .map((route) => route.shortName.trim().toUpperCase())
+    .filter((code) => /^[0-9A-Z]{4}-\d{2}$/.test(code)))].sort(), {
+    equal: (a, b) => a.join('|') === b.join('|'),
+  });
+  readonly noticesByRoute = computed(() => new Map(this.noticeRouteCodes().map((code) => [code,
+    (this.busNotices()?.notices ?? []).filter((notice) => notice.routes.includes(code))
+      .map((notice) => routeNoticeView(notice, code)),
+  ])));
+  readonly arrivalRows = computed(() => this.arrivalLines().map((line) => ({
+    line, notices: this.noticesByRoute().get(line.c.trim().toUpperCase()) ?? [],
+  })));
 
   private realtimeService = inject(RealtimeWebsocketService);
   private geographyService = inject(GeographyGraphQLService);
@@ -174,6 +195,23 @@ export class StopArrivalsComponent {
   });
 
   constructor() {
+    // Read the cached snapshot once for the route set, independently of 30s arrival updates.
+    effect((onCleanup) => {
+      const codes = this.noticeRouteCodes();
+      this.busNotices.set(null);
+      this.noticesUnavailable.set(false);
+      if (!codes.length) return;
+      if (codes.length > 100) { this.noticesUnavailable.set(true); return; }
+      const subscription = this.busInformation.notices(codes).subscribe({
+        next: (result) => {
+          this.busNotices.set(result);
+          this.noticesUnavailable.set(result.status === 'UNAVAILABLE');
+        },
+        error: () => this.noticesUnavailable.set(true),
+      });
+      onCleanup(() => subscription.unsubscribe());
+    });
+
     // Watch for stop changes and subscribe
     effect((onCleanup) => {
       const stop = this.stop();

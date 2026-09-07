@@ -1,3 +1,4 @@
+import { provideHttpClient } from '@angular/common/http';
 import { signal } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
@@ -52,6 +53,7 @@ describe('BusStopDialogComponent', () => {
     await TestBed.configureTestingModule({
       imports: [BusStopDialogComponent],
       providers: [
+        provideHttpClient(),
         { provide: MAT_DIALOG_DATA, useValue: data },
         { provide: MatDialogRef, useValue: { close: jest.fn() } },
         { provide: FavoritesService, useValue: favoritesService },

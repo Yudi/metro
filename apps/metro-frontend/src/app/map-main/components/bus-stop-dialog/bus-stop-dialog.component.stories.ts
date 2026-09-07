@@ -1,3 +1,4 @@
+import { BusInformationService } from '../../services/bus-information.service';
 import {
   Meta,
   StoryObj,
@@ -76,6 +77,12 @@ function createProviders(opts: ProviderOptions) {
   }
 
   return [
+    { provide: BusInformationService, useValue: { notices: () => of({ status: 'AVAILABLE', lastUpdated: '2026-09-07T07:30:00Z', notices: [{
+      sourceId: '1', sourceUrl: 'https://www.sptrans.com.br/informativos/oeste/desvios-de-itinerarios-na-regiao-da-av-paulista/71116/',
+      title: 'Exemplo: desvio na região da Av. Paulista', periodText: '07/09/2026, das 9h às 20h.',
+      description: '07/09/2026, das 9h às 20h.\nMotivo: exemplo ilustrativo de evento.\n477A-10 Pinheiros\nIda: exemplo de desvio pela via alternativa.\nVolta: sem alteração.\n875A-10 Outro destino\nIda: instrução de outra linha.',
+      routes: ['477A-10', '875A-10'], listing: 'RECENT', listedDate: '7 de setembro de 2026',
+    }] }) } },
     {
       provide: MatDialogRef,
       useValue: {

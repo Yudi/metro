@@ -1,3 +1,4 @@
+import { BusInformationModule } from '../bus-information/bus-information.module';
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
@@ -90,6 +91,7 @@ const isProduction = process.env.NODE_ENV === 'production';
     RailImportModule,
     RailModule,
     GeographyModule,
+    BusInformationModule,
     SearchModule,
     RealtimeModule,
     BikeModule,

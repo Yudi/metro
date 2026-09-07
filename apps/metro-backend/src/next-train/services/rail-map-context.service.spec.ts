@@ -63,6 +63,27 @@ describe('RailMapContextService', () => {
     expect(pathSql).toContain('ST_Transform');
   });
 
+  it('maps the reversed Bruno Covas map name to the canonical station code', async () => {
+    queryRaw
+      .mockResolvedValueOnce([
+        {
+          id: 'mvn',
+          name: 'Mendes / Bruno Covas',
+          originalName: 'MENDES / BRUNO COVAS',
+          latitude: -23.746,
+          longitude: -46.696,
+        },
+      ])
+      .mockResolvedValueOnce([
+        { path_id: 1, point_index: 1, lat: -23.746, lng: -46.696 },
+        { path_id: 1, point_index: 2, lat: -23.75, lng: -46.7 },
+      ]);
+
+    await expect(service.getContext('L9')).resolves.toMatchObject({
+      stations: [{ code: 'MVN', lat: -23.746, lng: -46.696 }],
+    });
+  });
+
   it('skips an ambiguous exact station match without accepting broad names', async () => {
     queryRaw
       .mockResolvedValueOnce([

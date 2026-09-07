@@ -39,6 +39,7 @@ export const L10_STATIONS: StaticRailStation[] = [
     code: 'SCT',
     name: 'São Caetano do Sul',
     alternativeNames: [
+      'São Caetano',
       'São Caetano do Sul-Prefeito Walter Braido',
       'São Caetano do Sul-Pref. Walter Braido',
     ],

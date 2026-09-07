@@ -1,8 +1,10 @@
 import { describe, expect, it } from '@jest/globals';
 
 import {
+  getCanonicalRailStationName,
   getRailLineByCode,
   getRailLinesByAgency,
+  getStationByName,
   LINE_AGENCY_MAPPING,
   RAIL_LINE_TRAFFIC_HANDS,
   RAIL_LINES,
@@ -17,6 +19,56 @@ import {
   TransitAgency,
   TRIVIATRENS_LIVE_DATA_ENABLED,
 } from '../transit/transit-agency.utils';
+import { getStaticRailStationsByLine } from './stations/rail-stations.entity';
+import {
+  findNextTrainStations,
+  NEXT_TRAIN_LINES,
+  type NextTrainLineCode,
+} from './viamobilidade-stations';
+
+describe('rail station name aliases', () => {
+  it.each(['L4', 'L8', 'L9'] satisfies NextTrainLineCode[])(
+    'uses the canonical catalog as the %s next-train station source',
+    (lineCode) => {
+      expect(NEXT_TRAIN_LINES[lineCode]).toBe(
+        getStaticRailStationsByLine(lineCode),
+      );
+    },
+  );
+
+  it.each([
+    [1, 'AYRTON SENNA-JARDIM SÃO PAULO', 'Jardim São Paulo'],
+    [2, 'SANTUÁRIO NOSSA SENHORA DE FÁTIMA-SUMARÉ', 'Sumaré'],
+    [4, 'Vila Sônia Profa. Elisabeth Tenreiro', 'Vila Sônia'],
+    [8, 'DOMINGOS DE MORAIS', 'Domingos de Moraes'],
+    [9, 'MENDES / BRUNO COVAS', 'Bruno Covas/Mendes-Vila Natal'],
+    [10, 'SÃO CAETANO', 'São Caetano do Sul'],
+    [11, 'BRÁS CUBAS', 'Braz Cubas'],
+  ])(
+    'maps the external Line %i name %s to the canonical catalog name',
+    (lineCode, externalName, canonicalName) => {
+      expect(getCanonicalRailStationName(externalName, [lineCode])).toBe(
+        canonicalName,
+      );
+      expect(getStationByName(lineCode, externalName)?.name).toBe(
+        canonicalName,
+      );
+    },
+  );
+
+  it.each([
+    'MENDES / BRUNO COVAS',
+    'MENDES/BRUNO COVAS',
+    'BRUNO COVAS-MENDES-VILA NATAL',
+  ])(
+    'resolves the %s variant to the Line 9 next-train station code',
+    (stationName) => {
+      expect(findNextTrainStations(stationName, [9])).toEqual([
+        { lineCode: 'L9', stationCode: 'MVN' },
+      ]);
+    },
+  );
+});
 
 describe('Linha 17 agency', () => {
   it('registers Linha 17 as operated by Metro', () => {

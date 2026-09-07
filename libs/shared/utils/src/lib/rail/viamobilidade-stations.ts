@@ -3,6 +3,12 @@ import {
   findApi1RailStationByName,
   hasExternalRailNextTrain,
 } from './cptm-stations';
+import {
+  L4_STATIONS as STATIC_L4_STATIONS,
+  L8_STATIONS as STATIC_L8_STATIONS,
+  L9_STATIONS as STATIC_L9_STATIONS,
+  type StaticRailStation,
+} from './stations/rail-stations.entity';
 
 /**
  * Station data for lines with real-time next train information.
@@ -14,31 +20,17 @@ import {
 /**
  * Station information for next-train enabled lines
  */
-export interface NextTrainStation {
-  /** 3-letter station code (e.g., "OSA", "PIN") */
-  code: string;
-  /** Display name (e.g., "Osasco", "Pinheiros") */
-  name: string;
-}
+export type NextTrainStation = Pick<
+  StaticRailStation,
+  'code' | 'name' | 'alternativeNames'
+>;
 
 /**
  * Line 4 - Amarela stations (Luz → Vila Sônia)
- * Order: Terminal 1 (LUZ) to Terminal 2 (VSO)
+ * Order: Terminal 1 (LUZ) to Terminal 2 (VLS)
  * Operated by Motiva
  */
-export const L4_STATIONS: NextTrainStation[] = [
-  { code: 'LUZ', name: 'Luz' },
-  { code: 'REP', name: 'República' },
-  { code: 'HGN', name: 'Higienópolis-Mackenzie' },
-  { code: 'PAU', name: 'Paulista' },
-  { code: 'OCR', name: 'Oscar Freire' },
-  { code: 'FRD', name: 'Fradique Coutinho' },
-  { code: 'FLM', name: 'Faria Lima' },
-  { code: 'PIH', name: 'Pinheiros' },
-  { code: 'BUT', name: 'Butantã' },
-  { code: 'SPM', name: 'São Paulo-Morumbi' },
-  { code: 'VLS', name: 'Vila Sônia' },
-];
+export const L4_STATIONS: NextTrainStation[] = STATIC_L4_STATIONS;
 
 /**
  * Line 8 - Diamante stations (Júlio Prestes → Amador Bueno)
@@ -49,59 +41,13 @@ export const L4_STATIONS: NextTrainStation[] = [
  * source prevents duplication and ensures both frontend and backend
  * reference the same information.
  */
-export const L8_STATIONS: NextTrainStation[] = [
-  { code: 'JPR', name: 'Júlio Prestes' },
-  { code: 'BFU', name: 'Palmeiras–Barra Funda' },
-  { code: 'LAB', name: 'Lapa' },
-  { code: 'DMO', name: 'Domingos de Moraes' },
-  { code: 'ILE', name: 'Imperatriz Leopoldina' },
-  { code: 'PAL', name: 'Presidente Altino' },
-  { code: 'OSA', name: 'Osasco' },
-  { code: 'CSA', name: 'Comandante Sampaio' },
-  { code: 'QTU', name: 'Quitaúna' },
-  { code: 'GMC', name: 'General Miguel Costa' },
-  { code: 'CPB', name: 'Carapicuíba' },
-  { code: 'STE', name: 'Santa Terezinha' },
-  { code: 'AJO', name: 'Antônio João' },
-  { code: 'BRU', name: 'Barueri' },
-  { code: 'JBE', name: 'Jardim Belval' },
-  { code: 'JSI', name: 'Jardim Silveira' },
-  { code: 'JDI', name: 'Jandira' },
-  { code: 'SCO', name: 'Sagrado Coração' },
-  { code: 'ECD', name: 'Engenheiro Cardoso' },
-  { code: 'IPV', name: 'Itapevi' },
-  { code: 'SRT', name: 'Santa Rita' },
-  { code: 'AMB', name: 'Ambuitá' },
-  { code: 'ABU', name: 'Amador Bueno' },
-];
+export const L8_STATIONS: NextTrainStation[] = STATIC_L8_STATIONS;
 
 /**
  * Line 9 - Esmeralda stations (Osasco → Varginha)
  * Order: Terminal 1 (OSA) to Terminal 2 (VAG)
  */
-export const L9_STATIONS: NextTrainStation[] = [
-  { code: 'OSA', name: 'Osasco' },
-  { code: 'PAL', name: 'Presidente Altino' },
-  { code: 'CEA', name: 'Ceasa' },
-  { code: 'JAG', name: 'Villa Lobos–Jaguaré' },
-  { code: 'USP', name: 'Cidade Universitária' },
-  { code: 'PIN', name: 'Pinheiros' },
-  { code: 'HBR', name: 'Hebraica–Rebouças' },
-  { code: 'CJD', name: 'Cidade Jardim' },
-  { code: 'VOL', name: 'Vila Olímpia' },
-  { code: 'BRR', name: 'Berrini' },
-  { code: 'MRB', name: 'Morumbi' },
-  { code: 'GJT', name: 'Granja Julieta' },
-  { code: 'JOD', name: 'João Dias' },
-  { code: 'SAM', name: 'Santo Amaro' },
-  { code: 'SOC', name: 'Socorro' },
-  { code: 'JUR', name: 'Jurubatuba' },
-  { code: 'AUT', name: 'Autódromo' },
-  { code: 'INT', name: 'Primavera–Interlagos' },
-  { code: 'GRA', name: 'Grajaú' },
-  { code: 'MVN', name: 'Bruno Covas/Mendes–Vila Natal' },
-  { code: 'VAG', name: 'Varginha' },
-];
+export const L9_STATIONS: NextTrainStation[] = STATIC_L9_STATIONS;
 
 /**
  * Line code type for lines with next-train data
@@ -273,21 +219,21 @@ export function findStationByName(
 
   // Check L4 first (higher priority)
   for (const station of L4_STATIONS) {
-    if (normalizeStationName(station.name) === normalizedName) {
+    if (matchesStationName(station, normalizedName)) {
       return { lineCode: 'L4', stationCode: station.code };
     }
   }
 
   // Check L8
   for (const station of L8_STATIONS) {
-    if (normalizeStationName(station.name) === normalizedName) {
+    if (matchesStationName(station, normalizedName)) {
       return { lineCode: 'L8', stationCode: station.code };
     }
   }
 
   // Check L9
   for (const station of L9_STATIONS) {
-    if (normalizeStationName(station.name) === normalizedName) {
+    if (matchesStationName(station, normalizedName)) {
       return { lineCode: 'L9', stationCode: station.code };
     }
   }
@@ -305,10 +251,19 @@ function normalizeStationName(name: string): string {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // Remove accents
-    .replace(/[-–—]/g, ' ') // Replace dashes with spaces
+    .replace(/[-–—/]/g, ' ') // Replace separators with spaces
     .replace(/\s+/g, ' ') // Normalize whitespace
     .replace(/\s*\(linha\s*\d+\)\s*/gi, '') // Remove "(linha X)" suffix
     .trim();
+}
+
+function matchesStationName(
+  station: NextTrainStation,
+  normalizedName: string,
+): boolean {
+  return [station.name, ...(station.alternativeNames ?? [])].some(
+    (candidateName) => normalizeStationName(candidateName) === normalizedName,
+  );
 }
 
 /**
@@ -330,7 +285,7 @@ export function findNextTrainStations(
   // Check if L4 is in the line codes
   if (lineCodes.includes(4)) {
     for (const station of L4_STATIONS) {
-      if (normalizeStationName(station.name) === normalizedName) {
+      if (matchesStationName(station, normalizedName)) {
         results.push({ lineCode: 'L4', stationCode: station.code });
         break;
       }
@@ -340,7 +295,7 @@ export function findNextTrainStations(
   // Check if L8 is in the line codes
   if (lineCodes.includes(8)) {
     for (const station of L8_STATIONS) {
-      if (normalizeStationName(station.name) === normalizedName) {
+      if (matchesStationName(station, normalizedName)) {
         results.push({ lineCode: 'L8', stationCode: station.code });
         break;
       }
@@ -350,7 +305,7 @@ export function findNextTrainStations(
   // Check if L9 is in the line codes
   if (lineCodes.includes(9)) {
     for (const station of L9_STATIONS) {
-      if (normalizeStationName(station.name) === normalizedName) {
+      if (matchesStationName(station, normalizedName)) {
         results.push({ lineCode: 'L9', stationCode: station.code });
         break;
       }

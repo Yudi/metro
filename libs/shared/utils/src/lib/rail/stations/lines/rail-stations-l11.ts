@@ -67,6 +67,7 @@ export const L11_STATIONS: StaticRailStation[] = [
   {
     code: 'BCB',
     name: 'Braz Cubas',
+    alternativeNames: ['Brás Cubas'],
   },
   {
     code: 'MDC',

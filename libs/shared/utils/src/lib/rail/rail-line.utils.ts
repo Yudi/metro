@@ -424,8 +424,15 @@ export function getStationByName(
   stationName: string,
 ): StaticRailStation | undefined {
   const line = getRailLineByCode(lineCode);
-  return line?.stations.find(
-    (s) => s.name.toLowerCase() === stationName.toLowerCase(),
+  const normalizedNames = new Set([
+    hardNormalizeString(stationName),
+    hardNormalizeString(normalizeStationName(stationName)),
+  ]);
+
+  return line?.stations.find((station) =>
+    [station.name, ...(station.alternativeNames ?? [])]
+      .flatMap((name) => [name, normalizeStationName(name)])
+      .some((name) => normalizedNames.has(hardNormalizeString(name))),
   );
 }
 

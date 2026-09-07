@@ -85,7 +85,11 @@ export const L9_STATIONS: StaticRailStation[] = [
   {
     code: 'MVN',
     name: 'Bruno Covas/Mendes-Vila Natal',
-    alternativeNames: ['Mendes-Vila Natal', 'Bruno Covas - Mendes-Vila Natal'],
+    alternativeNames: [
+      'Mendes / Bruno Covas',
+      'Mendes-Vila Natal',
+      'Bruno Covas - Mendes-Vila Natal',
+    ],
   },
   {
     code: 'VAG',

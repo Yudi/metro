@@ -17,6 +17,7 @@ export const L8_STATIONS: StaticRailStation[] = [
   {
     code: 'DMO',
     name: 'Domingos de Moraes',
+    alternativeNames: ['Domingos de Morais'],
   },
   {
     code: 'ILE',

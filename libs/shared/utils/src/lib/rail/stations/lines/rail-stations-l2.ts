@@ -6,6 +6,7 @@ export const L2_STATIONS: StaticRailStation[] = [
     code: 'SUM',
     name: 'Sumaré',
     alternativeNames: [
+      'Santuário Nossa Senhora de Fátima-Sumaré',
       'Santuário Nosa Senhora de Fátima-Sumaré',
       'Santuário N. S. de Fátima-Sumaré',
       'Santuário N. Sra. de Fátima',

@@ -19,6 +19,7 @@ export const L4_STATIONS: StaticRailStation[] = [
     code: 'VLS',
     name: 'Vila Sônia',
     alternativeNames: [
+      'Vila Sônia Profa. Elisabeth Tenreiro',
       'Vila Sônia-Professora Elisabeth Tenreiro',
       'Vila Sônia-Profª Elisabeth Tenreiro',
     ],

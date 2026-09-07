@@ -7,6 +7,7 @@ export const L1_STATIONS: StaticRailStation[] = [
     code: 'JPA',
     name: 'Jardim São Paulo',
     alternativeNames: [
+      'Ayrton Senna-Jardim São Paulo',
       'Jardim São Paulo-Ayrton Senna',
       'Jd. São Paulo',
       'Jd. São Paulo-Ayrton Senna',

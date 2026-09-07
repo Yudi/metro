@@ -15,7 +15,9 @@ describe('GraphQL timing plugin', () => {
     });
     const requestContext = {
       contextValue: { requestId: 'request-1234' },
-      request: { http: { headers: new Map([['x-request-id', 'request-1234']]) } },
+      request: {
+        http: { headers: new Map([['x-request-id', 'request-1234']]) },
+      },
     } as unknown as GraphQLRequestContext<Record<string, unknown>>;
     if (!plugin.requestDidStart) {
       throw new Error('GraphQL timing plugin did not register');

@@ -1,9 +1,5 @@
 import { NgOptimizedImage } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  input,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 
 @Component({
   selector: 'app-history-line-identity',
@@ -58,13 +54,7 @@ export class HistoryLineIdentityComponent {
   template: `
     <div class="identity">
       @if (iconPath(); as path) {
-        <img
-          class="agency-icon"
-          [ngSrc]="path"
-          width="28"
-          height="28"
-          alt=""
-        />
+        <img class="agency-icon" [ngSrc]="path" width="28" height="28" alt="" />
       }
       <span>{{ name() }}</span>
     </div>

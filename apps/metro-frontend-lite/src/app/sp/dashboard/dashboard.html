@@ -149,9 +149,9 @@
               <strong>{{ stop.name }}</strong>
               <div class="stop-identifiers">
                 <small>{{ stop.sourceId || stop.stopId }}</small>
-              @if (stop.platformCode) {
-              <small>Plataforma {{ stop.platformCode }}</small>
-              }
+                @if (stop.platformCode) {
+                <small>Plataforma {{ stop.platformCode }}</small>
+                }
               </div>
               @if (getBusStopAgencies(stop).length > 0) {
               <div class="agency-list" aria-label="Operadora">
@@ -199,7 +199,11 @@
                   </span>
                 </div>
                 @if (routeFareLabel(route); as fareLabel) {
-                <span class="route-fare" [class.fare-missing]="!route.fares?.length" [attr.aria-label]="'Tarifa: ' + fareLabel">
+                <span
+                  class="route-fare"
+                  [class.fare-missing]="!route.fares?.length"
+                  [attr.aria-label]="'Tarifa: ' + fareLabel"
+                >
                   <strong>{{ fareLabel }}</strong>
                 </span>
                 }
@@ -218,7 +222,8 @@
             (arrivalLines.length > 0) {
             <div class="arrival-box">
               <strong>Próximas chegadas</strong>
-              @for (line of arrivalLines.slice(0, 3); track line.cl || line.c + line.sl) {
+              @for (line of arrivalLines.slice(0, 3); track line.cl || line.c +
+              line.sl) {
               <div class="arrival-row">
                 <span>{{ line.c }} → {{ getBusDestination(line) }} </span>
                 @if (line.vs.length > 0 && line.vs[0].t) {
@@ -232,10 +237,9 @@
             </div>
             } @else if (!loading() && hasSptransRealtimeData(stop)) {
             <small>Sem previsão de chegada no último carregamento.</small>
-            }
-
-            @let scheduledRouteGroups = getBusScheduledRouteGroups(stop.stopId);
-            @if (hasArtespScheduleData(stop)) {
+            } @let scheduledRouteGroups =
+            getBusScheduledRouteGroups(stop.stopId); @if
+            (hasArtespScheduleData(stop)) {
             <div class="scheduled-box">
               <div class="scheduled-heading">
                 <span class="agency-lockup">
@@ -250,12 +254,14 @@
                 <span>Horários programados</span>
               </div>
               <small>Estes horários não são previsões em tempo real.</small>
-              @if (scheduledRouteGroups.length > 0) {
-              @for (group of scheduledRouteGroups; track group.routeId) {
+              @if (scheduledRouteGroups.length > 0) { @for (group of
+              scheduledRouteGroups; track group.routeId) {
               <div class="scheduled-route-group">
-                @for (departure of getVisibleScheduledDepartures(stop.stopId, group); track getScheduledDepartureKey(departure)) {
-                @let scheduleTime = departure.timeParts;
-                @let scheduleRoute = getBusRouteForScheduledDeparture(stop.stopId, departure.routeId);
+                @for (departure of getVisibleScheduledDepartures(stop.stopId,
+                group); track getScheduledDepartureKey(departure)) { @let
+                scheduleTime = departure.timeParts; @let scheduleRoute =
+                getBusRouteForScheduledDeparture(stop.stopId,
+                departure.routeId);
                 <div class="scheduled-row">
                   <time [attr.datetime]="departure.departureTime">
                     <span>{{ scheduleTime.time }}</span>
@@ -268,15 +274,17 @@
                       class="scheduled-route-code"
                       [style.background-color]="scheduleRoute ? routeColor(scheduleRoute) : null"
                       [style.color]="scheduleRoute ? routeTextColor(scheduleRoute) : null"
-                    >{{ departure.routeShortName }}</strong>
+                      >{{ departure.routeShortName }}</strong
+                    >
                     <span>{{ departure.headsign }}</span>
                   </div>
                   @if (departure.platformCode) {
-                  <small class="scheduled-platform">Plataforma {{ departure.platformCode }}</small>
+                  <small class="scheduled-platform"
+                    >Plataforma {{ departure.platformCode }}</small
+                  >
                   }
                 </div>
-                }
-                @if (group.departures.length > 1) {
+                } @if (group.departures.length > 1) {
                 <button
                   type="button"
                   class="schedule-toggle"
@@ -284,12 +292,12 @@
                   [attr.aria-label]="getScheduledRouteToggleLabel(stop.stopId, group.routeId, group.departures.length) + ' da linha ' + group.departures[0].routeShortName"
                   (click)="toggleScheduledRoute(stop.stopId, group.routeId)"
                 >
-                  {{ getScheduledRouteToggleLabel(stop.stopId, group.routeId, group.departures.length) }}
+                  {{ getScheduledRouteToggleLabel(stop.stopId, group.routeId,
+                  group.departures.length) }}
                 </button>
                 }
               </div>
-              }
-              } @else if (!loading()) {
+              } } @else if (!loading()) {
               <small>Nenhum horário programado disponível.</small>
               }
             </div>
@@ -327,7 +335,11 @@
               <small class="route-id">{{ routeDisplayId(route) }}</small>
             </div>
             @if (routeFareLabel(route); as fareLabel) {
-            <span class="route-fare" [class.fare-missing]="!route.fares?.length" [attr.aria-label]="'Tarifa: ' + fareLabel">
+            <span
+              class="route-fare"
+              [class.fare-missing]="!route.fares?.length"
+              [attr.aria-label]="'Tarifa: ' + fareLabel"
+            >
               <strong>{{ fareLabel }}</strong>
             </span>
             }

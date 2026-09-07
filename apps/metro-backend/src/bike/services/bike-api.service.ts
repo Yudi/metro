@@ -55,10 +55,7 @@ export class BikeApiService {
       (vehicleTypesResult.status === 'fulfilled'
         ? vehicleTypesResult.value.data.vehicle_types
         : []
-      ).map((vehicleType) => [
-        vehicleType.vehicle_type_id,
-        vehicleType,
-      ]),
+      ).map((vehicleType) => [vehicleType.vehicle_type_id, vehicleType]),
     );
     const pricingPlansById = new Map(
       (pricingPlansResult.status === 'fulfilled'

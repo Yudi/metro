@@ -90,11 +90,10 @@
             </span>
             }
           </div>
-          }
-          @if (stop.kind === 'busStop' && getPlatformLabel(stop); as platformLabel) {
+          } @if (stop.kind === 'busStop' && getPlatformLabel(stop); as
+          platformLabel) {
           <p class="stop-type">{{ platformLabel }}</p>
-          }
-          @if (stop.kind === 'bikeStation') {
+          } @if (stop.kind === 'bikeStation') {
           <p class="stop-type">{{ getBikeSummary(stop) }}</p>
           } @if (stop.lineCodes.length > 0) {
           <div class="stop-lines">
@@ -158,8 +157,8 @@
         </span>
         }
       </div>
-      }
-      @if (stop.kind === 'busStop' && getPlatformLabel(stop); as platformLabel) {
+      } @if (stop.kind === 'busStop' && getPlatformLabel(stop); as
+      platformLabel) {
       <span class="detail-type">{{ platformLabel }}</span>
       }
     </div>

@@ -16,9 +16,7 @@ export type GtfsDirectionId = 0 | 1;
  * determines which label is the destination for the current direction.
  * Unknown directions preserve the provider's lt0/lt1 order as a fallback.
  */
-export function getOlhoVivoDestination(
-  line: OlhoVivoDirectionFields,
-): string {
+export function getOlhoVivoDestination(line: OlhoVivoDirectionFields): string {
   return line.sl === 2 ? line.lt1 : line.lt0;
 }
 

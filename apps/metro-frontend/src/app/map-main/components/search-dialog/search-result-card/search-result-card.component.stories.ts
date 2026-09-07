@@ -1,5 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/angular';
-import { ROUTE_ARTESP_001, ROUTE_ARTESP_WITHOUT_FARE } from '@metro/storybook-mocks';
+import {
+  ROUTE_ARTESP_001,
+  ROUTE_ARTESP_WITHOUT_FARE,
+} from '@metro/storybook-mocks';
 import type { TypesenseRoute } from '../../../../services/typesense-search.service';
 import {
   SearchResultCardComponent,

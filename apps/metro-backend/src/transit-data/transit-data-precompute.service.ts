@@ -51,9 +51,7 @@ export class TransitDataPrecomputeService {
     );
   }
 
-  async markGtfsPostProcessingComplete(
-    sourceSignature: string,
-  ): Promise<void> {
+  async markGtfsPostProcessingComplete(sourceSignature: string): Promise<void> {
     await this.storeSignature(
       GTFS_POST_PROCESSING_STATE_KEY,
       `${GTFS_POST_PROCESSING_COMPLETE_PREFIX}${sourceSignature}`,

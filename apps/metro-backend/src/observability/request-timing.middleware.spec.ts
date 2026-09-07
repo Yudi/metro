@@ -20,7 +20,11 @@ describe('request timing middleware', () => {
       now: () => nowValue,
     });
 
-    middleware(request, response as unknown as Response, jest.fn() as NextFunction);
+    middleware(
+      request,
+      response as unknown as Response,
+      jest.fn() as NextFunction,
+    );
     nowValue = 20;
     response.emit('finish');
 

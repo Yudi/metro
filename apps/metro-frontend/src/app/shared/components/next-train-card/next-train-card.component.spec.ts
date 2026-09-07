@@ -97,7 +97,11 @@ describe('NextTrainCardComponent', () => {
   }
 
   it('uses the last passed station for null, in-transit, and departing statuses', () => {
-    for (const trainPositionStatus of [null, 'in_transit', 'departing'] as const) {
+    for (const trainPositionStatus of [
+      null,
+      'in_transit',
+      'departing',
+    ] as const) {
       expect(
         component.getTrainLocation(
           createArrival({
@@ -203,7 +207,9 @@ describe('NextTrainCardComponent', () => {
         }),
       );
 
-      expect(renderedLocation()).toBe(`Passou por ${trainLastPassedStationName}`);
+      expect(renderedLocation()).toBe(
+        `Passou por ${trainLastPassedStationName}`,
+      );
     },
   );
 
@@ -257,7 +263,9 @@ describe('NextTrainCardComponent', () => {
     );
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('.next-train-prominent')).toBeNull();
+    expect(
+      fixture.nativeElement.querySelector('.next-train-prominent'),
+    ).toBeNull();
     expect(
       fixture.nativeElement.querySelectorAll('.train-composition-card'),
     ).toHaveLength(2);

@@ -157,9 +157,8 @@ export class Search {
         return;
       }
 
-      const releaseStopSubscription = this.realtimeService.subscribeToStop(
-        stopCode,
-      );
+      const releaseStopSubscription =
+        this.realtimeService.subscribeToStop(stopCode);
       onCleanup(() => releaseStopSubscription());
     });
   }
@@ -304,7 +303,7 @@ export class Search {
     const routeIds = this.getUniqueRouteIds(stop.routes ?? []);
     if (routeIds.length === 0) {
       return;
-          }
+    }
 
     this.railConnectionsLoading.set(true);
     this.railConnectionsError.set(false);

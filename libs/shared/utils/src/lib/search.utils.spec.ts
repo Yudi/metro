@@ -1,5 +1,9 @@
 import { describe, expect, it } from '@jest/globals';
-import { SearchTypes, SearchTypesEnum, StopsAndStationsValues } from './search.utils';
+import {
+  SearchTypes,
+  SearchTypesEnum,
+  StopsAndStationsValues,
+} from './search.utils';
 
 // Keep string literals assignable to both the public type and array element type.
 const literalSearchType: SearchTypes = 'busRoute';

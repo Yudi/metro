@@ -112,8 +112,16 @@ describe('RailIntegrationClientService', () => {
   });
 
   it('preserves generic vehicle display metadata across transport', async () => {
-    const vehicle = { id: 'opaque-id', prefix: '', lat: -23.5, lng: -46.7,
-      bearing: 0, lastUpdate: 1_789_000_000_000, estimated: true, validUntil: 1_789_000_060_000 };
+    const vehicle = {
+      id: 'opaque-id',
+      prefix: '',
+      lat: -23.5,
+      lng: -46.7,
+      bearing: 0,
+      lastUpdate: 1_789_000_000_000,
+      estimated: true,
+      validUntil: 1_789_000_060_000,
+    };
     const service = createServiceWithClient({
       getVehiclesForLine: unarySuccess({ vehicles: [vehicle] }),
     });

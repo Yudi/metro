@@ -26,7 +26,9 @@ export class DataImportHooksService {
     private readonly routeStopMapping: RouteStopMappingService,
   ) {}
 
-  async onDataImportComplete(options: DataImportHookOptions = {}): Promise<void> {
+  async onDataImportComplete(
+    options: DataImportHookOptions = {},
+  ): Promise<void> {
     const dataChanged = options.dataChanged ?? true;
     const sourceSignature = options.sourceSignature;
     const feeds = options.feeds ?? ['sptrans'];

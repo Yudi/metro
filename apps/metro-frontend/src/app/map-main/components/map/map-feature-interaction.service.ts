@@ -1,10 +1,7 @@
 import { Service, inject } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { LoggerService } from '@metro/shared/api';
-import {
-  formatBusFare,
-  type BusFare,
-} from '@metro/shared/utils';
+import { formatBusFare, type BusFare } from '@metro/shared/utils';
 import { Feature } from 'ol';
 import { FeatureLike } from 'ol/Feature';
 import { BikeStationsService } from '../../services/bike-stations.service';
@@ -264,11 +261,9 @@ export class MapFeatureInteractionService {
         ? `Posição estimada ${estimatedPositionDescription}.`
         : 'Localização estimada. A posição exibida pode diferir da posição real do trem.';
 
-    this.snackBar.open(
-      `Linha ${lineCode}${direction}: ${position}`,
-      'Fechar',
-      { duration: 5000 },
-    );
+    this.snackBar.open(`Linha ${lineCode}${direction}: ${position}`, 'Fechar', {
+      duration: 5000,
+    });
   }
 
   private showRouteDetails(

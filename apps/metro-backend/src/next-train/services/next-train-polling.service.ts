@@ -423,7 +423,11 @@ export class NextTrainPollingService implements OnModuleDestroy {
       outOfSchedule,
     );
 
-    const stationName = await this.resolveStationName(lineCode, stationCode, sequence);
+    const stationName = await this.resolveStationName(
+      lineCode,
+      stationCode,
+      sequence,
+    );
 
     if (this.pollSequences.get(key) !== sequence) {
       return { delta: null, hasError: isApiError };
@@ -624,5 +628,4 @@ export class NextTrainPollingService implements OnModuleDestroy {
 
     return Number(match[1]);
   }
-
 }

@@ -437,19 +437,19 @@ export class FavoritesComponent {
   }
 
   routeFareLabel(
-    route: BusRouteGraphQL | {
-      routeId: string;
-      sourceAgency?: string;
-      fares?: Array<{ price: number; currency: string }>;
-    },
+    route:
+      | BusRouteGraphQL
+      | {
+          routeId: string;
+          sourceAgency?: string;
+          fares?: Array<{ price: number; currency: string }>;
+        },
   ): string | null {
     if (route.fares && route.fares.length > 0) {
       return route.fares.map((fare) => formatBusFare(fare)).join(' · ');
     }
 
-    return isArtespRoute(route)
-      ? 'Tarifa não informada'
-      : null;
+    return isArtespRoute(route) ? 'Tarifa não informada' : null;
   }
 
   stopDisplayId(stop: { stopId: string; sourceId?: string }): string {
@@ -469,9 +469,7 @@ export class FavoritesComponent {
     } else if (sourceAgency && this.isTransitAgency(sourceAgency)) {
       agency = sourceAgency;
     } else if (!sourceAgency) {
-      agency = route.shortName
-        ? getRouteAgency(route.shortName)
-        : undefined;
+      agency = route.shortName ? getRouteAgency(route.shortName) : undefined;
       if (!agency) {
         agency = TransitAgency.SPTRANS;
       }

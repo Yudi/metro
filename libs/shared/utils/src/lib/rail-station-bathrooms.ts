@@ -107,12 +107,7 @@ const STATION_BATHROOM_DATA = [
   ],
   ['L3', 'Marechal Deodoro', S.Unavailable],
   ['L3', 'Santa Cecília', S.Unavailable],
-  [
-    'L3',
-    'República',
-    S.PaidArea,
-    'Acesso pelo complexo da Linha 4',
-  ],
+  ['L3', 'República', S.PaidArea, 'Acesso pelo complexo da Linha 4'],
   ['L3', 'Anhangabaú', S.Unavailable],
   ['L3', 'Sé', S.PaidArea],
   ['L3', 'Pedro II', S.FreeArea],

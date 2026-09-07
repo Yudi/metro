@@ -4,7 +4,10 @@ import {
   getStaticRailStationsByLine,
   hardNormalizeString,
 } from '@metro/shared/utils';
-import { RAIL_MAP_CONTEXT_LIMITS, type RailVehicleMapContext } from '@metro/rail-integration-contracts';
+import {
+  RAIL_MAP_CONTEXT_LIMITS,
+  type RailVehicleMapContext,
+} from '@metro/rail-integration-contracts';
 import { PrismaService } from '../../prisma/prisma.service';
 
 const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -94,9 +97,12 @@ export class RailMapContextService {
         return undefined;
       }
       const paths = this.mapPaths(pathRows);
-      if (stations.length === 0 || paths.length === 0 ||
+      if (
+        stations.length === 0 ||
+        paths.length === 0 ||
         stations.length > RAIL_MAP_CONTEXT_LIMITS.stations ||
-        paths.length > RAIL_MAP_CONTEXT_LIMITS.paths) {
+        paths.length > RAIL_MAP_CONTEXT_LIMITS.paths
+      ) {
         return undefined;
       }
 
@@ -195,9 +201,7 @@ export class RailMapContextService {
     return mapped;
   }
 
-  private mapPaths(
-    rows: PathPointRow[],
-  ): RailVehicleMapContext['paths'] {
+  private mapPaths(rows: PathPointRow[]): RailVehicleMapContext['paths'] {
     const invalidPaths = new Set<number>();
     const grouped = new Map<
       number,
@@ -242,8 +246,13 @@ export class RailMapContextService {
       .filter(([pathId]) => !invalidPaths.has(pathId))
       .sort(([first], [second]) => first - second)
       .flatMap(([, entries]) => {
-        const ordered = entries.sort((first, second) => first.pointIndex - second.pointIndex);
-        if (ordered.length < 2 || ordered.some((entry, index) => entry.pointIndex !== index + 1)) {
+        const ordered = entries.sort(
+          (first, second) => first.pointIndex - second.pointIndex,
+        );
+        if (
+          ordered.length < 2 ||
+          ordered.some((entry, index) => entry.pointIndex !== index + 1)
+        ) {
           return [];
         }
         return [{ points: ordered.map(({ point }) => point) }];
@@ -260,7 +269,9 @@ function toFiniteNumber(value: number | string | bigint | null): number | null {
   return Number.isFinite(number) ? number : null;
 }
 
-function toFiniteInteger(value: number | string | bigint | null): number | null {
+function toFiniteInteger(
+  value: number | string | bigint | null,
+): number | null {
   const number = toFiniteNumber(value);
   return number !== null && Number.isInteger(number) ? number : null;
 }

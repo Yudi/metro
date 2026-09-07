@@ -29,9 +29,7 @@ describe('RailStationProcessorService precompute lifecycle', () => {
       .mockReturnValue([mergedStation] as never);
     jest
       .spyOn(service, 'getAllStations')
-      .mockResolvedValue([
-        { ...mergedStation, mergedIds: [1, 2] },
-      ] as never);
+      .mockResolvedValue([{ ...mergedStation, mergedIds: [1, 2] }] as never);
     const persist = jest
       .spyOn(service as never, 'persistMergedStations' as never)
       .mockResolvedValue(undefined as never);

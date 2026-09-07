@@ -379,7 +379,9 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
     maximum: number,
   ): number {
     const configured = Number(this.configService.get(key));
-    return Number.isFinite(configured) && configured >= minimum && configured <= maximum
+    return Number.isFinite(configured) &&
+      configured >= minimum &&
+      configured <= maximum
       ? configured
       : fallback;
   }
@@ -438,7 +440,11 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
   private isAvailabilityError(error: unknown): boolean {
     const record = isRecord(error) ? error : undefined;
     const response = isRecord(record?.response) ? record.response : undefined;
-    const status = firstDefined(record?.httpStatus, record?.status, response?.status);
+    const status = firstDefined(
+      record?.httpStatus,
+      record?.status,
+      response?.status,
+    );
     const code = typeof record?.code === 'string' ? record.code : '';
     const message =
       error instanceof Error

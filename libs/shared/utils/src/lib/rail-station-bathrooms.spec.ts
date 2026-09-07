@@ -51,9 +51,7 @@ describe('station bathroom data', () => {
   it('covers every canonical static station by its primary name', () => {
     for (const lineCode of STATIC_LINE_CODES) {
       for (const station of getStaticRailStationsByLine(lineCode) ?? []) {
-        expect(
-          findStationBathroomRecord(station.name, lineCode),
-        ).toBeDefined();
+        expect(findStationBathroomRecord(station.name, lineCode)).toBeDefined();
       }
     }
 
@@ -67,26 +65,23 @@ describe('station bathroom data', () => {
 
   it('resolves canonical aliases, branded names, codes, and numeric lines', () => {
     expect(
-      findStationBathroomRecord(
-        'Jabaquara-Comitê Paralímpico Brasileiro',
-        1,
-      ),
+      findStationBathroomRecord('Jabaquara-Comitê Paralímpico Brasileiro', 1),
     ).toMatchObject({
       stationName: 'Jabaquara',
       status: StationBathroomStatus.FreeArea,
     });
-    expect(findStationBathroomRecord('Faria Lima-Pag Bank', 'L4')).toMatchObject(
-      {
-        stationName: 'Faria Lima',
-        status: StationBathroomStatus.PaidArea,
-      },
-    );
-    expect(findStationBathroomRecord('Berrini-Casas Bahia', '09')).toMatchObject(
-      {
-        stationName: 'Berrini',
-        status: StationBathroomStatus.PaidArea,
-      },
-    );
+    expect(
+      findStationBathroomRecord('Faria Lima-Pag Bank', 'L4'),
+    ).toMatchObject({
+      stationName: 'Faria Lima',
+      status: StationBathroomStatus.PaidArea,
+    });
+    expect(
+      findStationBathroomRecord('Berrini-Casas Bahia', '09'),
+    ).toMatchObject({
+      stationName: 'Berrini',
+      status: StationBathroomStatus.PaidArea,
+    });
     expect(findStationBathroomRecord('Lapa (Linha 8)', 'L8')).toMatchObject({
       stationName: 'Lapa',
       status: StationBathroomStatus.PaidArea,
@@ -146,9 +141,9 @@ describe('station bathroom data', () => {
     expect(findStationBathroomRecord('Morumbi', 'L17')?.status).toBe(
       StationBathroomStatus.AvailableLocationUnknown,
     );
-    expect(
-      findStationBathroomRecord('São Paulo - Morumbi', 'L4')?.status,
-    ).toBe(StationBathroomStatus.PaidAndFreeAreas);
+    expect(findStationBathroomRecord('São Paulo - Morumbi', 'L4')?.status).toBe(
+      StationBathroomStatus.PaidAndFreeAreas,
+    );
     expect(resolveStationBathroomInfo('Morumbi', [9, 17])?.status).toBe(
       StationBathroomStatus.PaidArea,
     );
@@ -177,10 +172,7 @@ describe('station bathroom data', () => {
     ).toBe(StationBathroomStatus.Unavailable);
     expect(
       aggregateStationBathroomInfo([
-        bathroomRecord(
-          'L1',
-          StationBathroomStatus.AvailableLocationUnknown,
-        ),
+        bathroomRecord('L1', StationBathroomStatus.AvailableLocationUnknown),
         bathroomRecord('L2', StationBathroomStatus.Unavailable),
       ])?.status,
     ).toBe(StationBathroomStatus.AvailableLocationUnknown);

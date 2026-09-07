@@ -262,7 +262,10 @@ export class CsvProcessingService {
           );
         }
 
-        if (recordCount === 0 && !GTFSConfig.isEmptyAllowedFile(fileName, feed)) {
+        if (
+          recordCount === 0 &&
+          !GTFSConfig.isEmptyAllowedFile(fileName, feed)
+        ) {
           this.logger.warn(`No records found in ${fileName}`);
           throw new Error(`${fileName} contains no usable records`);
         }
@@ -865,7 +868,10 @@ export class CsvProcessingService {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to count records in ${filePath}:`, errorMessage);
+      this.logger.error(
+        `Failed to count records in ${filePath}:`,
+        errorMessage,
+      );
       throw withCause(
         `CSV record count failed for ${filePath}: ${errorMessage}`,
         error,

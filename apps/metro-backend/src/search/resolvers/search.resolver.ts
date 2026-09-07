@@ -1,4 +1,7 @@
-import { formatBusRouteDocument, formatBusStopDocument } from '../services/bus-search-document';
+import {
+  formatBusRouteDocument,
+  formatBusStopDocument,
+} from '../services/bus-search-document';
 import {
   Resolver,
   Query,
@@ -91,18 +94,26 @@ export class SearchResolver {
         ? this.typesenseService.search(input.query, types, input.limit ?? 10)
         : Promise.resolve([]));
 
-      const sortedByScore = typesenseResults.sort((a, b) =>
-        this.getAdjustedScore(b, input.query) - this.getAdjustedScore(a, input.query),
+      const sortedByScore = typesenseResults.sort(
+        (a, b) =>
+          this.getAdjustedScore(b, input.query) -
+          this.getAdjustedScore(a, input.query),
       );
       // Preserve rail/stop relevance and reorder only the bus-route positions.
-      const busRoutes = sortedByScore.filter((hit) => hit.type === 'busRoute').sort((a, b) => {
-        const left = formatBusRouteDocument(a.document as RouteDocument);
-        const right = formatBusRouteDocument(b.document as RouteDocument);
-        return Number(left.sourceAgency === 'artesp') - Number(right.sourceAgency === 'artesp');
-      });
+      const busRoutes = sortedByScore
+        .filter((hit) => hit.type === 'busRoute')
+        .sort((a, b) => {
+          const left = formatBusRouteDocument(a.document as RouteDocument);
+          const right = formatBusRouteDocument(b.document as RouteDocument);
+          return (
+            Number(left.sourceAgency === 'artesp') -
+            Number(right.sourceAgency === 'artesp')
+          );
+        });
       let busIndex = 0;
       for (let index = 0; index < sortedByScore.length; index++) {
-        if (sortedByScore[index].type === 'busRoute') sortedByScore[index] = busRoutes[busIndex++];
+        if (sortedByScore[index].type === 'busRoute')
+          sortedByScore[index] = busRoutes[busIndex++];
       }
 
       return sortedByScore.slice(0, input.limit ?? 10).map((hit) => ({
@@ -159,7 +170,9 @@ export class SearchResolver {
       await this.searchService.clearIndex();
       return true;
     } catch (error) {
-      this.logger.error(`Clearing index failed: ${formatTypesenseError(error)}`);
+      this.logger.error(
+        `Clearing index failed: ${formatTypesenseError(error)}`,
+      );
       if (error instanceof ServiceUnavailableException) {
         throw error;
       }

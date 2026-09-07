@@ -24,8 +24,7 @@ export const L11_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
         disembarkingSide: 'left',
         directionalFactReview: {
           status: 'reviewed',
-          source:
-            'https://pt.wikipedia.org/wiki/Esta%C3%A7%C3%A3o_da_Luz',
+          source: 'https://pt.wikipedia.org/wiki/Esta%C3%A7%C3%A3o_da_Luz',
           lastReviewedAt: '2026-09-04',
         },
         features: [],
@@ -47,8 +46,7 @@ export const L11_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
         disembarkingSide: 'left',
         directionalFactReview: {
           status: 'reviewed',
-          source:
-            'https://pt.wikipedia.org/wiki/Esta%C3%A7%C3%A3o_Br%C3%A1s',
+          source: 'https://pt.wikipedia.org/wiki/Esta%C3%A7%C3%A3o_Br%C3%A1s',
           lastReviewedAt: '2026-09-04',
         },
         features: [],

@@ -59,10 +59,9 @@ describe('OlhoVivo direction utilities', () => {
 
   it('does not loosely match an empty destination', () => {
     expect(
-      findOlhoVivoGtfsDirection(
-        { sl: 0, lt0: '', lt1: '' },
-        [{ directionId: 0, headsign: '' }],
-      ),
+      findOlhoVivoGtfsDirection({ sl: 0, lt0: '', lt1: '' }, [
+        { directionId: 0, headsign: '' },
+      ]),
     ).toBeUndefined();
   });
 });

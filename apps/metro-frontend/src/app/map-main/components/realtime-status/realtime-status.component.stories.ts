@@ -12,9 +12,7 @@ function createMockRealtimeService(
   hasRecentUpdate: boolean,
 ) {
   const lastUpdateTimestamp = signal(
-    hasRecentUpdate
-      ? Date.now()
-      : Date.now() - OLHOVIVO_POLL_INTERVAL_MS * 2,
+    hasRecentUpdate ? Date.now() : Date.now() - OLHOVIVO_POLL_INTERVAL_MS * 2,
   );
 
   // Simulate polling behavior - reset timestamp every poll interval

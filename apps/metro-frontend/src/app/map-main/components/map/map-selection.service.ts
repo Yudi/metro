@@ -301,10 +301,13 @@ export class MapSelectionService {
   ): void {
     const shortName = route.shortName;
     const routeId = 'routeId' in route ? route.routeId : route.id;
-    if (!shortName || isArtespRoute({
-      routeId,
-      sourceAgency: 'sourceAgency' in route ? route.sourceAgency : undefined,
-    })) {
+    if (
+      !shortName ||
+      isArtespRoute({
+        routeId,
+        sourceAgency: 'sourceAgency' in route ? route.sourceAgency : undefined,
+      })
+    ) {
       return;
     }
 
@@ -315,7 +318,9 @@ export class MapSelectionService {
         `Subscribed to private vehicles for line: ${vehicleLineCode}`,
       );
     } else if (isRailRouteReference(shortName)) {
-      this.logger.debug(`Tracked rail vehicles are unavailable for route: ${shortName}`);
+      this.logger.debug(
+        `Tracked rail vehicles are unavailable for route: ${shortName}`,
+      );
       return;
     }
 
@@ -337,12 +342,13 @@ export class MapSelectionService {
     }
   }
 
-  private unsubscribeFromRouteRealtime(
-    route: SelectedRoute | undefined,
-  ): void {
+  private unsubscribeFromRouteRealtime(route: SelectedRoute | undefined): void {
     const shortName = route?.shortName;
     const routeId = route?.id ?? '';
-    if (!shortName || isArtespRoute({ routeId, sourceAgency: route?.sourceAgency })) {
+    if (
+      !shortName ||
+      isArtespRoute({ routeId, sourceAgency: route?.sourceAgency })
+    ) {
       return;
     }
 
@@ -353,7 +359,9 @@ export class MapSelectionService {
         `Unsubscribed from private vehicles for line: ${vehicleLineCode}`,
       );
     } else if (isRailRouteReference(shortName)) {
-      this.logger.debug(`Tracked rail vehicles were unavailable for route: ${shortName}`);
+      this.logger.debug(
+        `Tracked rail vehicles were unavailable for route: ${shortName}`,
+      );
       return;
     }
 

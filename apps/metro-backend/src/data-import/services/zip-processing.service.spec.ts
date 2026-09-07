@@ -65,9 +65,9 @@ Archive:  /tmp/sptrans.zip
       getFileSize: jest.fn().mockResolvedValue(10),
     };
     service = new ZipProcessingService(fileOperations as never);
-    (
-      service as unknown as { extractZipFile: jest.Mock }
-    ).extractZipFile = jest.fn().mockResolvedValue(undefined);
+    (service as unknown as { extractZipFile: jest.Mock }).extractZipFile = jest
+      .fn()
+      .mockResolvedValue(undefined);
 
     await expect(
       service.extractAndAnalyzeFiles('/tmp/feed.zip', '/tmp/feed'),

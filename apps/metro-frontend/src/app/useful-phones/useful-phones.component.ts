@@ -9,8 +9,7 @@ import {
   TransitAgency,
 } from '@metro/shared/utils';
 
-type AgencyContact = { agencyKey: TransitAgency } &
-  AgenciesData[TransitAgency];
+type AgencyContact = { agencyKey: TransitAgency } & AgenciesData[TransitAgency];
 type PhoneContact = AgencyContact['contact']['phones'][number];
 
 interface AgencyGroup {

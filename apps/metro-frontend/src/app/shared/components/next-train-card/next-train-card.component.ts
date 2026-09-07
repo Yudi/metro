@@ -247,7 +247,9 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
         staticByDirection.get(hardNormalizeString(direction.terminal)),
     }));
     const liveDirectionKeys = new Set(
-      liveDirections.map((direction) => hardNormalizeString(direction.terminal)),
+      liveDirections.map((direction) =>
+        hardNormalizeString(direction.terminal),
+      ),
     );
 
     for (const composition of staticCompositions) {

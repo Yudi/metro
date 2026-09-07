@@ -58,9 +58,8 @@ export function validatePublicEnvironment(
 
   const allowedOrigins = optionalString(input['ALLOWED_ORIGINS']);
   if (allowedOrigins) {
-    environment.ALLOWED_ORIGINS = validateAllowedOrigins(allowedOrigins).join(
-      ',',
-    );
+    environment.ALLOWED_ORIGINS =
+      validateAllowedOrigins(allowedOrigins).join(',');
   }
 
   return environment;

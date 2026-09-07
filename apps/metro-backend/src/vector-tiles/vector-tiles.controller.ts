@@ -302,10 +302,7 @@ export class VectorTilesController {
     }
 
     const items = value.split(',').map((item) => item.trim());
-    if (
-      items.length > 100 ||
-      items.some((item) => !isSafeIdentifier(item))
-    ) {
+    if (items.length > 100 || items.some((item) => !isSafeIdentifier(item))) {
       throw new BadRequestException(
         `${argumentName} must contain at most 100 non-empty identifiers of up to 128 characters`,
       );

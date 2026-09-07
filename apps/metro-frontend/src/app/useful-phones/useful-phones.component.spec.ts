@@ -31,17 +31,16 @@ describe('UsefulPhonesComponent', () => {
       (group) => group.title === 'Trilhos',
     )?.agencies;
 
-    expect(railAgencies?.slice(0, 2).map((agency) => agency.shortName)).toEqual([
-      'Metrô',
-      'CPTM',
-    ]);
+    expect(railAgencies?.slice(0, 2).map((agency) => agency.shortName)).toEqual(
+      ['Metrô', 'CPTM'],
+    );
   });
 
   it('renders accessible actions for calls, SMS, and WhatsApp', () => {
     const links = Array.from(
-      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLAnchorElement>(
-        '.phone-action',
-      ),
+      (
+        fixture.nativeElement as HTMLElement
+      ).querySelectorAll<HTMLAnchorElement>('.phone-action'),
     );
 
     expect(links.some((link) => link.href.startsWith('tel:'))).toBe(true);

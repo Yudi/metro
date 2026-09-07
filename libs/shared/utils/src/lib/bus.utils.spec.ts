@@ -31,9 +31,7 @@ describe('bus identity and feed helpers', () => {
         supportsRealtime: true,
       }),
     ).toBe(false);
-    expect(
-      supportsSptransRealtime({ routeId: 'artesp:001' }),
-    ).toBe(false);
+    expect(supportsSptransRealtime({ routeId: 'artesp:001' })).toBe(false);
   });
 
   it('resolves only the SPTrans member of a merged physical stop', () => {
@@ -118,27 +116,28 @@ describe('bus identity and feed helpers', () => {
   it('marks tomorrow without displaying a full date', () => {
     const now = new Date('2026-09-05T12:00:00-03:00');
     expect(
-      formatScheduledBusDepartureTime(
-        '2026-09-06T04:00:00-03:00',
-        now,
-      ),
+      formatScheduledBusDepartureTime('2026-09-06T04:00:00-03:00', now),
     ).toBe('04:00 · amanhã');
   });
 
   it('compares departure dates in America/Sao_Paulo across UTC midnight', () => {
     const now = new Date('2026-09-07T23:30:00-03:00');
 
-    expect(
-      formatScheduledBusDepartureTime('2026-09-08T02:00:00Z', now),
-    ).toBe('23:00');
-    expect(
-      formatScheduledBusDepartureTime('2026-09-08T03:00:00Z', now),
-    ).toBe('00:00 · amanhã');
+    expect(formatScheduledBusDepartureTime('2026-09-08T02:00:00Z', now)).toBe(
+      '23:00',
+    );
+    expect(formatScheduledBusDepartureTime('2026-09-08T03:00:00Z', now)).toBe(
+      '00:00 · amanhã',
+    );
   });
   it('does not add a weekday to today and identifies later service days', () => {
     const now = new Date('2026-09-07T12:00:00-03:00');
-    expect(formatScheduledBusDepartureTime('2026-09-07T14:30:00-03:00', now)).toBe('14:30');
-    expect(formatScheduledBusDepartureTime('2026-09-09T04:00:00-03:00', now)).toBe('04:00 · qua');
+    expect(
+      formatScheduledBusDepartureTime('2026-09-07T14:30:00-03:00', now),
+    ).toBe('14:30');
+    expect(
+      formatScheduledBusDepartureTime('2026-09-09T04:00:00-03:00', now),
+    ).toBe('04:00 · qua');
   });
 
   it('groups each route independently, sorts its departures and caps each group at five', () => {
@@ -146,7 +145,10 @@ describe('bus identity and feed helpers', () => {
       routeId: 'artesp:001',
       departureTime: `2026-09-07T14:${String(index * 5).padStart(2, '0')}:00-03:00`,
     })).reverse();
-    departures.push({ routeId: '001', departureTime: '2026-09-07T14:02:00-03:00' });
+    departures.push({
+      routeId: '001',
+      departureTime: '2026-09-07T14:02:00-03:00',
+    });
     const groups = groupScheduledBusDepartures(departures);
     expect(groups.map((group) => group.routeId)).toEqual(['artesp:001', '001']);
     expect(groups.map((group) => group.departures.length)).toEqual([5, 1]);
@@ -155,5 +157,4 @@ describe('bus identity and feed helpers', () => {
     expect(departures[0].departureTime).toContain('14:30');
     expect(groupScheduledBusDepartures([])).toEqual([]);
   });
-
 });

@@ -52,9 +52,7 @@ describe('history transit identity components', () => {
         imports: [HistoryAgencyIdentityComponent],
       }).compileComponents();
 
-      const fixture = TestBed.createComponent(
-        HistoryAgencyIdentityComponent,
-      );
+      const fixture = TestBed.createComponent(HistoryAgencyIdentityComponent);
       fixture.componentRef.setInput('name', 'ViaMobilidade');
       fixture.componentRef.setInput(
         'iconPath',

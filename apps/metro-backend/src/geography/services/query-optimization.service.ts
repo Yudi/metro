@@ -577,10 +577,7 @@ export class QueryOptimizationService {
     );
 
     return stops.map((stop) =>
-      mapBusStop(
-        stop,
-        serviceInfo.get(stop.physical_stop_id || stop.stop_id),
-      ),
+      mapBusStop(stop, serviceInfo.get(stop.physical_stop_id || stop.stop_id)),
     );
   }
 
@@ -639,7 +636,9 @@ export class QueryOptimizationService {
   }
 
   /** Batch fare lookup for search results and other lightweight consumers. */
-  async getFaresByRouteIds(routeIds: string[]): Promise<Map<string, BusFare[]>> {
+  async getFaresByRouteIds(
+    routeIds: string[],
+  ): Promise<Map<string, BusFare[]>> {
     const uniqueRouteIds = uniqueIds(routeIds);
     if (uniqueRouteIds.length === 0) {
       return new Map();
@@ -668,9 +667,7 @@ export class QueryOptimizationService {
       WHERE route.route_id = ANY(${uniqueRouteIds}::TEXT[])
     `;
 
-    return new Map(
-      rows.map((row) => [row.route_id, parseBusFares(row.fares)]),
-    );
+    return new Map(rows.map((row) => [row.route_id, parseBusFares(row.fares)]));
   }
 }
 

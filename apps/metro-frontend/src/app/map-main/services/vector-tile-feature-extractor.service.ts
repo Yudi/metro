@@ -234,7 +234,9 @@ export class VectorTileFeatureExtractorService {
 
   private toStringArray(raw: unknown): string[] | undefined {
     if (Array.isArray(raw)) {
-      const values = raw.filter((value): value is string => typeof value === 'string');
+      const values = raw.filter(
+        (value): value is string => typeof value === 'string',
+      );
       return values.length > 0 ? values : undefined;
     }
 

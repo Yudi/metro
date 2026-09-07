@@ -67,7 +67,8 @@ export class NextTrainArrivalDto {
 
   @ApiProperty({
     example: 'Brás',
-    description: 'Last passed station resolved from the current position snapshot, when unambiguous',
+    description:
+      'Last passed station resolved from the current position snapshot, when unambiguous',
     required: false,
   })
   trainLastPassedStationName?: string | null;

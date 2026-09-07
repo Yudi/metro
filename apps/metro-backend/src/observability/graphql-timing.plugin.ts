@@ -19,10 +19,12 @@ export function createGraphQLTimingPlugin(
 ): ApolloServerPlugin<GraphQLTimingContext> {
   const logger = options.logger ?? createTimingLogger('GraphQLTiming');
   const thresholdMs = options.thresholdMs ?? getSlowRequestThresholdMs();
-  const now = options.now ?? (() => {
-    const [seconds, nanoseconds] = process.hrtime();
-    return seconds * 1_000 + nanoseconds / 1_000_000;
-  });
+  const now =
+    options.now ??
+    (() => {
+      const [seconds, nanoseconds] = process.hrtime();
+      return seconds * 1_000 + nanoseconds / 1_000_000;
+    });
 
   return {
     async requestDidStart(

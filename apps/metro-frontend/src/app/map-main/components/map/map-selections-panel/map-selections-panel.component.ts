@@ -56,8 +56,7 @@ export class MapSelectionsPanelComponent {
             getBusAgencyOrder({
               routeId: b.route.id,
               sourceAgency: b.route.sourceAgency,
-            }) ||
-          a.index - b.index,
+            }) || a.index - b.index,
       )
       .map(({ route }) => route);
   }

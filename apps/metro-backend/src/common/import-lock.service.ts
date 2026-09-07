@@ -1,8 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { Pool } from 'pg';
 
-export const TRANSIT_CATALOG_IMPORT_LOCK =
-  'metro-dev:transit-catalog-import';
+export const TRANSIT_CATALOG_IMPORT_LOCK = 'metro-dev:transit-catalog-import';
 
 export interface ImportLockOptions {
   /**
@@ -63,9 +62,7 @@ export class ImportLockService implements OnModuleDestroy {
         // so a background import remains queued until the current owner
         // releases the shared catalog lock. PostgreSQL's statement timeout
         // bounds the wait when a configured deadline is supplied.
-        await client.query('SELECT pg_advisory_lock(hashtext($1))', [
-          lockName,
-        ]);
+        await client.query('SELECT pg_advisory_lock(hashtext($1))', [lockName]);
         lockAcquired = true;
       } else {
         const result = await client.query<{ locked: boolean }>(
@@ -90,7 +87,10 @@ export class ImportLockService implements OnModuleDestroy {
             '0',
           ]);
         } catch (error) {
-          this.logger.warn('Failed to reset import lock statement timeout:', error);
+          this.logger.warn(
+            'Failed to reset import lock statement timeout:',
+            error,
+          );
         }
       }
 

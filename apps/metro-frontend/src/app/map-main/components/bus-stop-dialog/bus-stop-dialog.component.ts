@@ -1,4 +1,10 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import {
   MatDialogModule,
   MatDialogRef,
@@ -49,7 +55,8 @@ export class BusStopDialogComponent {
   readonly dialogRef = inject(MatDialogRef<BusStopDialogComponent>);
   readonly data = inject<BusStopDialogData>(MAT_DIALOG_DATA);
   readonly stopDescription =
-    this.data.stop.description?.trim() === `Plataforma ${this.data.stop.platformCode}`
+    this.data.stop.description?.trim() ===
+    `Plataforma ${this.data.stop.platformCode}`
       ? null
       : this.data.stop.description;
   private logger = inject(LoggerService);
@@ -59,9 +66,7 @@ export class BusStopDialogComponent {
       this.favoriteService.isFavorite(stopId, 'busStop'),
     ),
   );
-  readonly isFavorite = computed(() =>
-    this.favoriteStopIds().length > 0,
-  );
+  readonly isFavorite = computed(() => this.favoriteStopIds().length > 0);
   readonly routesSortedByFavorite = computed(() => {
     const favoriteRouteIds = new Set(
       this.favoriteService
@@ -123,8 +128,7 @@ export class BusStopDialogComponent {
 
   get availableRoutes(): BusRouteGraphQL[] {
     return this.routesSortedByFavorite().filter(
-      (route) =>
-        !this.data.selectedRoutes.has(getBusRouteIdentity(route)),
+      (route) => !this.data.selectedRoutes.has(getBusRouteIdentity(route)),
     );
   }
 
@@ -190,13 +194,12 @@ export class BusStopDialogComponent {
     route: BusRouteGraphQL,
     favoriteRouteIds: Set<string>,
   ): boolean {
-    return (
-      favoriteRouteIds.has(this.normalizeRouteCode(getBusRouteIdentity(route)))
+    return favoriteRouteIds.has(
+      this.normalizeRouteCode(getBusRouteIdentity(route)),
     );
   }
 
   private normalizeRouteCode(routeCode: string): string {
     return routeCode.trim().toUpperCase();
   }
-
 }

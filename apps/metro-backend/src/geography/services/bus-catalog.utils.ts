@@ -43,11 +43,17 @@ export function normalizeBusSourceAgency(
   value: unknown,
   sourceId?: string | null,
 ): BusSourceAgency {
-  if (String(value ?? '').trim().toLowerCase() === 'artesp') {
+  if (
+    String(value ?? '')
+      .trim()
+      .toLowerCase() === 'artesp'
+  ) {
     return 'artesp';
   }
 
-  return String(sourceId ?? '').toLowerCase().startsWith('artesp:')
+  return String(sourceId ?? '')
+    .toLowerCase()
+    .startsWith('artesp:')
     ? 'artesp'
     : 'sptrans';
 }
@@ -114,9 +120,7 @@ export function mapBusRoute(row: BusRouteRow): BusRoute {
   const routeId = row.route_id;
   const sourceId =
     row.source_id?.trim() ||
-    (sourceAgency === 'artesp'
-      ? routeId.replace(/^artesp:/i, '')
-      : routeId);
+    (sourceAgency === 'artesp' ? routeId.replace(/^artesp:/i, '') : routeId);
 
   return {
     id: routeId,
@@ -144,10 +148,7 @@ export function mapBusStop(
   row: BusStopRow,
   serviceInfo?: StopServiceInfoLike,
 ): BusStop {
-  const sourceAgency = normalizeBusSourceAgency(
-    row.source_agency,
-    row.stop_id,
-  );
+  const sourceAgency = normalizeBusSourceAgency(row.source_agency, row.stop_id);
   const stopId = row.physical_stop_id || row.stop_id;
   const sourceId =
     row.source_id?.trim() ||
@@ -187,9 +188,9 @@ export function agencyPriority(value: unknown): number {
   return normalizeBusSourceAgency(value) === 'sptrans' ? 0 : 1;
 }
 
-export function sortBusRoutes<T extends { sourceAgency?: string; shortName?: string; id?: string }>(
-  routes: T[],
-): T[] {
+export function sortBusRoutes<
+  T extends { sourceAgency?: string; shortName?: string; id?: string },
+>(routes: T[]): T[] {
   return routes.sort(
     (left, right) =>
       agencyPriority(left.sourceAgency) - agencyPriority(right.sourceAgency) ||

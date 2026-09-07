@@ -2,10 +2,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { QueryOptimizationService } from './query-optimization.service';
 import { BusStop } from '../entities/geography.entity';
-import {
-  BusStopRow,
-  mapBusStop,
-} from './bus-catalog.utils';
+import { BusStopRow, mapBusStop } from './bus-catalog.utils';
 
 /**
  * Optimized catalog stop service.
@@ -26,9 +23,7 @@ export class BusStopServiceOptimized {
   async searchBusStops(input?: StopSearchInputLike): Promise<BusStop[]> {
     const searchTerm = normalizeSearchTerm(input?.searchTerm ?? undefined);
     const normalizedInput =
-      input?.searchTerm === undefined
-        ? input
-        : { ...input, searchTerm };
+      input?.searchTerm === undefined ? input : { ...input, searchTerm };
     const limit = this.normalizeLimit(normalizedInput?.limit);
     let stops: BusStopRow[];
 
@@ -72,8 +67,9 @@ export class BusStopServiceOptimized {
     }
 
     const physicalStopId = stop.physical_stop_id || stop.stop_id;
-    const serviceInfo =
-      await this.queryOptimization.batchGetStopServiceInfo([physicalStopId]);
+    const serviceInfo = await this.queryOptimization.batchGetStopServiceInfo([
+      physicalStopId,
+    ]);
     return mapBusStop(stop, serviceInfo.get(physicalStopId));
   }
 

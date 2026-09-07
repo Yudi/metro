@@ -36,7 +36,10 @@ describe('MapFeatureInteractionService', () => {
         },
         {
           provide: BikeStationsService,
-          useValue: { upsertStationSummary: jest.fn(), stations: jest.fn(() => []) },
+          useValue: {
+            upsertStationSummary: jest.fn(),
+            stations: jest.fn(() => []),
+          },
         },
         {
           provide: VectorTileLayerService,

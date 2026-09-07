@@ -202,7 +202,10 @@ describe('WFSProcessingService', () => {
       features: [
         {
           properties: { primaryindex: '1', name: 'A' },
-          geometry: { coordinates: [-46.60000001, -23.50000001], type: 'Point' },
+          geometry: {
+            coordinates: [-46.60000001, -23.50000001],
+            type: 'Point',
+          },
           type: 'Feature' as const,
           id: 'station-1',
         },

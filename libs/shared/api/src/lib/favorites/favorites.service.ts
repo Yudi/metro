@@ -635,7 +635,9 @@ export class FavoritesService implements OnDestroy {
       next: ({ records, operations }) => {
         if (scope === this.activeScope) {
           this._favorites.set(this.recordsToFavoriteList(records));
-          if (operations.some((operation) => operation.status === 'dead-letter')) {
+          if (
+            operations.some((operation) => operation.status === 'dead-letter')
+          ) {
             this._syncError.set(FAVORITE_SYNC_ERROR_MESSAGE);
           }
         }
@@ -693,10 +695,7 @@ export class FavoritesService implements OnDestroy {
           return 'already-present' as const;
         }
 
-        const count = await db.favorites
-          .where('scope')
-          .equals(scope)
-          .count();
+        const count = await db.favorites.where('scope').equals(scope).count();
         if (count >= MAX_FAVORITES_PER_SCOPE) {
           return 'limit-reached' as const;
         }
@@ -859,7 +858,13 @@ export class FavoritesService implements OnDestroy {
 
   private async syncScope(scope: string, generation: number): Promise<void> {
     try {
-      if (this.pauseForFailedOperations(await this.readOutbox(scope, true), scope, generation)) {
+      if (
+        this.pauseForFailedOperations(
+          await this.readOutbox(scope, true),
+          scope,
+          generation,
+        )
+      ) {
         return;
       }
       const result = await this.postGraphql<UserFavoritesResult>({
@@ -1025,10 +1030,7 @@ export class FavoritesService implements OnDestroy {
       !Number.isInteger(value.revision) ||
       (value.revision ?? -1) < 0
     ) {
-      throw new FavoriteSyncFailure(
-        'terminal',
-        'invalid-favorite-snapshot',
-      );
+      throw new FavoriteSyncFailure('terminal', 'invalid-favorite-snapshot');
     }
 
     return {
@@ -1062,10 +1064,11 @@ export class FavoritesService implements OnDestroy {
       return [];
     }
 
-    const records = (await this.db.outbox
-      .where('scope')
-      .equals(scope)
-      .toArray()).filter((operation) => includeFailed || operation.status !== 'dead-letter');
+    const records = (
+      await this.db.outbox.where('scope').equals(scope).toArray()
+    ).filter(
+      (operation) => includeFailed || operation.status !== 'dead-letter',
+    );
     return records.sort(
       (left, right) =>
         left.createdAt - right.createdAt ||
@@ -1419,10 +1422,7 @@ function readHttpStatus(error: unknown): number | null {
   const nested = error['error'];
   if (isRecord(nested)) {
     const nestedStatus = nested['status'];
-    if (
-      typeof nestedStatus === 'number' &&
-      Number.isInteger(nestedStatus)
-    ) {
+    if (typeof nestedStatus === 'number' && Number.isInteger(nestedStatus)) {
       return nestedStatus;
     }
   }

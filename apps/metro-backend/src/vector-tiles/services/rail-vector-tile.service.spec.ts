@@ -42,9 +42,9 @@ describe('RailVectorTileService refresh coordination', () => {
 
     await service.refreshMvtViewsWithinImport();
 
-    expect(stationProcessor.refreshMergedStationsWithinImport).toHaveBeenCalledTimes(
-      1,
-    );
+    expect(
+      stationProcessor.refreshMergedStationsWithinImport,
+    ).toHaveBeenCalledTimes(1);
     expect(
       stationProcessor.refreshMergedStationsWithinImport.mock
         .invocationCallOrder[0],

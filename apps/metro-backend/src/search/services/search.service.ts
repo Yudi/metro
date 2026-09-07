@@ -20,7 +20,12 @@ import {
 } from '@metro/shared/utils';
 import { BikePollingService } from '../../bike/services/bike-polling.service';
 
-import { BusRouteRow, BusStopRow, mapBusRoute, mapBusStop } from '../../geography/services/bus-catalog.utils';
+import {
+  BusRouteRow,
+  BusStopRow,
+  mapBusRoute,
+  mapBusStop,
+} from '../../geography/services/bus-catalog.utils';
 
 @Injectable()
 export class SearchService {

@@ -85,13 +85,16 @@ describe('GeographyResolver full-data selections', () => {
 
     await resolver.routeFullData(
       'route-1',
-      resolveInfoFor(`
+      resolveInfoFor(
+        `
         query Route {
           routeFullData(routeId: "route-1") {
             route { routeId }
           }
         }
-      `, 'routeFullData'),
+      `,
+        'routeFullData',
+      ),
     );
 
     expect(geographyService.getRouteFullData).toHaveBeenCalledWith('route-1', {
@@ -109,7 +112,8 @@ describe('GeographyResolver full-data selections', () => {
 
     await resolver.routeFullData(
       'route-1',
-      resolveInfoFor(`
+      resolveInfoFor(
+        `
         query Route {
           routeFullData(routeId: "route-1") {
             route { routeId }
@@ -117,7 +121,9 @@ describe('GeographyResolver full-data selections', () => {
             stops { stopId }
           }
         }
-      `, 'routeFullData'),
+      `,
+        'routeFullData',
+      ),
     );
 
     expect(geographyService.getRouteFullData).toHaveBeenCalledWith('route-1', {
@@ -135,7 +141,8 @@ describe('GeographyResolver full-data selections', () => {
 
     await resolver.routeFullData(
       'route-1',
-      resolveInfoFor(`
+      resolveInfoFor(
+        `
         query Route {
           routeFullData(routeId: "route-1") {
             route { routeId }
@@ -149,7 +156,9 @@ describe('GeographyResolver full-data selections', () => {
         fragment RouteCollections on RouteFullData {
           trips { tripId }
         }
-      `, 'routeFullData'),
+      `,
+        'routeFullData',
+      ),
     );
 
     expect(geographyService.getRouteFullData).toHaveBeenCalledWith('route-1', {
@@ -167,7 +176,8 @@ describe('GeographyResolver full-data selections', () => {
 
     await resolver.stopFullData(
       'stop-1',
-      resolveInfoFor(`
+      resolveInfoFor(
+        `
         query Stop {
           stopFullData(stopId: "stop-1") {
             ...StopCollections
@@ -181,7 +191,9 @@ describe('GeographyResolver full-data selections', () => {
             }
           }
         }
-      `, 'stopFullData'),
+      `,
+        'stopFullData',
+      ),
     );
 
     expect(geographyService.getStopFullData).toHaveBeenCalledWith(
@@ -200,10 +212,7 @@ function createResolver(geographyService: object): GeographyResolver {
   );
 }
 
-function resolveInfoFor(
-  source: string,
-  fieldName: string,
-): GraphQLResolveInfo {
+function resolveInfoFor(source: string, fieldName: string): GraphQLResolveInfo {
   const document = parse(source);
   const operation = document.definitions.find(
     (definition) => definition.kind === Kind.OPERATION_DEFINITION,

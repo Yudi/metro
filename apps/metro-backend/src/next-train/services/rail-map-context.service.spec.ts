@@ -101,30 +101,45 @@ describe('RailMapContextService', () => {
     queryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     await expect(service.getContext('L9')).resolves.toBeUndefined();
 
-    queryRaw.mockResolvedValueOnce([
-      {
-        id: 'jag',
-        name: 'Villa Lobos',
-        originalName: 'Villa Lobos',
-        latitude: -23.55,
-        longitude: -46.72,
-      },
-    ]).mockResolvedValueOnce([]);
+    queryRaw
+      .mockResolvedValueOnce([
+        {
+          id: 'jag',
+          name: 'Villa Lobos',
+          originalName: 'Villa Lobos',
+          latitude: -23.55,
+          longitude: -46.72,
+        },
+      ])
+      .mockResolvedValueOnce([]);
     await expect(service.getContext('L9')).resolves.toBeUndefined();
   });
 
   it.each(['invalid coordinate', 'missing point', 'duplicate point'])(
-    'rejects a path with an %s rather than joining its remaining vertices', async (scenario) => {
+    'rejects a path with an %s rather than joining its remaining vertices',
+    async (scenario) => {
       const points = [
         { path_id: 1, point_index: 1, lat: -23.55, lng: -46.72 },
-        { path_id: 1, point_index: 2, lat: scenario === 'invalid coordinate' ? NaN : -23.56, lng: -46.715 },
+        {
+          path_id: 1,
+          point_index: 2,
+          lat: scenario === 'invalid coordinate' ? NaN : -23.56,
+          lng: -46.715,
+        },
         { path_id: 1, point_index: 3, lat: -23.57, lng: -46.71 },
       ];
       if (scenario === 'missing point') points.splice(1, 1);
       if (scenario === 'duplicate point') points[1].point_index = 1;
-      queryRaw.mockResolvedValueOnce([
-        { name: 'Villa Lobos', originalName: 'Villa Lobos', latitude: -23.55, longitude: -46.72 },
-      ]).mockResolvedValueOnce(points);
+      queryRaw
+        .mockResolvedValueOnce([
+          {
+            name: 'Villa Lobos',
+            originalName: 'Villa Lobos',
+            latitude: -23.55,
+            longitude: -46.72,
+          },
+        ])
+        .mockResolvedValueOnce(points);
       await expect(service.getContext('L9')).resolves.toBeUndefined();
     },
   );
@@ -136,12 +151,10 @@ describe('RailMapContextService', () => {
     const pendingStations = new Promise<unknown[]>((resolve) => {
       resolveStations = resolve;
     });
-    queryRaw
-      .mockReturnValueOnce(pendingStations)
-      .mockResolvedValueOnce([
-        { path_id: 1, point_index: 1, lat: -23.55, lng: -46.72 },
-        { path_id: 1, point_index: 2, lat: -23.56, lng: -46.715 },
-      ]);
+    queryRaw.mockReturnValueOnce(pendingStations).mockResolvedValueOnce([
+      { path_id: 1, point_index: 1, lat: -23.55, lng: -46.72 },
+      { path_id: 1, point_index: 2, lat: -23.56, lng: -46.715 },
+    ]);
 
     const first = service.getContext('L9');
     const second = service.getContext('L09');

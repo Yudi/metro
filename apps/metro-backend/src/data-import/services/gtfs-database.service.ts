@@ -226,7 +226,9 @@ export class GTFSDatabaseService {
       !GTFSConfig.getExpectedFiles().includes(fileName) ||
       GTFSConfig.isRequiredFile(fileName, feed)
     ) {
-      throw new Error(`Cannot clear required or unknown GTFS file: ${fileName}`);
+      throw new Error(
+        `Cannot clear required or unknown GTFS file: ${fileName}`,
+      );
     }
 
     const table = GTFSConfig.getTableName(fileName, feed);

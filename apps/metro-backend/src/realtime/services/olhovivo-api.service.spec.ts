@@ -25,7 +25,9 @@ describe('OlhoVivoApiService', () => {
     );
 
     service = new OlhoVivoApiService(
-      { get: jest.fn().mockReturnValue('test-token') } as unknown as ConfigService,
+      {
+        get: jest.fn().mockReturnValue('test-token'),
+      } as unknown as ConfigService,
       { get, post } as unknown as HttpService,
     );
     await service.onModuleInit();
@@ -48,8 +50,7 @@ describe('OlhoVivoApiService', () => {
       expect.stringContaining('/Previsao/Linha?codigoLinha=33191'),
       expect.objectContaining({
         headers: expect.objectContaining({
-          Cookie:
-            'ASP.NET_SessionId=test-session; affinity=test-affinity',
+          Cookie: 'ASP.NET_SessionId=test-session; affinity=test-affinity',
         }),
       }),
     );
@@ -60,8 +61,7 @@ describe('OlhoVivoApiService', () => {
       ),
       expect.objectContaining({
         headers: expect.objectContaining({
-          Cookie:
-            'ASP.NET_SessionId=test-session; affinity=test-affinity',
+          Cookie: 'ASP.NET_SessionId=test-session; affinity=test-affinity',
         }),
       }),
     );
@@ -158,7 +158,9 @@ describe('OlhoVivoApiService', () => {
       of({ data: { hr: '15:31', l: [] }, status: 200, headers: {} }),
     );
     const concurrentService = new OlhoVivoApiService(
-      { get: jest.fn().mockReturnValue('concurrent-token') } as unknown as ConfigService,
+      {
+        get: jest.fn().mockReturnValue('concurrent-token'),
+      } as unknown as ConfigService,
       { get, post } as unknown as HttpService,
     );
 
@@ -187,7 +189,9 @@ describe('OlhoVivoApiService', () => {
       }),
     );
     const localService = new OlhoVivoApiService(
-      { get: jest.fn().mockReturnValue(canaryToken) } as unknown as ConfigService,
+      {
+        get: jest.fn().mockReturnValue(canaryToken),
+      } as unknown as ConfigService,
       { get: jest.fn(), post: localPost } as unknown as HttpService,
     );
 

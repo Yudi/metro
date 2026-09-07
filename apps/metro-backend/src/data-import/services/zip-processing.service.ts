@@ -77,7 +77,6 @@ export class ZipProcessingService {
   private async analyzeExtractedFiles(
     extractDir: string,
   ): Promise<GTFSFileInfo[]> {
-
     const files = await this.fileOperationsService.listFiles(extractDir);
     const fileInfos: GTFSFileInfo[] = [];
     const analysisErrors: string[] = [];

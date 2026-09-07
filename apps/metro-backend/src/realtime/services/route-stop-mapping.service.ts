@@ -201,7 +201,9 @@ export class RouteStopMappingService {
       }
 
       if (!/^\d+$/.test(stopId)) {
-        this.logger.warn(`Cannot map non-numeric stop ID ${stopId} to API code`);
+        this.logger.warn(
+          `Cannot map non-numeric stop ID ${stopId} to API code`,
+        );
         this.stopCodeCache.set(stopId, null);
         return null;
       }

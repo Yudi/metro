@@ -142,9 +142,7 @@ const MOCK_ROUTE_RESULTS = {
   ],
 };
 
-function toSearchRouteDocument(
-  route: typeof ROUTE_ARTESP_001,
-) {
+function toSearchRouteDocument(route: typeof ROUTE_ARTESP_001) {
   return {
     id: route.id,
     route_id: route.routeId,
@@ -162,9 +160,7 @@ function toSearchRouteDocument(
 }
 
 function toSearchStopDocument(
-  stop:
-    | typeof ARTESP_ONLY_BUS_STOP
-    | typeof SHARED_SPTRANS_ARTESP_BUS_STOP,
+  stop: typeof ARTESP_ONLY_BUS_STOP | typeof SHARED_SPTRANS_ARTESP_BUS_STOP,
 ) {
   return {
     id: stop.id,
@@ -243,14 +239,20 @@ function createMockTypesenseService(scenario: SearchScenario, delayMs = 0) {
 
 function createMockGeographyService() {
   return {
-    getBatchRoutesForStops: (stopIds: string[]) => of(new Map(
-      stopIds.map((stopId) => [
-        stopId,
-        stopId === ARTESP_ONLY_BUS_STOP.stopId
-          ? [ROUTE_ARTESP_001.shortName, ROUTE_ARTESP_WITHOUT_FARE.shortName]
-          : ['477A', ROUTE_ARTESP_001.shortName],
-      ]),
-    )),
+    getBatchRoutesForStops: (stopIds: string[]) =>
+      of(
+        new Map(
+          stopIds.map((stopId) => [
+            stopId,
+            stopId === ARTESP_ONLY_BUS_STOP.stopId
+              ? [
+                  ROUTE_ARTESP_001.shortName,
+                  ROUTE_ARTESP_WITHOUT_FARE.shortName,
+                ]
+              : ['477A', ROUTE_ARTESP_001.shortName],
+          ]),
+        ),
+      ),
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     getRoutesForStop: (stopId: string) => {
       // Return mock routes for any stop

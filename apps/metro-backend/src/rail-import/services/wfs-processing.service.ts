@@ -176,9 +176,7 @@ export class WFSProcessingService {
   async delayBetweenRequests(
     delayMs = WFSConfig.BETWEEN_REQUEST_DELAY_MS,
   ): Promise<void> {
-    await new Promise((resolve) =>
-      setTimeout(resolve, delayMs),
-    );
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
 
   private async readResponseText(response: Response): Promise<string> {
@@ -694,10 +692,10 @@ function featureSortKey(feature: unknown): string {
     properties?: Record<string, unknown> | null;
   };
   const stableId =
-    candidate.id ?? candidate.properties?.['primaryindex'] ?? candidate.properties?.['id'];
-  return stableId === undefined
-    ? JSON.stringify(feature)
-    : String(stableId);
+    candidate.id ??
+    candidate.properties?.['primaryindex'] ??
+    candidate.properties?.['id'];
+  return stableId === undefined ? JSON.stringify(feature) : String(stableId);
 }
 
 function canonicalize(value: unknown): unknown {

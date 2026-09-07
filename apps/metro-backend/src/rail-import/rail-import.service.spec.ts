@@ -23,7 +23,10 @@ describe('RailImportService', () => {
   };
   let railVectorTileService: { refreshMvtViewsWithinImport: jest.Mock };
   let vectorTilesService: { clearCache: jest.Mock };
-  let searchService: { indexRailLines: jest.Mock; indexRailStations: jest.Mock };
+  let searchService: {
+    indexRailLines: jest.Mock;
+    indexRailStations: jest.Mock;
+  };
 
   beforeEach(() => {
     jest.useFakeTimers();
@@ -82,13 +85,16 @@ describe('RailImportService', () => {
     );
     const database = new WFSDatabaseService({
       gPKGDataset: {
-        findUnique: jest.fn(async ({ where }: { where: { source: WFSSourceType } }) =>
-          datasets.get(where.source) ?? null,
+        findUnique: jest.fn(
+          async ({ where }: { where: { source: WFSSourceType } }) =>
+            datasets.get(where.source) ?? null,
         ),
-        deleteMany: jest.fn(async ({ where }: { where: { source: WFSSourceType } }) => {
-          datasets.delete(where.source);
-          return { count: 1 };
-        }),
+        deleteMany: jest.fn(
+          async ({ where }: { where: { source: WFSSourceType } }) => {
+            datasets.delete(where.source);
+            return { count: 1 };
+          },
+        ),
         upsert: jest.fn(async ({ create }: { create: WFSDatasetMetadata }) => {
           datasets.set(create.source, create);
           return { id: create.source };
@@ -116,17 +122,20 @@ describe('RailImportService', () => {
       const [changedSource, failingSource] = WFSConfig.getAllSources();
       let sourceUnavailable = true;
       let currentHash = 'updated-hash';
-      wfsProcessingService.downloadLayer.mockImplementation(async (source: WFSSourceConfig) => {
-        if (source.source === failingSource.source && sourceUnavailable) {
-          throw new Error('temporary source failure');
-        }
-        return {
-          fileHash: source.source === changedSource.source ? currentHash : 'hash',
-          fileSize: 123,
-          featureCollection: { features: [] },
-          sourceSrid: WFSConfig.TARGET_SRID,
-        };
-      });
+      wfsProcessingService.downloadLayer.mockImplementation(
+        async (source: WFSSourceConfig) => {
+          if (source.source === failingSource.source && sourceUnavailable) {
+            throw new Error('temporary source failure');
+          }
+          return {
+            fileHash:
+              source.source === changedSource.source ? currentHash : 'hash',
+            fileSize: 123,
+            featureCollection: { features: [] },
+            sourceSrid: WFSConfig.TARGET_SRID,
+          };
+        },
+      );
       wfsProcessingService.replaceSourceTable.mockResolvedValue(1);
 
       await expect(service.startImport()).resolves.toMatchObject({
@@ -135,7 +144,9 @@ describe('RailImportService', () => {
       });
       expect(datasets.has(changedSource.source)).toBe(false);
       expect(datasets.get(failingSource.source)?.fileHash).toBe('hash');
-      expect(railVectorTileService.refreshMvtViewsWithinImport).not.toHaveBeenCalled();
+      expect(
+        railVectorTileService.refreshMvtViewsWithinImport,
+      ).not.toHaveBeenCalled();
 
       sourceUnavailable = false;
       currentHash = retryHash;
@@ -145,7 +156,9 @@ describe('RailImportService', () => {
         sourcesProcessed: 1,
       });
       expect(wfsProcessingService.replaceSourceTable).toHaveBeenCalledTimes(2);
-      expect(railVectorTileService.refreshMvtViewsWithinImport).toHaveBeenCalledTimes(1);
+      expect(
+        railVectorTileService.refreshMvtViewsWithinImport,
+      ).toHaveBeenCalledTimes(1);
       expect(searchService.indexRailLines).toHaveBeenCalledTimes(1);
       expect(searchService.indexRailStations).toHaveBeenCalledTimes(1);
       expect(vectorTilesService.clearCache).toHaveBeenCalledTimes(1);
@@ -155,7 +168,9 @@ describe('RailImportService', () => {
         success: true,
         sourcesProcessed: 0,
       });
-      expect(railVectorTileService.refreshMvtViewsWithinImport).toHaveBeenCalledTimes(1);
+      expect(
+        railVectorTileService.refreshMvtViewsWithinImport,
+      ).toHaveBeenCalledTimes(1);
     },
   );
 
@@ -163,12 +178,15 @@ describe('RailImportService', () => {
     'retries a forced same-hash import after a %s failure and restart',
     async (stage) => {
       const { datasets, restart } = usePersistedMetadata();
-      const refresh = stage === 'views'
-        ? railVectorTileService.refreshMvtViewsWithinImport
-        : searchService.indexRailStations;
+      const refresh =
+        stage === 'views'
+          ? railVectorTileService.refreshMvtViewsWithinImport
+          : searchService.indexRailStations;
       refresh.mockRejectedValueOnce(new Error('refresh failed'));
 
-      await expect(service.clearAndReimport()).rejects.toThrow('refresh failed');
+      await expect(service.clearAndReimport()).rejects.toThrow(
+        'refresh failed',
+      );
       expect(datasets.size).toBe(0);
       expect(vectorTilesService.clearCache).not.toHaveBeenCalled();
 

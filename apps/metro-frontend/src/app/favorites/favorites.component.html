@@ -40,18 +40,30 @@
               @if (busStops().length === 0) {
                 <span class="empty-category">Nenhum ponto salvo.</span>
               } @else {
-                @for (stop of busStops(); track stop.favoriteId || stop.stopId) {
+                @for (
+                  stop of busStops();
+                  track stop.favoriteId || stop.stopId
+                ) {
                   <div class="config-item">
                     <mat-chip-set aria-label="Ponto favorito">
                       <mat-chip
                         removable
-                        (removed)="removeFavorite(stop.favoriteId || stop.stopId, 'busStop')"
+                        (removed)="
+                          removeFavorite(
+                            stop.favoriteId || stop.stopId,
+                            'busStop'
+                          )
+                        "
                       >
                         <mat-icon matChipAvatar>directions_bus</mat-icon>
                         {{ stop.name }}
-                        <span class="favorite-stop-id">ID: {{ stopDisplayId(stop) }}</span>
+                        <span class="favorite-stop-id"
+                          >ID: {{ stopDisplayId(stop) }}</span
+                        >
                         @if (stop.platformCode) {
-                          <span class="favorite-stop-id">Plataforma {{ stop.platformCode }}</span>
+                          <span class="favorite-stop-id"
+                            >Plataforma {{ stop.platformCode }}</span
+                          >
                         }
                         <button
                           matChipRemove
@@ -91,7 +103,9 @@
                               {{ route.shortName }}
                             </span>
                             <span class="choice-copy">
-                              <span class="choice-title">{{ route.longName }}</span>
+                              <span class="choice-title">{{
+                                route.longName
+                              }}</span>
                               <span class="choice-meta">
                                 @if (agencyIdentity(route); as agency) {
                                   <span class="agency-identity">
@@ -103,7 +117,9 @@
                                         alt=""
                                       />
                                     } @else {
-                                      <mat-icon aria-hidden="true">business</mat-icon>
+                                      <mat-icon aria-hidden="true"
+                                        >business</mat-icon
+                                      >
                                     }
                                     <span>{{ agency.name }}</span>
                                   </span>
@@ -111,7 +127,9 @@
                                 @if (routeFareLabel(route); as fareLabel) {
                                   <span
                                     class="route-fare"
-                                    [class.missing-fare]="fareLabel === 'Tarifa não informada'"
+                                    [class.missing-fare]="
+                                      fareLabel === 'Tarifa não informada'
+                                    "
                                   >
                                     <mat-icon>payments</mat-icon>
                                     {{ fareLabel }}
@@ -175,7 +193,9 @@
                           @if (routeFareLabel(route); as fareLabel) {
                             <span
                               class="route-fare"
-                              [class.missing-fare]="fareLabel === 'Tarifa não informada'"
+                              [class.missing-fare]="
+                                fareLabel === 'Tarifa não informada'
+                              "
                             >
                               <mat-icon>payments</mat-icon>
                               {{ fareLabel }}

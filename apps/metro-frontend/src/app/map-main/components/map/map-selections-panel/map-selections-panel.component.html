@@ -35,12 +35,7 @@
                 @if (getAgencyIdentity(route); as agency) {
                   <span class="agency-identity">
                     @if (agency.iconPath; as iconPath) {
-                      <img
-                        [ngSrc]="iconPath"
-                        width="16"
-                        height="16"
-                        alt=""
-                      />
+                      <img [ngSrc]="iconPath" width="16" height="16" alt="" />
                     } @else {
                       <mat-icon aria-hidden="true">business</mat-icon>
                     }

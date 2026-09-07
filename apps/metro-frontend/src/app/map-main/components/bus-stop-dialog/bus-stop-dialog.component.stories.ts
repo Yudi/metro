@@ -77,12 +77,30 @@ function createProviders(opts: ProviderOptions) {
   }
 
   return [
-    { provide: BusInformationService, useValue: { notices: () => of({ status: 'AVAILABLE', lastUpdated: '2026-09-07T07:30:00Z', notices: [{
-      sourceId: '1', sourceUrl: 'https://www.sptrans.com.br/informativos/oeste/desvios-de-itinerarios-na-regiao-da-av-paulista/71116/',
-      title: 'Exemplo: desvio na região da Av. Paulista', periodText: '07/09/2026, das 9h às 20h.',
-      description: '07/09/2026, das 9h às 20h.\nMotivo: exemplo ilustrativo de evento.\n477A-10 Pinheiros\nIda: exemplo de desvio pela via alternativa.\nVolta: sem alteração.\n875A-10 Outro destino\nIda: instrução de outra linha.',
-      routes: ['477A-10', '875A-10'], listing: 'RECENT', listedDate: '7 de setembro de 2026',
-    }] }) } },
+    {
+      provide: BusInformationService,
+      useValue: {
+        notices: () =>
+          of({
+            status: 'AVAILABLE',
+            lastUpdated: '2026-09-07T07:30:00Z',
+            notices: [
+              {
+                sourceId: '1',
+                sourceUrl:
+                  'https://www.sptrans.com.br/informativos/oeste/desvios-de-itinerarios-na-regiao-da-av-paulista/71116/',
+                title: 'Exemplo: desvio na região da Av. Paulista',
+                periodText: '07/09/2026, das 9h às 20h.',
+                description:
+                  '07/09/2026, das 9h às 20h.\nMotivo: exemplo ilustrativo de evento.\n477A-10 Pinheiros\nIda: exemplo de desvio pela via alternativa.\nVolta: sem alteração.\n875A-10 Outro destino\nIda: instrução de outra linha.',
+                routes: ['477A-10', '875A-10'],
+                listing: 'RECENT',
+                listedDate: '7 de setembro de 2026',
+              },
+            ],
+          }),
+      },
+    },
     {
       provide: MatDialogRef,
       useValue: {
@@ -204,11 +222,7 @@ export const AllRoutesSelected: Story = {
         dialogData: createDialogData(
           PINHEIROS_BUS_STOP,
           [ROUTE_477A, ROUTE_775A, ROUTE_177H],
-          new Set([
-            ROUTE_477A.routeId,
-            ROUTE_775A.routeId,
-            ROUTE_177H.routeId,
-          ]),
+          new Set([ROUTE_477A.routeId, ROUTE_775A.routeId, ROUTE_177H.routeId]),
         ),
         realtimeKind: 'arrivals',
       }),

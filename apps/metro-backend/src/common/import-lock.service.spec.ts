@@ -45,11 +45,7 @@ describe('ImportLockService', () => {
       .mockResolvedValueOnce({ rows: [] });
 
     await expect(
-      service.withLock(
-        TRANSIT_CATALOG_IMPORT_LOCK,
-        'manual import',
-        jest.fn(),
-      ),
+      service.withLock(TRANSIT_CATALOG_IMPORT_LOCK, 'manual import', jest.fn()),
     ).rejects.toThrow('manual import already in progress in another process');
 
     expect(client.query).toHaveBeenCalledTimes(1);

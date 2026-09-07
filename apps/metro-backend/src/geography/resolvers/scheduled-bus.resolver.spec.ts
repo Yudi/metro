@@ -1,21 +1,31 @@
 import { Test } from '@nestjs/testing';
-import { GraphQLSchemaBuilderModule, GraphQLSchemaFactory } from '@nestjs/graphql';
+import {
+  GraphQLSchemaBuilderModule,
+  GraphQLSchemaFactory,
+} from '@nestjs/graphql';
 import { validate, parse } from 'graphql';
 import { ScheduledBusResolver } from './scheduled-bus.resolver';
 
 describe('scheduled bus GraphQL contract', () => {
   it('accepts the frontend departure query without starting application services', async () => {
-    const module = await Test.createTestingModule({ imports: [GraphQLSchemaBuilderModule] }).compile();
+    const module = await Test.createTestingModule({
+      imports: [GraphQLSchemaBuilderModule],
+    }).compile();
     try {
       const factory = module.get(GraphQLSchemaFactory);
       const schema = await factory.create([ScheduledBusResolver]);
-      expect(validate(schema, parse(`
+      expect(
+        validate(
+          schema,
+          parse(`
         query Departures($stopId: String!, $limit: Int!, $perRouteLimit: Int) {
           scheduledBusDepartures(stopId: $stopId, limit: $limit, perRouteLimit: $perRouteLimit) {
             routeId routeShortName tripId headsign directionId departureTime sourceAgency platformCode
           }
         }
-      `))).toEqual([]);
+      `),
+        ),
+      ).toEqual([]);
     } finally {
       await module.close();
     }

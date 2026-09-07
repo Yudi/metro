@@ -45,8 +45,15 @@
           <span class="rail-station-heading">
             <span class="rail-station-name">{{ station.name }}</span>
             <span class="station-line-badges">
-              @for (line of stationLineBadges().get(station.id) ?? []; track line.code) {
-                <span class="station-line-badge" [style.background-color]="line.bg" [style.color]="line.text" [attr.aria-label]="'Linha ' + line.code">{{ line.code }}</span>
+              @for (line of stationLineBadges().get(station.id) ?? []; track
+              line.code) {
+              <span
+                class="station-line-badge"
+                [style.background-color]="line.bg"
+                [style.color]="line.text"
+                [attr.aria-label]="'Linha ' + line.code"
+                >{{ line.code }}</span
+              >
               }
             </span>
           </span>
@@ -67,9 +74,7 @@
   </div>
   }
 </section>
-}
-
-@if (hasArtespSchedules()) {
+} @if (hasArtespSchedules()) {
 <section class="detail-section scheduled-section">
   <div class="section-title-row">
     <div>
@@ -82,7 +87,9 @@
           alt=""
         />
         <span>Artesp</span>
-        <span class="section-note">Estes horários não são previsões em tempo real.</span>
+        <span class="section-note"
+          >Estes horários não são previsões em tempo real.</span
+        >
       </div>
     </div>
     @if (scheduledDeparturesLoading()) {
@@ -94,7 +101,8 @@
   <div class="scheduled-list">
     @for (group of scheduledRouteGroups(); track group.routeId) {
     <div class="scheduled-route-group">
-      @for (departure of getVisibleScheduledDepartures(group); track getScheduledDepartureKey(departure)) {
+      @for (departure of getVisibleScheduledDepartures(group); track
+      getScheduledDepartureKey(departure)) {
       <div class="scheduled-row">
         <time class="scheduled-time" [attr.datetime]="departure.departureTime">
           <span>{{ departure.timeLabel }}</span>
@@ -103,15 +111,21 @@
           }
         </time>
         <div class="scheduled-route">
-          <strong class="scheduled-route-code" [style.background-color]="departure.color" [style.color]="departure.textColor">{{ departure.routeShortName }}</strong>
+          <strong
+            class="scheduled-route-code"
+            [style.background-color]="departure.color"
+            [style.color]="departure.textColor"
+            >{{ departure.routeShortName }}</strong
+          >
           <span class="scheduled-destination">{{ departure.headsign }}</span>
         </div>
         @if (departure.platformCode) {
-        <span class="scheduled-platform">Plataforma {{ departure.platformCode }}</span>
+        <span class="scheduled-platform"
+          >Plataforma {{ departure.platformCode }}</span
+        >
         }
       </div>
-      }
-      @if (group.departures.length > 1) {
+      } @if (group.departures.length > 1) {
       <button
         type="button"
         class="schedule-toggle"
@@ -119,7 +133,8 @@
         [attr.aria-label]="getScheduledRouteToggleLabel(group.routeId, group.departures.length) + ' da linha ' + group.departures[0].routeShortName"
         (click)="toggleScheduledRoute(group.routeId)"
       >
-        {{ getScheduledRouteToggleLabel(group.routeId, group.departures.length) }}
+        {{ getScheduledRouteToggleLabel(group.routeId, group.departures.length)
+        }}
       </button>
       }
     </div>
@@ -140,9 +155,7 @@
   </div>
   }
 </section>
-}
-
-@if (routes().length > 0) {
+} @if (routes().length > 0) {
 <section class="detail-section">
   <div class="section-title-row">
     <h3>Linhas do ponto</h3>
@@ -161,8 +174,8 @@
         [attr.aria-expanded]="isRouteExpanded(route)"
         (click)="toggleRoute(route)"
       >
-          <span
-            class="route-badge"
+        <span
+          class="route-badge"
           [style.background-color]="'#' + route.color"
           [style.color]="'#' + route.textColor"
         >
@@ -185,12 +198,14 @@
 
         <span class="route-metadata">
           @if (getRouteFareLabel(route); as fareLabel) {
-          <span class="route-fare" [class.fare-missing]="!route.fares?.length" [attr.aria-label]="'Tarifa: ' + fareLabel">
+          <span
+            class="route-fare"
+            [class.fare-missing]="!route.fares?.length"
+            [attr.aria-label]="'Tarifa: ' + fareLabel"
+          >
             <strong>{{ fareLabel }}</strong>
           </span>
-          }
-
-          @if (!railConnectionsLoading() && routeServesRail(route)) {
+          } @if (!railConnectionsLoading() && routeServesRail(route)) {
           <lite-chip size="sm" variant="primary">
             Integração · {{ getRouteRailStationCount(route) }}
           </lite-chip>
@@ -221,8 +236,15 @@
             <span class="rail-station-heading">
               <span class="rail-station-name">{{ station.name }}</span>
               <span class="station-line-badges">
-                @for (line of stationLineBadges().get(station.id) ?? []; track line.code) {
-                  <span class="station-line-badge" [style.background-color]="line.bg" [style.color]="line.text" [attr.aria-label]="'Linha ' + line.code">{{ line.code }}</span>
+                @for (line of stationLineBadges().get(station.id) ?? []; track
+                line.code) {
+                <span
+                  class="station-line-badge"
+                  [style.background-color]="line.bg"
+                  [style.color]="line.text"
+                  [attr.aria-label]="'Linha ' + line.code"
+                  >{{ line.code }}</span
+                >
                 }
               </span>
             </span>

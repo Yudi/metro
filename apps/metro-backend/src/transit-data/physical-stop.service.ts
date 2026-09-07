@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { matchPhysicalStops, PhysicalStopCandidate } from './physical-stop-matcher';
+import {
+  matchPhysicalStops,
+  PhysicalStopCandidate,
+} from './physical-stop-matcher';
 
 const MATCHER_VERSION = 1;
 
@@ -12,9 +15,13 @@ export class PhysicalStopService {
 
   /** Run under the transit catalog import lock, after service summary refresh. */
   async refresh(sourceSignature: string | null): Promise<void> {
-    const signature = sourceSignature ? `v${MATCHER_VERSION}:${sourceSignature}` : null;
+    const signature = sourceSignature
+      ? `v${MATCHER_VERSION}:${sourceSignature}`
+      : null;
     if (signature) {
-      const states = await this.prisma.$queryRaw<Array<{ sourceSignature: string }>>`
+      const states = await this.prisma.$queryRaw<
+        Array<{ sourceSignature: string }>
+      >`
         SELECT "sourceSignature" FROM public.transit_precompute_state
         WHERE key = 'physical-bus-stops'
       `;
@@ -36,8 +43,14 @@ export class PhysicalStopService {
     `;
     const matches = matchPhysicalStops(candidates);
     const members = matches.flatMap((match) => [
-      { source_stop_id: match.sptransStopId, physical_stop_id: match.sptransStopId },
-      { source_stop_id: match.artespStopId, physical_stop_id: match.sptransStopId },
+      {
+        source_stop_id: match.sptransStopId,
+        physical_stop_id: match.sptransStopId,
+      },
+      {
+        source_stop_id: match.artespStopId,
+        physical_stop_id: match.sptransStopId,
+      },
     ]);
     // Atomic replacement: readers see either the old complete mapping or the new one.
     await this.prisma.$transaction(async (tx) => {
@@ -58,6 +71,8 @@ export class PhysicalStopService {
         `;
       }
     });
-    this.logger.log(`Matched ${matches.length} shared SPTrans/Artesp bus stops`);
+    this.logger.log(
+      `Matched ${matches.length} shared SPTrans/Artesp bus stops`,
+    );
   }
 }

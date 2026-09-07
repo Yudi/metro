@@ -69,6 +69,9 @@ export function getHttpOperationName(request: {
   return request.method;
 }
 
-export function elapsedMilliseconds(startedAt: number, now: () => number): number {
+export function elapsedMilliseconds(
+  startedAt: number,
+  now: () => number,
+): number {
   return now() - startedAt;
 }

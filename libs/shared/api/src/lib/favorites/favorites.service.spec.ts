@@ -111,9 +111,9 @@ describe('favorites persistence contracts', () => {
     expect(
       classifyFavoriteSyncError({ status: 400, error: 'invalid favorites' }),
     ).toEqual({ kind: 'terminal', reason: 'http-400' });
-    expect(classifyFavoriteSyncError(new Error('invalid local payload'))).toEqual(
-      { kind: 'terminal', reason: 'unknown' },
-    );
+    expect(
+      classifyFavoriteSyncError(new Error('invalid local payload')),
+    ).toEqual({ kind: 'terminal', reason: 'unknown' });
   });
 
   it('rejects a 501st favorite before writing the favorite or outbox operation', async () => {
@@ -160,7 +160,9 @@ describe('favorites persistence contracts', () => {
 
     expect(favorites.put).not.toHaveBeenCalled();
     expect(outbox.put).not.toHaveBeenCalled();
-    expect(service._syncError()).toBe('Você já atingiu o limite de 500 favoritos.');
+    expect(service._syncError()).toBe(
+      'Você já atingiu o limite de 500 favoritos.',
+    );
     expect(service.syncWithServer).not.toHaveBeenCalled();
   });
 });
@@ -278,18 +280,27 @@ describe('anonymous favorites first-login import', () => {
   it('imports anonymous favorites into an empty account and syncs them', async () => {
     const { service, importedScopes, operations } = createHarness();
     service.postGraphql
-      .mockResolvedValueOnce({ userFavoritesSnapshot: {
-        revision: 0, favorites: createEmptyFavorites(),
-      } })
-      .mockResolvedValueOnce({ syncFavorites: {
-        success: true, revision: 1, favorites: anonymousFavorites,
-      } });
+      .mockResolvedValueOnce({
+        userFavoritesSnapshot: {
+          revision: 0,
+          favorites: createEmptyFavorites(),
+        },
+      })
+      .mockResolvedValueOnce({
+        syncFavorites: {
+          success: true,
+          revision: 1,
+          favorites: anonymousFavorites,
+        },
+      });
 
     await service.syncScope(scope, 0);
 
-    expect(service.postGraphql).toHaveBeenLastCalledWith(expect.objectContaining({
-      variables: { favorites: anonymousFavorites, expectedRevision: 0 },
-    }));
+    expect(service.postGraphql).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        variables: { favorites: anonymousFavorites, expectedRevision: 0 },
+      }),
+    );
     expect(service.replaceScopeFavorites).toHaveBeenLastCalledWith(
       scope,
       anonymousFavorites,
@@ -301,20 +312,30 @@ describe('anonymous favorites first-login import', () => {
   it('does not restore imported anonymous favorites after the account clears them', async () => {
     const { service, clearAccountFavorites } = createHarness();
     service.postGraphql
-      .mockResolvedValueOnce({ userFavoritesSnapshot: {
-        revision: 0, favorites: createEmptyFavorites(),
-      } })
-      .mockResolvedValueOnce({ syncFavorites: {
-        success: true, revision: 1, favorites: anonymousFavorites,
-      } });
+      .mockResolvedValueOnce({
+        userFavoritesSnapshot: {
+          revision: 0,
+          favorites: createEmptyFavorites(),
+        },
+      })
+      .mockResolvedValueOnce({
+        syncFavorites: {
+          success: true,
+          revision: 1,
+          favorites: anonymousFavorites,
+        },
+      });
     await service.syncScope(scope, 0);
 
     clearAccountFavorites();
     service.postGraphql.mockReset();
     service.replaceScopeFavorites.mockClear();
-    service.postGraphql.mockResolvedValueOnce({ userFavoritesSnapshot: {
-      revision: 2, favorites: createEmptyFavorites(),
-    } });
+    service.postGraphql.mockResolvedValueOnce({
+      userFavoritesSnapshot: {
+        revision: 2,
+        favorites: createEmptyFavorites(),
+      },
+    });
 
     await service.syncScope(scope, 0);
 
@@ -329,9 +350,14 @@ describe('anonymous favorites first-login import', () => {
 describe('failed favorite synchronization recovery', () => {
   function createHarness() {
     const scope = getFavoritesScope('user-a');
-    let operations = [operation({
-      operation: 'add', type: 'railLine', code: 'L4', status: 'pending',
-    })];
+    let operations = [
+      operation({
+        operation: 'add',
+        type: 'railLine',
+        code: 'L4',
+        status: 'pending',
+      }),
+    ];
     let localFavorites = { ...createEmptyFavorites(), railLine: ['L4'] };
     const service = Object.create(FavoritesService.prototype) as {
       db: unknown;
@@ -356,15 +382,22 @@ describe('failed favorite synchronization recovery', () => {
     }
     service.db = {
       outbox: {
-        where: () => ({ equals: (value: string) => collection((record) => record.scope === value) }),
+        where: () => ({
+          equals: (value: string) =>
+            collection((record) => record.scope === value),
+        }),
         bulkPut: async (records: FavoriteOutboxRecord[]) => {
           for (const record of records) {
-            operations = operations.filter((item) => item.operationId !== record.operationId);
+            operations = operations.filter(
+              (item) => item.operationId !== record.operationId,
+            );
             operations.push(record);
           }
         },
         bulkDelete: async (ids: string[]) => {
-          operations = operations.filter((record) => !ids.includes(record.operationId));
+          operations = operations.filter(
+            (record) => !ids.includes(record.operationId),
+          );
         },
       },
       transaction: async (...args: unknown[]) =>
@@ -377,11 +410,14 @@ describe('failed favorite synchronization recovery', () => {
     service.postGraphql = jest.fn();
     service.queueAnonymousFavoritesImport = jest.fn();
     service.syncWithServer = jest.fn();
-    service.replaceScopeFavorites = jest.fn(async (_scope: string, favorites: FavoriteList) => {
-      localFavorites = favorites;
-    });
+    service.replaceScopeFavorites = jest.fn(
+      async (_scope: string, favorites: FavoriteList) => {
+        localFavorites = favorites;
+      },
+    );
     return {
-      service, scope,
+      service,
+      scope,
       operations: () => operations,
       favorites: () => localFavorites,
     };
@@ -417,17 +453,26 @@ describe('failed favorite synchronization recovery', () => {
 
     const merged = { ...createEmptyFavorites(), railLine: ['L1', 'L4'] };
     service.postGraphql
-      .mockResolvedValueOnce({ userFavoritesSnapshot: {
-        revision: 2, favorites: { ...createEmptyFavorites(), railLine: ['L1'] },
-      } })
-      .mockResolvedValueOnce({ syncFavorites: {
-        success: true, revision: 3, favorites: merged,
-      } });
+      .mockResolvedValueOnce({
+        userFavoritesSnapshot: {
+          revision: 2,
+          favorites: { ...createEmptyFavorites(), railLine: ['L1'] },
+        },
+      })
+      .mockResolvedValueOnce({
+        syncFavorites: {
+          success: true,
+          revision: 3,
+          favorites: merged,
+        },
+      });
     await service.syncScope(scope, 0);
 
-    expect(service.postGraphql).toHaveBeenLastCalledWith(expect.objectContaining({
-      variables: { favorites: merged, expectedRevision: 2 },
-    }));
+    expect(service.postGraphql).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        variables: { favorites: merged, expectedRevision: 2 },
+      }),
+    );
     expect(favorites()).toEqual(merged);
     expect(operations()).toEqual([]);
     expect(service._syncError()).toBeNull();
@@ -441,9 +486,12 @@ describe('failed favorite synchronization recovery', () => {
     expect(operations()).toEqual([]);
     expect(service.syncWithServer).toHaveBeenCalledTimes(1);
 
-    service.postGraphql.mockResolvedValueOnce({ userFavoritesSnapshot: {
-      revision: 2, favorites: createEmptyFavorites(),
-    } });
+    service.postGraphql.mockResolvedValueOnce({
+      userFavoritesSnapshot: {
+        revision: 2,
+        favorites: createEmptyFavorites(),
+      },
+    });
     await service.syncScope(scope, 0);
 
     expect(favorites()).toEqual(createEmptyFavorites());

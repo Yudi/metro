@@ -6,7 +6,11 @@
   "sourceRoot": "apps/metro-frontend-lite/src",
   "tags": [],
   "namedInputs": {
-    "default": ["{projectRoot}/**/*", "sharedGlobals", "{workspaceRoot}/libs/shared/styles/**/*.scss"]
+    "default": [
+      "{projectRoot}/**/*",
+      "sharedGlobals",
+      "{workspaceRoot}/libs/shared/styles/**/*.scss"
+    ]
   },
   "targets": {
     "build": {

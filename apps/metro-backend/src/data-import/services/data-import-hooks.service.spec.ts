@@ -25,7 +25,9 @@ describe('DataImportHooksService', () => {
 
     await service.onDataImportComplete();
 
-    expect(subwayStationProcessor.refreshMergedStations).toHaveBeenCalledTimes(1);
+    expect(subwayStationProcessor.refreshMergedStations).toHaveBeenCalledTimes(
+      1,
+    );
     expect(precompute.refreshAfterGtfsImport).toHaveBeenCalledTimes(1);
     expect(vectorTiles.clearCache).toHaveBeenCalledTimes(1);
     expect(search.indexAllData).toHaveBeenCalledTimes(1);
@@ -33,7 +35,9 @@ describe('DataImportHooksService', () => {
     expect(routeStopMapping.clearCaches).toHaveBeenCalledTimes(1);
     expect(
       gtfsDatabase.analyzeImportedTables.mock.invocationCallOrder[0],
-    ).toBeLessThan(subwayStationProcessor.refreshMergedStations.mock.invocationCallOrder[0]);
+    ).toBeLessThan(
+      subwayStationProcessor.refreshMergedStations.mock.invocationCallOrder[0],
+    );
     expect(
       precompute.refreshAfterGtfsImport.mock.invocationCallOrder[0],
     ).toBeLessThan(search.indexAllData.mock.invocationCallOrder[0]);
@@ -107,9 +111,7 @@ describe('DataImportHooksService', () => {
     const precompute = {
       isGtfsPostProcessingCurrent: jest.fn().mockResolvedValue(false),
       markGtfsPostProcessingPending: jest.fn().mockResolvedValue(undefined),
-      markGtfsPostProcessingComplete: jest
-        .fn()
-        .mockResolvedValue(undefined),
+      markGtfsPostProcessingComplete: jest.fn().mockResolvedValue(undefined),
       refreshAfterGtfsImport: jest.fn().mockResolvedValue(undefined),
     };
     const subwayStationProcessor = {

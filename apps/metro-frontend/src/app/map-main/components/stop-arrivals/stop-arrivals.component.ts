@@ -1,6 +1,9 @@
 import { BusInformationComponent } from '../bus-information/bus-information.component';
 import { routeNoticeView } from '../bus-information/bus-notice-view';
-import { BusInformationService, BusNoticesResult } from '../../services/bus-information.service';
+import {
+  BusInformationService,
+  BusNoticesResult,
+} from '../../services/bus-information.service';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -84,19 +87,37 @@ export class StopArrivalsComponent {
   private readonly busInformation = inject(BusInformationService);
   readonly busNotices = signal<BusNoticesResult | null>(null);
   readonly noticesUnavailable = signal(false);
-  readonly noticeRouteCodes = computed(() => [...new Set(this.routes()
-    .filter((route) => supportsSptransRealtime(route))
-    .map((route) => route.shortName.trim().toUpperCase())
-    .filter((code) => /^[0-9A-Z]{4}-\d{2}$/.test(code)))].sort(), {
-    equal: (a, b) => a.join('|') === b.join('|'),
-  });
-  readonly noticesByRoute = computed(() => new Map(this.noticeRouteCodes().map((code) => [code,
-    (this.busNotices()?.notices ?? []).filter((notice) => notice.routes.includes(code))
-      .map((notice) => routeNoticeView(notice, code)),
-  ])));
-  readonly arrivalRows = computed(() => this.arrivalLines().map((line) => ({
-    line, notices: this.noticesByRoute().get(line.c.trim().toUpperCase()) ?? [],
-  })));
+  readonly noticeRouteCodes = computed(
+    () =>
+      [
+        ...new Set(
+          this.routes()
+            .filter((route) => supportsSptransRealtime(route))
+            .map((route) => route.shortName.trim().toUpperCase())
+            .filter((code) => /^[0-9A-Z]{4}-\d{2}$/.test(code)),
+        ),
+      ].sort(),
+    {
+      equal: (a, b) => a.join('|') === b.join('|'),
+    },
+  );
+  readonly noticesByRoute = computed(
+    () =>
+      new Map(
+        this.noticeRouteCodes().map((code) => [
+          code,
+          (this.busNotices()?.notices ?? [])
+            .filter((notice) => notice.routes.includes(code))
+            .map((notice) => routeNoticeView(notice, code)),
+        ]),
+      ),
+  );
+  readonly arrivalRows = computed(() =>
+    this.arrivalLines().map((line) => ({
+      line,
+      notices: this.noticesByRoute().get(line.c.trim().toUpperCase()) ?? [],
+    })),
+  );
 
   private realtimeService = inject(RealtimeWebsocketService);
   private geographyService = inject(GeographyGraphQLService);
@@ -126,7 +147,9 @@ export class StopArrivalsComponent {
   readonly scheduledRows = computed(() =>
     this.scheduledDepartures().map((departure) => {
       const route = this.getScheduledDepartureRoute(departure);
-      const [timeLabel, dayLabel] = this.formatScheduledDepartureTime(departure.departureTime).split(' · ');
+      const [timeLabel, dayLabel] = this.formatScheduledDepartureTime(
+        departure.departureTime,
+      ).split(' · ');
       return {
         ...departure,
         key: this.getScheduledDepartureKey(departure),
@@ -151,14 +174,20 @@ export class StopArrivalsComponent {
   readonly hasArtespSchedules = computed(() => hasArtespStopData(this.stop()));
 
   readonly stationLineBadges = computed(() => {
-    const badges = new Map<string, Array<{ code: number; bg: string; text: string }>>();
+    const badges = new Map<
+      string,
+      Array<{ code: number; bg: string; text: string }>
+    >();
     for (const connection of this.railConnections().values()) {
       for (const direction of connection.directions) {
         for (const station of direction.stations) {
-          badges.set(station.id, getLineCodesFromColorNames(station.lines).map((code) => ({
-            code,
-            ...getLineColors(code),
-          })));
+          badges.set(
+            station.id,
+            getLineCodesFromColorNames(station.lines).map((code) => ({
+              code,
+              ...getLineColors(code),
+            })),
+          );
         }
       }
     }
@@ -201,7 +230,10 @@ export class StopArrivalsComponent {
       this.busNotices.set(null);
       this.noticesUnavailable.set(false);
       if (!codes.length) return;
-      if (codes.length > 100) { this.noticesUnavailable.set(true); return; }
+      if (codes.length > 100) {
+        this.noticesUnavailable.set(true);
+        return;
+      }
       const subscription = this.busInformation.notices(codes).subscribe({
         next: (result) => {
           this.busNotices.set(result);
@@ -224,9 +256,8 @@ export class StopArrivalsComponent {
 
       if (realtimeStopCode) {
         // Subscribe to this stop
-        releaseStopSubscription = this.realtimeService.subscribeToStop(
-          realtimeStopCode,
-        );
+        releaseStopSubscription =
+          this.realtimeService.subscribeToStop(realtimeStopCode);
 
         // Set timeout to stop loading state after 10 seconds
         loadingTimeout = setTimeout(() => {
@@ -577,7 +608,8 @@ export class StopArrivalsComponent {
   getAgencyLogo(name: string): string | null {
     const normalized = name.trim().toLocaleLowerCase('pt-BR');
     const agency = Object.values(TransitAgency).find(
-      (key) => key === normalized ||
+      (key) =>
+        key === normalized ||
         AGENCIES_DATA[key].shortName.toLocaleLowerCase('pt-BR') === normalized,
     );
     return agency ? getAgencyIconPath(agency) : null;

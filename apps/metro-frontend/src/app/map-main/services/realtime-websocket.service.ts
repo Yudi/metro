@@ -344,7 +344,9 @@ export class RealtimeWebsocketService implements OnDestroy {
       Number.isFinite(data.cacheTimestamp) &&
       data.cacheTimestamp < latestTimestamp
     ) {
-      this.logger.debug(`Ignoring stale arrival predictions for stop ${data.stopCode}`);
+      this.logger.debug(
+        `Ignoring stale arrival predictions for stop ${data.stopCode}`,
+      );
       return;
     }
 

@@ -185,10 +185,7 @@ export class LiteRealtimeService implements OnDestroy {
     const arrivals = new Map(this.stopArrivals());
     arrivals.set(update.stopCode, update);
     this.stopArrivals.set(arrivals);
-    this.latestStopUpdateTimestamps.set(
-      update.stopCode,
-      update.cacheTimestamp,
-    );
+    this.latestStopUpdateTimestamps.set(update.stopCode, update.cacheTimestamp);
   }
 
   private readArrivalUpdate(payload: unknown): LiteStopArrivalUpdate | null {

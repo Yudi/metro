@@ -8,8 +8,8 @@ describe('BikeVectorTileService', () => {
       { getCachedSummaryPayload: jest.fn().mockReturnValue(null) } as never,
     );
 
-    await expect(service.generateBikeStationsTile(12, 1000, 1000)).rejects.toBeInstanceOf(
-      ServiceUnavailableException,
-    );
+    await expect(
+      service.generateBikeStationsTile(12, 1000, 1000),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 });

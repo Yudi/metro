@@ -22,18 +22,27 @@ export class BusInformationService {
   private readonly http = inject(HttpClient);
 
   notices(routeCodes: string[]) {
-    return this.query<BusNoticesResult>('busOperationalNotices', routeCodes,
-      'status lastUpdated notices { sourceId sourceUrl title description routes periodText listedDate listing }');
+    return this.query<BusNoticesResult>(
+      'busOperationalNotices',
+      routeCodes,
+      'status lastUpdated notices { sourceId sourceUrl title description routes periodText listedDate listing }',
+    );
   }
 
   private query<T>(field: string, routeCodes: string[], selection: string) {
-    return this.http.post<{ data?: Record<string, T>; errors?: unknown[] }>('/api/graphql', {
-      query: `query BusInformation($routeCodes: [String!]!) { ${field}(routeCodes: $routeCodes) { ${selection} } }`,
-      variables: { routeCodes },
-    }).pipe(timeout(12_000), map((response) => {
-      const result = response.data?.[field];
-      if (response.errors?.length || !result) throw new Error('Bus information unavailable');
-      return result;
-    }));
+    return this.http
+      .post<{ data?: Record<string, T>; errors?: unknown[] }>('/api/graphql', {
+        query: `query BusInformation($routeCodes: [String!]!) { ${field}(routeCodes: $routeCodes) { ${selection} } }`,
+        variables: { routeCodes },
+      })
+      .pipe(
+        timeout(12_000),
+        map((response) => {
+          const result = response.data?.[field];
+          if (response.errors?.length || !result)
+            throw new Error('Bus information unavailable');
+          return result;
+        }),
+      );
   }
 }

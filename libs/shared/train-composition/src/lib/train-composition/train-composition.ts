@@ -57,10 +57,7 @@ export class TrainCompositionComponent {
     const composition = this.composition();
     const side = composition.disembarkingSide;
     return side
-      ? this.getDisembarkingSideLabel(
-          side,
-          composition.directionalFactReview,
-        )
+      ? this.getDisembarkingSideLabel(side, composition.directionalFactReview)
       : null;
   });
 
@@ -111,8 +108,6 @@ export class TrainCompositionComponent {
       }
     })();
 
-    return review?.status === 'unknown'
-      ? `${label} (não confirmado)`
-      : label;
+    return review?.status === 'unknown' ? `${label} (não confirmado)` : label;
   }
 }

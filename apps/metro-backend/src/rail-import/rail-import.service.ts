@@ -278,7 +278,9 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
     try {
       const result = await this.startImportInBackground();
       if (result.success) {
-        this.logger.debug('Scheduled GeoSampa WFS import completed successfully');
+        this.logger.debug(
+          'Scheduled GeoSampa WFS import completed successfully',
+        );
       } else {
         this.logger.warn(
           `Scheduled GeoSampa WFS import completed with errors: ${result.errors.join('; ')}`,
@@ -392,7 +394,8 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
         // Continue with next source even if one fails
         this.currentImportStatus.processedSources++;
       } finally {
-        const failureAttempt = this.sourceFailureAttempts.get(source.source) ?? 0;
+        const failureAttempt =
+          this.sourceFailureAttempts.get(source.source) ?? 0;
         const delayMs = sourceFailed
           ? Math.min(
               WFSConfig.BETWEEN_REQUEST_DELAY_MS * 2 ** (failureAttempt - 1),

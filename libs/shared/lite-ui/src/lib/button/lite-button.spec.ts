@@ -23,7 +23,9 @@ describe('LiteButton', () => {
     const fixture = TestBed.createComponent(ButtonHost);
     fixture.detectChanges();
     const component = fixture.debugElement.query(By.directive(LiteButton));
-    const button = component.nativeElement.querySelector('button') as HTMLButtonElement;
+    const button = component.nativeElement.querySelector(
+      'button',
+    ) as HTMLButtonElement;
     return { fixture, component, button };
   }
 
@@ -38,30 +40,38 @@ describe('LiteButton', () => {
     expect(clicked).toHaveBeenCalledTimes(1);
   });
 
-  it.each(['disabled', 'loading'] as const)('blocks native activation while %s', (input) => {
-    const { fixture, component, button } = setup();
-    const clicked = jest.fn();
-    (component.componentInstance as LiteButton).buttonClick.subscribe(clicked);
-    fixture.componentInstance[input].set(true);
-    fixture.detectChanges();
-    expect(button.disabled).toBe(true);
-    button.click();
-    expect(clicked).not.toHaveBeenCalled();
-    if (input === 'loading') {
-      expect(button.getAttribute('aria-busy')).toBe('true');
-    }
-    fixture.componentInstance[input].set(false);
-    fixture.detectChanges();
-    expect(button.disabled).toBe(false);
-    expect(button.hasAttribute('aria-busy')).toBe(false);
-    button.click();
-    expect(clicked).toHaveBeenCalledTimes(1);
-  });
+  it.each(['disabled', 'loading'] as const)(
+    'blocks native activation while %s',
+    (input) => {
+      const { fixture, component, button } = setup();
+      const clicked = jest.fn();
+      (component.componentInstance as LiteButton).buttonClick.subscribe(
+        clicked,
+      );
+      fixture.componentInstance[input].set(true);
+      fixture.detectChanges();
+      expect(button.disabled).toBe(true);
+      button.click();
+      expect(clicked).not.toHaveBeenCalled();
+      if (input === 'loading') {
+        expect(button.getAttribute('aria-busy')).toBe('true');
+      }
+      fixture.componentInstance[input].set(false);
+      fixture.detectChanges();
+      expect(button.disabled).toBe(false);
+      expect(button.hasAttribute('aria-busy')).toBe(false);
+      button.click();
+      expect(clicked).toHaveBeenCalledTimes(1);
+    },
+  );
 
-  it.each(['submit', 'reset'] as const)('forwards the %s type to the native control', (type) => {
-    const { fixture, button } = setup();
-    fixture.componentInstance.type.set(type);
-    fixture.detectChanges();
-    expect(button.type).toBe(type);
-  });
+  it.each(['submit', 'reset'] as const)(
+    'forwards the %s type to the native control',
+    (type) => {
+      const { fixture, button } = setup();
+      fixture.componentInstance.type.set(type);
+      fixture.detectChanges();
+      expect(button.type).toBe(type);
+    },
+  );
 });

@@ -101,7 +101,9 @@ export class RailStationService {
 
     const numericId = Number(normalizedId);
     if (!Number.isSafeInteger(numericId)) {
-      throw new BadRequestException('Rail station id is outside the allowed range');
+      throw new BadRequestException(
+        'Rail station id is outside the allowed range',
+      );
     }
 
     const stations = await this.prisma.$queryRaw<
@@ -433,6 +435,8 @@ function validateCoordinates(latitude: number, longitude: number): void {
     longitude < -180 ||
     longitude > 180
   ) {
-    throw new BadRequestException('latitude and longitude are outside their valid ranges');
+    throw new BadRequestException(
+      'latitude and longitude are outside their valid ranges',
+    );
   }
 }

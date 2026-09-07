@@ -40,7 +40,11 @@ class BusServiceIntervalsResult {
 }
 
 export function validateRouteCodes(codes: string[]): string[] {
-  if (!codes.length || codes.length > 100 || codes.some((code) => !/^[0-9A-Z]{4}-\d{2}$/.test(code))) {
+  if (
+    !codes.length ||
+    codes.length > 100 ||
+    codes.some((code) => !/^[0-9A-Z]{4}-\d{2}$/.test(code))
+  ) {
     throw new BadRequestException('Expected 1–100 SPTrans route codes');
   }
   return [...new Set(codes)];
@@ -50,11 +54,18 @@ export function validateRouteCodes(codes: string[]): string[] {
 export class BusServiceIntervalsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async forRoutes(codes: string[], now = new Date()): Promise<BusServiceIntervalsResult> {
+  async forRoutes(
+    codes: string[],
+    now = new Date(),
+  ): Promise<BusServiceIntervalsResult> {
     const parts = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
+      timeZone: 'America/Sao_Paulo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
     }).formatToParts(now);
-    const part = (key: string) => parts.find((value) => value.type === key)?.value ?? '';
+    const part = (key: string) =>
+      parts.find((value) => value.type === key)?.value ?? '';
     const serviceDate = `${part('year')}-${part('month')}-${part('day')}`;
     const date = serviceDate.replace(/-/g, '');
     const weekday = new Date(`${serviceDate}T12:00:00Z`).getUTCDay();
@@ -79,10 +90,20 @@ export class BusServiceIntervalsService {
       `;
       const seconds = (time: string) => {
         const match = /^(\d{1,2}):([0-5]\d):([0-5]\d)$/.exec(time);
-        return match ? Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]) : NaN;
+        return match
+          ? Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3])
+          : NaN;
       };
-      if (rows.length > 2000 || rows.some((row) => !Number.isSafeInteger(row.headwaySeconds) || row.headwaySeconds <= 0 ||
-        !(seconds(row.endTime) > seconds(row.startTime)))) throw new Error('Invalid service intervals');
+      if (
+        rows.length > 2000 ||
+        rows.some(
+          (row) =>
+            !Number.isSafeInteger(row.headwaySeconds) ||
+            row.headwaySeconds <= 0 ||
+            !(seconds(row.endTime) > seconds(row.startTime)),
+        )
+      )
+        throw new Error('Invalid service intervals');
       return { status: 'AVAILABLE', serviceDate, intervals: rows };
     } catch {
       return { status: 'UNAVAILABLE', serviceDate, intervals: [] };
@@ -92,15 +113,28 @@ export class BusServiceIntervalsService {
 
 @Resolver()
 export class BusInformationResolver {
-  constructor(private readonly notices: BusNoticeService, private readonly intervals: BusServiceIntervalsService) {}
+  constructor(
+    private readonly notices: BusNoticeService,
+    private readonly intervals: BusServiceIntervalsService,
+  ) {}
 
-  @Query(() => BusNoticesResult, { description: 'Cached SPTrans operational publications. Never scrapes on demand; listing dates do not prove an active incident.' })
-  busOperationalNotices(@Args('routeCodes', { type: () => [String] }) codes: string[]) {
+  @Query(() => BusNoticesResult, {
+    description:
+      'Cached SPTrans operational publications. Never scrapes on demand; listing dates do not prove an active incident.',
+  })
+  busOperationalNotices(
+    @Args('routeCodes', { type: () => [String] }) codes: string[],
+  ) {
     return this.notices.forRoutes(validateRouteCodes(codes));
   }
 
-  @Query(() => BusServiceIntervalsResult, { description: 'GTFS frequency windows for the current Sao Paulo service day, measured at route origin. Not stop arrival predictions or exact departures.' })
-  busServiceIntervals(@Args('routeCodes', { type: () => [String] }) codes: string[]) {
+  @Query(() => BusServiceIntervalsResult, {
+    description:
+      'GTFS frequency windows for the current Sao Paulo service day, measured at route origin. Not stop arrival predictions or exact departures.',
+  })
+  busServiceIntervals(
+    @Args('routeCodes', { type: () => [String] }) codes: string[],
+  ) {
     return this.intervals.forRoutes(validateRouteCodes(codes));
   }
 }

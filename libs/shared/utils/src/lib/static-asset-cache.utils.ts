@@ -1,4 +1,5 @@
-const HASHED_ASSET_PATTERN = /^(?:chunk|main|polyfills|styles)-[\w-]{8,}\.(?:css|js)$/i;
+const HASHED_ASSET_PATTERN =
+  /^(?:chunk|main|polyfills|styles)-[\w-]{8,}\.(?:css|js)$/i;
 
 /** Cache policy for a static asset's basename, excluding its directory. */
 export function getStaticAssetCacheControl(fileName: string): string {

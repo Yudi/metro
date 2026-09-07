@@ -265,9 +265,7 @@ export class InsightsDashboardComponent {
       return route.fares.map((fare) => formatBusFare(fare)).join(' · ');
     }
 
-    return isArtespRoute(route)
-      ? 'Tarifa não informada'
-      : null;
+    return isArtespRoute(route) ? 'Tarifa não informada' : null;
   }
 
   stopDisplayId(stop: BusStopInsight): string {
@@ -299,9 +297,7 @@ export class InsightsDashboardComponent {
     } else if (sourceAgency && this.isTransitAgency(sourceAgency)) {
       agency = sourceAgency;
     } else if (!sourceAgency) {
-      agency = route.shortName
-        ? getRouteAgency(route.shortName)
-        : undefined;
+      agency = route.shortName ? getRouteAgency(route.shortName) : undefined;
       if (!agency) {
         agency = TransitAgency.SPTRANS;
       }

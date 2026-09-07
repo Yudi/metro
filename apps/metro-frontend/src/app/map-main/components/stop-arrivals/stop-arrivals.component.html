@@ -20,7 +20,10 @@
         </div>
       } @else if (hasArrivals()) {
         <div class="arrivals-list">
-          @for (arrival of arrivalRows(); track getArrivalLineKey(arrival.line)) {
+          @for (
+            arrival of arrivalRows();
+            track getArrivalLineKey(arrival.line)
+          ) {
             @let line = arrival.line;
             <div class="arrival-line">
               <div class="line-header">
@@ -86,8 +89,12 @@
                 </button>
               }
 
-              <app-bus-information [routeCode]="line.c" [notices]="arrival.notices"
-                [stale]="busNotices()?.status === 'STALE'" [lastUpdated]="busNotices()?.lastUpdated ?? null" />
+              <app-bus-information
+                [routeCode]="line.c"
+                [notices]="arrival.notices"
+                [stale]="busNotices()?.status === 'STALE'"
+                [lastUpdated]="busNotices()?.lastUpdated ?? null"
+              />
 
               @if (!compact() && getLineRailStations(line).length > 0) {
                 <div class="rail-service">
@@ -103,17 +110,29 @@
                     ) {
                       <div class="rail-station">
                         <span class="rail-station-heading">
-                          <span class="rail-station-name">{{ station.name }}</span>
+                          <span class="rail-station-name">{{
+                            station.name
+                          }}</span>
                           <span class="station-line-badges">
-                            @for (line of stationLineBadges().get(station.id) ?? []; track line.code) {
-                              <span class="station-line-badge" [style.background-color]="line.bg" [style.color]="line.text" [attr.aria-label]="'Linha ' + line.code">{{ line.code }}</span>
+                            @for (
+                              line of stationLineBadges().get(station.id) ?? [];
+                              track line.code
+                            ) {
+                              <span
+                                class="station-line-badge"
+                                [style.background-color]="line.bg"
+                                [style.color]="line.text"
+                                [attr.aria-label]="'Linha ' + line.code"
+                                >{{ line.code }}</span
+                              >
                             }
                           </span>
                         </span>
                         @if (formatStationDistance(station); as distanceText) {
-                          <span class="rail-station-meta rail-station-distance">{{
-                            distanceText
-                          }}</span>
+                          <span
+                            class="rail-station-meta rail-station-distance"
+                            >{{ distanceText }}</span
+                          >
                         }
                       </div>
                     }
@@ -141,11 +160,17 @@
     }
 
     @if (noticesUnavailable()) {
-      <p class="hint" role="status">Avisos de alterações indisponíveis no momento.</p>
+      <p class="hint" role="status">
+        Avisos de alterações indisponíveis no momento.
+      </p>
     }
 
     @if (hasArtespSchedules()) {
-      <section class="scheduled-section" aria-label="Horários programados" [attr.aria-busy]="scheduledDeparturesLoading()">
+      <section
+        class="scheduled-section"
+        aria-label="Horários programados"
+        [attr.aria-busy]="scheduledDeparturesLoading()"
+      >
         <div class="route-rail-header scheduled-header">
           <div>
             <div class="scheduled-title">
@@ -164,14 +189,22 @@
             @for (group of scheduledGroups(); track group.routeId) {
               <li class="scheduled-group">
                 <div class="scheduled-row">
-                  <time class="scheduled-time" [attr.datetime]="group.next.departureTime">
+                  <time
+                    class="scheduled-time"
+                    [attr.datetime]="group.next.departureTime"
+                  >
                     <span>{{ group.next.timeLabel }}</span>
                     @if (group.next.dayLabel) {
                       <small>{{ group.next.dayLabel }}</small>
                     }
                   </time>
                   <div class="scheduled-route">
-                    <span class="route-badge" [style.background-color]="group.next.color" [style.color]="group.next.textColor">{{ group.next.routeShortName }}</span>
+                    <span
+                      class="route-badge"
+                      [style.background-color]="group.next.color"
+                      [style.color]="group.next.textColor"
+                      >{{ group.next.routeShortName }}</span
+                    >
                     <span class="scheduled-destination">
                       <span>{{ group.next.headsign }}</span>
                       @if (group.next.platformCode) {
@@ -180,21 +213,49 @@
                     </span>
                   </div>
                   @if (group.remaining.length > 0) {
-                    <button mat-button type="button" class="schedule-toggle"
+                    <button
+                      mat-button
+                      type="button"
+                      class="schedule-toggle"
                       [attr.aria-expanded]="group.expanded"
-                      [matTooltip]="group.expanded ? 'Mostrar menos' : 'Ver ' + group.departures.length + ' horários'"
-                      [attr.aria-label]="(group.expanded ? 'Recolher horários da linha ' : 'Ver ' + group.departures.length + ' horários da linha ') + group.next.routeShortName"
-                      (click)="toggleScheduleRoute(group.routeId)">
-                      <mat-icon>{{ group.expanded ? 'expand_less' : 'expand_more' }}</mat-icon>
-                      <span class="schedule-toggle-label">{{ group.expanded ? 'Mostrar menos' : 'Ver ' + group.departures.length + ' horários' }}</span>
+                      [matTooltip]="
+                        group.expanded
+                          ? 'Mostrar menos'
+                          : 'Ver ' + group.departures.length + ' horários'
+                      "
+                      [attr.aria-label]="
+                        (group.expanded
+                          ? 'Recolher horários da linha '
+                          : 'Ver ' +
+                            group.departures.length +
+                            ' horários da linha ') + group.next.routeShortName
+                      "
+                      (click)="toggleScheduleRoute(group.routeId)"
+                    >
+                      <mat-icon>{{
+                        group.expanded ? "expand_less" : "expand_more"
+                      }}</mat-icon>
+                      <span class="schedule-toggle-label">{{
+                        group.expanded
+                          ? "Mostrar menos"
+                          : "Ver " + group.departures.length + " horários"
+                      }}</span>
                     </button>
                   }
                 </div>
                 @if (group.expanded) {
-                  <ul class="scheduled-following" [attr.aria-label]="'Mais horários da linha ' + group.next.routeShortName">
+                  <ul
+                    class="scheduled-following"
+                    [attr.aria-label]="
+                      'Mais horários da linha ' + group.next.routeShortName
+                    "
+                  >
                     @for (departure of group.remaining; track departure.key) {
                       <li class="scheduled-following-row">
-                        <time class="scheduled-time" [attr.datetime]="departure.departureTime">
+                        <time
+                          class="scheduled-time"
+                          [attr.datetime]="departure.departureTime"
+                        >
                           <span>{{ departure.timeLabel }}</span>
                           @if (departure.dayLabel) {
                             <small>{{ departure.dayLabel }}</small>
@@ -203,7 +264,9 @@
                         <span class="scheduled-destination">
                           <span>{{ departure.headsign }}</span>
                           @if (departure.platformCode) {
-                            <small>Plataforma {{ departure.platformCode }}</small>
+                            <small
+                              >Plataforma {{ departure.platformCode }}</small
+                            >
                           }
                         </span>
                       </li>
@@ -250,13 +313,20 @@
 
         <mat-accordion class="route-chip-list" multi>
           @for (route of displayRoutes(); track route.routeId) {
-            <mat-expansion-panel class="route-panel mat-elevation-z0"
+            <mat-expansion-panel
+              class="route-panel mat-elevation-z0"
               [expanded]="isRouteExpanded(route)"
               (opened)="setRouteExpanded(route, true)"
-              (closed)="setRouteExpanded(route, false)">
+              (closed)="setRouteExpanded(route, false)"
+            >
               <mat-expansion-panel-header class="route-panel-header">
                 <mat-panel-title class="route-summary">
-                  <span class="route-badge" [style.background-color]="'#' + route.color" [style.color]="'#' + route.textColor">{{ route.shortName }}</span>
+                  <span
+                    class="route-badge"
+                    [style.background-color]="'#' + route.color"
+                    [style.color]="'#' + route.textColor"
+                    >{{ route.shortName }}</span
+                  >
                   <span class="route-label">{{ route.longName }}</span>
                   <span class="route-meta">
                     <span class="agency-identity">
@@ -266,13 +336,23 @@
                       {{ route.agencyName }}
                     </span>
                     @if (route.fareLabel; as fareLabel) {
-                      <span class="route-fare" [class.fare-missing]="route.fareMissing" [attr.aria-label]="'Tarifa: ' + fareLabel">
+                      <span
+                        class="route-fare"
+                        [class.fare-missing]="route.fareMissing"
+                        [attr.aria-label]="'Tarifa: ' + fareLabel"
+                      >
                         <mat-icon>payments</mat-icon>
                         <span>{{ fareLabel }}</span>
                       </span>
                     }
                     @if (!railConnectionsLoading() && routeServesRail(route)) {
-                      <span class="rail-count" [attr.aria-label]="getRouteRailStationCount(route) + ' estações de metrô ou trem'">
+                      <span
+                        class="rail-count"
+                        [attr.aria-label]="
+                          getRouteRailStationCount(route) +
+                          ' estações de metrô ou trem'
+                        "
+                      >
                         <mat-icon>train</mat-icon>
                         {{ getRouteRailStationCount(route) }}
                       </span>
@@ -317,10 +397,23 @@
                           ) {
                             <div class="rail-station detail-station">
                               <span class="rail-station-heading">
-                                <span class="rail-station-name">{{ station.name }}</span>
+                                <span class="rail-station-name">{{
+                                  station.name
+                                }}</span>
                                 <span class="station-line-badges">
-                                  @for (line of stationLineBadges().get(station.id) ?? []; track line.code) {
-                                    <span class="station-line-badge" [style.background-color]="line.bg" [style.color]="line.text" [attr.aria-label]="'Linha ' + line.code">{{ line.code }}</span>
+                                  @for (
+                                    line of stationLineBadges().get(
+                                      station.id
+                                    ) ?? [];
+                                    track line.code
+                                  ) {
+                                    <span
+                                      class="station-line-badge"
+                                      [style.background-color]="line.bg"
+                                      [style.color]="line.text"
+                                      [attr.aria-label]="'Linha ' + line.code"
+                                      >{{ line.code }}</span
+                                    >
                                   }
                                 </span>
                               </span>

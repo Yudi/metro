@@ -263,9 +263,12 @@ export function isValidApi1RailStationCode(
 export function hasExternalRailVehicles(
   lineCode: string,
 ): lineCode is TrackedRailLineCode {
-  return lineCode === 'L4' || isApi1RailLine(lineCode) ||
+  return (
+    lineCode === 'L4' ||
+    isApi1RailLine(lineCode) ||
     ((lineCode === 'L8' || lineCode === 'L9') &&
-      getLiveTrainTrackingApiIds([Number(lineCode.slice(1))]).length > 0);
+      getLiveTrainTrackingApiIds([Number(lineCode.slice(1))]).length > 0)
+  );
 }
 
 /**
@@ -327,7 +330,9 @@ export function extractTrackedRailVehicleLineCode(
 ): TrackedRailLineCode | undefined {
   if (!shortName) return undefined;
 
-  const match = shortName.match(/(?:^|[^A-Za-z0-9])(L(?:4|8|9|1[0-3])|EA|10X)(?=$|[^A-Za-z0-9])/i);
+  const match = shortName.match(
+    /(?:^|[^A-Za-z0-9])(L(?:4|8|9|1[0-3])|EA|10X)(?=$|[^A-Za-z0-9])/i,
+  );
   if (match) {
     const lineCode = match[1].toUpperCase() as TrackedRailLineCode;
     if (!requireAvailable || hasExternalRailVehicles(lineCode)) {

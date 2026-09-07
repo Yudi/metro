@@ -62,7 +62,10 @@
       </p>
     }
 
-    @if (result().type === "bus_stop" && stopPlatformLabel(); as platformLabel) {
+    @if (
+      result().type === "bus_stop" && stopPlatformLabel();
+      as platformLabel
+    ) {
       <p class="result-platform">
         <mat-icon>place</mat-icon>
         {{ platformLabel }}

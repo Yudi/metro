@@ -263,11 +263,10 @@ export class CptmVehiclePollingService implements OnModuleDestroy {
       const results = await Promise.all(
         lineCodes.map(async (lineCode) => {
           try {
-            const vehicles =
-              await this.externalRailProvider.getVehiclesForLine(
-                lineCode,
-                await this.mapContext.getContext(lineCode),
-              );
+            const vehicles = await this.externalRailProvider.getVehiclesForLine(
+              lineCode,
+              await this.mapContext.getContext(lineCode),
+            );
             if (!Array.isArray(vehicles)) {
               this.logger.warn(
                 `Ignoring malformed vehicle snapshot for ${lineCode}`,
@@ -291,11 +290,15 @@ export class CptmVehiclePollingService implements OnModuleDestroy {
           continue;
         }
 
-        const config = isCptmLine(lineCode) ? CPTM_LINE_CONFIG[lineCode] : {
-          name: getRailLineById(lineCode)?.colorName ?? lineCode,
-          bgcolor: getRailLineById(lineCode)?.colorHex.replace('#', '') ?? '000000',
-          fgcolor: 'FFFFFF',
-        };
+        const config = isCptmLine(lineCode)
+          ? CPTM_LINE_CONFIG[lineCode]
+          : {
+              name: getRailLineById(lineCode)?.colorName ?? lineCode,
+              bgcolor:
+                getRailLineById(lineCode)?.colorHex.replace('#', '') ??
+                '000000',
+              fgcolor: 'FFFFFF',
+            };
         const cached = this.cache.get(lineCode);
 
         // Check if vehicles changed

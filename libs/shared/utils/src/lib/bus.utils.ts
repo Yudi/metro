@@ -103,9 +103,7 @@ export function isArtespRoute(route: BusRouteIdentityLike): boolean {
  * are being upgraded; an explicitly identified non-SPTrans route is never
  * treated as realtime-capable.
  */
-export function supportsSptransRealtime(
-  route: BusRouteIdentityLike,
-): boolean {
+export function supportsSptransRealtime(route: BusRouteIdentityLike): boolean {
   if (/^artesp[:/]/i.test(route.routeId)) {
     return false;
   }
@@ -115,7 +113,9 @@ export function supportsSptransRealtime(
     return false;
   }
 
-  return route.supportsRealtime === undefined || route.supportsRealtime === true;
+  return (
+    route.supportsRealtime === undefined || route.supportsRealtime === true
+  );
 }
 
 /**
@@ -123,9 +123,7 @@ export function supportsSptransRealtime(
  * physical stop may be represented by an Artesp record, in which case the
  * namespaced SPTrans member is the only valid realtime target.
  */
-export function getSptransStopCode(
-  stop: BusStopIdentityLike,
-): string | null {
+export function getSptransStopCode(stop: BusStopIdentityLike): string | null {
   const sourceAgency = normalizeBusSourceAgency(stop.sourceAgency);
   if (sourceAgency === 'sptrans' && !/^artesp[:/]/i.test(stop.stopId)) {
     return stop.stopId || null;
@@ -256,7 +254,10 @@ export function formatScheduledBusDepartureTime(
 /** Keep one group per feed-qualified route, ordered by its next departure. */
 export function groupScheduledBusDepartures<
   T extends { routeId: string; departureTime: string },
->(departures: readonly T[], limitPerRoute = 5): Array<{ routeId: string; departures: T[] }> {
+>(
+  departures: readonly T[],
+  limitPerRoute = 5,
+): Array<{ routeId: string; departures: T[] }> {
   const groups = new Map<string, { routeId: string; departures: T[] }>();
   const chronological = [...departures].sort(
     (a, b) => Date.parse(a.departureTime) - Date.parse(b.departureTime),

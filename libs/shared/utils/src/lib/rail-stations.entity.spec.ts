@@ -1,6 +1,9 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { getStaticRailStationsByLine, L6_STATIONS } from './rail-stations.entity';
+import {
+  getStaticRailStationsByLine,
+  L6_STATIONS,
+} from './rail-stations.entity';
 import { hardNormalizeString } from './strings.utils';
 
 describe('Line 6 static stations', () => {

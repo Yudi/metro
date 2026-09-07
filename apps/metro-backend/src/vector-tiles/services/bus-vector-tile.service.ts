@@ -275,7 +275,9 @@ export class BusVectorTileService {
   normalizeIds(ids: string[] | undefined): string[] {
     const values = ids ?? [];
     if (values.length > 100) {
-      throw new BadRequestException('A maximum of 100 identifiers is supported');
+      throw new BadRequestException(
+        'A maximum of 100 identifiers is supported',
+      );
     }
 
     const normalized = values.map((id) => id.trim());

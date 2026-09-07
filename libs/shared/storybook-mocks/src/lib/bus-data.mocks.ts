@@ -294,8 +294,9 @@ export const ROUTE_ARTESP_WITHOUT_FARE: BusRouteGraphQL = {
 // Relative fixtures keep today's departures free of a weekday label in Storybook.
 const scheduledFixtureNow = new Date();
 scheduledFixtureNow.setSeconds(0, 0);
-const scheduledFixtureTomorrow = new Date(scheduledFixtureNow.getTime() + 86_400_000)
-  .toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+const scheduledFixtureTomorrow = new Date(
+  scheduledFixtureNow.getTime() + 86_400_000,
+).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
 
 export const SCHEDULED_ARTESP_DEPARTURES: ScheduledBusDepartureGraphQL[] = [
   ...[10, 25, 40, 55, 70, 85].map((minutes, index) => ({
@@ -304,7 +305,9 @@ export const SCHEDULED_ARTESP_DEPARTURES: ScheduledBusDepartureGraphQL[] = [
     tripId: `artesp:trip-001-${index}`,
     headsign: index % 2 === 0 ? 'Centro' : 'Terminal Regional',
     directionId: index % 2,
-    departureTime: new Date(scheduledFixtureNow.getTime() + minutes * 60_000).toISOString(),
+    departureTime: new Date(
+      scheduledFixtureNow.getTime() + minutes * 60_000,
+    ).toISOString(),
     sourceAgency: 'ARTESP',
     platformCode: '1',
   })),
@@ -314,7 +317,9 @@ export const SCHEDULED_ARTESP_DEPARTURES: ScheduledBusDepartureGraphQL[] = [
     tripId: `artesp:trip-02Verde-${index}`,
     headsign: 'Bairro Verde',
     directionId: 0,
-    departureTime: new Date(scheduledFixtureNow.getTime() + minutes * 60_000).toISOString(),
+    departureTime: new Date(
+      scheduledFixtureNow.getTime() + minutes * 60_000,
+    ).toISOString(),
     sourceAgency: 'ARTESP',
     platformCode: '2',
   })),

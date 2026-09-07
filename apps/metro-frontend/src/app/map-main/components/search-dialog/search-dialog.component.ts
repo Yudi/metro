@@ -371,8 +371,7 @@ export class SearchDialogComponent implements AfterViewInit {
             getBusAgencyOrder({
               routeId: bRoute.route_id,
               sourceAgency: bRoute.sourceAgency,
-            }) ||
-          a.index - b.index
+            }) || a.index - b.index
         );
       })
       .map(({ result }) => result);

@@ -21,7 +21,10 @@ describe('TransitDataPrecomputeService', () => {
       $executeRaw: jest.fn().mockResolvedValue(1),
       $executeRawUnsafe: jest.fn().mockResolvedValue(1),
     };
-    service = new TransitDataPrecomputeService(prisma as never, physicalStops as never);
+    service = new TransitDataPrecomputeService(
+      prisma as never,
+      physicalStops as never,
+    );
   });
 
   it('refreshes both GTFS-derived views and records their source signatures', async () => {
@@ -51,8 +54,7 @@ describe('TransitDataPrecomputeService', () => {
       .mockResolvedValueOnce([{ source_signature: 'rail-hash' }])
       .mockResolvedValueOnce([
         {
-          source_signature:
-            'v2:radius=200:gtfs=gtfs-hash:rail=rail-hash',
+          source_signature: 'v2:radius=200:gtfs=gtfs-hash:rail=rail-hash',
         },
       ]);
 
@@ -82,13 +84,13 @@ describe('TransitDataPrecomputeService', () => {
     const query = (
       prisma.$queryRaw.mock.calls[0][0] as TemplateStringsArray
     ).join(' ');
-    const [, requiredFiles, dependentFiles, dependentFileCount] =
-      prisma.$queryRaw.mock.calls[0] as [
-        TemplateStringsArray,
-        string[],
-        string[],
-        number,
-      ];
+    const [, requiredFiles, dependentFiles, dependentFileCount] = prisma
+      .$queryRaw.mock.calls[0] as [
+      TemplateStringsArray,
+      string[],
+      string[],
+      number,
+    ];
 
     expect(
       optionalFailures.every((file) => !requiredFiles.includes(file.fileName)),
@@ -112,13 +114,11 @@ describe('TransitDataPrecomputeService', () => {
     prisma.$queryRaw
       .mockResolvedValueOnce([{ source_signature: 'rail-hash' }])
       .mockResolvedValueOnce([]);
-    prisma.$executeRawUnsafe.mockRejectedValueOnce(
-      new Error('refresh failed'),
-    );
+    prisma.$executeRawUnsafe.mockRejectedValueOnce(new Error('refresh failed'));
 
-    await expect(service.refreshRouteRailConnections('gtfs-hash')).rejects.toThrow(
-      'refresh failed',
-    );
+    await expect(
+      service.refreshRouteRailConnections('gtfs-hash'),
+    ).rejects.toThrow('refresh failed');
     expect(prisma.$executeRaw).not.toHaveBeenCalled();
   });
 

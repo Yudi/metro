@@ -22,9 +22,7 @@ describe('graphqlQueryTimeoutInterceptor', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       providers: [
-        provideHttpClient(
-          withInterceptors([graphqlQueryTimeoutInterceptor]),
-        ),
+        provideHttpClient(withInterceptors([graphqlQueryTimeoutInterceptor])),
         provideHttpClientTesting(),
         { provide: GRAPHQL_QUERY_TIMEOUT_MS, useValue: 12_345 },
       ],
@@ -109,8 +107,7 @@ describe('graphqlQueryTimeoutInterceptor', () => {
 
     http
       .post('/api/graphql', {
-        query:
-          'query Read { read } mutation Write { write }',
+        query: 'query Read { read } mutation Write { write }',
         operationName: 'Read',
       })
       .subscribe();
@@ -184,9 +181,7 @@ describe('graphqlQueryTimeoutInterceptor configuration', () => {
   it('ignores a fractional timeout that Angular would reject', () => {
     TestBed.configureTestingModule({
       providers: [
-        provideHttpClient(
-          withInterceptors([graphqlQueryTimeoutInterceptor]),
-        ),
+        provideHttpClient(withInterceptors([graphqlQueryTimeoutInterceptor])),
         provideHttpClientTesting(),
         { provide: GRAPHQL_QUERY_TIMEOUT_MS, useValue: 12.5 },
       ],

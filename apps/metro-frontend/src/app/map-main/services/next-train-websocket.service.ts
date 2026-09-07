@@ -544,9 +544,11 @@ function isRenderableTrackedRailVehicle(
     latitude <= 90 &&
     longitude >= -180 &&
     longitude <= 180 &&
-    (vehicle.estimated === undefined || typeof vehicle.estimated === 'boolean') &&
+    (vehicle.estimated === undefined ||
+      typeof vehicle.estimated === 'boolean') &&
     (vehicle.validUntil === undefined || Number.isFinite(vehicle.validUntil)) &&
-    (vehicle.destination === undefined || typeof vehicle.destination === 'string') &&
+    (vehicle.destination === undefined ||
+      typeof vehicle.destination === 'string') &&
     (vehicle.estimatedPositionDescription === undefined ||
       typeof vehicle.estimatedPositionDescription === 'string')
   );

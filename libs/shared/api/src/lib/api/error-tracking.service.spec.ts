@@ -45,10 +45,7 @@ describe('ErrorTrackingService', () => {
       ([event]) => event === 'online',
     )?.[1];
     expect(onlineListener).toEqual(expect.any(Function));
-    expect(removeEventListener).toHaveBeenCalledWith(
-      'online',
-      onlineListener,
-    );
+    expect(removeEventListener).toHaveBeenCalledWith('online', onlineListener);
 
     addEventListener.mockRestore();
     removeEventListener.mockRestore();

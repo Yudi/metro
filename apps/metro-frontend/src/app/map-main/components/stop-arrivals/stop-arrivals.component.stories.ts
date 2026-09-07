@@ -59,12 +59,30 @@ function createProviders(opts: StopArrivalsProviderOptions) {
         : of(opts.scheduledDepartures ?? []);
 
   return [
-    { provide: BusInformationService, useValue: { notices: () => of({ status: 'AVAILABLE', lastUpdated: '2026-09-07T07:30:00Z', notices: [{
-      sourceId: '1', sourceUrl: 'https://www.sptrans.com.br/informativos/oeste/desvios-de-itinerarios-na-regiao-da-av-paulista/71116/',
-      title: 'Exemplo: desvio na região da Av. Paulista', periodText: '07/09/2026, das 9h às 20h.',
-      description: '07/09/2026, das 9h às 20h.\nMotivo: exemplo ilustrativo de evento.\n477A-10 Pinheiros\nIda: exemplo de desvio pela via alternativa.\nVolta: sem alteração.\n875A-10 Outro destino\nIda: instrução de outra linha.',
-      routes: ['477A-10', '875A-10'], listing: 'RECENT', listedDate: '7 de setembro de 2026',
-    }] }) } },
+    {
+      provide: BusInformationService,
+      useValue: {
+        notices: () =>
+          of({
+            status: 'AVAILABLE',
+            lastUpdated: '2026-09-07T07:30:00Z',
+            notices: [
+              {
+                sourceId: '1',
+                sourceUrl:
+                  'https://www.sptrans.com.br/informativos/oeste/desvios-de-itinerarios-na-regiao-da-av-paulista/71116/',
+                title: 'Exemplo: desvio na região da Av. Paulista',
+                periodText: '07/09/2026, das 9h às 20h.',
+                description:
+                  '07/09/2026, das 9h às 20h.\nMotivo: exemplo ilustrativo de evento.\n477A-10 Pinheiros\nIda: exemplo de desvio pela via alternativa.\nVolta: sem alteração.\n875A-10 Outro destino\nIda: instrução de outra linha.',
+                routes: ['477A-10', '875A-10'],
+                listing: 'RECENT',
+                listedDate: '7 de setembro de 2026',
+              },
+            ],
+          }),
+      },
+    },
     {
       provide: GeographyGraphQLService,
       useValue: {
@@ -407,7 +425,8 @@ export const ArtespLongRoute: Story = {
     routes: [
       {
         ...ROUTE_ARTESP_001,
-        longName: 'Terminal Metropolitano de São Bernardo do Campo – São Paulo (Terminal Sacomã)',
+        longName:
+          'Terminal Metropolitano de São Bernardo do Campo – São Paulo (Terminal Sacomã)',
         fares: [
           { price: 5.5, currency: 'BRL' },
           { price: 8.75, currency: 'BRL' },
@@ -430,8 +449,20 @@ export const ArtespSeveralRoutes: Story = {
     routes: [
       ROUTE_ARTESP_001,
       ROUTE_ARTESP_WITHOUT_FARE,
-      { ...ROUTE_ARTESP_001, id: 'artesp:003', routeId: 'artesp:003', shortName: '003', longName: 'Terminal Regional – Vila Nova' },
-      { ...ROUTE_ARTESP_WITHOUT_FARE, id: 'artesp:004', routeId: 'artesp:004', shortName: '004', longName: 'Terminal Regional – Jardim das Flores' },
+      {
+        ...ROUTE_ARTESP_001,
+        id: 'artesp:003',
+        routeId: 'artesp:003',
+        shortName: '003',
+        longName: 'Terminal Regional – Vila Nova',
+      },
+      {
+        ...ROUTE_ARTESP_WITHOUT_FARE,
+        id: 'artesp:004',
+        routeId: 'artesp:004',
+        shortName: '004',
+        longName: 'Terminal Regional – Jardim das Flores',
+      },
     ],
   },
   decorators: [
@@ -440,11 +471,24 @@ export const ArtespSeveralRoutes: Story = {
         stop: ARTESP_ONLY_BUS_STOP,
         scheduledDepartures: [
           ...SCHEDULED_ARTESP_DEPARTURES,
-          ...SCHEDULED_ARTESP_DEPARTURES.filter((departure) => departure.routeId === ROUTE_ARTESP_001.routeId)
-            .flatMap((departure) => [
-              { ...departure, routeId: 'artesp:003', routeShortName: '003', tripId: `${departure.tripId}-003`, headsign: 'Vila Nova' },
-              { ...departure, routeId: 'artesp:004', routeShortName: '004', tripId: `${departure.tripId}-004`, headsign: 'Jardim das Flores' },
-            ]),
+          ...SCHEDULED_ARTESP_DEPARTURES.filter(
+            (departure) => departure.routeId === ROUTE_ARTESP_001.routeId,
+          ).flatMap((departure) => [
+            {
+              ...departure,
+              routeId: 'artesp:003',
+              routeShortName: '003',
+              tripId: `${departure.tripId}-003`,
+              headsign: 'Vila Nova',
+            },
+            {
+              ...departure,
+              routeId: 'artesp:004',
+              routeShortName: '004',
+              tripId: `${departure.tripId}-004`,
+              headsign: 'Jardim das Flores',
+            },
+          ]),
         ],
       }),
     }),

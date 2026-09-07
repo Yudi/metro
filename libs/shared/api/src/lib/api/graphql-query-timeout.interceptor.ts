@@ -1,7 +1,4 @@
-import {
-  HttpInterceptorFn,
-  HttpRequest,
-} from '@angular/common/http';
+import { HttpInterceptorFn, HttpRequest } from '@angular/common/http';
 import { inject, InjectionToken } from '@angular/core';
 
 export const DEFAULT_GRAPHQL_QUERY_TIMEOUT_MS = 30_000;

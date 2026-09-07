@@ -152,7 +152,9 @@ describe('NextTrainPollingService', () => {
     };
     externalRailProvider.getStationName.mockResolvedValue('Luz');
     externalRailProvider.fetchNextTrains.mockResolvedValue({
-      success: true, trains: [train], isApiError: false,
+      success: true,
+      trains: [train],
+      isApiError: false,
     });
     const listener = jest.fn();
     service.onPollComplete(listener);
@@ -162,12 +164,17 @@ describe('NextTrainPollingService', () => {
 
     for (const location of [
       { trainLastPassedStationName: 'Brás' },
-      { trainLastPassedStationName: null, trainPositionStatus: 'approaching' as const },
+      {
+        trainLastPassedStationName: null,
+        trainPositionStatus: 'approaching' as const,
+      },
       { trainLastPassedStationName: null, trainPositionStatus: null },
     ]) {
       const updated = { ...train, ...location };
       externalRailProvider.fetchNextTrains.mockResolvedValue({
-        success: true, trains: [updated], isApiError: false,
+        success: true,
+        trains: [updated],
+        isApiError: false,
       });
       await jest.advanceTimersByTimeAsync(30_000);
       expect(listener).toHaveBeenLastCalledWith([
@@ -453,35 +460,50 @@ describe('NextTrainPollingService', () => {
     expect(service.getCached('L9', 'HBR')?.stationName).toBeTruthy();
   });
 
-  it.each(['rejected', 'missing'])('retries %s station metadata on a later poll', async (failure) => {
-    externalRailProvider.fetchNextTrains.mockResolvedValue({
-      trains: [], isApiError: false,
-    });
-    if (failure === 'rejected') {
-      externalRailProvider.getStationName.mockRejectedValueOnce(new Error('offline'));
-    } else {
-      externalRailProvider.getStationName.mockResolvedValueOnce(null);
-    }
-    externalRailProvider.getStationName.mockResolvedValue('Recovered station');
-    const poll = (service as unknown as {
-      fetchAndCacheKey(key: string, timestamp: number): Promise<unknown>;
-    }).fetchAndCacheKey.bind(service);
+  it.each(['rejected', 'missing'])(
+    'retries %s station metadata on a later poll',
+    async (failure) => {
+      externalRailProvider.fetchNextTrains.mockResolvedValue({
+        trains: [],
+        isApiError: false,
+      });
+      if (failure === 'rejected') {
+        externalRailProvider.getStationName.mockRejectedValueOnce(
+          new Error('offline'),
+        );
+      } else {
+        externalRailProvider.getStationName.mockResolvedValueOnce(null);
+      }
+      externalRailProvider.getStationName.mockResolvedValue(
+        'Recovered station',
+      );
+      const poll = (
+        service as unknown as {
+          fetchAndCacheKey(key: string, timestamp: number): Promise<unknown>;
+        }
+      ).fetchAndCacheKey.bind(service);
 
-    await poll('L11:LUZ', 100);
-    expect(service.getCached('L11', 'LUZ')?.stationName).toBe('LUZ');
-    await poll('L11:LUZ', 200);
-    await poll('L11:LUZ', 300);
+      await poll('L11:LUZ', 100);
+      expect(service.getCached('L11', 'LUZ')?.stationName).toBe('LUZ');
+      await poll('L11:LUZ', 200);
+      await poll('L11:LUZ', 300);
 
-    expect(service.getCached('L11', 'LUZ')?.stationName).toBe('Recovered station');
-    expect(externalRailProvider.getStationName).toHaveBeenCalledTimes(2);
-  });
+      expect(service.getCached('L11', 'LUZ')?.stationName).toBe(
+        'Recovered station',
+      );
+      expect(externalRailProvider.getStationName).toHaveBeenCalledTimes(2);
+    },
+  );
 
   it.each(['unsubscribe', 'unsubscribeAll'] as const)(
     'rejects the old poll after %s and immediate resubscription',
     async (unsubscribe) => {
       jest.useFakeTimers();
       jest.setSystemTime(new Date('2026-06-06T12:00:00-03:00'));
-      const older = deferred<{ trains: NextTrainArrivalDto[]; isApiError: boolean }>();
+      const older = deferred<{
+        trains: NextTrainArrivalDto[];
+        isApiError: boolean;
+      }>();
       externalRailProvider.fetchNextTrains
         .mockReturnValueOnce(older.promise)
         .mockResolvedValue({ trains: [createTrain('NEW')], isApiError: false });
@@ -498,11 +520,15 @@ describe('NextTrainPollingService', () => {
       }
       service.subscribe('new-owner', 'L9', 'HBR');
       await flushMicrotasks();
-      expect(service.getCached('L9', 'HBR')?.trains[0].destinationCode).toBe('NEW');
+      expect(service.getCached('L9', 'HBR')?.trains[0].destinationCode).toBe(
+        'NEW',
+      );
 
       older.resolve({ trains: [createTrain('OLD')], isApiError: false });
       await flushMicrotasks();
-      expect(service.getCached('L9', 'HBR')?.trains[0].destinationCode).toBe('NEW');
+      expect(service.getCached('L9', 'HBR')?.trains[0].destinationCode).toBe(
+        'NEW',
+      );
     },
   );
 

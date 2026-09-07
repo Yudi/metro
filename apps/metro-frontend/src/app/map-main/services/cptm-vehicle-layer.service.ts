@@ -63,22 +63,12 @@ export class CptmVehicleLayerService implements OnDestroy {
       L4: this.createLineIcon(getRailLineByCode(4)?.colorHex ?? '#007A5E'),
       L8: this.createLineIcon(getRailLineByCode(8)?.colorHex ?? '#969696'),
       L9: this.createLineIcon(getRailLineByCode(9)?.colorHex ?? '#00A78E'),
-      L10: this.createLineIcon(
-        getRailLineByCode(10)?.colorHex ?? '#007A5E',
-      ),
-      L11: this.createLineIcon(
-        getRailLineByCode(11)?.colorHex ?? '#007A5E',
-      ),
-      L12: this.createLineIcon(
-        getRailLineByCode(12)?.colorHex ?? '#007A5E',
-      ),
-      L13: this.createLineIcon(
-        getRailLineByCode(13)?.colorHex ?? '#007A5E',
-      ),
+      L10: this.createLineIcon(getRailLineByCode(10)?.colorHex ?? '#007A5E'),
+      L11: this.createLineIcon(getRailLineByCode(11)?.colorHex ?? '#007A5E'),
+      L12: this.createLineIcon(getRailLineByCode(12)?.colorHex ?? '#007A5E'),
+      L13: this.createLineIcon(getRailLineByCode(13)?.colorHex ?? '#007A5E'),
       EA: this.createLineIcon('#000000'),
-      '10X': this.createLineIcon(
-        getRailLineByCode(10)?.colorHex ?? '#007A5E',
-      ),
+      '10X': this.createLineIcon(getRailLineByCode(10)?.colorHex ?? '#007A5E'),
     };
 
     this.setupLayer();
@@ -329,7 +319,9 @@ export class CptmVehicleLayerService implements OnDestroy {
       (() => this.nextTrainService.unsubscribeFromCptmVehicles(lineCode));
     this.subscriptionReleases.set(lineCode, release);
     this.subscribedLines.update((set) => new Set([...set, lineCode]));
-    this.logger.debug(`Subscribed to tracked rail vehicles for line ${lineCode}`);
+    this.logger.debug(
+      `Subscribed to tracked rail vehicles for line ${lineCode}`,
+    );
   }
 
   unsubscribeFromLine(lineCode: TrackedRailLineCode): void {
@@ -437,12 +429,15 @@ export class CptmVehicleLayerService implements OnDestroy {
     }
 
     if (nextExpiry !== Number.POSITIVE_INFINITY) {
-      this.estimateExpiryTimer = window.setTimeout(() => {
-        this.updateVehicleMarkers(
-          this.nextTrainService.cptmVehicles(),
-          this.nextTrainService.connected(),
-        );
-      }, Math.max(1, nextExpiry - now));
+      this.estimateExpiryTimer = window.setTimeout(
+        () => {
+          this.updateVehicleMarkers(
+            this.nextTrainService.cptmVehicles(),
+            this.nextTrainService.connected(),
+          );
+        },
+        Math.max(1, nextExpiry - now),
+      );
     }
   }
 

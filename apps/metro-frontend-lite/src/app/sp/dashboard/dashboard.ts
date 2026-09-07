@@ -201,15 +201,22 @@ export class Dashboard {
   readonly busSchedulesByStopId = signal(
     new Map<string, LiteScheduledBusDeparture[]>(),
   );
-  readonly scheduledGroupsByStopId = computed(() => new Map(
-    [...this.busSchedulesByStopId()].map(([stopId, departures]) => [
-      stopId,
-      groupScheduledBusDepartures(departures.map((departure) => ({
-        ...departure,
-        timeParts: this.getScheduledDepartureTimeParts(departure.departureTime),
-      }))),
-    ]),
-  ));
+  readonly scheduledGroupsByStopId = computed(
+    () =>
+      new Map(
+        [...this.busSchedulesByStopId()].map(([stopId, departures]) => [
+          stopId,
+          groupScheduledBusDepartures(
+            departures.map((departure) => ({
+              ...departure,
+              timeParts: this.getScheduledDepartureTimeParts(
+                departure.departureTime,
+              ),
+            })),
+          ),
+        ]),
+      ),
+  );
   readonly expandedScheduledRoutes = signal<Set<string>>(new Set());
   readonly mergedRailStations = signal<MergedRailStationInsight[]>([]);
   readonly railStatus = signal<RailLinesStatusResponse | null>(null);
@@ -467,10 +474,12 @@ export class Dashboard {
     return this.scheduledGroupsByStopId().get(stopId) ?? [];
   }
 
-  getVisibleScheduledDepartures<T extends {
-    routeId: string;
-    departureTime: string;
-  }>(
+  getVisibleScheduledDepartures<
+    T extends {
+      routeId: string;
+      departureTime: string;
+    },
+  >(
     stopId: string,
     group: { routeId: string; departures: readonly T[] },
   ): readonly T[] {
@@ -529,7 +538,9 @@ export class Dashboard {
     routeId: string,
   ): BusRouteInsight | BusRouteGraphQL | null {
     return (
-      this.busRoutesByStopId().get(stopId)?.find((route) => route.routeId === routeId) ??
+      this.busRoutesByStopId()
+        .get(stopId)
+        ?.find((route) => route.routeId === routeId) ??
       this.busRoutesById().get(routeId) ??
       null
     );
@@ -556,18 +567,14 @@ export class Dashboard {
       return route.fares.map((fare) => formatBusFare(fare)).join(' · ');
     }
 
-    return isArtespRoute(route)
-      ? 'Tarifa não informada'
-      : null;
+    return isArtespRoute(route) ? 'Tarifa não informada' : null;
   }
 
   routeDisplayId(route: BusRouteInsight): string {
     return getBusRouteDisplayId(route);
   }
 
-  getBusRouteAgencyLabel(
-    route: BusRouteInsight | BusRouteGraphQL,
-  ): string {
+  getBusRouteAgencyLabel(route: BusRouteInsight | BusRouteGraphQL): string {
     const agency = route.sourceAgency?.trim().toLowerCase();
     if (agency === 'artesp' || isArtespRoute(route)) {
       return 'Artesp';

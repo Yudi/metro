@@ -6,7 +6,10 @@ import { of } from 'rxjs';
 import { FavoritesService, LoggerService } from '@metro/shared/api';
 import { GeographyGraphQLService } from '../../services/geography-graphql.service';
 import { RealtimeWebsocketService } from '../../services/realtime-websocket.service';
-import { BusStopDialogComponent, BusStopDialogData } from './bus-stop-dialog.component';
+import {
+  BusStopDialogComponent,
+  BusStopDialogData,
+} from './bus-stop-dialog.component';
 
 describe('BusStopDialogComponent', () => {
   let component: BusStopDialogComponent;
@@ -59,7 +62,12 @@ describe('BusStopDialogComponent', () => {
         { provide: FavoritesService, useValue: favoritesService },
         {
           provide: LoggerService,
-          useValue: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+          useValue: {
+            debug: jest.fn(),
+            info: jest.fn(),
+            warn: jest.fn(),
+            error: jest.fn(),
+          },
         },
         {
           provide: RealtimeWebsocketService,

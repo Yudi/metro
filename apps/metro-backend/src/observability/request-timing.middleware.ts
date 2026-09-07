@@ -14,10 +14,12 @@ export function createRequestTimingMiddleware(
 ): (request: Request, response: Response, next: NextFunction) => void {
   const logger = options.logger ?? createTimingLogger('RequestTiming');
   const thresholdMs = options.thresholdMs ?? getSlowRequestThresholdMs();
-  const now = options.now ?? (() => {
-    const [seconds, nanoseconds] = process.hrtime();
-    return seconds * 1_000 + nanoseconds / 1_000_000;
-  });
+  const now =
+    options.now ??
+    (() => {
+      const [seconds, nanoseconds] = process.hrtime();
+      return seconds * 1_000 + nanoseconds / 1_000_000;
+    });
 
   return (request, response, next) => {
     const startedAt = now();

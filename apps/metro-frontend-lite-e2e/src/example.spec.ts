@@ -20,7 +20,9 @@ const searchActivations = [
 ];
 
 for (const activation of searchActivations) {
-  test(`searches for a bus stop and opens its detail view using ${activation.name}`, async ({ page }) => {
+  test(`searches for a bus stop and opens its detail view using ${activation.name}`, async ({
+    page,
+  }) => {
     await page.route('**/graphql', async (route) => {
       const request = route.request().postDataJSON() as { query?: string };
       const query = request.query ?? '';
@@ -68,7 +70,10 @@ for (const activation of searchActivations) {
     });
 
     await page.goto('/sp/proxima-chegada');
-    const searchButton = page.getByRole('button', { name: 'Buscar', exact: true });
+    const searchButton = page.getByRole('button', {
+      name: 'Buscar',
+      exact: true,
+    });
     await expect(searchButton).toBeDisabled();
     await page.locator('input[type="search"]').fill('Terminal');
     await expect(searchButton).toBeEnabled();

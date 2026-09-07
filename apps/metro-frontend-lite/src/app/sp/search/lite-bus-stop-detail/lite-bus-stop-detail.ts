@@ -61,7 +61,9 @@ export class LiteBusStopDetail {
   );
   readonly scheduledRows = computed(() =>
     this.scheduledDepartures().map((departure) => {
-      const route = this.routes().find((item) => item.routeId === departure.routeId);
+      const route = this.routes().find(
+        (item) => item.routeId === departure.routeId,
+      );
       const timeLabel = this.formatScheduledDepartureTime(
         departure.departureTime,
       );
@@ -70,11 +72,10 @@ export class LiteBusStopDetail {
         ...departure,
         color: route?.color ? `#${route.color}` : null,
         textColor: route?.textColor ? `#${route.textColor}` : null,
-        timeLabel: separatorIndex >= 0 ? timeLabel.slice(0, separatorIndex) : timeLabel,
+        timeLabel:
+          separatorIndex >= 0 ? timeLabel.slice(0, separatorIndex) : timeLabel,
         dayLabel:
-          separatorIndex >= 0
-            ? timeLabel.slice(separatorIndex + 3)
-            : null,
+          separatorIndex >= 0 ? timeLabel.slice(separatorIndex + 3) : null,
       };
     }),
   );
@@ -82,14 +83,20 @@ export class LiteBusStopDetail {
     groupScheduledBusDepartures(this.scheduledRows(), 5),
   );
   readonly stationLineBadges = computed(() => {
-    const badges = new Map<string, Array<{ code: number; bg: string; text: string }>>();
+    const badges = new Map<
+      string,
+      Array<{ code: number; bg: string; text: string }>
+    >();
     for (const connection of this.railConnections()) {
       for (const direction of connection.directions) {
         for (const station of direction.stations) {
-          badges.set(station.id, getLineCodesFromColorNames(station.lines).map((code) => ({
-            code,
-            ...getLineColors(code),
-          })));
+          badges.set(
+            station.id,
+            getLineCodesFromColorNames(station.lines).map((code) => ({
+              code,
+              ...getLineColors(code),
+            })),
+          );
         }
       }
     }
@@ -209,9 +216,7 @@ export class LiteBusStopDetail {
       return route.fares.map((fare) => formatBusFare(fare)).join(' · ');
     }
 
-    return isArtespRoute(route)
-      ? 'Tarifa não informada'
-      : null;
+    return isArtespRoute(route) ? 'Tarifa não informada' : null;
   }
 
   getRouteAgencyLabel(route: LiteBusRoute): string {
@@ -248,10 +253,12 @@ export class LiteBusStopDetail {
     return `${departure.routeId}:${departure.tripId}:${departure.directionId}:${departure.departureTime}`;
   }
 
-  getVisibleScheduledDepartures<T extends {
-    routeId: string;
-    departureTime: string;
-  }>(group: { routeId: string; departures: readonly T[] }): readonly T[] {
+  getVisibleScheduledDepartures<
+    T extends {
+      routeId: string;
+      departureTime: string;
+    },
+  >(group: { routeId: string; departures: readonly T[] }): readonly T[] {
     return this.isScheduledRouteExpanded(group.routeId)
       ? group.departures
       : group.departures.slice(0, 1);
@@ -314,5 +321,4 @@ export class LiteBusStopDetail {
   private normalizeRouteCode(routeCode: string): string {
     return routeCode.trim().toUpperCase();
   }
-
 }

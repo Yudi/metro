@@ -144,10 +144,7 @@ function createHttpClient(
         if (scenario === 'artesp') {
           return of({
             data: {
-              multipleBusRoutes: [
-                ROUTE_ARTESP_001,
-                ROUTE_ARTESP_WITHOUT_FARE,
-              ],
+              multipleBusRoutes: [ROUTE_ARTESP_001, ROUTE_ARTESP_WITHOUT_FARE],
               multipleBusStops: [ARTESP_ONLY_BUS_STOP],
             },
           } as T);
@@ -219,10 +216,7 @@ function createHttpClient(
         if (scenario === 'artesp') {
           return of({
             data: {
-              routesForStop: [
-                ROUTE_ARTESP_001,
-                ROUTE_ARTESP_WITHOUT_FARE,
-              ],
+              routesForStop: [ROUTE_ARTESP_001, ROUTE_ARTESP_WITHOUT_FARE],
             },
           } as T);
         }

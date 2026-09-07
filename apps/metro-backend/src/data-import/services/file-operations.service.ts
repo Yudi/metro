@@ -60,7 +60,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function toCkanResource(value: unknown): CkanResource | undefined {
-  if (!isRecord(value) || typeof value.name !== 'string' || typeof value.url !== 'string') {
+  if (
+    !isRecord(value) ||
+    typeof value.name !== 'string' ||
+    typeof value.url !== 'string'
+  ) {
     return undefined;
   }
 
@@ -122,7 +126,10 @@ export class FileOperationsService {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
-      throw withCause(`CKAN resource resolution failed: ${errorMessage}`, error);
+      throw withCause(
+        `CKAN resource resolution failed: ${errorMessage}`,
+        error,
+      );
     }
   }
 
@@ -263,7 +270,9 @@ export class FileOperationsService {
       for (const fileName of files) {
         hashSum.update(fileName);
         hashSum.update('\0');
-        for await (const chunk of createReadStream(path.join(dirPath, fileName))) {
+        for await (const chunk of createReadStream(
+          path.join(dirPath, fileName),
+        )) {
           hashSum.update(chunk);
         }
         hashSum.update('\0');
@@ -311,7 +320,10 @@ export class FileOperationsService {
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to get file size for ${filePath}:`, errorMessage);
+      this.logger.error(
+        `Failed to get file size for ${filePath}:`,
+        errorMessage,
+      );
       throw withCause(`File size check failed: ${errorMessage}`, error);
     }
   }

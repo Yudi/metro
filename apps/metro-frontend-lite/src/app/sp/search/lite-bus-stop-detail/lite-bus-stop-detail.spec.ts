@@ -106,11 +106,7 @@ describe('LiteBusStopDetail', () => {
   });
 
   it('does not format invalid station distances', () => {
-    for (const distanceMeters of [
-      -1,
-      Number.NaN,
-      Number.POSITIVE_INFINITY,
-    ]) {
+    for (const distanceMeters of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
       expect(
         fixture.componentInstance.formatStationDistance({
           ...createStation('invalid', 'Invalid'),

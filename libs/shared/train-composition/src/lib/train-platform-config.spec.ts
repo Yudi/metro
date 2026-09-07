@@ -342,5 +342,4 @@ describe('train platform configuration', () => {
       status: 'unknown',
     });
   });
-
 });

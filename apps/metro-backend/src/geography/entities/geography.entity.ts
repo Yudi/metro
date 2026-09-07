@@ -58,7 +58,8 @@ export class BusStop {
 
   @Field(() => [String], {
     nullable: true,
-    description: 'Normalized bus and rail agency identifiers, including sptrans and artesp, for icon display',
+    description:
+      'Normalized bus and rail agency identifiers, including sptrans and artesp, for icon display',
   })
   agencies?: string[];
 

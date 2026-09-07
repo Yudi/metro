@@ -116,16 +116,25 @@ describe('NextTrainWebsocketService', () => {
     const update = listeners.get('next_train_update');
 
     update?.({
-      type: 'full', lineCode: 'L9', stationCode: 'HBR',
-      trains: [], timestamp: 201, processing: true,
+      type: 'full',
+      lineCode: 'L9',
+      stationCode: 'HBR',
+      trains: [],
+      timestamp: 201,
+      processing: true,
     });
     update?.({
-      type: 'delta', lineCode: 'L9', stationCode: 'HBR',
-      trains: [], timestamp: 200, processing: false,
+      type: 'delta',
+      lineCode: 'L9',
+      stationCode: 'HBR',
+      trains: [],
+      timestamp: 200,
+      processing: false,
     });
 
     expect(service.getStationData('L9', 'HBR')).toMatchObject({
-      processing: false, dataReceived: true,
+      processing: false,
+      dataReceived: true,
     });
   });
 
@@ -191,7 +200,12 @@ describe('NextTrainWebsocketService', () => {
       estimated: true,
       validUntil: Date.now() + 20_000,
     };
-    const actual = { ...estimate, id: 'actual-id', prefix: 'actual', estimated: false };
+    const actual = {
+      ...estimate,
+      id: 'actual-id',
+      prefix: 'actual',
+      estimated: false,
+    };
 
     listeners.get('cptm_vehicle_update')?.({
       type: 'full',

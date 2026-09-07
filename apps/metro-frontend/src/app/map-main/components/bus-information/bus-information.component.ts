@@ -1,4 +1,9 @@
-import { ChangeDetectionStrategy, Component, input, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  input,
+  signal,
+} from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -18,5 +23,7 @@ export class BusInformationComponent {
   readonly stale = input(false);
   readonly lastUpdated = input<string | null>(null);
   readonly expanded = signal<string | null>(null);
-  toggle(id: string): void { this.expanded.update((current) => current === id ? null : id); }
+  toggle(id: string): void {
+    this.expanded.update((current) => (current === id ? null : id));
+  }
 }

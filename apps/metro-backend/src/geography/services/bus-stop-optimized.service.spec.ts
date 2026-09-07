@@ -64,15 +64,7 @@ describe('BusStopServiceOptimized', () => {
     expect(sql).toContain('stop_lat BETWEEN');
     expect(sql).toContain('stop_lon BETWEEN');
     expect(prisma.$queryRaw.mock.calls[0].slice(1)).toEqual([
-      -46.8,
-      -23.7,
-      -46.4,
-      -23.4,
-      -23.7,
-      -23.4,
-      -46.8,
-      -46.4,
-      500,
+      -46.8, -23.7, -46.4, -23.4, -23.7, -23.4, -46.8, -46.4, 500,
     ]);
   });
 
@@ -103,7 +95,9 @@ describe('BusStopServiceOptimized', () => {
   });
 
   it('rejects blank direct search terms instead of scanning every stop', async () => {
-    await expect(service.searchBusStops({ searchTerm: '   ' })).rejects.toMatchObject({
+    await expect(
+      service.searchBusStops({ searchTerm: '   ' }),
+    ).rejects.toMatchObject({
       status: 400,
     });
     expect(prisma.$queryRaw).not.toHaveBeenCalled();

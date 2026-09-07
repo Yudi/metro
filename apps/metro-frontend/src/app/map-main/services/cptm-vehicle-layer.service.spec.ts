@@ -10,9 +10,7 @@ import { CptmVehicleLayerService } from './cptm-vehicle-layer.service';
 
 describe('CptmVehicleLayerService', () => {
   let service: CptmVehicleLayerService;
-  let vehicles: WritableSignal<
-    Map<TrackedRailLineCode, TrackedRailVehicle[]>
-  >;
+  let vehicles: WritableSignal<Map<TrackedRailLineCode, TrackedRailVehicle[]>>;
   let connected: WritableSignal<boolean>;
   let subscribeToCptmVehicles: jest.Mock;
   let releases: jest.Mock[];
@@ -260,12 +258,7 @@ describe('CptmVehicleLayerService', () => {
     service.subscribeToLine('L8');
     const validUntil = Date.now() + 1_000;
     vehicles.set(
-      new Map([
-        [
-          'L8',
-          [createVehicle({ estimated: true, validUntil })],
-        ],
-      ]),
+      new Map([['L8', [createVehicle({ estimated: true, validUntil })]]]),
     );
 
     refreshMarkers();

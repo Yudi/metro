@@ -78,8 +78,9 @@ export class BusStopService {
     }
 
     const physicalStopId = stop.physical_stop_id || stop.stop_id;
-    const serviceInfo =
-      await this.queryOptimization.batchGetStopServiceInfo([physicalStopId]);
+    const serviceInfo = await this.queryOptimization.batchGetStopServiceInfo([
+      physicalStopId,
+    ]);
     return mapBusStop(stop, serviceInfo.get(physicalStopId));
   }
 

@@ -146,14 +146,10 @@ export class DataImportService implements OnModuleInit {
   }
 
   private async startImportInBackground(): Promise<GTFSProcessingResult> {
-    return this.withImportLock(
-      'GTFS import',
-      () => this.startImportLocked(),
-      {
-        waitForLock: true,
-        timeoutMs: GTFSConfig.IMPORT_LOCK_TIMEOUT_MS,
-      },
-    );
+    return this.withImportLock('GTFS import', () => this.startImportLocked(), {
+      waitForLock: true,
+      timeoutMs: GTFSConfig.IMPORT_LOCK_TIMEOUT_MS,
+    });
   }
 
   private async startImportLocked(
@@ -286,7 +282,8 @@ export class DataImportService implements OnModuleInit {
       try {
         results.push(await this.performFeedImport(feed, forceReimport));
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
+        const message =
+          error instanceof Error ? error.message : 'Unknown error';
         this.logger.error(`${feed} GTFS import failed: ${message}`);
         results.push({
           success: false,
@@ -486,11 +483,14 @@ export class DataImportService implements OnModuleInit {
         30,
         `Updating ${feed} dataset record...`,
       );
-      const dataset = await this.gtfsDatabaseService.createOrUpdateDataset({
-        fileHash,
-        fileSize,
-        version: new Date().toISOString().split('T')[0], // Use date as version
-      }, feed);
+      const dataset = await this.gtfsDatabaseService.createOrUpdateDataset(
+        {
+          fileHash,
+          fileSize,
+          version: new Date().toISOString().split('T')[0], // Use date as version
+        },
+        feed,
+      );
       catalogMutationStarted = true;
 
       await this.gtfsDatabaseService.prepareDatasetForImport(
@@ -549,7 +549,8 @@ export class DataImportService implements OnModuleInit {
         await this.fileOperationsService.cleanup(zipFilePath, extractDir);
       }
       if (catalogMutationStarted) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
+        const message =
+          error instanceof Error ? error.message : 'Unknown error';
         return {
           success: false,
           filesProcessed: 0,
@@ -642,7 +643,12 @@ export class DataImportService implements OnModuleInit {
           const rustDbUrl = this.getRustDatabaseUrl(dbUrl);
 
           // Process shapes with Rust tool directly to PostGIS
-          await this.rustGtfsService.processShapes(filePath, rustDbUrl, 4326, feed);
+          await this.rustGtfsService.processShapes(
+            filePath,
+            rustDbUrl,
+            4326,
+            feed,
+          );
 
           // Count records in the file for reporting
           recordCount =

@@ -90,9 +90,7 @@ describe('LiteRealtimeService', () => {
       stopCode: '1234',
     });
     expect(
-      socket.emit.mock.calls.filter(
-        ([event]) => event === 'subscribe_stop',
-      ),
+      socket.emit.mock.calls.filter(([event]) => event === 'subscribe_stop'),
     ).toHaveLength(1);
 
     listeners.get('arrival_predictions')?.({

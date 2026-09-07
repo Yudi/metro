@@ -252,10 +252,9 @@ export class GeographyResolver {
   async mergedSubwayStation(
     @Args('stopId', { type: () => String }) stopId: string,
   ): Promise<MergedSubwayStation | null> {
-    const station =
-      await this.subwayStationProcessor.getStationByStopId(
-        validateIdentifier(stopId, 'stopId'),
-      );
+    const station = await this.subwayStationProcessor.getStationByStopId(
+      validateIdentifier(stopId, 'stopId'),
+    );
     if (!station) return null;
 
     return {
@@ -489,7 +488,9 @@ function validateIdentifier(value: string, argumentName: string): string {
       return codePoint <= 0x1f || codePoint === 0x7f;
     })
   ) {
-    throw new BadRequestException(`${argumentName} contains an invalid identifier`);
+    throw new BadRequestException(
+      `${argumentName} contains an invalid identifier`,
+    );
   }
 
   return identifier;

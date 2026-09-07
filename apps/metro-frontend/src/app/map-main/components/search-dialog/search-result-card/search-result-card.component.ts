@@ -120,7 +120,9 @@ export class SearchResultCardComponent {
       return null;
     }
     const description = result.description?.trim();
-    return description && description !== this.stopPlatformLabel() ? description : null;
+    return description && description !== this.stopPlatformLabel()
+      ? description
+      : null;
   });
 
   onCardClick(): void {

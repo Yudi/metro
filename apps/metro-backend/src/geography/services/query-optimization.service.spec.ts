@@ -52,7 +52,9 @@ describe('QueryOptimizationService precomputed stop service data', () => {
     };
     const service = new QueryOptimizationService(prisma as never);
 
-    await expect(service.getRoutesForMultipleStops(['artesp:2'])).resolves.toEqual(
+    await expect(
+      service.getRoutesForMultipleStops(['artesp:2']),
+    ).resolves.toEqual(
       new Map([
         [
           'artesp:2',
@@ -69,7 +71,9 @@ describe('QueryOptimizationService precomputed stop service data', () => {
       ]),
     );
 
-    const sql = (prisma.$queryRaw.mock.calls[0][0] as TemplateStringsArray).join('?');
+    const sql = (
+      prisma.$queryRaw.mock.calls[0][0] as TemplateStringsArray
+    ).join('?');
     expect(sql).toContain('Gtfs_StopTime');
     expect(sql).toContain('Gtfs_Trip');
     expect(sql).toContain('Gtfs_Route');

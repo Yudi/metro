@@ -98,11 +98,13 @@ describe('TypesenseService', () => {
   it('preserves unaliased rebuilds owned by other processes during startup', async () => {
     const deleteCollection = jest.fn().mockResolvedValue(undefined);
     const retrieveCollection = jest.fn().mockResolvedValue({});
-    const retrieveCollections = jest.fn().mockResolvedValue([
-      { name: 'metro-sptrans-gtfs-routes' },
-      { name: 'metro-sptrans-gtfs-routes__rebuild_orphan' },
-      { name: 'metro-sptrans-gtfs-stops__rebuild_active' },
-    ]);
+    const retrieveCollections = jest
+      .fn()
+      .mockResolvedValue([
+        { name: 'metro-sptrans-gtfs-routes' },
+        { name: 'metro-sptrans-gtfs-routes__rebuild_orphan' },
+        { name: 'metro-sptrans-gtfs-stops__rebuild_active' },
+      ]);
     const collections = jest.fn((name?: string) =>
       name
         ? { retrieve: retrieveCollection, delete: deleteCollection }
@@ -119,8 +121,7 @@ describe('TypesenseService', () => {
               retrieve: jest.fn().mockResolvedValue({
                 aliases: [
                   {
-                    collection_name:
-                      'metro-sptrans-gtfs-stops__rebuild_active',
+                    collection_name: 'metro-sptrans-gtfs-stops__rebuild_active',
                   },
                 ],
               }),
@@ -164,7 +165,8 @@ describe('TypesenseService', () => {
       multiSearch: { perform },
     };
     (service as never as { initialized: boolean }).initialized = true;
-    const logger = (service as never as { logger: { error: jest.Mock } }).logger;
+    const logger = (service as never as { logger: { error: jest.Mock } })
+      .logger;
     const loggerError = jest
       .spyOn(logger, 'error')
       .mockImplementation(() => undefined);

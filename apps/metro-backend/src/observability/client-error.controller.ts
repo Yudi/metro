@@ -43,7 +43,12 @@ interface ContextBudget {
 }
 
 function sanitizeContext(value: unknown): Record<string, unknown> {
-  const sanitized = sanitizeValue(value, 0, { keys: MAX_CONTEXT_KEYS }, new WeakSet());
+  const sanitized = sanitizeValue(
+    value,
+    0,
+    { keys: MAX_CONTEXT_KEYS },
+    new WeakSet(),
+  );
   const record = isRecord(sanitized) ? sanitized : {};
   const bounded: Record<string, unknown> = {};
 
@@ -99,11 +104,7 @@ function sanitizeValue(
     if (budget.keys <= 0) {
       break;
     }
-    if (
-      key === '__proto__' ||
-      key === 'constructor' ||
-      key === 'prototype'
-    ) {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
       continue;
     }
 

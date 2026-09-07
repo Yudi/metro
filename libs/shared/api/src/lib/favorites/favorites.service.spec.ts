@@ -165,6 +165,167 @@ describe('favorites persistence contracts', () => {
   });
 });
 
+describe('anonymous favorites first-login import', () => {
+  const scope = getFavoritesScope('user-a');
+  const anonymousFavorites = {
+    ...createEmptyFavorites(),
+    railLine: ['L4'],
+    railStation: ['PIN'],
+  };
+
+  function createHarness() {
+    let accountFavorites: Array<{
+      key: string;
+      scope: string;
+      type: 'railLine' | 'railStation';
+      code: string;
+      updatedAt: number;
+    }> = [];
+    const anonymousRecords = [
+      {
+        key: 'anonymous:railLine:L4',
+        scope: ANONYMOUS_FAVORITES_SCOPE,
+        type: 'railLine' as const,
+        code: 'L4',
+        updatedAt: 1,
+      },
+      {
+        key: 'anonymous:railStation:PIN',
+        scope: ANONYMOUS_FAVORITES_SCOPE,
+        type: 'railStation' as const,
+        code: 'PIN',
+        updatedAt: 1,
+      },
+    ];
+    let operations: FavoriteOutboxRecord[] = [];
+    const importedScopes = new Set<string>();
+    const favorites = {
+      where: () => ({
+        equals: (recordScope: string) => ({
+          toArray: async () =>
+            recordScope === ANONYMOUS_FAVORITES_SCOPE
+              ? anonymousRecords
+              : accountFavorites,
+        }),
+      }),
+    };
+    const outbox = {
+      where: () => ({
+        equals: (recordScope: string) => ({
+          toArray: async () =>
+            operations.filter((operation) => operation.scope === recordScope),
+        }),
+      }),
+      put: async (operation: FavoriteOutboxRecord) => {
+        operations.push(operation);
+      },
+      bulkDelete: async (ids: string[]) => {
+        operations = operations.filter(
+          (operation) => !ids.includes(operation.operationId),
+        );
+      },
+    };
+    const service = Object.create(FavoritesService.prototype) as {
+      db: unknown;
+      activeScope: string;
+      scopeGeneration: number;
+      retryAttempt: number;
+      _syncError: ReturnType<typeof signal<string | null>>;
+      postGraphql: jest.Mock;
+      replaceScopeFavorites: jest.Mock;
+      syncScope(scope: string, generation: number): Promise<void>;
+    };
+    service.db = {
+      favorites,
+      outbox,
+      anonymousFavoritesImports: {
+        get: async (recordScope: string) =>
+          importedScopes.has(recordScope) ? { scope: recordScope } : undefined,
+        put: async ({ scope: recordScope }: { scope: string }) => {
+          importedScopes.add(recordScope);
+        },
+      },
+      transaction: async (...args: unknown[]) =>
+        (args[args.length - 1] as () => Promise<unknown>)(),
+    };
+    service.activeScope = scope;
+    service.scopeGeneration = 0;
+    service.retryAttempt = 0;
+    service._syncError = signal<string | null>(null);
+    service.postGraphql = jest.fn();
+    service.replaceScopeFavorites = jest.fn(
+      async (_scope: string, favorites: FavoriteList) => {
+        accountFavorites = favorites.railLine.map((code) => ({
+          key: `${scope}:railLine:${code}`,
+          scope,
+          type: 'railLine' as const,
+          code,
+          updatedAt: 1,
+        }));
+      },
+    );
+
+    return {
+      service,
+      clearAccountFavorites: () => {
+        accountFavorites = [];
+      },
+      importedScopes,
+      operations: () => operations,
+    };
+  }
+
+  it('imports anonymous favorites into an empty account and syncs them', async () => {
+    const { service, importedScopes, operations } = createHarness();
+    service.postGraphql
+      .mockResolvedValueOnce({ userFavoritesSnapshot: {
+        revision: 0, favorites: createEmptyFavorites(),
+      } })
+      .mockResolvedValueOnce({ syncFavorites: {
+        success: true, revision: 1, favorites: anonymousFavorites,
+      } });
+
+    await service.syncScope(scope, 0);
+
+    expect(service.postGraphql).toHaveBeenLastCalledWith(expect.objectContaining({
+      variables: { favorites: anonymousFavorites, expectedRevision: 0 },
+    }));
+    expect(service.replaceScopeFavorites).toHaveBeenLastCalledWith(
+      scope,
+      anonymousFavorites,
+    );
+    expect(importedScopes).toContain(scope);
+    expect(operations()).toEqual([]);
+  });
+
+  it('does not restore imported anonymous favorites after the account clears them', async () => {
+    const { service, clearAccountFavorites } = createHarness();
+    service.postGraphql
+      .mockResolvedValueOnce({ userFavoritesSnapshot: {
+        revision: 0, favorites: createEmptyFavorites(),
+      } })
+      .mockResolvedValueOnce({ syncFavorites: {
+        success: true, revision: 1, favorites: anonymousFavorites,
+      } });
+    await service.syncScope(scope, 0);
+
+    clearAccountFavorites();
+    service.postGraphql.mockReset();
+    service.replaceScopeFavorites.mockClear();
+    service.postGraphql.mockResolvedValueOnce({ userFavoritesSnapshot: {
+      revision: 2, favorites: createEmptyFavorites(),
+    } });
+
+    await service.syncScope(scope, 0);
+
+    expect(service.postGraphql).toHaveBeenCalledTimes(1);
+    expect(service.replaceScopeFavorites).toHaveBeenCalledWith(
+      scope,
+      createEmptyFavorites(),
+    );
+  });
+});
+
 describe('failed favorite synchronization recovery', () => {
   function createHarness() {
     const scope = getFavoritesScope('user-a');
@@ -179,6 +340,7 @@ describe('failed favorite synchronization recovery', () => {
       retryAttempt: number;
       _syncError: ReturnType<typeof signal<string | null>>;
       postGraphql: jest.Mock;
+      queueAnonymousFavoritesImport: jest.Mock;
       replaceScopeFavorites: jest.Mock;
       syncWithServer: jest.Mock;
       syncScope(scope: string, generation: number): Promise<void>;
@@ -213,6 +375,7 @@ describe('failed favorite synchronization recovery', () => {
     service.retryAttempt = 0;
     service._syncError = signal<string | null>(null);
     service.postGraphql = jest.fn();
+    service.queueAnonymousFavoritesImport = jest.fn();
     service.syncWithServer = jest.fn();
     service.replaceScopeFavorites = jest.fn(async (_scope: string, favorites: FavoriteList) => {
       localFavorites = favorites;

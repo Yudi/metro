@@ -19,9 +19,9 @@ import {
 } from '@metro/shared/utils';
 import { firstValueFrom } from 'rxjs';
 
-// Anonymous data is deliberately retained but is never merged into an
-// authenticated UID automatically. A future explicit "import anonymous
-// favorites" action would have to make that choice visible to the user.
+// Anonymous favorites are copied to an empty account during its first
+// successful sync. The import decision is retained per account so a later
+// login cannot restore favorites the user deliberately removed.
 export const ANONYMOUS_FAVORITES_SCOPE = 'anonymous';
 export const FAVORITE_CODE_MAX_LENGTH = 128;
 const MAX_FAVORITES_PER_SCOPE = 500;
@@ -70,6 +70,11 @@ interface LegacyDashboardSelectionRecord {
   values: string[];
   updatedAt: number;
   scope?: string;
+}
+
+interface AnonymousFavoritesImportRecord {
+  scope: string;
+  importedAt: number;
 }
 
 export interface FavoriteOutboxRecord {
@@ -266,6 +271,7 @@ class FavoritesDatabase extends Dexie {
   favorites!: Table<FavoriteRecord, string>;
   dashboardSelections!: Table<DashboardSelectionRecord, string>;
   outbox!: Table<FavoriteOutboxRecord, string>;
+  anonymousFavoritesImports!: Table<AnonymousFavoritesImportRecord, string>;
 
   constructor() {
     super(FAVORITES_DATABASE_NAME);
@@ -324,6 +330,12 @@ class FavoritesDatabase extends Dexie {
           );
         }
       });
+    this.version(4).stores({
+      favorites: '&key, [scope+type], scope, type, code, updatedAt',
+      dashboardSelections: '&key, scope, updatedAt',
+      outbox: '&operationId, scope, operation, type, code, createdAt',
+      anonymousFavoritesImports: '&scope, importedAt',
+    });
   }
 }
 
@@ -872,6 +884,11 @@ export class FavoritesService implements OnDestroy {
       }
 
       let snapshot = this.requireSnapshot(result.userFavoritesSnapshot);
+      await this.queueAnonymousFavoritesImport(
+        scope,
+        generation,
+        snapshot.favorites,
+      );
       for (let attempt = 0; attempt < 5; attempt += 1) {
         if (scope !== this.activeScope || generation !== this.scopeGeneration) {
           return;
@@ -1078,6 +1095,66 @@ export class FavoritesService implements OnDestroy {
     await this.db.outbox.put(operation);
   }
 
+  private async queueAnonymousFavoritesImport(
+    scope: string,
+    generation: number,
+    serverFavorites: FavoriteList,
+  ): Promise<void> {
+    if (
+      !this.db ||
+      scope === ANONYMOUS_FAVORITES_SCOPE ||
+      scope !== this.activeScope ||
+      generation !== this.scopeGeneration
+    ) {
+      return;
+    }
+
+    await this.db.transaction(
+      'rw',
+      this.db.favorites,
+      this.db.outbox,
+      this.db.anonymousFavoritesImports,
+      async () => {
+        if (await this.db?.anonymousFavoritesImports.get(scope)) {
+          return;
+        }
+
+        const [accountFavorites, accountOperations, anonymousFavorites] =
+          await Promise.all([
+            this.db?.favorites.where('scope').equals(scope).toArray() ?? [],
+            this.db?.outbox.where('scope').equals(scope).toArray() ?? [],
+            this.db?.favorites
+              .where('scope')
+              .equals(ANONYMOUS_FAVORITES_SCOPE)
+              .toArray() ?? [],
+          ]);
+
+        await this.db?.anonymousFavoritesImports.put({
+          scope,
+          importedAt: Date.now(),
+        });
+
+        if (
+          accountFavorites.length > 0 ||
+          accountOperations.length > 0 ||
+          this.hasFavorites(serverFavorites) ||
+          anonymousFavorites.length === 0
+        ) {
+          return;
+        }
+
+        await this.db?.outbox.put({
+          operationId: this.createOperationId(),
+          scope,
+          status: 'pending',
+          operation: 'replace',
+          favorites: this.recordsToFavoriteList(anonymousFavorites),
+          createdAt: Date.now(),
+        });
+      },
+    );
+  }
+
   private async quarantinePendingOperations(
     scope: string,
     reason: string,
@@ -1165,6 +1242,10 @@ export class FavoritesService implements OnDestroy {
     operations: FavoriteOutboxRecord[],
   ): FavoriteList {
     return replayFavoriteOperations(favorites, operations);
+  }
+
+  private hasFavorites(favorites: FavoriteList): boolean {
+    return favoriteTypes.some((type) => favorites[type].length > 0);
   }
 
   private scheduleRetry(scope: string, generation: number): void {

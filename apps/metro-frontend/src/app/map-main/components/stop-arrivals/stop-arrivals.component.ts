@@ -3,7 +3,7 @@ import { routeNoticeView } from '../bus-information/bus-notice-view';
 import {
   BusInformationService,
   BusNoticesResult,
-} from '../../services/bus-information.service';
+} from '../bus-information/bus-information.service';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -29,24 +29,20 @@ import type {
   RouteRailConnectionGraphQL,
   RouteRailConnectionStationGraphQL,
   ScheduledBusDepartureGraphQL,
-} from '../../services/geography-graphql.service';
-import { GeographyGraphQLService } from '../../services/geography-graphql.service';
+} from '../../geography/geography-graphql.service';
+import { GeographyGraphQLService } from '../../geography/geography-graphql.service';
 import {
   RealtimeWebsocketService,
   type LineWithVehicles,
   type StopArrivalUpdate,
   type VehiclePosition,
-} from '../../services/realtime-websocket.service';
+} from '../../realtime/realtime-websocket.service';
 import {
-  AGENCIES_DATA,
   TransitAgency,
   getAgencyIconPath,
   groupScheduledBusDepartures,
   getLineCodesFromColorNames,
   getLineColors,
-  findOlhoVivoGtfsDirection,
-  formatBusFare,
-  formatScheduledBusDepartureTime,
   getBusRouteIdentity,
   getSptransStopCode,
   hasArtespStopData,
@@ -56,7 +52,29 @@ import {
   supportsSptransRealtime,
 } from '@metro/shared/utils';
 
-const VISIBLE_VEHICLE_COUNT = 2;
+import {
+  VISIBLE_VEHICLE_COUNT,
+  findRailConnectionByShortName,
+  findRouteForArrivalLine,
+  formatHexColor,
+  formatStationDistance,
+  getAgencyLogo,
+  getArrivalLineKey,
+  getHiddenVehicleCount,
+  getHiddenVehiclesLabel,
+  getMinutesUntilArrival,
+  getRailDirectionForLine,
+  getRailDirections,
+  getRailStationCount,
+  getRouteAgencyLabel,
+  getRouteFareLabel,
+  getScheduledDepartureKey,
+  getScheduledDepartureTime,
+  getUniqueRouteIds,
+  getVisibleVehicles,
+  normalizeRouteCode,
+  sortArrivalLinesByRouteOrder,
+} from './stop-arrivals-view.utils';
 
 @Component({
   selector: 'app-stop-arrivals',
@@ -155,8 +173,8 @@ export class StopArrivalsComponent {
         key: this.getScheduledDepartureKey(departure),
         timeLabel,
         dayLabel,
-        color: route ? this.formatHexColor(route.color) : null,
-        textColor: route ? this.formatHexColor(route.textColor) : null,
+        color: route ? formatHexColor(route.color) : null,
+        textColor: route ? formatHexColor(route.textColor) : null,
       };
     }),
   );
@@ -202,24 +220,25 @@ export class StopArrivalsComponent {
     ];
 
     if (selectedRouteKeys.length === 0) {
-      return this.sortArrivalLinesByRouteOrder(lines);
+      return sortArrivalLinesByRouteOrder(lines, this.routes());
     }
 
     const normalizedSelections = new Set(
-      selectedRouteKeys.map((routeKey) => this.normalizeRouteCode(routeKey)),
+      selectedRouteKeys.map((routeKey) => normalizeRouteCode(routeKey)),
     );
 
-    return this.sortArrivalLinesByRouteOrder(
+    return sortArrivalLinesByRouteOrder(
       lines.filter((line) => {
-        const route = this.getRouteForLine(line);
+        const route = findRouteForArrivalLine(line, this.routes());
 
         return Boolean(
           route &&
             normalizedSelections.has(
-              this.normalizeRouteCode(getBusRouteIdentity(route)),
+              normalizeRouteCode(getBusRouteIdentity(route)),
             ),
         );
       }),
+      this.routes(),
     );
   });
 
@@ -326,7 +345,7 @@ export class StopArrivalsComponent {
 
     effect((onCleanup) => {
       const stop = this.stop();
-      const routeIds = this.getUniqueRouteIds(this.routes());
+      const routeIds = getUniqueRouteIds(this.routes());
 
       if (!stop?.stopId || routeIds.length === 0) {
         this.railConnections.set(new Map());
@@ -376,32 +395,7 @@ export class StopArrivalsComponent {
    * Calculate minutes until arrival
    */
   getMinutesUntilArrival(arrivalTime: string): string {
-    try {
-      const [hours, minutes] = arrivalTime.split(':').map(Number);
-      const now = new Date();
-      const arrival = new Date();
-      arrival.setHours(hours, minutes, 0);
-
-      // If arrival is tomorrow (e.g., 00:30 when it's 23:30)
-      if (arrival < now) {
-        arrival.setDate(arrival.getDate() + 1);
-      }
-
-      const diffMs = arrival.getTime() - now.getTime();
-      const diffMins = Math.round(diffMs / 60000);
-
-      if (diffMins === 0) {
-        return 'Chegando';
-      } else if (diffMins < 0) {
-        return 'Atrasado';
-      } else if (diffMins === 1) {
-        return 'Em 1 min';
-      } else {
-        return `Em ${diffMins} min`;
-      }
-    } catch {
-      return arrivalTime;
-    }
+    return getMinutesUntilArrival(arrivalTime);
   }
 
   /**
@@ -419,11 +413,7 @@ export class StopArrivalsComponent {
   }
 
   getVisibleVehicles(line: LineWithVehicles): VehiclePosition[] {
-    if (this.isArrivalLineExpanded(line)) {
-      return line.vs;
-    }
-
-    return line.vs.slice(0, VISIBLE_VEHICLE_COUNT);
+    return getVisibleVehicles(line, this.isArrivalLineExpanded(line));
   }
 
   hasHiddenVehicles(line: LineWithVehicles): boolean {
@@ -431,14 +421,11 @@ export class StopArrivalsComponent {
   }
 
   getHiddenVehicleCount(line: LineWithVehicles): number {
-    return Math.max(line.vs.length - VISIBLE_VEHICLE_COUNT, 0);
+    return getHiddenVehicleCount(line);
   }
 
   getHiddenVehiclesLabel(line: LineWithVehicles): string {
-    const hiddenVehicleCount = this.getHiddenVehicleCount(line);
-    const vehicleLabel = hiddenVehicleCount === 1 ? 'veículo' : 'veículos';
-
-    return `Mostrar mais ${hiddenVehicleCount} ${vehicleLabel}`;
+    return getHiddenVehiclesLabel(line);
   }
 
   isArrivalLineExpanded(line: LineWithVehicles): boolean {
@@ -459,13 +446,13 @@ export class StopArrivalsComponent {
   }
 
   getLineRouteColor(line: LineWithVehicles): string | null {
-    const route = this.getRouteForLine(line);
-    return route ? this.formatHexColor(route.color) : null;
+    const route = findRouteForArrivalLine(line, this.routes());
+    return route ? formatHexColor(route.color) : null;
   }
 
   getLineRouteTextColor(line: LineWithVehicles): string | null {
-    const route = this.getRouteForLine(line);
-    return route ? this.formatHexColor(route.textColor) : null;
+    const route = findRouteForArrivalLine(line, this.routes());
+    return route ? formatHexColor(route.textColor) : null;
   }
 
   getRouteKey(route: BusRouteGraphQL): string {
@@ -526,31 +513,19 @@ export class StopArrivalsComponent {
   }
 
   formatRouteFare(route: BusRouteGraphQL): string | null {
-    const fares = route.fares ?? [];
-    if (fares.length > 0) {
-      return fares.map((fare) => formatBusFare(fare)).join(' · ');
-    }
-
-    return supportsSptransRealtime(route) ? null : 'Tarifa não informada';
+    return getRouteFareLabel(route);
   }
 
   formatRouteAgency(route: BusRouteGraphQL): string {
-    const agency = route.sourceAgency?.trim().toLowerCase();
-    if (agency === 'artesp' || isArtespRoute(route)) {
-      return 'Artesp';
-    }
-    if (agency === 'sptrans' || !agency) {
-      return 'SPTrans';
-    }
-    return agency.toUpperCase();
+    return getRouteAgencyLabel(route);
   }
 
   formatScheduledDepartureTime(departureTime: string): string {
-    return formatScheduledBusDepartureTime(departureTime);
+    return getScheduledDepartureTime(departureTime);
   }
 
   getScheduledDepartureKey(departure: ScheduledBusDepartureGraphQL): string {
-    return `${departure.routeId}:${departure.tripId}:${departure.directionId}:${departure.departureTime}`;
+    return getScheduledDepartureKey(departure);
   }
 
   getScheduledDepartureRoute(
@@ -566,25 +541,13 @@ export class StopArrivalsComponent {
   }
 
   getRouteRailStationCount(route: BusRouteGraphQL): number {
-    const stationIds = new Set<string>();
-
-    for (const direction of this.getRouteDirectionsWithRail(route)) {
-      for (const station of direction.stations) {
-        stationIds.add(station.id);
-      }
-    }
-
-    return stationIds.size;
+    return getRailStationCount(this.getRouteConnection(route));
   }
 
   getRouteDirectionsWithRail(
     route: BusRouteGraphQL,
   ): RouteRailConnectionDirectionGraphQL[] {
-    return (
-      this.getRouteConnection(route)?.directions.filter(
-        (direction) => direction.stations.length > 0,
-      ) ?? []
-    );
+    return getRailDirections(this.getRouteConnection(route));
   }
 
   getLineRailStations(
@@ -592,13 +555,13 @@ export class StopArrivalsComponent {
   ): RouteRailConnectionStationGraphQL[] {
     const connection =
       this.railConnections().get(line.c) ??
-      this.findConnectionByShortName(line.c);
+      findRailConnectionByShortName(this.railConnections(), line.c);
 
     if (!connection) {
       return [];
     }
 
-    return this.getDirectionForLine(connection, line)?.stations ?? [];
+    return getRailDirectionForLine(connection, line)?.stations ?? [];
   }
 
   getLineDestination(line: LineWithVehicles): string {
@@ -606,147 +569,16 @@ export class StopArrivalsComponent {
   }
 
   getAgencyLogo(name: string): string | null {
-    const normalized = name.trim().toLocaleLowerCase('pt-BR');
-    const agency = Object.values(TransitAgency).find(
-      (key) =>
-        key === normalized ||
-        AGENCIES_DATA[key].shortName.toLocaleLowerCase('pt-BR') === normalized,
-    );
-    return agency ? getAgencyIconPath(agency) : null;
+    return getAgencyLogo(name);
   }
 
   formatStationDistance(
     station: RouteRailConnectionStationGraphQL,
   ): string | null {
-    const { distanceMeters } = station;
-
-    if (
-      typeof distanceMeters !== 'number' ||
-      !Number.isFinite(distanceMeters) ||
-      distanceMeters < 0
-    ) {
-      return null;
-    }
-
-    return `Parada da linha a ${distanceMeters} m da estação`;
-  }
-
-  private getDirectionForLine(
-    connection: RouteRailConnectionGraphQL,
-    line: LineWithVehicles,
-  ): RouteRailConnectionDirectionGraphQL | undefined {
-    return findOlhoVivoGtfsDirection(line, connection.directions);
-  }
-
-  private findConnectionByShortName(
-    routeShortName: string,
-  ): RouteRailConnectionGraphQL | undefined {
-    const normalizedRoute = this.normalizeRouteCode(routeShortName);
-    return Array.from(this.railConnections().values()).find(
-      (connection) =>
-        !/^artesp[:/]/i.test(connection.routeId) &&
-        this.normalizeRouteCode(connection.routeShortName) === normalizedRoute,
-    );
-  }
-
-  private getUniqueRouteIds(routes: BusRouteGraphQL[]): string[] {
-    return Array.from(
-      new Set(
-        routes
-          .map((route) => getBusRouteIdentity(route).trim())
-          .filter(Boolean),
-      ),
-    );
-  }
-
-  private normalizeRouteCode(routeCode: string): string {
-    return routeCode.trim().toUpperCase();
+    return formatStationDistance(station);
   }
 
   getArrivalLineKey(line: LineWithVehicles): string {
-    if (Number.isFinite(line.cl) && line.cl !== 0) {
-      return line.cl.toString();
-    }
-
-    return `${this.normalizeRouteCode(line.c)}:${line.sl}:${this.normalizeName(
-      getOlhoVivoDestination(line),
-    )}`;
-  }
-
-  private sortArrivalLinesByRouteOrder(
-    lines: LineWithVehicles[],
-  ): LineWithVehicles[] {
-    const routeOrder = this.getRouteOrder();
-
-    return lines
-      .map((line, index) => ({ line, index }))
-      .sort((a, b) => {
-        const aOrder = routeOrder.get(this.normalizeRouteCode(a.line.c));
-        const bOrder = routeOrder.get(this.normalizeRouteCode(b.line.c));
-
-        if (aOrder === undefined && bOrder === undefined) {
-          return a.index - b.index;
-        }
-
-        if (aOrder === undefined) {
-          return 1;
-        }
-
-        if (bOrder === undefined) {
-          return -1;
-        }
-
-        if (aOrder === bOrder) {
-          return a.index - b.index;
-        }
-
-        return aOrder - bOrder;
-      })
-      .map(({ line }) => line);
-  }
-
-  private getRouteOrder(): Map<string, number> {
-    const routeOrder = new Map<string, number>();
-
-    this.displayRoutes().forEach((route, index) => {
-      for (const routeCode of [route.routeId, route.shortName]) {
-        const normalizedRouteCode = this.normalizeRouteCode(routeCode);
-
-        if (!routeOrder.has(normalizedRouteCode)) {
-          routeOrder.set(normalizedRouteCode, index);
-        }
-      }
-    });
-
-    return routeOrder;
-  }
-
-  private getRouteForLine(line: LineWithVehicles): BusRouteGraphQL | undefined {
-    const normalizedRouteCode = this.normalizeRouteCode(line.c);
-
-    return this.routes().find(
-      (route) =>
-        supportsSptransRealtime(route) &&
-        this.normalizeRouteCode(route.shortName) === normalizedRouteCode,
-    );
-  }
-
-  private formatHexColor(color: string): string | null {
-    const normalizedColor = color.trim().replace(/^#/, '');
-
-    if (!/^[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(normalizedColor)) {
-      return null;
-    }
-
-    return `#${normalizedColor}`;
-  }
-
-  private normalizeName(name: string): string {
-    return name
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^\p{L}\p{N}]+/gu, ' ')
-      .trim()
-      .toUpperCase();
+    return getArrivalLineKey(line);
   }
 }

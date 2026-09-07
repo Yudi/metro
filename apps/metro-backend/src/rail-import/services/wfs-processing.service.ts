@@ -1,31 +1,28 @@
-import { createHash } from 'crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { WFSSourceConfig, WFSConfig } from '../config/wfs.config';
+import type { WFSFeature, WFSFeatureCollection } from '../types/wfs.types';
 import {
-  GeoJsonGeometry,
-  WFSFeature,
-  WFSFeatureCollection,
-} from '../types/wfs.types';
+  DownloadedWFSLayer,
+  MissingWFSColumn,
+  WFSFeatureInsert,
+  buildWfsUrl,
+  canonicalWfsHash,
+  extractSrid,
+  getPrimaryIndex,
+  optionalNumber,
+  optionalText,
+  parseFeatureCollection,
+  previewWfsResponse,
+  requiredText,
+  serializeGeometry,
+  validateGeometry,
+} from './wfs-processing.utils';
 
-interface DownloadedWFSLayer {
-  text: string;
-  fileHash: string;
-  fileSize: number;
-  featureCollection: WFSFeatureCollection;
-  sourceSrid: number;
-}
-
-interface MissingWFSColumn {
-  table_name: string;
-  column_name: string;
-}
-
-interface WFSFeatureInsert {
-  columns: string[];
-  values: Array<string | number | null>;
-}
+// Keep the existing service module export stable for callers and tests while
+// the pure canonicalization logic lives with the other WFS transforms.
+export { canonicalWfsHash } from './wfs-processing.utils';
 
 @Injectable()
 export class WFSProcessingService {
@@ -50,7 +47,7 @@ export class WFSProcessingService {
   }
 
   async downloadLayer(source: WFSSourceConfig): Promise<DownloadedWFSLayer> {
-    const url = this.buildWfsUrl(source);
+    const url = buildWfsUrl(source);
     const controller = new AbortController();
     const timeout = setTimeout(
       () => controller.abort(),
@@ -69,13 +66,13 @@ export class WFSProcessingService {
       const text = await this.readResponseText(response);
       if (!response.ok) {
         throw new Error(
-          `GeoSampa WFS returned ${response.status} ${response.statusText}: ${this.preview(text)}`,
+          `GeoSampa WFS returned ${response.status} ${response.statusText}: ${previewWfsResponse(text)}`,
         );
       }
 
-      const featureCollection = this.parseFeatureCollection(text, source);
+      const featureCollection = parseFeatureCollection(text, source);
       const sourceSrid =
-        this.extractSrid(featureCollection) ?? WFSConfig.TARGET_SRID;
+        extractSrid(featureCollection) ?? WFSConfig.TARGET_SRID;
 
       return {
         text,
@@ -306,9 +303,9 @@ export class WFSProcessingService {
     sourceSrid: number,
   ): WFSFeatureInsert {
     const properties = feature.properties ?? {};
-    const primaryIndex = this.getPrimaryIndex(feature, index);
-    this.validateGeometry(source, feature.geometry);
-    const geometry = this.serializeGeometry(feature.geometry);
+    const primaryIndex = getPrimaryIndex(feature, index);
+    validateGeometry(source, feature.geometry);
+    const geometry = serializeGeometry(feature.geometry);
 
     switch (source.source) {
       case 'metro_station':
@@ -442,208 +439,31 @@ export class WFSProcessingService {
     }
   }
 
-  private buildWfsUrl(source: WFSSourceConfig): string {
-    const url = new URL(WFSConfig.BASE_URL);
-    url.search = new URLSearchParams({
-      service: 'WFS',
-      version: WFSConfig.WFS_VERSION,
-      request: 'GetFeature',
-      typeName: source.typeName,
-      outputFormat: WFSConfig.OUTPUT_FORMAT,
-      srsName: `EPSG:${WFSConfig.TARGET_SRID}`,
-    }).toString();
-
-    return url.toString();
-  }
-
-  private parseFeatureCollection(
-    text: string,
-    source: WFSSourceConfig,
-  ): WFSFeatureCollection {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      throw new Error(
-        `GeoSampa WFS did not return JSON for ${source.typeName}: ${this.preview(text)}`,
-      );
-    }
-
-    if (!this.isFeatureCollection(parsed)) {
-      throw new Error(
-        `Invalid GeoJSON FeatureCollection for ${source.typeName}`,
-      );
-    }
-
-    return parsed;
-  }
-
-  private isFeatureCollection(value: unknown): value is WFSFeatureCollection {
-    if (typeof value !== 'object' || value === null) {
-      return false;
-    }
-
-    const candidate = value as Partial<WFSFeatureCollection>;
-    return (
-      candidate.type === 'FeatureCollection' &&
-      Array.isArray(candidate.features)
-    );
-  }
-
-  private extractSrid(featureCollection: WFSFeatureCollection): number | null {
-    const crsName = featureCollection.crs?.properties?.name;
-    const match = crsName?.match(/(?:EPSG|epsg\.xml)[^0-9]*(\d+)$/i);
-    return match ? Number(match[1]) : null;
-  }
-
-  private serializeGeometry(geometry: GeoJsonGeometry | null): string {
-    if (!geometry) {
-      throw new Error('Feature has no geometry');
-    }
-
-    return JSON.stringify(geometry);
-  }
-
-  private validateGeometry(
-    source: WFSSourceConfig,
-    geometry: GeoJsonGeometry | null,
-  ): void {
-    if (!geometry) {
-      throw new Error('Feature has no geometry');
-    }
-
-    const valid =
-      (source.geometryKind === 'point' &&
-        ((geometry.type === 'Point' && this.isPosition(geometry.coordinates)) ||
-          (geometry.type === 'MultiPoint' &&
-            this.isPositionCollection(geometry.coordinates)))) ||
-      (source.geometryKind === 'line' &&
-        ((geometry.type === 'LineString' &&
-          this.isLineString(geometry.coordinates)) ||
-          (geometry.type === 'MultiLineString' &&
-            Array.isArray(geometry.coordinates) &&
-            geometry.coordinates.length > 0 &&
-            geometry.coordinates.every((line) => this.isLineString(line)))));
-
-    if (!valid) {
-      throw new Error('Feature geometry contains invalid coordinates');
-    }
-  }
-
-  private isPosition(value: unknown): boolean {
-    return (
-      Array.isArray(value) &&
-      value.length >= 2 &&
-      value.every(
-        (coordinate) =>
-          typeof coordinate === 'number' && Number.isFinite(coordinate),
-      )
-    );
-  }
-
-  private isPositionCollection(value: unknown): boolean {
-    return (
-      Array.isArray(value) &&
-      value.length > 0 &&
-      value.every((position) => this.isPosition(position))
-    );
-  }
-
-  private isLineString(value: unknown): boolean {
-    return (
-      Array.isArray(value) &&
-      value.length >= 2 &&
-      value.every((position) => this.isPosition(position))
-    );
-  }
-
-  private getPrimaryIndex(feature: WFSFeature, index: number): string {
-    const fromProperties = this.optionalText(feature.properties ?? {}, [
-      'primaryindex',
-      'id',
-    ]);
-
-    if (fromProperties) {
-      return this.extractNumericSuffix(fromProperties) ?? fromProperties;
-    }
-
-    if (feature.id) {
-      return this.extractNumericSuffix(feature.id) ?? feature.id;
-    }
-
-    return String(index + 1);
-  }
-
-  private extractNumericSuffix(value: string): string | null {
-    const match = value.match(/(\d+)$/);
-    return match?.[1] ?? null;
-  }
-
   private requiredText(
     properties: Record<string, unknown>,
     names: string[],
   ): string {
-    const value = this.optionalText(properties, names);
-    if (!value) {
-      throw new Error(`Missing required WFS property: ${names.join(' or ')}`);
-    }
-
-    return value;
+    return requiredText(properties, names);
   }
 
   private optionalText(
     properties: Record<string, unknown>,
     names: string[],
   ): string | null {
-    const value = this.getProperty(properties, names);
-    if (value === null || value === undefined) {
-      return null;
-    }
-
-    const text = String(value).trim();
-    return text.length > 0 ? text : null;
+    return optionalText(properties, names);
   }
 
   private optionalNumber(
     properties: Record<string, unknown>,
     names: string[],
   ): number | null {
-    const value = this.getProperty(properties, names);
-    if (value === null || value === undefined || value === '') {
-      return null;
-    }
-
-    const numberValue = Number(value);
-    if (!Number.isFinite(numberValue)) {
+    const result = optionalNumber(properties, names);
+    if (result.malformed) {
       this.logger.warn(
         `Ignoring malformed optional numeric WFS property: ${names.join(' or ')}`,
       );
-      return null;
     }
-
-    return numberValue;
-  }
-
-  private getProperty(
-    properties: Record<string, unknown>,
-    names: string[],
-  ): unknown {
-    for (const name of names) {
-      if (name in properties) {
-        return properties[name];
-      }
-
-      const upperName = name.toUpperCase();
-      if (upperName in properties) {
-        return properties[upperName];
-      }
-    }
-
-    return null;
-  }
-
-  private preview(text: string): string {
-    return text.replace(/\s+/g, ' ').trim().slice(0, 300);
+    return result.value;
   }
 
   private qualifiedTable(tableName: string): string {
@@ -657,63 +477,4 @@ export class WFSProcessingService {
 
     return `"${identifier.replace(/"/g, '""')}"`;
   }
-}
-
-/**
- * Hash semantic WFS content rather than transport serialization. Providers
- * are free to reorder features or JSON properties without changing the layer.
- */
-export function canonicalWfsHash(
-  featureCollection: WFSFeatureCollection,
-): string {
-  const features = featureCollection.features
-    .map((feature) => canonicalize(feature))
-    .sort((left, right) => {
-      const leftKey = featureSortKey(left);
-      const rightKey = featureSortKey(right);
-      return leftKey.localeCompare(rightKey);
-    });
-  const canonical = canonicalize({
-    type: featureCollection.type,
-    crs: featureCollection.crs,
-    features,
-  });
-
-  return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
-}
-
-function featureSortKey(feature: unknown): string {
-  if (typeof feature !== 'object' || feature === null) {
-    return JSON.stringify(feature);
-  }
-
-  const candidate = feature as {
-    id?: unknown;
-    properties?: Record<string, unknown> | null;
-  };
-  const stableId =
-    candidate.id ??
-    candidate.properties?.['primaryindex'] ??
-    candidate.properties?.['id'];
-  return stableId === undefined ? JSON.stringify(feature) : String(stableId);
-}
-
-function canonicalize(value: unknown): unknown {
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? Number(value.toFixed(7)) : null;
-  }
-
-  if (Array.isArray(value)) {
-    return value.map((item) => canonicalize(item));
-  }
-
-  if (typeof value === 'object' && value !== null) {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, item]) => [key, canonicalize(item)]),
-    );
-  }
-
-  return value;
 }

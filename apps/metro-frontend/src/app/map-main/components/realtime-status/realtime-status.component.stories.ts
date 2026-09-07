@@ -1,7 +1,7 @@
 import { Meta, StoryObj, applicationConfig } from '@storybook/angular';
 import { signal } from '@angular/core';
 import { RealtimeStatusComponent } from './realtime-status.component';
-import { RealtimeWebsocketService } from '../../services/realtime-websocket.service';
+import { RealtimeWebsocketService } from '../../realtime/realtime-websocket.service';
 import { OLHOVIVO_POLL_INTERVAL_MS } from '@metro/shared/utils';
 
 // Mock service factory

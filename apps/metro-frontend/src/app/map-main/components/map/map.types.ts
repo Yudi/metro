@@ -1,7 +1,7 @@
 import {
   BusRouteGraphQL,
   BusShapeGraphQL,
-} from '../../services/geography-graphql.service';
+} from '../../geography/geography-graphql.service';
 import type {
   LiveTrainTrackingApiId,
   SpecialRailService,

@@ -10,7 +10,7 @@ import {
   isApi1RailLine,
   CPTM_LINE_CONFIG,
 } from '@metro/shared/utils';
-import { LiteNextTrainArrival } from '../../../services/lite-search.service';
+import { LiteNextTrainArrival } from '../../../shared/search/lite-search.service';
 import { LiteSpinner } from '@metro/shared/lite-ui';
 
 export interface LiteNextTrainGroup {

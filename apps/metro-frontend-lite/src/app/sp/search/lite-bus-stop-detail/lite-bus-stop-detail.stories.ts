@@ -11,8 +11,8 @@ import {
   LiteBusRoute,
   LiteRouteRailConnection,
   LiteSearchStop,
-} from '../../../services/lite-search.service';
-import { LiteStopArrivalUpdate } from '../../../services/lite-realtime.service';
+} from '../../../shared/search/lite-search.service';
+import { LiteStopArrivalUpdate } from '../../../shared/realtime/lite-realtime.service';
 
 const routes: LiteBusRoute[] = [
   {

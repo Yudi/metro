@@ -1,0 +1,24 @@
+@use "../../../../../../../libs/shared/styles/rail-line-badge" as lineBadge;
+
+.rail-station-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.rail-station-heading .rail-station-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.station-line-badges {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 4px;
+}
+
+.station-line-badge {
+  @include lineBadge.circle;
+}

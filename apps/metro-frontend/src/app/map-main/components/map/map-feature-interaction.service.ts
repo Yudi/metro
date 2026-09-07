@@ -4,17 +4,17 @@ import { LoggerService } from '@metro/shared/api';
 import { formatBusFare, type BusFare } from '@metro/shared/utils';
 import { Feature } from 'ol';
 import { FeatureLike } from 'ol/Feature';
-import { BikeStationsService } from '../../services/bike-stations.service';
-import { MapService } from '../../services/map.service';
+import { BikeStationsService } from '../../geography/bike-stations.service';
+import { MapService } from './map.service';
 import {
   VectorTileLayerService,
   VectorTileLayerType,
-} from '../../services/vector-tile-layer.service';
+} from './vector-tiles/vector-tile-layer.service';
 import { MapDetailsDialogService } from './map-details-dialog.service';
 import { MapDisplayService } from './map-display.service';
 import { MapSelectionService } from './map-selection.service';
 import { MapStateService } from './map-state.service';
-import { GeographyGraphQLService } from '../../services/geography-graphql.service';
+import { GeographyGraphQLService } from '../../geography/geography-graphql.service';
 
 @Service()
 export class MapFeatureInteractionService {

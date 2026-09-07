@@ -1,2 +1,2 @@
-export * from './lib/environment/environment';
-export * from './lib/environment/environment.prod';
+export * from './lib/environment';
+export * from './lib/environment.prod';

@@ -1,0 +1,54 @@
+@media (max-width: 520px) {
+  .line-header,
+  .vehicle-arrival {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .line-info,
+  .arrival-info {
+    width: 100%;
+  }
+
+  .scheduled-row {
+    grid-template-columns: 56px minmax(0, 1fr) 40px;
+    gap: 8px;
+  }
+
+  .schedule-toggle {
+    grid-column: 3;
+    min-width: 40px;
+    width: 40px;
+    height: 44px;
+    padding: 0;
+
+    mat-icon {
+      margin: 0;
+    }
+  }
+
+  .schedule-toggle-label {
+    display: none;
+  }
+
+  .scheduled-route {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .route-panel-header {
+    padding-inline: 12px;
+  }
+
+  .route-summary {
+    column-gap: 8px;
+    margin-right: 12px;
+  }
+
+  .route-meta {
+    grid-column: 1 / -1;
+    gap: 8px 12px;
+  }
+}

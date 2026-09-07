@@ -16,8 +16,8 @@ import {
   LiteSearchStop,
   LiteRouteRailConnection,
   type LiteScheduledBusDeparture,
-} from '../../services/lite-search.service';
-import { LiteRealtimeService } from '../../services/lite-realtime.service';
+} from '../../shared/search/lite-search.service';
+import { LiteRealtimeService } from '../../shared/realtime/lite-realtime.service';
 import { GeolocationService } from '@metro/shared/geolocation';
 import {
   getLineColors,

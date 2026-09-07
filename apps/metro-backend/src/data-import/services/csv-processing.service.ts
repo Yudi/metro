@@ -1,25 +1,38 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import csv from 'csv-parser';
-import { randomUUID } from 'crypto';
-import { createReadStream } from 'fs';
 import { GTFSConfig, GTFSFeed } from '../config/gtfs.config';
-import { StopRecord, ValidationResult } from '../types/gtfs.types';
-
-interface CsvRecord {
-  [key: string]: string;
-}
+import type { StopRecord, ValidationResult } from '../types/gtfs.types';
+import { withCause } from './data-import-error.utils';
+import { CsvRecord, strictFloat } from './csv-field.utils';
+import { validateStopRecords as validateStopRecordsRows } from './gtfs-stop-validation.utils';
+import type {
+  CsvImportContext,
+  SqlExecutor,
+  SqlValue,
+} from './gtfs-csv-row-importers';
+import {
+  insertRows as insertRowsSql,
+  qualifyGtfsTable,
+  quoteIdent,
+  truncateTable as truncateTableSql,
+  updateStopGeography as updateStopGeographySql,
+} from './gtfs-sql.utils';
+import { readCsvBatches } from './csv-reader.utils';
+import {
+  importAgency as importAgencyRows,
+  importCalendar as importCalendarRows,
+  importCalendarDates as importCalendarDatesRows,
+  importFareAttributes as importFareAttributesRows,
+  importFareRules as importFareRulesRows,
+  importFeedInfo as importFeedInfoRows,
+  importFrequencies as importFrequenciesRows,
+  importRoutes as importRoutesRows,
+  importStopTimes as importStopTimesRows,
+  importStops as importStopsRows,
+  importTrips as importTripsRows,
+} from './gtfs-csv-row-importers';
 
 const CSV_BATCH_SIZE = 1_000;
-
-type SqlValue = string | number | null;
-type SqlExecutor = {
-  $executeRaw(
-    strings: TemplateStringsArray,
-    ...values: unknown[]
-  ): Promise<unknown>;
-  $executeRawUnsafe(query: string, ...values: unknown[]): Promise<unknown>;
-};
 
 type RowMapper<T extends SqlValue[]> = (record: CsvRecord) => T;
 
@@ -33,122 +46,6 @@ export class CsvProcessingService {
     ...GTFSConfig.getRawTables('sptrans'),
     ...GTFSConfig.getRawTables('artesp'),
   ]);
-
-  private requiredText(record: CsvRecord, field: string): string {
-    const value = record[field]?.trim();
-    if (!value) {
-      throw new Error(`${field} is required`);
-    }
-
-    return value;
-  }
-
-  private conditionalRouteName(
-    record: CsvRecord,
-    field: 'route_short_name' | 'route_long_name',
-    alternativeField: 'route_short_name' | 'route_long_name',
-  ): string {
-    const value = record[field]?.trim() || '';
-    if (!value && !record[alternativeField]?.trim()) {
-      throw new Error('route_short_name or route_long_name must be provided');
-    }
-    return value;
-  }
-
-  private optionalColor(record: CsvRecord, field: string): string {
-    const value = record[field]?.trim().replace(/^#/, '') || '';
-    if (value && !/^[0-9A-Fa-f]{6}$/.test(value)) {
-      this.logger.warn(
-        `Ignoring malformed optional ${field}: expected a six-digit hexadecimal color`,
-      );
-      return '';
-    }
-    return value.toUpperCase();
-  }
-
-  private strictInt(
-    record: CsvRecord,
-    field: string,
-    options: { min?: number; max?: number } = {},
-  ): number {
-    const value = record[field]?.trim();
-    if (!value || !/^-?\d+$/.test(value)) {
-      throw new Error(`${field} must be an integer`);
-    }
-
-    const parsed = Number(value);
-    if (
-      !Number.isSafeInteger(parsed) ||
-      (options.min !== undefined && parsed < options.min) ||
-      (options.max !== undefined && parsed > options.max)
-    ) {
-      throw new Error(`${field} is outside the allowed range`);
-    }
-
-    return parsed;
-  }
-
-  private strictFloat(
-    record: CsvRecord,
-    field: string,
-    options: { min?: number; max?: number } = {},
-  ): number {
-    const value = record[field]?.trim();
-    if (!value || !/^-?(?:\d+\.?\d*|\.\d+)$/.test(value)) {
-      throw new Error(`${field} must be a number`);
-    }
-
-    const parsed = Number(value);
-    if (
-      !Number.isFinite(parsed) ||
-      (options.min !== undefined && parsed < options.min) ||
-      (options.max !== undefined && parsed > options.max)
-    ) {
-      throw new Error(`${field} is outside the allowed range`);
-    }
-
-    return parsed;
-  }
-
-  private strictDate(record: CsvRecord, field: string): string {
-    const value = this.requiredText(record, field);
-    if (!/^\d{8}$/.test(value)) {
-      throw new Error(`${field} must use YYYYMMDD format`);
-    }
-
-    const year = Number(value.slice(0, 4));
-    const month = Number(value.slice(4, 6));
-    const day = Number(value.slice(6, 8));
-    const date = new Date(Date.UTC(year, month - 1, day));
-    if (
-      date.getUTCFullYear() !== year ||
-      date.getUTCMonth() !== month - 1 ||
-      date.getUTCDate() !== day
-    ) {
-      throw new Error(`${field} is not a valid calendar date`);
-    }
-
-    return value;
-  }
-
-  private strictTime(record: CsvRecord, field: string): string {
-    const value = this.requiredText(record, field);
-    const match = value.match(/^(\d{1,2}):([0-5]\d):([0-5]\d)$/);
-    if (!match || Number(match[1]) > 99) {
-      throw new Error(`${field} must use GTFS HH:MM:SS format`);
-    }
-
-    return value;
-  }
-
-  private strictRouteType(record: CsvRecord): number {
-    const value = this.strictInt(record, 'route_type', { min: 0, max: 999 });
-    if (value > 12 && value < 100) {
-      throw new Error('route_type is not a valid GTFS route type');
-    }
-
-    return value;
-  }
 
   private mapRows<T extends SqlValue[]>(
     fileName: string,
@@ -176,6 +73,15 @@ export class CsvProcessingService {
     }
 
     return rows;
+  }
+
+  private importContext(): CsvImportContext {
+    return {
+      mapRows: this.mapRows.bind(this),
+      insertRows: this.insertRows.bind(this),
+      validateStopRecords: this.validateStopRecords.bind(this),
+      warn: (message) => this.logger.warn(message),
+    };
   }
 
   /**
@@ -216,26 +122,7 @@ export class CsvProcessingService {
    * Read CSV file in bounded batches.
    */
   private async *readCsvBatches(filePath: string): AsyncGenerator<CsvRecord[]> {
-    const input = createReadStream(filePath);
-    const parser = input.pipe(csv());
-    // csv-parser does not always forward an input stream open/read error to
-    // its async iterator. Forward it explicitly so callers can fail the run
-    // instead of hanging and later recording a zero count.
-    input.on('error', (error) => parser.destroy(error));
-    const stream = parser as AsyncIterable<CsvRecord>;
-    let batch: CsvRecord[] = [];
-
-    for await (const record of stream) {
-      batch.push(record);
-      if (batch.length >= CSV_BATCH_SIZE) {
-        yield batch;
-        batch = [];
-      }
-    }
-
-    if (batch.length > 0) {
-      yield batch;
-    }
+    yield* readCsvBatches(filePath, CSV_BATCH_SIZE);
   }
 
   /**
@@ -293,18 +180,13 @@ export class CsvProcessingService {
     tx: SqlExecutor,
     tableName: string,
   ): Promise<void> {
-    try {
-      const qualifiedTable = this.getQualifiedGtfsTable(tableName);
-      await tx.$executeRawUnsafe(
-        `TRUNCATE TABLE ${qualifiedTable} RESTART IDENTITY CASCADE`,
-      );
-      this.logger.debug(`Truncated ${tableName}`);
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Failed to truncate table ${tableName}:`, errorMessage);
-      throw withCause(`Table truncate failed: ${errorMessage}`, error);
-    }
+    return truncateTableSql(
+      tx,
+      tableName,
+      this.getQualifiedGtfsTable(tableName),
+      (message) => this.logger.debug(message),
+      (message, errorMessage) => this.logger.error(message, errorMessage),
+    );
   }
 
   /**
@@ -359,33 +241,7 @@ export class CsvProcessingService {
     fileName: string,
     feed: GTFSFeed = 'sptrans',
   ): Promise<number> {
-    const rows = this.mapRows(fileName, records, (record) => [
-      record.agency_id?.trim() || '',
-      this.requiredText(record, 'agency_name'),
-      this.requiredText(record, 'agency_url'),
-      this.requiredText(record, 'agency_timezone'),
-      record.agency_lang?.trim() || null,
-      record.agency_phone?.trim() || null,
-      record.agency_fare_url?.trim() || null,
-      record.agency_email?.trim() || null,
-    ]);
-    await this.insertRows(
-      tx,
-      GTFSConfig.getTableName('agency.txt', feed),
-      [
-        'agency_id',
-        'agency_name',
-        'agency_url',
-        'agency_timezone',
-        'agency_lang',
-        'agency_phone',
-        'agency_fare_url',
-        'agency_email',
-      ],
-      rows,
-    );
-
-    return rows.length;
+    return importAgencyRows(this.importContext(), tx, records, fileName, feed);
   }
 
   /**
@@ -397,37 +253,13 @@ export class CsvProcessingService {
     fileName: string,
     feed: GTFSFeed = 'sptrans',
   ): Promise<number> {
-    const rows = this.mapRows(fileName, records, (record) => [
-      this.requiredText(record, 'service_id'),
-      this.strictInt(record, 'monday', { min: 0, max: 1 }),
-      this.strictInt(record, 'tuesday', { min: 0, max: 1 }),
-      this.strictInt(record, 'wednesday', { min: 0, max: 1 }),
-      this.strictInt(record, 'thursday', { min: 0, max: 1 }),
-      this.strictInt(record, 'friday', { min: 0, max: 1 }),
-      this.strictInt(record, 'saturday', { min: 0, max: 1 }),
-      this.strictInt(record, 'sunday', { min: 0, max: 1 }),
-      this.strictDate(record, 'start_date'),
-      this.strictDate(record, 'end_date'),
-    ]);
-    await this.insertRows(
+    return importCalendarRows(
+      this.importContext(),
       tx,
-      GTFSConfig.getTableName('calendar.txt', feed),
-      [
-        'service_id',
-        'monday',
-        'tuesday',
-        'wednesday',
-        'thursday',
-        'friday',
-        'saturday',
-        'sunday',
-        'start_date',
-        'end_date',
-      ],
-      rows,
+      records,
+      fileName,
+      feed,
     );
-
-    return rows.length;
   }
 
   /** Import optional service exceptions from calendar_dates.txt. */
@@ -437,19 +269,13 @@ export class CsvProcessingService {
     fileName: string,
     feed: GTFSFeed = 'sptrans',
   ): Promise<number> {
-    const rows = this.mapRows(fileName, records, (record) => [
-      this.requiredText(record, 'service_id'),
-      this.strictDate(record, 'date'),
-      this.strictInt(record, 'exception_type', { min: 1, max: 2 }),
-    ]);
-    await this.insertRows(
+    return importCalendarDatesRows(
+      this.importContext(),
       tx,
-      GTFSConfig.getTableName('calendar_dates.txt', feed),
-      ['service_id', 'date', 'exception_type'],
-      rows,
+      records,
+      fileName,
+      feed,
     );
-
-    return rows.length;
   }
 
   /**
@@ -461,31 +287,7 @@ export class CsvProcessingService {
     fileName: string,
     feed: GTFSFeed = 'sptrans',
   ): Promise<number> {
-    const rows = this.mapRows(fileName, records, (record) => [
-      this.requiredText(record, 'route_id'),
-      record.agency_id?.trim() || '',
-      this.conditionalRouteName(record, 'route_short_name', 'route_long_name'),
-      this.conditionalRouteName(record, 'route_long_name', 'route_short_name'),
-      this.strictRouteType(record),
-      this.optionalColor(record, 'route_color'),
-      this.optionalColor(record, 'route_text_color'),
-    ]);
-    await this.insertRows(
-      tx,
-      GTFSConfig.getTableName('routes.txt', feed),
-      [
-        'route_id',
-        'agency_id',
-        'route_short_name',
-        'route_long_name',
-        'route_type',
-        'route_color',
-        'route_text_color',
-      ],
-      rows,
-    );
-
-    return rows.length;
+    return importRoutesRows(this.importContext(), tx, records, fileName, feed);
   }
 
   /**
@@ -497,39 +299,7 @@ export class CsvProcessingService {
     fileName: string,
     feed: GTFSFeed = 'sptrans',
   ): Promise<number> {
-    // Step 1: Validate and transform records with type safety
-    const validationResult = this.validateStopRecords(records);
-
-    if (validationResult.invalid.length > 0) {
-      const firstInvalid = validationResult.invalid[0];
-      this.logger.warn(
-        `Skipped ${validationResult.invalid.length} malformed stop row(s) from ${fileName}; first rejection: ${firstInvalid.errors.join(', ')}`,
-      );
-    }
-
-    // Step 2: Import CSV data using raw SQL into the external GTFS schema
-    await this.insertRows(
-      tx,
-      GTFSConfig.getTableName('stops.txt', feed),
-      [
-        'stop_id',
-        'stop_name',
-        'stop_desc',
-        'platform_code',
-        'stop_lat',
-        'stop_lon',
-      ],
-      validationResult.valid.map((record: StopRecord) => [
-        record.stop_id,
-        record.stop_name,
-        record.stop_desc || null,
-        record.platform_code || null,
-        record.stop_lat,
-        record.stop_lon,
-      ]),
-    );
-
-    return validationResult.valid.length;
+    return importStopsRows(this.importContext(), tx, records, fileName, feed);
   }
 
   /**
@@ -538,58 +308,7 @@ export class CsvProcessingService {
   private validateStopRecords(
     records: CsvRecord[],
   ): ValidationResult<StopRecord> {
-    const valid: StopRecord[] = [];
-    const invalid: Array<{
-      record: Record<string, unknown>;
-      errors: string[];
-    }> = [];
-
-    for (const record of records) {
-      const errors: string[] = [];
-
-      // Required field validation
-      if (!record.stop_id) errors.push('stop_id is required');
-      if (!record.stop_name) errors.push('stop_name is required');
-      if (!record.stop_lat?.trim()) errors.push('stop_lat is required');
-      if (!record.stop_lon?.trim()) errors.push('stop_lon is required');
-
-      // Coordinate validation
-      let lat = Number.NaN;
-      let lon = Number.NaN;
-      try {
-        lat = this.strictFloat(record, 'stop_lat', { min: -90, max: 90 });
-      } catch (error) {
-        errors.push(
-          error instanceof Error ? error.message : 'invalid stop_lat',
-        );
-      }
-      try {
-        lon = this.strictFloat(record, 'stop_lon', { min: -180, max: 180 });
-      } catch (error) {
-        errors.push(
-          error instanceof Error ? error.message : 'invalid stop_lon',
-        );
-      }
-
-      if (errors.length > 0) {
-        invalid.push({ record, errors });
-      } else {
-        valid.push({
-          stop_id: record.stop_id.trim(),
-          stop_name: record.stop_name.trim(),
-          stop_desc: record.stop_desc?.trim() || undefined,
-          platform_code:
-            record.platform_code?.trim() ||
-            record.stop_platform_code?.trim() ||
-            record.platform?.trim() ||
-            undefined,
-          stop_lat: lat,
-          stop_lon: lon,
-        });
-      }
-    }
-
-    return { valid, invalid };
+    return validateStopRecordsRows(records, strictFloat);
   }
 
   /**
@@ -601,11 +320,7 @@ export class CsvProcessingService {
   ): Promise<void> {
     const tableName = GTFSConfig.getTableName('stops.txt', feed);
     const qualifiedTable = this.getQualifiedGtfsTable(tableName);
-    await tx.$executeRawUnsafe(
-      `UPDATE ${qualifiedTable}
-       SET location = ST_SetSRID(ST_MakePoint(stop_lon, stop_lat), 4326)::geography
-       WHERE location IS NULL`,
-    );
+    await updateStopGeographySql(tx, qualifiedTable);
   }
 
   /**
@@ -617,31 +332,7 @@ export class CsvProcessingService {
     fileName: string,
     feed: GTFSFeed = 'sptrans',
   ): Promise<number> {
-    const rows = this.mapRows(fileName, records, (record) => [
-      this.requiredText(record, 'route_id'),
-      this.requiredText(record, 'service_id'),
-      this.requiredText(record, 'trip_id'),
-      record.trip_headsign?.trim() || '',
-      record.direction_id?.trim()
-        ? this.strictInt(record, 'direction_id', { min: 0, max: 1 })
-        : 0,
-      record.shape_id?.trim() || '',
-    ]);
-    await this.insertRows(
-      tx,
-      GTFSConfig.getTableName('trips.txt', feed),
-      [
-        'route_id',
-        'service_id',
-        'trip_id',
-        'trip_headsign',
-        'direction_id',
-        'shape_id',
-      ],
-      rows,
-    );
-
-    return rows.length;
+    return importTripsRows(this.importContext(), tx, records, fileName, feed);
   }
 
   /**
@@ -653,23 +344,13 @@ export class CsvProcessingService {
     fileName: string,
     feed: GTFSFeed = 'sptrans',
   ): Promise<number> {
-    const rows = this.mapRows(fileName, records, (record) => [
-      this.requiredText(record, 'trip_id'),
-      this.strictTime(record, 'arrival_time'),
-      this.strictTime(record, 'departure_time'),
-      this.requiredText(record, 'stop_id'),
-      // GTFS permits either zero- or one-based stop sequences; ARTESP uses
-      // zero-based values while SPTrans currently starts at one.
-      this.strictInt(record, 'stop_sequence', { min: 0 }),
-    ]);
-    await this.insertRows(
+    return importStopTimesRows(
+      this.importContext(),
       tx,
-      GTFSConfig.getTableName('stop_times.txt', feed),
-      ['trip_id', 'arrival_time', 'departure_time', 'stop_id', 'stop_sequence'],
-      rows,
+      records,
+      fileName,
+      feed,
     );
-
-    return rows.length;
   }
 
   /**
@@ -681,20 +362,13 @@ export class CsvProcessingService {
     fileName: string,
     feed: GTFSFeed = 'sptrans',
   ): Promise<number> {
-    const rows = this.mapRows(fileName, records, (record) => [
-      this.requiredText(record, 'trip_id'),
-      this.strictTime(record, 'start_time'),
-      this.strictTime(record, 'end_time'),
-      this.strictInt(record, 'headway_secs', { min: 1 }),
-    ]);
-    await this.insertRows(
+    return importFrequenciesRows(
+      this.importContext(),
       tx,
-      GTFSConfig.getTableName('frequencies.txt', feed),
-      ['trip_id', 'start_time', 'end_time', 'headway_secs'],
-      rows,
+      records,
+      fileName,
+      feed,
     );
-
-    return rows.length;
   }
 
   /**
@@ -706,33 +380,13 @@ export class CsvProcessingService {
     fileName: string,
     feed: GTFSFeed = 'sptrans',
   ): Promise<number> {
-    const rows = this.mapRows(fileName, records, (record) => [
-      this.requiredText(record, 'fare_id'),
-      this.strictFloat(record, 'price', { min: 0 }),
-      this.requiredText(record, 'currency_type'),
-      this.strictInt(record, 'payment_method', { min: 0, max: 2 }),
-      this.strictInt(record, 'transfers', { min: 0, max: 2 }),
-      record.transfer_duration?.trim()
-        ? this.strictInt(record, 'transfer_duration', { min: 0 })
-        : null,
-      record.agency_id?.trim() || null,
-    ]);
-    await this.insertRows(
+    return importFareAttributesRows(
+      this.importContext(),
       tx,
-      GTFSConfig.getTableName('fare_attributes.txt', feed),
-      [
-        'fare_id',
-        'price',
-        'currency_type',
-        'payment_method',
-        'transfers',
-        'transfer_duration',
-        'agency_id',
-      ],
-      rows,
+      records,
+      fileName,
+      feed,
     );
-
-    return rows.length;
   }
 
   /**
@@ -744,21 +398,13 @@ export class CsvProcessingService {
     fileName: string,
     feed: GTFSFeed = 'sptrans',
   ): Promise<number> {
-    const rows = this.mapRows(fileName, records, (record) => [
-      this.requiredText(record, 'fare_id'),
-      this.requiredText(record, 'route_id'),
-      record.origin_id?.trim() || null,
-      record.destination_id?.trim() || null,
-      record.contains_id?.trim() || null,
-    ]);
-    await this.insertRows(
+    return importFareRulesRows(
+      this.importContext(),
       tx,
-      GTFSConfig.getTableName('fare_rules.txt', feed),
-      ['fare_id', 'route_id', 'origin_id', 'destination_id', 'contains_id'],
-      rows,
+      records,
+      fileName,
+      feed,
     );
-
-    return rows.length;
   }
 
   private async importFeedInfo(
@@ -767,35 +413,13 @@ export class CsvProcessingService {
     fileName: string,
     feed: GTFSFeed = 'sptrans',
   ): Promise<number> {
-    const rows = this.mapRows(fileName, records, (record) => [
-      this.requiredText(record, 'feed_publisher_name'),
-      record.feed_publisher_url?.trim() || null,
-      record.feed_lang?.trim() || null,
-      record.feed_start_date?.trim()
-        ? this.strictDate(record, 'feed_start_date')
-        : null,
-      record.feed_end_date?.trim()
-        ? this.strictDate(record, 'feed_end_date')
-        : null,
-      record.feed_version?.trim() || null,
-      record.feed_contact_email?.trim() || null,
-    ]);
-    await this.insertRows(
+    return importFeedInfoRows(
+      this.importContext(),
       tx,
-      GTFSConfig.getTableName('feed_info.txt', feed),
-      [
-        'feed_publisher_name',
-        'feed_publisher_url',
-        'feed_lang',
-        'feed_start_date',
-        'feed_end_date',
-        'feed_version',
-        'feed_contact_email',
-      ],
-      rows,
+      records,
+      fileName,
+      feed,
     );
-
-    return rows.length;
   }
 
   private async insertRows(
@@ -804,55 +428,21 @@ export class CsvProcessingService {
     columns: string[],
     rows: SqlValue[][],
   ): Promise<void> {
-    if (rows.length === 0) {
-      return;
-    }
-
-    const qualifiedTable = this.getQualifiedGtfsTable(tableName);
-    const insertColumns = columns.includes('id') ? columns : ['id', ...columns];
-    const quotedColumns = insertColumns.map((column) =>
-      this.quoteIdent(column),
+    return insertRowsSql(
+      tx,
+      tableName,
+      columns,
+      rows,
+      this.getQualifiedGtfsTable(tableName),
     );
-    const chunkSize = Math.max(1, Math.floor(5000 / insertColumns.length));
-
-    for (let offset = 0; offset < rows.length; offset += chunkSize) {
-      const chunk = rows.slice(offset, offset + chunkSize);
-      const values: SqlValue[] = [];
-      const placeholders = chunk.map((row) => {
-        if (row.length !== columns.length) {
-          throw new Error(`Invalid row width for ${tableName}`);
-        }
-
-        const insertRow = columns.includes('id') ? row : [randomUUID(), ...row];
-        const rowPlaceholders = insertRow.map((value) => {
-          values.push(value);
-          return `$${values.length}`;
-        });
-
-        return `(${rowPlaceholders.join(', ')})`;
-      });
-
-      await tx.$executeRawUnsafe(
-        `INSERT INTO ${qualifiedTable} (${quotedColumns.join(', ')}) VALUES ${placeholders.join(', ')}`,
-        ...values,
-      );
-    }
   }
 
   private getQualifiedGtfsTable(tableName: string): string {
-    if (!this.rawGtfsTables.has(tableName)) {
-      throw new Error(`Unsupported GTFS table: ${tableName}`);
-    }
-
-    return `${this.quoteIdent(GTFSConfig.EXTERNAL_SCHEMA)}.${this.quoteIdent(tableName)}`;
+    return qualifyGtfsTable(tableName, this.rawGtfsTables);
   }
 
   private quoteIdent(identifier: string): string {
-    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(identifier)) {
-      throw new Error(`Invalid SQL identifier: ${identifier}`);
-    }
-
-    return `"${identifier.replace(/"/g, '""')}"`;
+    return quoteIdent(identifier);
   }
 
   /**
@@ -878,14 +468,4 @@ export class CsvProcessingService {
       );
     }
   }
-}
-
-function withCause(message: string, cause: unknown): Error {
-  const wrapped = new Error(message);
-  Object.defineProperty(wrapped, 'cause', {
-    configurable: true,
-    enumerable: false,
-    value: cause,
-  });
-  return wrapped;
 }

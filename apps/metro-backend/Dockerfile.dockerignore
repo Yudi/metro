@@ -15,7 +15,7 @@ tmp
 
 docker
 private
-dataset-handling/target
+tools/dataset-handling/target
 
 apps/*
 !apps/metro-backend

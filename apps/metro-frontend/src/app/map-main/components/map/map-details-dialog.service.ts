@@ -6,8 +6,8 @@ import {
 } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { LoggerService } from '@metro/shared/api';
-import { BikeStationsService } from '../../services/bike-stations.service';
-import { GeographyGraphQLService } from '../../services/geography-graphql.service';
+import { BikeStationsService } from '../../geography/bike-stations.service';
+import { GeographyGraphQLService } from '../../geography/geography-graphql.service';
 import {
   BikeStationDialogComponent,
   BikeStationDialogData,

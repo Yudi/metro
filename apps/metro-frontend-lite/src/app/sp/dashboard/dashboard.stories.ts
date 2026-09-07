@@ -22,7 +22,7 @@ import {
   LINES_WITH_ISSUES,
 } from '@metro/storybook-mocks';
 import { FavoriteList, emptyFavorites } from '@metro/shared/utils';
-import { LiteRealtimeService } from '../../services/lite-realtime.service';
+import { LiteRealtimeService } from '../../shared/realtime/lite-realtime.service';
 import { Dashboard } from './dashboard';
 
 type DashboardScenario =

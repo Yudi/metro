@@ -2,8 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { throwError } from 'rxjs';
 import { LoggerService } from '@metro/shared/api';
-import { GeographyGraphQLService } from '../../services/geography-graphql.service';
-import { VectorTileLayerService } from '../../services/vector-tile-layer.service';
+import { GeographyGraphQLService } from '../../geography/geography-graphql.service';
+import { VectorTileLayerService } from './vector-tiles/vector-tile-layer.service';
 import { MapDataLoaderService } from './map-data-loader.service';
 import { MapStateService } from './map-state.service';
 

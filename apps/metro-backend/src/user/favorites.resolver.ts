@@ -1,7 +1,7 @@
 import { Resolver, Query, Mutation, Args, Int } from '@nestjs/graphql';
 import { BadRequestException, UseGuards } from '@nestjs/common';
-import { AuthGuard } from '../shared/guards/auth.guard';
-import { CurrentUserId } from '../shared/decorators/current-user-id.decorator';
+import { AuthGuard } from '../common/guards/auth.guard';
+import { CurrentUserId } from '../common/decorators/current-user-id.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { createEmptyFavorites } from '@metro/shared/utils';
 import {

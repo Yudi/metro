@@ -20,7 +20,6 @@ import { FavoritesService } from '@metro/shared/api';
 import {
   AGENCIES_DATA,
   FavoriteTypes,
-  FavoriteRailLineOption,
   createFavoriteRailLineOptions,
   getContrastColor,
   getAgencyIconPath,
@@ -40,29 +39,23 @@ import {
   TransitAgency,
 } from '@metro/shared/utils';
 import { catchError, of } from 'rxjs';
-import { BikeStationsService } from '../map-main/services/bike-stations.service';
+import { BikeStationsService } from '../map-main/geography/bike-stations.service';
 import {
   BusRouteGraphQL,
   GeographyGraphQLService,
-} from '../map-main/services/geography-graphql.service';
-
-interface FavoriteRailStation {
-  id: string;
-  name: string;
-  favoriteIds: string[];
-  lines: FavoriteRailLineOption[];
-}
-
-interface MergedRailStationFavorite {
-  id: string;
-  name: string;
-  lines: string[];
-}
-
-interface AgencyIdentity {
-  name: string;
-  iconPath: string | null;
-}
+} from '../map-main/geography/geography-graphql.service';
+import type {
+  AgencyIdentity,
+  FavoriteBusLookupResponse,
+  FavoriteBusRoute,
+  FavoriteBusStop,
+  FavoriteRailStation,
+  MergedRailStationFavorite,
+} from './favorites.types';
+import {
+  FAVORITE_REMOVAL_LOOKUP_QUERY,
+  MERGED_RAIL_STATIONS_FOR_REMOVAL_QUERY,
+} from './favorites.queries';
 
 @Component({
   selector: 'app-favorites',
@@ -88,33 +81,8 @@ export class FavoritesComponent {
   private lastBusLookupKey = '';
 
   readonly favorites = this.favoritesService.favorites;
-  readonly busRoutesById = signal(
-    new Map<
-      string,
-      {
-        routeId: string;
-        shortName: string;
-        longName: string;
-        sourceAgency?: string;
-        color?: string;
-        textColor?: string;
-        fares?: Array<{ price: number; currency: string }>;
-      }
-    >(),
-  );
-  readonly busStopsById = signal(
-    new Map<
-      string,
-      {
-        stopId: string;
-        name: string;
-        sourceId?: string;
-        platformCode?: string;
-        favoriteId?: string;
-        mergedStopIds?: string[];
-      }
-    >(),
-  );
+  readonly busRoutesById = signal(new Map<string, FavoriteBusRoute>());
+  readonly busStopsById = signal(new Map<string, FavoriteBusStop>());
   readonly busRoutesByStopId = signal(new Map<string, BusRouteGraphQL[]>());
   readonly railLinesById = signal(
     new Map<string, { id: string; name: string }>(),
@@ -208,49 +176,8 @@ export class FavoritesComponent {
       }
 
       const subscription = this.http
-        .post<{
-          data: {
-            multipleBusRoutes: Array<{
-              routeId: string;
-              shortName: string;
-              longName: string;
-              sourceAgency?: string;
-              color?: string;
-              textColor?: string;
-              fares?: Array<{ price: number; currency: string }>;
-            }>;
-            multipleBusStops: Array<{
-              stopId: string;
-              name: string;
-              sourceId?: string;
-              platformCode?: string;
-              mergedStopIds?: string[];
-            }>;
-          };
-        }>('/api/graphql', {
-          query: `
-            query FavoriteRemovalLookup($routeIds: [ID!]!, $stopIds: [ID!]!) {
-              multipleBusRoutes(ids: $routeIds) {
-                routeId
-                shortName
-                longName
-                sourceAgency
-                color
-                textColor
-                fares {
-                  price
-                  currency
-                }
-              }
-              multipleBusStops(ids: $stopIds) {
-                stopId
-                name
-                sourceId
-                platformCode
-                mergedStopIds
-              }
-            }
-          `,
+        .post<FavoriteBusLookupResponse>('/api/graphql', {
+          query: FAVORITE_REMOVAL_LOOKUP_QUERY,
           variables: {
             routeIds,
             stopIds,
@@ -529,21 +456,12 @@ export class FavoritesComponent {
 
   private loadMergedRailStations(): void {
     this.http
-      .post<{
-        data: {
-          mergedRailStations: MergedRailStationFavorite[];
-        };
-      }>('/api/graphql', {
-        query: `
-          query MergedRailStationsForFavoriteRemoval {
-            mergedRailStations {
-              id
-              name
-              lines
-            }
-          }
-        `,
-      })
+      .post<{ data: { mergedRailStations: MergedRailStationFavorite[] } }>(
+        '/api/graphql',
+        {
+          query: MERGED_RAIL_STATIONS_FOR_REMOVAL_QUERY,
+        },
+      )
       .pipe(
         catchError(() => of(null)),
         takeUntilDestroyed(this.destroyRef),

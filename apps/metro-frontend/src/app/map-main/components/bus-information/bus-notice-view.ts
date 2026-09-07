@@ -1,4 +1,4 @@
-import type { OperationalNotice } from '../../services/bus-information.service';
+import type { OperationalNotice } from './bus-information.service';
 
 export interface RouteNoticeView {
   id: string;

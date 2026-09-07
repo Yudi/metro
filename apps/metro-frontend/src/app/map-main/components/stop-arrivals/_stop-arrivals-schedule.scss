@@ -1,0 +1,145 @@
+.scheduled-section {
+  margin-block-start: 24px;
+  padding-block: 4px;
+
+  &:first-child {
+    margin-block-start: 8px;
+  }
+}
+
+.scheduled-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.scheduled-header {
+  flex-wrap: wrap;
+
+  h4 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    mat-icon {
+      width: 20px;
+      height: 20px;
+      font-size: 20px;
+    }
+  }
+}
+
+.scheduled-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scheduled-group {
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+
+  &:last-child {
+    border-bottom: 0;
+  }
+}
+
+.scheduled-row,
+.scheduled-following-row {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding-block: 12px;
+}
+
+.scheduled-time {
+  display: grid;
+  gap: 4px;
+  color: var(--mat-sys-on-surface);
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+
+  small {
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 12px;
+    font-weight: 400;
+  }
+}
+
+.scheduled-following {
+  margin: 0;
+  padding: 0 0 8px;
+  list-style: none;
+}
+
+.scheduled-following-row {
+  grid-template-columns: 72px minmax(0, 1fr);
+  padding-block: 8px;
+}
+
+.scheduled-route {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.scheduled-destination {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+
+  small {
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 12px;
+    font-weight: 400;
+  }
+}
+
+.scheduled-state {
+  padding-block: 20px;
+}
+
+.agency-identity {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 12px;
+  font-weight: 400;
+
+  img {
+    flex-shrink: 0;
+    object-fit: contain;
+  }
+}
+
+.route-fare {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--mat-sys-on-surface);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+
+  mat-icon {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    font-size: 16px;
+  }
+
+  &.fare-missing {
+    color: var(--mat-sys-on-surface-variant);
+    font-weight: 400;
+  }
+}

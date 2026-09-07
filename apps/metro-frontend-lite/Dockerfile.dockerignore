@@ -13,7 +13,7 @@ tmp
 *.log
 *.local
 
-dataset-handling
+tools/dataset-handling
 docker
 private
 

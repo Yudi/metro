@@ -1,4 +1,4 @@
-import { BusInformationService } from '../../services/bus-information.service';
+import { BusInformationService } from '../bus-information/bus-information.service';
 import {
   Meta,
   StoryObj,
@@ -15,17 +15,17 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { GeographyGraphQLService } from '../../services/geography-graphql.service';
+import { GeographyGraphQLService } from '../../geography/geography-graphql.service';
 import {
   BusStopDialogComponent,
   type BusStopDialogData,
 } from './bus-stop-dialog.component';
 import { LoggerService } from '@metro/shared/api';
-import { RealtimeWebsocketService } from '../../services/realtime-websocket.service';
+import { RealtimeWebsocketService } from '../../realtime/realtime-websocket.service';
 import type {
   BusStopGraphQL,
   BusRouteGraphQL,
-} from '../../services/geography-graphql.service';
+} from '../../geography/geography-graphql.service';
 import {
   PINHEIROS_BUS_STOP,
   CONSOLACAO_BUS_STOP,

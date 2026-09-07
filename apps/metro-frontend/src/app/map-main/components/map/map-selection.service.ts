@@ -9,14 +9,14 @@ import {
   supportsSptransRealtime,
 } from '@metro/shared/utils';
 import { LoggerService } from '@metro/shared/api';
-import { BikeStationsService } from '../../services/bike-stations.service';
-import { CptmVehicleLayerService } from '../../services/cptm-vehicle-layer.service';
-import { RealtimeWebsocketService } from '../../services/realtime-websocket.service';
+import { BikeStationsService } from '../../geography/bike-stations.service';
+import { CptmVehicleLayerService } from '../../realtime/cptm-vehicle-layer.service';
+import { RealtimeWebsocketService } from '../../realtime/realtime-websocket.service';
 import {
   VectorTileLayerService,
   VectorTileLayerType,
-} from '../../services/vector-tile-layer.service';
-import { GeographyCacheService } from '../../utils/geography-cache.service';
+} from './vector-tiles/vector-tile-layer.service';
+import { GeographyCacheService } from '../../geography/geography-cache.service';
 import { MapDataLoaderService } from './map-data-loader.service';
 import { MapDisplayService } from './map-display.service';
 import { MapStateService } from './map-state.service';

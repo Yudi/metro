@@ -1,1 +1,1 @@
-export * from './lib/seo/seo.guard';
+export * from './lib/seo.guard';

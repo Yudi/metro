@@ -10,58 +10,22 @@ import {
 import { isPlatformBrowser } from '@angular/common';
 import { LoggerService } from '@metro/shared/api';
 
-/** Geolocation permission states */
-export type LocationPermissionState =
-  | 'prompt'
-  | 'granted'
-  | 'denied'
-  | 'unavailable';
-
-/** User location coordinates */
-export interface UserLocation {
-  latitude: number;
-  longitude: number;
-  accuracy?: number;
-  altitude?: number | null;
-  altitudeAccuracy?: number | null;
-  heading?: number | null; // GPS heading (direction of travel)
-  speed?: number | null;
-  timestamp: number;
-}
-
-/** Device orientation data */
-export interface DeviceOrientation {
-  /** Compass heading in degrees (0-360, 0 = North) */
-  heading: number | null;
-  /** Whether the heading is absolute (true compass) or relative */
-  absolute: boolean;
-  timestamp: number;
-}
-
-/** Geolocation request options */
-export interface GeolocationRequestOptions {
-  enableHighAccuracy?: boolean;
-  timeout?: number;
-  maximumAge?: number;
-}
-
-/** Watch options for continuous tracking */
-export interface WatchOptions extends GeolocationRequestOptions {
-  /** Whether to also track device orientation (compass) */
-  trackOrientation?: boolean;
-}
-
-const DEFAULT_OPTIONS: GeolocationRequestOptions = {
-  enableHighAccuracy: true,
-  timeout: 10000,
-  maximumAge: 300000, // 5 minutes
-};
-
-const WATCH_OPTIONS: GeolocationRequestOptions = {
-  enableHighAccuracy: true,
-  timeout: 30000,
-  maximumAge: 0, // Always get fresh position when watching
-};
+import { getLocationPermissionMessage } from './geolocation.messages';
+import { DEFAULT_OPTIONS, WATCH_OPTIONS } from './geolocation.options';
+import type {
+  DeviceOrientation,
+  GeolocationRequestOptions,
+  LocationPermissionState,
+  UserLocation,
+  WatchOptions,
+} from './geolocation.types';
+export type {
+  DeviceOrientation,
+  GeolocationRequestOptions,
+  LocationPermissionState,
+  UserLocation,
+  WatchOptions,
+} from './geolocation.types';
 
 /**
  * Shared service for managing geolocation permissions and user location.
@@ -130,17 +94,7 @@ export class GeolocationService implements OnDestroy {
 
   /** Human-readable message for current permission state */
   readonly permissionMessage = computed(() => {
-    switch (this.permission()) {
-      case 'denied':
-        return 'Acesso à localização negado. Permita nas configurações do navegador.';
-      case 'unavailable':
-        return 'Localização não disponível neste dispositivo.';
-      case 'granted':
-        return 'Localização disponível.';
-      case 'prompt':
-      default:
-        return 'Clique para permitir acesso à sua localização.';
-    }
+    return getLocationPermissionMessage(this.permission());
   });
 
   constructor() {

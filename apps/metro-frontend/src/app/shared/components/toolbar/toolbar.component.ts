@@ -25,7 +25,7 @@ import { BottomToolbarComponent } from '../bottom-toolbar/bottom-toolbar.compone
 import { footerLinks } from '../footer/footer.component';
 import { filter, map } from 'rxjs';
 import { isPlatformBrowser } from '@angular/common';
-import { MapViewStateStorageService } from '../../../map-main/services/map-view-state-storage.service';
+import { MapViewStateStorageService } from '../../../map-main/components/map/map-view-state-storage.service';
 
 @Component({
   selector: 'app-material-toolbar',

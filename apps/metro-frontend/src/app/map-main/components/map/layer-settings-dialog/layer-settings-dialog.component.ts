@@ -11,9 +11,9 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
-import { MapService } from '../../../services/map.service';
-import { LayerType } from '../../../services/map-layer.service';
-import { VectorTileLayerType } from '../../../services/vector-tile-layer.service';
+import { MapService } from '.././map.service';
+import { LayerType } from '../layers/map-layer.service';
+import { VectorTileLayerType } from '../vector-tiles/vector-tile-layer.service';
 import { MapDataLoaderService } from '../map-data-loader.service';
 import { LoggerService } from '@metro/shared/api';
 

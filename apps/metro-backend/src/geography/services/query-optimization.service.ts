@@ -1,22 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { getUniqueAgencies } from '@metro/shared/utils';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { BusFare, BusRoute, BusStop } from '../entities/geography.entity';
+import { BusRouteRow, BusStopRow, mapBusStop } from './bus-catalog.utils';
 import {
-  BusRouteRow,
-  BusStopRow,
-  mapBusRoute,
-  mapBusStop,
-  normalizeBusSourceAgency,
-  parseBusFares,
-} from './bus-catalog.utils';
-
-export interface StopServiceInfo {
-  servesRail: boolean;
-  servesBus: boolean;
-  agencies: string[];
-  railRouteShortNames: string[];
-}
+  StopServiceInfo,
+  buildStopAgencies,
+  emptyStopServiceInfo,
+  uniqueIds,
+} from './query-optimization.utils';
+import { QueryOptimizationRouteFacade } from './query-optimization-route.facade';
 
 interface StopServiceRow {
   stop_id: string;
@@ -35,9 +27,11 @@ interface StopServiceRow {
  */
 @Injectable()
 export class QueryOptimizationService {
-  private readonly logger = new Logger(QueryOptimizationService.name);
+  private readonly routeQueries: QueryOptimizationRouteFacade;
 
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {
+    this.routeQueries = new QueryOptimizationRouteFacade(this.prisma);
+  }
 
   async batchCheckSubwayStations(stopIds: string[]): Promise<Set<string>> {
     const serviceInfo = await this.batchGetStopServiceInfo(stopIds);
@@ -157,14 +151,11 @@ export class QueryOptimizationService {
 
     for (const row of rows) {
       const railRouteShortNames = row.rail_route_short_names ?? [];
-      const busAgencies = (row.bus_agencies ?? []).map(normalizeAgencyName);
+      const busAgencies = row.bus_agencies ?? [];
       result.set(row.stop_id, {
         servesRail: Boolean(row.serves_rail),
         servesBus: Boolean(row.serves_bus),
-        agencies: sortAgencies([
-          ...getUniqueAgencies(railRouteShortNames),
-          ...busAgencies,
-        ]),
+        agencies: buildStopAgencies(railRouteShortNames, busAgencies),
         railRouteShortNames,
       });
     }
@@ -365,144 +356,18 @@ export class QueryOptimizationService {
 
   /** Get all routes serving one source or matched physical stop group. */
   async getRoutesForStopOptimized(stopId: string): Promise<BusRoute[]> {
-    const routes = await this.getRoutesForMultipleStops([stopId]);
+    const routes = await this.routeQueries.getRoutesForMultipleStops([stopId]);
     return routes.get(stopId) ?? [];
   }
 
   async getRoutesForMultipleStops(
     stopIds: string[],
   ): Promise<Map<string, BusRoute[]>> {
-    const uniqueStopIds = uniqueIds(stopIds);
-    if (uniqueStopIds.length === 0) {
-      return new Map();
-    }
-
-    const routes = await this.prisma.$queryRaw<
-      Array<BusRouteRow & { requested_stop_id: string }>
-    >`
-      WITH requested_stops AS (
-        SELECT requested_stop_id
-        FROM unnest(${uniqueStopIds}::TEXT[]) AS requested_stop_id
-      ),
-      resolved_stops AS (
-        SELECT
-          requested.requested_stop_id,
-          COALESCE(member.physical_stop_id, requested.requested_stop_id) AS physical_stop_id
-        FROM requested_stops requested
-        LEFT JOIN "public"."physical_stop_members" member
-          ON member.source_stop_id = requested.requested_stop_id
-      ),
-      expanded_stops AS (
-        SELECT DISTINCT
-          resolved.requested_stop_id,
-          COALESCE(member.source_stop_id, resolved.physical_stop_id) AS source_stop_id
-        FROM resolved_stops resolved
-        LEFT JOIN "public"."physical_stop_members" member
-          ON member.physical_stop_id = resolved.physical_stop_id
-      )
-      SELECT DISTINCT ON (expanded.requested_stop_id, route.route_id)
-        expanded.requested_stop_id,
-        route.id,
-        route.route_id,
-        route.agency_id,
-        route.route_short_name,
-        route.route_long_name,
-        route.route_type,
-        route.route_color,
-        route.route_text_color,
-        route.source_agency,
-        route.source_id,
-        COALESCE(fares.fares, '[]'::jsonb) AS fares
-      FROM expanded_stops expanded
-      INNER JOIN "public"."Gtfs_StopTime" stop_time
-        ON stop_time.stop_id = expanded.source_stop_id
-      INNER JOIN "public"."Gtfs_Trip" trip
-        ON trip.trip_id = stop_time.trip_id
-      INNER JOIN "public"."Gtfs_Route" route
-        ON route.route_id = trip.route_id
-      LEFT JOIN LATERAL (
-        SELECT jsonb_agg(
-          jsonb_build_object('price', fare.price, 'currency', fare.currency_type)
-          ORDER BY fare.price, fare.currency_type
-        ) AS fares
-        FROM (
-          SELECT DISTINCT attribute.price, attribute.currency_type
-          FROM "public"."Gtfs_FareRule" rule
-          INNER JOIN "public"."Gtfs_FareAttribute" attribute
-            ON attribute.fare_id = rule.fare_id
-          WHERE rule.route_id = route.route_id
-        ) fare
-      ) fares ON TRUE
-      ORDER BY
-        expanded.requested_stop_id,
-        route.route_id,
-        CASE WHEN LOWER(COALESCE(route.source_agency, '')) = 'sptrans' THEN 0 ELSE 1 END
-    `;
-
-    const result = new Map<string, BusRoute[]>();
-    for (const stopId of uniqueStopIds) {
-      result.set(stopId, []);
-    }
-
-    for (const row of routes) {
-      const current = result.get(row.requested_stop_id);
-      if (current) current.push(mapBusRoute(row));
-    }
-
-    for (const routesForStop of result.values()) {
-      routesForStop.sort(compareBusRoutes);
-    }
-
-    return result;
+    return this.routeQueries.getRoutesForMultipleStops(stopIds);
   }
 
   async getRoutesById(routeIds: string[]): Promise<BusRoute[]> {
-    const uniqueRouteIds = uniqueIds(routeIds);
-    if (uniqueRouteIds.length === 0) {
-      return [];
-    }
-
-    const routes = await this.prisma.$queryRaw<
-      Array<BusRouteRow & { coordinates: number[][] | null }>
-    >`
-      SELECT DISTINCT ON (route.route_id)
-        route.id,
-        route.route_id,
-        route.agency_id,
-        route.route_short_name,
-        route.route_long_name,
-        route.route_type,
-        route.route_color,
-        route.route_text_color,
-        route.source_agency,
-        route.source_id,
-        COALESCE(fares.fares, '[]'::jsonb) AS fares,
-        trip.shape_id,
-        ST_AsGeoJSON(shape.geom)::json->'coordinates' AS coordinates
-      FROM "public"."Gtfs_Route" route
-      LEFT JOIN "public"."Gtfs_Trip" trip
-        ON trip.route_id = route.route_id
-      LEFT JOIN "public"."Gtfs_Shape" shape
-        ON shape.shape_id = trip.shape_id
-        AND shape.geom IS NOT NULL
-      LEFT JOIN LATERAL (
-        SELECT jsonb_agg(
-          jsonb_build_object('price', fare.price, 'currency', fare.currency_type)
-          ORDER BY fare.price, fare.currency_type
-        ) AS fares
-        FROM (
-          SELECT DISTINCT attribute.price, attribute.currency_type
-          FROM "public"."Gtfs_FareRule" rule
-          INNER JOIN "public"."Gtfs_FareAttribute" attribute
-            ON attribute.fare_id = rule.fare_id
-          WHERE rule.route_id = route.route_id
-        ) fare
-      ) fares ON TRUE
-      WHERE route.route_id = ANY(${uniqueRouteIds}::TEXT[])
-      ORDER BY route.route_id, trip.shape_id
-    `;
-
-    return routes.map((route) => mapBusRoute(route));
+    return this.routeQueries.getRoutesById(routeIds);
   }
 
   async getStopsById(stopIds: string[]): Promise<BusStop[]> {
@@ -584,133 +449,13 @@ export class QueryOptimizationService {
   async getBatchRoutesForStops(
     stopIds: string[],
   ): Promise<Map<string, string[]>> {
-    const uniqueStopIds = uniqueIds(stopIds);
-    if (uniqueStopIds.length === 0) {
-      return new Map();
-    }
-
-    const rows = await this.prisma.$queryRaw<
-      Array<{ requested_stop_id: string; route_short_name: string }>
-    >`
-      WITH requested_stops AS (
-        SELECT requested_stop_id
-        FROM unnest(${uniqueStopIds}::TEXT[]) AS requested_stop_id
-      ),
-      resolved_stops AS (
-        SELECT
-          requested.requested_stop_id,
-          COALESCE(member.physical_stop_id, requested.requested_stop_id) AS physical_stop_id
-        FROM requested_stops requested
-        LEFT JOIN "public"."physical_stop_members" member
-          ON member.source_stop_id = requested.requested_stop_id
-      ),
-      expanded_stops AS (
-        SELECT DISTINCT
-          resolved.requested_stop_id,
-          COALESCE(member.source_stop_id, resolved.physical_stop_id) AS source_stop_id
-        FROM resolved_stops resolved
-        LEFT JOIN "public"."physical_stop_members" member
-          ON member.physical_stop_id = resolved.physical_stop_id
-      )
-      SELECT DISTINCT expanded.requested_stop_id, route.route_short_name
-      FROM expanded_stops expanded
-      INNER JOIN "public"."Gtfs_StopTime" stop_time
-        ON stop_time.stop_id = expanded.source_stop_id
-      INNER JOIN "public"."Gtfs_Trip" trip
-        ON trip.trip_id = stop_time.trip_id
-      INNER JOIN "public"."Gtfs_Route" route
-        ON route.route_id = trip.route_id
-      ORDER BY expanded.requested_stop_id, route.route_short_name
-    `;
-
-    const result = new Map<string, string[]>();
-    for (const stopId of uniqueStopIds) {
-      result.set(stopId, []);
-    }
-
-    for (const row of rows) {
-      result.get(row.requested_stop_id)?.push(row.route_short_name);
-    }
-
-    return result;
+    return this.routeQueries.getBatchRoutesForStops(stopIds);
   }
 
   /** Batch fare lookup for search results and other lightweight consumers. */
   async getFaresByRouteIds(
     routeIds: string[],
   ): Promise<Map<string, BusFare[]>> {
-    const uniqueRouteIds = uniqueIds(routeIds);
-    if (uniqueRouteIds.length === 0) {
-      return new Map();
-    }
-
-    const rows = await this.prisma.$queryRaw<
-      Array<{ route_id: string; fares: unknown }>
-    >`
-      SELECT
-        route.route_id,
-        COALESCE(fares.fares, '[]'::jsonb) AS fares
-      FROM "public"."Gtfs_Route" route
-      LEFT JOIN LATERAL (
-        SELECT jsonb_agg(
-          jsonb_build_object('price', fare.price, 'currency', fare.currency_type)
-          ORDER BY fare.price, fare.currency_type
-        ) AS fares
-        FROM (
-          SELECT DISTINCT attribute.price, attribute.currency_type
-          FROM "public"."Gtfs_FareRule" rule
-          INNER JOIN "public"."Gtfs_FareAttribute" attribute
-            ON attribute.fare_id = rule.fare_id
-          WHERE rule.route_id = route.route_id
-        ) fare
-      ) fares ON TRUE
-      WHERE route.route_id = ANY(${uniqueRouteIds}::TEXT[])
-    `;
-
-    return new Map(rows.map((row) => [row.route_id, parseBusFares(row.fares)]));
+    return this.routeQueries.getFaresByRouteIds(routeIds);
   }
-}
-
-function uniqueIds(values: string[]): string[] {
-  return Array.from(
-    new Set(values.map((value) => value.trim()).filter(Boolean)),
-  );
-}
-
-function emptyStopServiceInfo(): StopServiceInfo {
-  return {
-    servesRail: false,
-    servesBus: false,
-    agencies: [],
-    railRouteShortNames: [],
-  };
-}
-
-function normalizeAgencyName(value: string): string {
-  return value.trim().toLowerCase();
-}
-
-function sortAgencies(agencies: string[]): string[] {
-  return Array.from(new Set(agencies)).sort(
-    (left, right) =>
-      agencyRank(left) - agencyRank(right) || left.localeCompare(right),
-  );
-}
-
-function agencyRank(value: string): number {
-  if (value === 'sptrans') return 0;
-  if (value === 'artesp') return 1;
-  return 2;
-}
-
-function compareBusRoutes(left: BusRoute, right: BusRoute): number {
-  const sourceRank =
-    normalizeBusSourceAgency(left.sourceAgency) === 'sptrans' ? 0 : 1;
-  const otherSourceRank =
-    normalizeBusSourceAgency(right.sourceAgency) === 'sptrans' ? 0 : 1;
-  return (
-    sourceRank - otherSourceRank ||
-    left.shortName.localeCompare(right.shortName) ||
-    left.routeId.localeCompare(right.routeId)
-  );
 }

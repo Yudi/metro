@@ -26,28 +26,28 @@ export class RustGtfsService {
       // Development paths
       path.join(
         process.cwd(),
-        '../../dataset-handling/target/debug/metro-dataset-handling',
+        '../../tools/dataset-handling/target/debug/metro-dataset-handling',
       ),
       path.join(
         process.cwd(),
-        '../dataset-handling/target/debug/metro-dataset-handling',
+        '../tools/dataset-handling/target/debug/metro-dataset-handling',
       ),
       path.join(
         process.cwd(),
-        'dataset-handling/target/debug/metro-dataset-handling',
+        'tools/dataset-handling/target/debug/metro-dataset-handling',
       ),
       // Release build paths
       path.join(
         process.cwd(),
-        '../../dataset-handling/target/release/metro-dataset-handling',
+        '../../tools/dataset-handling/target/release/metro-dataset-handling',
       ),
       path.join(
         process.cwd(),
-        '../dataset-handling/target/release/metro-dataset-handling',
+        '../tools/dataset-handling/target/release/metro-dataset-handling',
       ),
       path.join(
         process.cwd(),
-        'dataset-handling/target/release/metro-dataset-handling',
+        'tools/dataset-handling/target/release/metro-dataset-handling',
       ),
     ];
 

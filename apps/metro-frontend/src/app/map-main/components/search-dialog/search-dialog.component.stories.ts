@@ -14,8 +14,8 @@ import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { SearchDialogComponent } from './search-dialog.component';
-import { TypesenseSearchService } from '../../../services/typesense-search.service';
-import { GeographyGraphQLService } from '../../services/geography-graphql.service';
+import { TypesenseSearchService } from '../../../search/typesense-search.service';
+import { GeographyGraphQLService } from '../../geography/geography-graphql.service';
 import { of, delay } from 'rxjs';
 import {
   ARTESP_ONLY_BUS_STOP,

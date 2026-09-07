@@ -1,4 +1,3 @@
-import { BusInformationService } from '../../services/bus-information.service';
 import {
   Meta,
   StoryObj,
@@ -10,10 +9,6 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatButtonModule } from '@angular/material/button';
 import { StopArrivalsComponent } from './stop-arrivals.component';
-import { RealtimeWebsocketService } from '../../services/realtime-websocket.service';
-import { GeographyGraphQLService } from '../../services/geography-graphql.service';
-import type { BusStopGraphQL } from '../../services/geography-graphql.service';
-import type { StopArrivalUpdate } from '../../services/realtime-websocket.service';
 import {
   PINHEIROS_BUS_STOP,
   ROUTE_177H,
@@ -25,89 +20,16 @@ import {
   ROUTE_ARTESP_WITHOUT_FARE,
   SCHEDULED_ARTESP_DEPARTURES,
   SHARED_SPTRANS_ARTESP_BUS_STOP,
-  MOCK_ROUTE_RAIL_CONNECTIONS,
   createMockArrivals,
   createEmptyArrivals,
 } from '@metro/storybook-mocks';
-import { signal } from '@angular/core';
-import { OLHOVIVO_POLL_INTERVAL_MS } from '@metro/shared/utils';
-import { NEVER, of, throwError } from 'rxjs';
-
-// Mock Service with Dynamic Arrivals
-
-interface StopArrivalsProviderOptions {
-  stop: BusStopGraphQL;
-  arrivals?: StopArrivalUpdate;
-  isLoading?: boolean;
-  scheduledDepartures?: typeof SCHEDULED_ARTESP_DEPARTURES;
-  scheduledState?: 'loaded' | 'loading' | 'error';
-}
-
-function createProviders(opts: StopArrivalsProviderOptions) {
-  const { stop, arrivals, isLoading = false } = opts;
-
-  const arrivalsMap = new Map<string, StopArrivalUpdate>();
-  if (arrivals && !isLoading) {
-    arrivalsMap.set(stop.stopId, arrivals);
-  }
-
-  const scheduledDepartures$ =
-    opts.scheduledState === 'loading'
-      ? NEVER
-      : opts.scheduledState === 'error'
-        ? throwError(() => new Error('Falha simulada ao carregar horários'))
-        : of(opts.scheduledDepartures ?? []);
-
-  return [
-    {
-      provide: BusInformationService,
-      useValue: {
-        notices: () =>
-          of({
-            status: 'AVAILABLE',
-            lastUpdated: '2026-09-07T07:30:00Z',
-            notices: [
-              {
-                sourceId: '1',
-                sourceUrl:
-                  'https://www.sptrans.com.br/informativos/oeste/desvios-de-itinerarios-na-regiao-da-av-paulista/71116/',
-                title: 'Exemplo: desvio na região da Av. Paulista',
-                periodText: '07/09/2026, das 9h às 20h.',
-                description:
-                  '07/09/2026, das 9h às 20h.\nMotivo: exemplo ilustrativo de evento.\n477A-10 Pinheiros\nIda: exemplo de desvio pela via alternativa.\nVolta: sem alteração.\n875A-10 Outro destino\nIda: instrução de outra linha.',
-                routes: ['477A-10', '875A-10'],
-                listing: 'RECENT',
-                listedDate: '7 de setembro de 2026',
-              },
-            ],
-          }),
-      },
-    },
-    {
-      provide: GeographyGraphQLService,
-      useValue: {
-        getRouteRailConnectionsForStop: () => of(MOCK_ROUTE_RAIL_CONNECTIONS),
-        getScheduledBusDepartures: () => scheduledDepartures$,
-      },
-    },
-    {
-      provide: RealtimeWebsocketService,
-      useValue: {
-        connected: signal(!isLoading),
-        lastUpdateTimestamp: signal(arrivals ? Date.now() : null),
-        vehiclePositions: signal(new Map()),
-        stopArrivals: signal(arrivalsMap),
-        subscribeToStop: (stopId: string) => {
-          console.debug('[story] subscribeToStop', stopId);
-        },
-        unsubscribeFromStop: (stopId: string) => {
-          console.debug('[story] unsubscribeFromStop', stopId);
-        },
-        POLL_INTERVAL_MS: OLHOVIVO_POLL_INTERVAL_MS,
-      },
-    },
-  ];
-}
+import {
+  createStopArrivalsProviders,
+  createSingleLineArrival,
+  createBusyStopArrivals,
+  createVehicleArriving,
+  createAllAccessibleArrivals,
+} from './stop-arrivals.stories.fixtures';
 
 // Meta
 
@@ -159,7 +81,7 @@ export const WithArrivals: Story = {
   },
   decorators: [
     applicationConfig({
-      providers: createProviders({
+      providers: createStopArrivalsProviders({
         stop: PINHEIROS_BUS_STOP,
         arrivals: createMockArrivals(PINHEIROS_BUS_STOP.stopId),
       }),
@@ -177,7 +99,7 @@ export const Loading: Story = {
   },
   decorators: [
     applicationConfig({
-      providers: createProviders({
+      providers: createStopArrivalsProviders({
         stop: PINHEIROS_BUS_STOP,
         isLoading: true,
       }),
@@ -195,7 +117,7 @@ export const NoArrivals: Story = {
   },
   decorators: [
     applicationConfig({
-      providers: createProviders({
+      providers: createStopArrivalsProviders({
         stop: PINHEIROS_BUS_STOP,
         arrivals: createEmptyArrivals(PINHEIROS_BUS_STOP.stopId),
       }),
@@ -213,39 +135,9 @@ export const SingleLineOneVehicle: Story = {
   },
   decorators: [
     applicationConfig({
-      providers: createProviders({
+      providers: createStopArrivalsProviders({
         stop: PINHEIROS_BUS_STOP,
-        arrivals: {
-          stopCode: PINHEIROS_BUS_STOP.stopId,
-          hr: '14:30',
-          p: {
-            cp: parseInt(PINHEIROS_BUS_STOP.stopId, 10),
-            np: PINHEIROS_BUS_STOP.name,
-            py: PINHEIROS_BUS_STOP.latitude,
-            px: PINHEIROS_BUS_STOP.longitude,
-            l: [
-              {
-                c: '477A-10',
-                cl: 477,
-                sl: 1,
-                lt0: 'Pinheiros',
-                lt1: 'Metrô Santana',
-                qv: 1,
-                vs: [
-                  {
-                    p: 12345,
-                    a: true,
-                    ta: new Date().toISOString(),
-                    py: -23.568,
-                    px: -46.693,
-                    t: '14:35',
-                  },
-                ],
-              },
-            ],
-          },
-          cacheTimestamp: Date.now(),
-        },
+        arrivals: createSingleLineArrival(PINHEIROS_BUS_STOP),
       }),
     }),
   ],
@@ -261,123 +153,9 @@ export const BusyStop: Story = {
   },
   decorators: [
     applicationConfig({
-      providers: createProviders({
+      providers: createStopArrivalsProviders({
         stop: PINHEIROS_BUS_STOP,
-        arrivals: {
-          stopCode: PINHEIROS_BUS_STOP.stopId,
-          hr: '18:00',
-          p: {
-            cp: parseInt(PINHEIROS_BUS_STOP.stopId, 10),
-            np: PINHEIROS_BUS_STOP.name,
-            py: PINHEIROS_BUS_STOP.latitude,
-            px: PINHEIROS_BUS_STOP.longitude,
-            l: [
-              {
-                c: '477A-10',
-                cl: 477,
-                sl: 1,
-                lt0: 'Pinheiros',
-                lt1: 'Metrô Santana',
-                qv: 4,
-                vs: [
-                  {
-                    p: 12341,
-                    a: true,
-                    ta: new Date().toISOString(),
-                    py: -23.567,
-                    px: -46.691,
-                    t: '18:02',
-                  },
-                  {
-                    p: 12342,
-                    a: false,
-                    ta: new Date().toISOString(),
-                    py: -23.568,
-                    px: -46.692,
-                    t: '18:08',
-                  },
-                  {
-                    p: 12343,
-                    a: true,
-                    ta: new Date().toISOString(),
-                    py: -23.569,
-                    px: -46.693,
-                    t: '18:15',
-                  },
-                  {
-                    p: 12344,
-                    a: false,
-                    ta: new Date().toISOString(),
-                    py: -23.57,
-                    px: -46.694,
-                    t: '18:22',
-                  },
-                ],
-              },
-              {
-                c: '775A-10',
-                cl: 775,
-                sl: 1,
-                lt0: 'Pinheiros',
-                lt1: 'Term. Pirituba',
-                qv: 3,
-                vs: [
-                  {
-                    p: 23451,
-                    a: false,
-                    ta: new Date().toISOString(),
-                    py: -23.566,
-                    px: -46.69,
-                    t: '18:03',
-                  },
-                  {
-                    p: 23452,
-                    a: true,
-                    ta: new Date().toISOString(),
-                    py: -23.565,
-                    px: -46.689,
-                    t: '18:12',
-                  },
-                  {
-                    p: 23453,
-                    a: false,
-                    ta: new Date().toISOString(),
-                    py: -23.564,
-                    px: -46.688,
-                    t: '18:25',
-                  },
-                ],
-              },
-              {
-                c: '177H-10',
-                cl: 177,
-                sl: 2,
-                lt0: 'Lapa',
-                lt1: 'Metrô Butantã',
-                qv: 2,
-                vs: [
-                  {
-                    p: 34561,
-                    a: true,
-                    ta: new Date().toISOString(),
-                    py: -23.567,
-                    px: -46.688,
-                    t: '18:05',
-                  },
-                  {
-                    p: 34562,
-                    a: false,
-                    ta: new Date().toISOString(),
-                    py: -23.565,
-                    px: -46.686,
-                    t: '18:18',
-                  },
-                ],
-              },
-            ],
-          },
-          cacheTimestamp: Date.now(),
-        },
+        arrivals: createBusyStopArrivals(PINHEIROS_BUS_STOP),
       }),
     }),
   ],
@@ -391,7 +169,7 @@ export const ArtespScheduledSharedStop: Story = {
   },
   decorators: [
     applicationConfig({
-      providers: createProviders({
+      providers: createStopArrivalsProviders({
         stop: SHARED_SPTRANS_ARTESP_BUS_STOP,
         arrivals: createMockArrivals(SHARED_SPTRANS_ARTESP_BUS_STOP.stopId),
         scheduledDepartures: SCHEDULED_ARTESP_DEPARTURES,
@@ -408,7 +186,7 @@ export const ArtespScheduledOnly: Story = {
   },
   decorators: [
     applicationConfig({
-      providers: createProviders({
+      providers: createStopArrivalsProviders({
         stop: ARTESP_ONLY_BUS_STOP,
         scheduledDepartures: SCHEDULED_ARTESP_DEPARTURES,
       }),
@@ -467,7 +245,7 @@ export const ArtespSeveralRoutes: Story = {
   },
   decorators: [
     applicationConfig({
-      providers: createProviders({
+      providers: createStopArrivalsProviders({
         stop: ARTESP_ONLY_BUS_STOP,
         scheduledDepartures: [
           ...SCHEDULED_ARTESP_DEPARTURES,
@@ -502,7 +280,7 @@ export const ArtespNoScheduledDepartures: Story = {
   },
   decorators: [
     applicationConfig({
-      providers: createProviders({ stop: ARTESP_ONLY_BUS_STOP }),
+      providers: createStopArrivalsProviders({ stop: ARTESP_ONLY_BUS_STOP }),
     }),
   ],
 };
@@ -514,7 +292,7 @@ export const ArtespScheduleLoading: Story = {
   },
   decorators: [
     applicationConfig({
-      providers: createProviders({
+      providers: createStopArrivalsProviders({
         stop: ARTESP_ONLY_BUS_STOP,
         scheduledState: 'loading',
       }),
@@ -529,7 +307,7 @@ export const ArtespScheduleError: Story = {
   },
   decorators: [
     applicationConfig({
-      providers: createProviders({
+      providers: createStopArrivalsProviders({
         stop: ARTESP_ONLY_BUS_STOP,
         scheduledState: 'error',
       }),
@@ -547,39 +325,9 @@ export const VehicleArriving: Story = {
   },
   decorators: [
     applicationConfig({
-      providers: createProviders({
+      providers: createStopArrivalsProviders({
         stop: PINHEIROS_BUS_STOP,
-        arrivals: {
-          stopCode: PINHEIROS_BUS_STOP.stopId,
-          hr: new Date().toTimeString().slice(0, 5),
-          p: {
-            cp: parseInt(PINHEIROS_BUS_STOP.stopId, 10),
-            np: PINHEIROS_BUS_STOP.name,
-            py: PINHEIROS_BUS_STOP.latitude,
-            px: PINHEIROS_BUS_STOP.longitude,
-            l: [
-              {
-                c: '477A-10',
-                cl: 477,
-                sl: 1,
-                lt0: 'Pinheiros',
-                lt1: 'Metrô Santana',
-                qv: 1,
-                vs: [
-                  {
-                    p: 12345,
-                    a: true,
-                    ta: new Date().toISOString(),
-                    py: PINHEIROS_BUS_STOP.latitude,
-                    px: PINHEIROS_BUS_STOP.longitude,
-                    t: new Date().toTimeString().slice(0, 5), // Current time = arriving now
-                  },
-                ],
-              },
-            ],
-          },
-          cacheTimestamp: Date.now(),
-        },
+        arrivals: createVehicleArriving(PINHEIROS_BUS_STOP),
       }),
     }),
   ],
@@ -595,55 +343,9 @@ export const AllAccessible: Story = {
   },
   decorators: [
     applicationConfig({
-      providers: createProviders({
+      providers: createStopArrivalsProviders({
         stop: PINHEIROS_BUS_STOP,
-        arrivals: {
-          stopCode: PINHEIROS_BUS_STOP.stopId,
-          hr: '10:00',
-          p: {
-            cp: parseInt(PINHEIROS_BUS_STOP.stopId, 10),
-            np: PINHEIROS_BUS_STOP.name,
-            py: PINHEIROS_BUS_STOP.latitude,
-            px: PINHEIROS_BUS_STOP.longitude,
-            l: [
-              {
-                c: '477A-10',
-                cl: 477,
-                sl: 1,
-                lt0: 'Pinheiros',
-                lt1: 'Metrô Santana',
-                qv: 3,
-                vs: [
-                  {
-                    p: 12341,
-                    a: true,
-                    ta: new Date().toISOString(),
-                    py: -23.567,
-                    px: -46.691,
-                    t: '10:05',
-                  },
-                  {
-                    p: 12342,
-                    a: true,
-                    ta: new Date().toISOString(),
-                    py: -23.568,
-                    px: -46.692,
-                    t: '10:12',
-                  },
-                  {
-                    p: 12343,
-                    a: true,
-                    ta: new Date().toISOString(),
-                    py: -23.569,
-                    px: -46.693,
-                    t: '10:20',
-                  },
-                ],
-              },
-            ],
-          },
-          cacheTimestamp: Date.now(),
-        },
+        arrivals: createAllAccessibleArrivals(PINHEIROS_BUS_STOP),
       }),
     }),
   ],

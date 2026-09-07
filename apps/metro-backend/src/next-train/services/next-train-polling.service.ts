@@ -1,77 +1,37 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
-import { createHash } from 'crypto';
 import {
-  ExtendedNextTrainLineCode,
   getHeadwayBucket,
   getStationName,
   isHeadwayOffHoursSuppressionWindow,
   isApi1RailLine,
   NextTrainLineCode,
-  RailStatusCode,
 } from '@metro/shared/utils';
-import {
-  NextTrainArrivalDto,
-  NextTrainFetchResult,
-} from '../dto/next-train.dto';
+import { NextTrainFetchResult } from '../dto/next-train.dto';
 import { RailRealtimeSourcePort } from '@metro/rail-integration-contracts';
 import { RailService } from '../../rail/rail.service';
 import { NextTrainScheduleService } from './next-train-schedule.service';
+import {
+  MAX_CONCURRENT_STATION_POLLS,
+  NON_OPERATING_STATUS_CODES,
+  OFF_HOURS_STATUS_RECHECK_INTERVAL,
+  POLL_INTERVALS,
+  OffHoursOperationState,
+  PollBucket,
+  PollCompleteListener,
+  LineCode,
+  StationCacheEntry,
+  StationDelta,
+} from './next-train-polling.types';
+import {
+  computeStationCacheHash,
+  getLineNumber,
+} from './next-train-polling.utils';
 
-export type LineCode = ExtendedNextTrainLineCode;
-
-type PollBucket = 'line8Line9' | 'line4' | 'extended';
-type OffHoursOperationState = 'operating' | 'nonOperating' | 'unknown';
-
-export interface StationCacheEntry {
-  lineCode: LineCode;
-  stationCode: string;
-  stationName: string;
-  trains: NextTrainArrivalDto[];
-  hash: string;
-  fetchedAt: number;
-  /** True if the last fetch returned an upstream error */
-  hasError: boolean;
-  /** True when operation is closed and no station arrival data remains relevant */
-  operationClosed: boolean;
-  outOfSchedule: boolean;
-}
-
-export interface StationDelta {
-  lineCode: LineCode;
-  stationCode: string;
-  trains: NextTrainArrivalDto[];
-  timestamp: number;
-  /** True if the upstream source returned an error */
-  hasError: boolean;
-  /** True when operation is closed and no station arrival data remains relevant */
-  operationClosed: boolean;
-  outOfSchedule: boolean;
-}
-
-type PollCompleteListener = (deltas: StationDelta[]) => void;
-
-const POLL_INTERVALS: Record<PollBucket, { normal: number; error: number }> = {
-  line8Line9: {
-    normal: 30000,
-    error: 60000,
-  },
-  line4: {
-    normal: 30000,
-    error: 60000,
-  },
-  extended: {
-    normal: 30000,
-    error: 60000,
-  },
-};
-
-const OFF_HOURS_STATUS_RECHECK_INTERVAL = 300_000;
-const MAX_CONCURRENT_STATION_POLLS = 8;
-
-const NON_OPERATING_STATUS_CODES = new Set<RailStatusCode>([
-  'OperacaoEncerrada',
-  'Paralisada',
-]);
+export type {
+  LineCode,
+  StationCacheEntry,
+  StationDelta,
+} from './next-train-polling.types';
 
 @Injectable()
 export class NextTrainPollingService implements OnModuleDestroy {
@@ -416,7 +376,7 @@ export class NextTrainPollingService implements OnModuleDestroy {
       operationClosed || outOfSchedule
         ? { trains: [], isApiError: false }
         : await this.fetchTrains(lineCode, stationCode);
-    const newHash = this.computeHash(
+    const newHash = computeStationCacheHash(
       trains,
       isApiError,
       operationClosed,
@@ -520,38 +480,6 @@ export class NextTrainPollingService implements OnModuleDestroy {
     }
   }
 
-  private computeHash(
-    trains: NextTrainArrivalDto[],
-    hasError: boolean,
-    operationClosed: boolean,
-    outOfSchedule: boolean,
-  ): string {
-    const sorted = [...trains].sort((a, b) => {
-      const destCompare = a.destinationCode.localeCompare(b.destinationCode);
-      if (destCompare !== 0) return destCompare;
-      return a.arrivalTime.localeCompare(b.arrivalTime);
-    });
-
-    const data = {
-      hasError,
-      operationClosed,
-      outOfSchedule,
-      trains: sorted.map((t) => ({
-        dest: t.destinationCode,
-        curr: t.trainCurrentStationName,
-        time: t.arrivalTime,
-        plat: t.isAtPlatform,
-        stopped: t.isTrainStopped,
-        position: t.trainPositionStatus,
-        near: t.trainNearStationName,
-        passed: t.trainLastPassedStationName,
-        cars: t.cars,
-      })),
-    };
-
-    return createHash('md5').update(JSON.stringify(data)).digest('hex');
-  }
-
   private async shouldCloseOperation(
     lineCode: LineCode,
     cached: StationCacheEntry | null | undefined,
@@ -589,7 +517,7 @@ export class NextTrainPollingService implements OnModuleDestroy {
       return cachedCheck.state;
     }
 
-    const lineNumber = this.getLineNumber(lineCode);
+    const lineNumber = getLineNumber(lineCode);
     if (lineNumber === null) {
       this.lineOperationChecks.set(lineCode, {
         checkedAt: timestamp,
@@ -620,12 +548,5 @@ export class NextTrainPollingService implements OnModuleDestroy {
       });
       return 'unknown';
     }
-  }
-
-  private getLineNumber(lineCode: LineCode): number | null {
-    const match = lineCode.match(/^L(\d+)$/);
-    if (!match) return null;
-
-    return Number(match[1]);
   }
 }

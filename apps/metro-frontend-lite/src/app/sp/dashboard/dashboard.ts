@@ -1,5 +1,15 @@
+import * as dashboardPresentation from './dashboard-presentation';
+import { DashboardApiService } from './dashboard-api.service';
+import type {
+  BusRouteInsight,
+  BusRouteGraphQL,
+  BusStopInsight,
+  BusFavoritesLookupResponse,
+  MergedRailStationInsight,
+  RailStationInsight,
+  RailNextTrainGroup,
+} from './dashboard.types';
 import { DatePipe, NgOptimizedImage, isPlatformBrowser } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -11,157 +21,36 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
-  API_BASE_URL,
   DashboardFavoriteSelections,
   FavoritesService,
 } from '@metro/shared/api';
 import { AuthService, authReady, firebaseUser } from '@metro/shared/firebase';
 import {
   FavoriteRailLineOption,
-  ExtendedNextTrainLineCode,
   FavoriteList,
-  RailLineStatus,
   RailLinesStatusResponse,
   createFavoriteRailLineOptions,
-  formatTransitTime,
-  getOlhoVivoDestination,
-  getTransitTimeDifferenceMinutes,
-  getContrastColor,
   getRailLineFavorites,
   getRailLineByCode,
   getRailStationIdentityFromFavoriteKey,
   getRailStationIdentityKey,
   getSptransStopCode,
-  getBusRouteDisplayId,
   getBusStopIdentityAliases,
   groupScheduledBusDepartures,
   hasArtespStopData,
-  isArtespRoute,
-  formatBusFare,
-  formatScheduledBusDepartureTime,
   sortBusRoutesByAgency,
   hasFetchableNextTrain,
-  normalizeHexColor,
   sortRailLineCodes,
   toTitleCase,
   uniqueIds,
 } from '@metro/shared/utils';
-import { catchError, firstValueFrom, forkJoin, map, of } from 'rxjs';
-import {
-  LiteNextTrainArrival,
-  type LiteScheduledBusDeparture,
-} from '../../services/lite-search.service';
+import { firstValueFrom, forkJoin, map, of } from 'rxjs';
+import type { LiteScheduledBusDeparture } from '../../shared/search/lite-search.service';
 import {
   LiteArrivalLine,
   LiteRealtimeService,
   LiteStopArrivalUpdate,
-} from '../../services/lite-realtime.service';
-
-interface BusRouteInsight {
-  routeId: string;
-  shortName: string;
-  longName: string;
-  color?: string;
-  textColor?: string;
-  sourceAgency?: string;
-  sourceId?: string;
-  supportsRealtime?: boolean;
-  fares?: Array<{ price: number; currency: string }>;
-}
-
-type LiteAgencyKey = 'artesp' | 'sptrans';
-
-interface LiteAgencyDisplay {
-  key: LiteAgencyKey | null;
-  label: string;
-}
-
-interface BusStopInsight {
-  id: string;
-  stopId: string;
-  name: string;
-  latitude: number;
-  longitude: number;
-  isSubwayStation: boolean;
-  agencies?: string[];
-  routeShortNames: string[];
-  sourceAgency?: string;
-  sourceId?: string;
-  platformCode?: string;
-  mergedStopIds?: string[];
-}
-
-interface BusRouteGraphQL {
-  id: string;
-  routeId: string;
-  shortName: string;
-  longName: string;
-  color?: string;
-  textColor?: string;
-  sourceAgency?: string;
-  sourceId?: string;
-  supportsRealtime?: boolean;
-  fares?: Array<{ price: number; currency: string }>;
-}
-
-interface BusFavoritesLookupResponse {
-  data?: {
-    multipleBusRoutes: BusRouteInsight[];
-    multipleBusStops: Array<{
-      id: string;
-      stopId: string;
-      name: string;
-      latitude: number;
-      longitude: number;
-      isSubwayStation: boolean;
-      agencies?: string[];
-      routeShortNames?: string[];
-      sourceAgency?: string;
-      sourceId?: string;
-      platformCode?: string;
-      mergedStopIds?: string[];
-    }>;
-  };
-}
-
-interface MergedRailStationInsight {
-  id: string;
-  name: string;
-  lines: string[];
-}
-
-interface RailStationInsight {
-  key: string;
-  name: string;
-  lineCodes: number[];
-  lines: FavoriteRailLineOption[];
-}
-
-interface RailNextTrainGroup {
-  key: string;
-  stationName: string;
-  line: FavoriteRailLineOption;
-  trains: LiteNextTrainArrival[];
-}
-
-interface RoutesForStopResponse {
-  data?: {
-    routesForStop: BusRouteGraphQL[];
-  };
-}
-
-interface RailStatusResponse {
-  data?: {
-    railLinesStatus: RailLinesStatusResponse;
-    railSpecialLinesStatus?: RailLinesStatusResponse['specialLines'];
-  };
-}
-
-interface NextTrainsResponse {
-  data?: {
-    nextTrains: { trains: LiteNextTrainArrival[] } | null;
-  };
-}
+} from '../../shared/realtime/lite-realtime.service';
 
 @Component({
   selector: 'app-dashboard',
@@ -172,12 +61,10 @@ interface NextTrainsResponse {
 })
 export class Dashboard {
   private readonly favoritesService = inject(FavoritesService);
-  private readonly http = inject(HttpClient);
+  private readonly dashboardApi = inject(DashboardApiService);
   private readonly realtimeService = inject(LiteRealtimeService);
-  private readonly baseUrl = inject(API_BASE_URL);
   private readonly platformId = inject(PLATFORM_ID);
   private readonly authService = inject(AuthService);
-  private readonly graphqlEndpoint = `${this.baseUrl}/graphql`;
   private favoriteSnapshotKey = '';
   private refreshQueued = false;
 
@@ -430,41 +317,25 @@ export class Dashboard {
     return station.lines.filter((line) => selectedLineIdSet.has(line.id));
   }
 
-  routeColor(route: BusRouteInsight | BusRouteGraphQL): string {
-    return normalizeHexColor(route.color, '475569');
-  }
+  readonly routeColor = dashboardPresentation.routeColor;
 
-  routeTextColor(route: BusRouteInsight | BusRouteGraphQL): string {
-    return normalizeHexColor(route.textColor, 'ffffff');
-  }
+  readonly routeTextColor = dashboardPresentation.routeTextColor;
 
-  lineName(code: number): string {
-    return getRailLineByCode(code)?.fullName ?? `Linha ${code}`;
-  }
+  readonly lineName = dashboardPresentation.lineName;
 
-  lineColor(code: number): string {
-    return getRailLineByCode(code)?.colorHex ?? '#475569';
-  }
+  readonly lineColor = dashboardPresentation.lineColor;
 
-  lineTextColor(code: number): string {
-    return getContrastColor(this.lineColor(code));
-  }
+  readonly lineTextColor = dashboardPresentation.lineTextColor;
 
-  formatLineLabel(line: FavoriteRailLineOption): string {
-    return `L${line.lineCode}`;
-  }
+  readonly formatLineLabel = dashboardPresentation.formatLineLabel;
 
-  formatTrainTime(value: string): string {
-    return formatTransitTime(value, { locale: 'pt-BR' });
-  }
+  readonly formatTrainTime = dashboardPresentation.formatTrainTime;
 
   getBusArrivalLines(stopId: string): LiteArrivalLine[] {
     return this.busArrivalsByStopId().get(stopId)?.p?.l ?? [];
   }
 
-  getBusDestination(line: LiteArrivalLine): string {
-    return getOlhoVivoDestination(line);
-  }
+  readonly getBusDestination = dashboardPresentation.getBusDestination;
 
   getBusScheduledDepartures(stopId: string): LiteScheduledBusDeparture[] {
     return this.busSchedulesByStopId().get(stopId) ?? [];
@@ -519,19 +390,8 @@ export class Dashboard {
       : `Ver ${count} horários`;
   }
 
-  getScheduledDepartureTimeParts(departureTime: string): {
-    time: string;
-    day: string | null;
-  } {
-    const label = this.formatScheduledDepartureTime(departureTime);
-    const separatorIndex = label.indexOf(' · ');
-    return separatorIndex >= 0
-      ? {
-          time: label.slice(0, separatorIndex),
-          day: label.slice(separatorIndex + 3),
-        }
-      : { time: label, day: null };
-  }
+  readonly getScheduledDepartureTimeParts =
+    dashboardPresentation.getScheduledDepartureTimeParts;
 
   getBusRouteForScheduledDeparture(
     stopId: string,
@@ -546,138 +406,36 @@ export class Dashboard {
     );
   }
 
-  hasArtespScheduleData(stop: BusStopInsight): boolean {
-    return hasArtespStopData(stop);
-  }
+  readonly hasArtespScheduleData = dashboardPresentation.hasArtespScheduleData;
 
-  hasSptransRealtimeData(stop: BusStopInsight): boolean {
-    return getSptransStopCode(stop) !== null;
-  }
+  readonly hasSptransRealtimeData =
+    dashboardPresentation.hasSptransRealtimeData;
 
-  formatScheduledDepartureTime(departureTime: string): string {
-    return formatScheduledBusDepartureTime(departureTime);
-  }
+  readonly formatScheduledDepartureTime =
+    dashboardPresentation.formatScheduledDepartureTime;
 
-  getScheduledDepartureKey(departure: LiteScheduledBusDeparture): string {
-    return `${departure.routeId}:${departure.tripId}:${departure.directionId}:${departure.departureTime}`;
-  }
+  readonly getScheduledDepartureKey =
+    dashboardPresentation.getScheduledDepartureKey;
 
-  routeFareLabel(route: BusRouteInsight | BusRouteGraphQL): string | null {
-    if (route.fares && route.fares.length > 0) {
-      return route.fares.map((fare) => formatBusFare(fare)).join(' · ');
-    }
+  readonly routeFareLabel = dashboardPresentation.routeFareLabel;
 
-    return isArtespRoute(route) ? 'Tarifa não informada' : null;
-  }
+  readonly routeDisplayId = dashboardPresentation.routeDisplayId;
 
-  routeDisplayId(route: BusRouteInsight): string {
-    return getBusRouteDisplayId(route);
-  }
+  readonly getBusRouteAgencyLabel =
+    dashboardPresentation.getBusRouteAgencyLabel;
 
-  getBusRouteAgencyLabel(route: BusRouteInsight | BusRouteGraphQL): string {
-    const agency = route.sourceAgency?.trim().toLowerCase();
-    if (agency === 'artesp' || isArtespRoute(route)) {
-      return 'Artesp';
-    }
-    if (agency === 'sptrans' || !agency) {
-      return 'SPTrans';
-    }
-    return agency.toUpperCase();
-  }
+  readonly getBusRouteAgencyKey = dashboardPresentation.getBusRouteAgencyKey;
 
-  getBusRouteAgencyKey(
-    route: BusRouteInsight | BusRouteGraphQL,
-  ): LiteAgencyKey | null {
-    const agency = route.sourceAgency?.trim().toLowerCase();
-    if (agency === 'artesp' || isArtespRoute(route)) {
-      return 'artesp';
-    }
-    if (agency === 'sptrans' || !agency) {
-      return 'sptrans';
-    }
-    return null;
-  }
+  readonly getBusStopAgencies = dashboardPresentation.getBusStopAgencies;
 
-  getBusStopAgencies(stop: BusStopInsight): LiteAgencyDisplay[] {
-    const sourceAgency = stop.sourceAgency?.trim();
-    const normalizedAgency = sourceAgency?.toLowerCase();
-    const listedAgencies = (stop.agencies ?? []).map((agency) =>
-      agency.trim().toLowerCase(),
-    );
-    const hasArtesp =
-      normalizedAgency === 'artesp' ||
-      listedAgencies.includes('artesp') ||
-      (stop.mergedStopIds ?? []).some((id) => /^artesp[:/]/i.test(id));
-    const hasSptrans =
-      normalizedAgency === 'sptrans' || listedAgencies.includes('sptrans');
-    const agencies: LiteAgencyDisplay[] = [];
+  readonly getAgencyLogoPath = dashboardPresentation.getAgencyLogoPath;
 
-    if (hasSptrans) {
-      agencies.push({ key: 'sptrans', label: 'SPTrans' });
-    }
-    if (hasArtesp) {
-      agencies.push({ key: 'artesp', label: 'Artesp' });
-    }
-    if (
-      agencies.length === 0 &&
-      sourceAgency &&
-      normalizedAgency !== 'sptrans' &&
-      normalizedAgency !== 'artesp'
-    ) {
-      agencies.push({ key: null, label: sourceAgency });
-    }
+  readonly getMinutesUntilArrival =
+    dashboardPresentation.getMinutesUntilArrival;
 
-    return agencies;
-  }
+  readonly statusLabelFormat = dashboardPresentation.statusLabelFormat;
 
-  getAgencyLogoPath(agency: LiteAgencyKey): string {
-    return `/public/shared/agencies/${agency}.svg`;
-  }
-
-  getMinutesUntilArrival(arrivalTime: string): string {
-    const diffMins = getTransitTimeDifferenceMinutes(arrivalTime);
-    if (diffMins === null) {
-      return arrivalTime;
-    }
-
-    if (diffMins <= 0) {
-      return 'Chegando';
-    }
-
-    if (diffMins === 1) {
-      return 'Em 1 min';
-    }
-
-    return `Em ${diffMins} min`;
-  }
-
-  statusLabelFormat(statusLabel: string): string {
-    switch (statusLabel) {
-      case 'Operação Normal':
-        return 'Normal';
-      case 'Operação Encerrada':
-        return 'Encerrada';
-      default:
-        return statusLabel;
-    }
-  }
-
-  statusTone(status: RailLineStatus | undefined): string {
-    if (!status) {
-      return 'unknown';
-    }
-
-    switch (status.statusColor) {
-      case 'verde':
-        return 'good';
-      case 'amarelo':
-        return 'warn';
-      case 'vermelho':
-        return 'bad';
-      default:
-        return 'muted';
-    }
-  }
+  readonly statusTone = dashboardPresentation.statusTone;
 
   private async loadDashboardData(favorites: FavoriteList): Promise<void> {
     const routeIds = uniqueIds(favorites.busRoute);
@@ -685,9 +443,9 @@ export class Dashboard {
 
     const [busLookup, mergedStations, railStatus] = await firstValueFrom(
       forkJoin([
-        this.fetchBusFavorites(routeIds, stopIds),
-        this.fetchMergedRailStations(),
-        this.fetchRailStatus(),
+        this.dashboardApi.fetchBusFavorites(routeIds, stopIds),
+        this.dashboardApi.fetchMergedRailStations(),
+        this.dashboardApi.fetchRailStatus(),
       ]),
     );
 
@@ -710,143 +468,6 @@ export class Dashboard {
     this.busSchedulesByStopId.set(schedulesByStop);
   }
 
-  private fetchBusFavorites(routeIds: string[], stopIds: string[]) {
-    if (routeIds.length === 0 && stopIds.length === 0) {
-      return of(null);
-    }
-
-    return this.http
-      .post<BusFavoritesLookupResponse>(this.graphqlEndpoint, {
-        query: `
-          query LiteDashboardBusFavorites($routeIds: [ID!]!, $stopIds: [ID!]!) {
-            multipleBusRoutes(ids: $routeIds) {
-              routeId
-              shortName
-              longName
-              color
-              textColor
-              sourceAgency
-              sourceId
-              supportsRealtime
-              fares {
-                price
-                currency
-              }
-            }
-            multipleBusStops(ids: $stopIds) {
-              id
-              stopId
-              name
-              latitude
-              longitude
-              isSubwayStation
-              agencies
-              routeShortNames
-              sourceAgency
-              sourceId
-              platformCode
-              mergedStopIds
-            }
-          }
-        `,
-        variables: { routeIds, stopIds },
-      })
-      .pipe(catchError(() => of(null)));
-  }
-
-  private fetchMergedRailStations() {
-    return this.http
-      .post<{
-        data?: {
-          mergedRailStations: MergedRailStationInsight[];
-        };
-      }>(this.graphqlEndpoint, {
-        query: `
-          query LiteDashboardMergedRailStations {
-            mergedRailStations {
-              id
-              name
-              lines
-            }
-          }
-        `,
-      })
-      .pipe(
-        map((response) => response.data?.mergedRailStations ?? []),
-        catchError(() => of([])),
-      );
-  }
-
-  private fetchRailStatus() {
-    return this.http
-      .post<RailStatusResponse>(this.graphqlEndpoint, {
-        query: `
-          query LiteDashboardRailStatus {
-            railLinesStatus {
-              lines {
-                code
-                colorName
-                colorHex
-                line
-                statusCode
-                statusLabel
-                statusColor
-                description
-                detail
-              }
-              lastUpdated
-              success
-              errorMessage
-            }
-            railSpecialLinesStatus {
-              code
-              colorName
-              colorHex
-              line
-              statusCode
-              statusLabel
-              statusColor
-              nextDepartures {
-                label
-                time
-              }
-              issues {
-                code
-                line
-                description
-              }
-            }
-          }
-        `,
-      })
-      .pipe(
-        map((response) => ({
-          ...(response.data?.railLinesStatus ?? {
-            lines: [],
-            specialLines: [],
-            specialInfoCards: [],
-            lastUpdated: new Date(),
-            success: false,
-            errorMessage: null,
-          }),
-          specialLines: response.data?.railSpecialLinesStatus ?? [],
-          lastUpdated: new Date(
-            response.data?.railLinesStatus?.lastUpdated ?? Date.now(),
-          ),
-        })),
-        catchError(() =>
-          of({
-            lines: [],
-            specialLines: [],
-            specialInfoCards: [],
-            lastUpdated: new Date(),
-            success: false,
-            errorMessage: 'Erro ao carregar status das linhas.',
-          } satisfies RailLinesStatusResponse),
-        ),
-      );
-  }
-
   private fetchRoutesForStops(stopIds: string[]) {
     if (stopIds.length === 0) {
       return of(new Map<string, BusRouteGraphQL[]>());
@@ -854,15 +475,15 @@ export class Dashboard {
 
     return forkJoin(
       stopIds.map((stopId) =>
-        this.fetchRoutesForStop(
-          this.busStopsById().get(stopId)?.stopId ?? stopId,
-        ).pipe(
-          map((routes) => ({
-            stopId,
-            resolvedStopId: this.busStopsById().get(stopId)?.stopId ?? stopId,
-            routes,
-          })),
-        ),
+        this.dashboardApi
+          .fetchRoutesForStop(this.busStopsById().get(stopId)?.stopId ?? stopId)
+          .pipe(
+            map((routes) => ({
+              stopId,
+              resolvedStopId: this.busStopsById().get(stopId)?.stopId ?? stopId,
+              routes,
+            })),
+          ),
       ),
     ).pipe(
       map((entries) => {
@@ -876,49 +497,21 @@ export class Dashboard {
     );
   }
 
-  private fetchRoutesForStop(stopId: string) {
-    return this.http
-      .post<RoutesForStopResponse>(this.graphqlEndpoint, {
-        query: `
-          query LiteDashboardRoutesForStop($stopId: String!) {
-            routesForStop(stopId: $stopId) {
-              id
-              routeId
-              shortName
-              longName
-              color
-              textColor
-              sourceAgency
-              sourceId
-              supportsRealtime
-              fares {
-                price
-                currency
-              }
-            }
-          }
-        `,
-        variables: { stopId },
-      })
-      .pipe(
-        map((response) => response.data?.routesForStop ?? []),
-        catchError(() => of([])),
-      );
-  }
-
   private fetchNextTrainsForSelectedStations() {
     const requests = this.railStations().flatMap((station) =>
       this.getSelectedRailLines(station)
         .filter((line) => hasFetchableNextTrain(line))
         .map((line) =>
-          this.fetchNextTrains(line.nextTrainLineCode, line.stationCode).pipe(
-            map((trains) => ({
-              key: `${station.key}:${line.id}`,
-              stationName: station.name,
-              line,
-              trains,
-            })),
-          ),
+          this.dashboardApi
+            .fetchNextTrains(line.nextTrainLineCode, line.stationCode)
+            .pipe(
+              map((trains) => ({
+                key: `${station.key}:${line.id}`,
+                stationName: station.name,
+                line,
+                trains,
+              })),
+            ),
         ),
     );
 
@@ -927,34 +520,6 @@ export class Dashboard {
     }
 
     return forkJoin(requests);
-  }
-
-  private fetchNextTrains(
-    lineCode: ExtendedNextTrainLineCode,
-    stationCode: string,
-  ) {
-    return this.http
-      .post<NextTrainsResponse>(this.graphqlEndpoint, {
-        query: `
-          query LiteDashboardNextTrains($lineCode: String!, $stationCode: String!) {
-            nextTrains(lineCode: $lineCode, stationCode: $stationCode) {
-              trains {
-                lineCode
-                stationCode
-                destinationCode
-                destinationName
-                arrivalTime
-                isAtPlatform
-              }
-            }
-          }
-        `,
-        variables: { lineCode, stationCode },
-      })
-      .pipe(
-        map((response) => response.data?.nextTrains?.trains ?? []),
-        catchError(() => of([])),
-      );
   }
 
   private async fetchBusArrivals(
@@ -996,49 +561,11 @@ export class Dashboard {
     const schedules = await Promise.all(
       stopsWithSchedules.map(async (stopId) => ({
         stopId,
-        departures: await this.fetchScheduledDepartures(stopId),
+        departures: await this.dashboardApi.fetchScheduledDepartures(stopId),
       })),
     );
 
     return new Map(schedules.map((entry) => [entry.stopId, entry.departures]));
-  }
-
-  private fetchScheduledDepartures(
-    stopId: string,
-    limit = 5,
-  ): Promise<LiteScheduledBusDeparture[]> {
-    return firstValueFrom(
-      this.http
-        .post<{
-          data?: {
-            scheduledBusDepartures?: LiteScheduledBusDeparture[];
-          };
-        }>(this.graphqlEndpoint, {
-          query: `
-            query LiteDashboardScheduledBusDepartures($stopId: String!, $limit: Int!) {
-              scheduledBusDepartures(
-                stopId: $stopId
-                limit: $limit
-                perRouteLimit: $limit
-              ) {
-                routeId
-                routeShortName
-                tripId
-                headsign
-                directionId
-                departureTime
-                sourceAgency
-                platformCode
-              }
-            }
-          `,
-          variables: { stopId, limit },
-        })
-        .pipe(
-          map((response) => response.data?.scheduledBusDepartures ?? []),
-          catchError(() => of([])),
-        ),
-    );
   }
 
   private applyBusLookup(

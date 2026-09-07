@@ -1,14 +1,14 @@
 # syntax=docker/dockerfile:1
 
 FROM rust:alpine@sha256:a10e64dd139b7387337c7fbe8aca31b959b57b2fd4c8ae20a02cf1d6ea424dce AS rust-builder
-WORKDIR /workspace/dataset-handling
-COPY dataset-handling/Cargo.toml ./
+WORKDIR /workspace/tools/dataset-handling
+COPY tools/dataset-handling/Cargo.toml ./
 RUN mkdir src \
     && printf 'fn main() {}' > src/main.rs \
     && cargo generate-lockfile \
     && cargo build --release --locked \
     && rm -rf src
-COPY dataset-handling/src ./src
+COPY tools/dataset-handling/src ./src
 RUN touch src/main.rs && cargo build --release --locked
 
 FROM oven/bun:1.3.14-alpine@sha256:5acc90a93e91ff07bf72aa90a7c9f0fa189765aec90b47bdbf2152d2196383c0 AS bun
@@ -54,7 +54,7 @@ RUN apk add --no-cache dumb-init unzip \
     && mkdir -p /app/temp/gtfs \
     && chown -R app:app /app
 
-COPY --from=rust-builder /workspace/dataset-handling/target/release/metro-dataset-handling /usr/local/bin/gtfs-processor
+COPY --from=rust-builder /workspace/tools/dataset-handling/target/release/metro-dataset-handling /usr/local/bin/gtfs-processor
 COPY --from=production-deps --chown=app:app /workspace/node_modules ./node_modules
 COPY --from=prisma-deps --chown=app:app /workspace/apps/metro-backend/generated ./generated
 COPY --from=prisma-deps --chown=app:app /workspace/apps/metro-backend/prisma.config.ts ./prisma.config.ts

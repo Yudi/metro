@@ -11,8 +11,8 @@ import {
   ExploreDialogComponent,
   ExploreDialogResult,
 } from '../explore-dialog/explore-dialog.component';
-import { UserLocationLayerService } from '../../services/user-location-layer.service';
-import { MapService } from '../../services/map.service';
+import { UserLocationLayerService } from './user-location-layer.service';
+import { MapService } from './map.service';
 import { MapDataLoaderService } from './map-data-loader.service';
 import { MapDisplayService } from './map-display.service';
 import { MapStateService } from './map-state.service';

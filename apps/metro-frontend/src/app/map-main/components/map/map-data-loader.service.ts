@@ -1,10 +1,10 @@
 import { Service, inject } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { GeographyGraphQLService } from '../../services/geography-graphql.service';
+import { GeographyGraphQLService } from '../../geography/geography-graphql.service';
 import { MapStateService } from './map-state.service';
 import { LoggerService } from '@metro/shared/api';
-import { isSubwayRoute } from '../../utils/transit-utils';
-import { VectorTileLayerService } from '../../services/vector-tile-layer.service';
+import { isSubwayRoute } from '../../geography/transit-utils';
+import { VectorTileLayerService } from './vector-tiles/vector-tile-layer.service';
 
 @Service()
 export class MapDataLoaderService {

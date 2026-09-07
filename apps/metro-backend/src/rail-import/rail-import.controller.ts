@@ -2,8 +2,8 @@ import { Controller, Post, Get, Logger, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { RailImportService } from './rail-import.service';
 import { ImportProgress, WFSProcessingResult } from './types/wfs.types';
-import { DevelopmentOnlyGuard } from '../shared/guards/development-only.guard';
-import { DevOnly } from '../shared/decorators/development-only.decorator';
+import { DevelopmentOnlyGuard } from '../common/guards/development-only.guard';
+import { DevOnly } from '../common/decorators/development-only.decorator';
 
 @ApiTags('Rail Import')
 @Controller('rail-import')

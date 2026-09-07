@@ -1,4 +1,4 @@
-jest.mock('../services/headway-tracking.service', () => ({
+jest.mock('../headway/headway-tracking.service', () => ({
   HeadwayTrackingService: class {},
 }));
 jest.mock('../services/cptm-vehicle-polling.service', () => ({

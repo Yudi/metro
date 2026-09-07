@@ -3,9 +3,9 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MapComponent } from './map.component';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { of } from 'rxjs';
-import { LayerType } from '../../services/map-layer.service';
-import { MapOptions, MapService } from '../../services/map.service';
-import { BikeStationsService } from '../../services/bike-stations.service';
+import { LayerType } from './layers/map-layer.service';
+import { MapOptions, MapService } from './map.service';
+import { BikeStationsService } from '../../geography/bike-stations.service';
 import {
   FavoritesService,
   LoggerService,
@@ -13,10 +13,10 @@ import {
 } from '@metro/shared/api';
 import { emptyFavorites } from '@metro/shared/utils';
 import { GeolocationService } from '@metro/shared/geolocation';
-import { RealtimeWebsocketService } from '../../services/realtime-websocket.service';
-import { RealtimeVehicleLayerService } from '../../services/realtime-vehicle-layer.service';
-import { CptmVehicleLayerService } from '../../services/cptm-vehicle-layer.service';
-import { UserLocationLayerService } from '../../services/user-location-layer.service';
+import { RealtimeWebsocketService } from '../../realtime/realtime-websocket.service';
+import { RealtimeVehicleLayerService } from '../../realtime/realtime-vehicle-layer.service';
+import { CptmVehicleLayerService } from '../../realtime/cptm-vehicle-layer.service';
+import { UserLocationLayerService } from './user-location-layer.service';
 
 describe('MapComponent', () => {
   let component: MapComponent;

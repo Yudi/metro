@@ -31,7 +31,7 @@ import {
   ExploreLocationResult,
   ExploreLocationSearchService,
   PhotonLocationType,
-} from '../../services/explore-location-search.service';
+} from './explore-location-search.service';
 import { SAO_PAULO_CITY_CENTER } from '@metro/shared/utils';
 
 export type ExploreDialogResult =

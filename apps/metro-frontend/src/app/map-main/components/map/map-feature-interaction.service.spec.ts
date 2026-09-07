@@ -4,9 +4,9 @@ import { LoggerService } from '@metro/shared/api';
 import { MapFeatureInteractionService } from './map-feature-interaction.service';
 import { MapStateService } from './map-state.service';
 import { MapDisplayService } from './map-display.service';
-import { MapService } from '../../services/map.service';
-import { BikeStationsService } from '../../services/bike-stations.service';
-import { VectorTileLayerService } from '../../services/vector-tile-layer.service';
+import { MapService } from './map.service';
+import { BikeStationsService } from '../../geography/bike-stations.service';
+import { VectorTileLayerService } from './vector-tiles/vector-tile-layer.service';
 import { MapDetailsDialogService } from './map-details-dialog.service';
 import { MapSelectionService } from './map-selection.service';
 

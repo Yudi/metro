@@ -1,5 +1,5 @@
-import { ScheduledBusService } from './services/scheduled-bus.service';
-import { ScheduledBusResolver } from './resolvers/scheduled-bus.resolver';
+import { ScheduledBusService } from './scheduled-bus/scheduled-bus.service';
+import { ScheduledBusResolver } from './scheduled-bus/scheduled-bus.resolver';
 import { Module, forwardRef } from '@nestjs/common';
 import { PostGISService } from './services/postgis.service';
 import { BusStopService } from './services/bus-stop.service';

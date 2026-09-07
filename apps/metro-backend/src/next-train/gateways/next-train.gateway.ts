@@ -18,7 +18,7 @@ import {
   CptmVehiclePollingService,
   CptmVehicleDelta,
 } from '../services/cptm-vehicle-polling.service';
-import { HeadwayTrackingService } from '../services/headway-tracking.service';
+import { HeadwayTrackingService } from '../headway/headway-tracking.service';
 import { SubscribeStationDto, NextTrainUpdateDto } from '../dto/next-train.dto';
 import {
   isValidStation,

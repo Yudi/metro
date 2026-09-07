@@ -8,7 +8,7 @@ import {
   NextTrainPollingService,
   LineCode,
 } from './services/next-train-polling.service';
-import { HeadwayTrackingService } from './services/headway-tracking.service';
+import { HeadwayTrackingService } from './headway/headway-tracking.service';
 import { NextTrainScheduleService } from './services/next-train-schedule.service';
 import { RailRealtimeSourcePort } from '@metro/rail-integration-contracts';
 import {

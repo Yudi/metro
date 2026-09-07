@@ -4,8 +4,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FavoritesService } from '@metro/shared/api';
 import { emptyFavorites } from '@metro/shared/utils';
 import { of } from 'rxjs';
-import { BikeStationsService } from '../map-main/services/bike-stations.service';
-import { GeographyGraphQLService } from '../map-main/services/geography-graphql.service';
+import { BikeStationsService } from '../map-main/geography/bike-stations.service';
+import { GeographyGraphQLService } from '../map-main/geography/geography-graphql.service';
 import { FavoritesComponent } from './favorites.component';
 
 describe('FavoritesComponent', () => {

@@ -14,8 +14,8 @@ import {
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDividerModule } from '@angular/material/divider';
-import { BusStopGraphQL } from '../../services/geography-graphql.service';
-import { StationNameService } from '../../services/station-name.service';
+import { BusStopGraphQL } from '../../geography/geography-graphql.service';
+import { StationNameService } from '../../geography/station-name.service';
 import {
   FavoritesService,
   LoggerService,
@@ -36,7 +36,7 @@ import {
   StationBathroomStatus,
 } from '@metro/shared/utils';
 import { DialogHeaderComponent } from '../../../shared/components/dialog-header/dialog-header.component';
-import { NextTrainCardComponent } from '../../../shared/components/next-train-card/next-train-card.component';
+import { NextTrainCardComponent } from '../../../next-train/components/next-train-card/next-train-card.component';
 import { DatePipe } from '@angular/common';
 import {
   resolveStationTrainCompositionViews,

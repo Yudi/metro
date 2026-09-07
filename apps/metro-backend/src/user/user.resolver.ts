@@ -1,8 +1,8 @@
 import { Resolver, Query } from '@nestjs/graphql';
 import { PrismaService } from '../prisma/prisma.service';
 import { UseGuards } from '@nestjs/common';
-import { AuthGuard } from '../shared/guards/auth.guard';
-import { CurrentUserId } from '../shared/decorators/current-user-id.decorator';
+import { AuthGuard } from '../common/guards/auth.guard';
+import { CurrentUserId } from '../common/decorators/current-user-id.decorator';
 
 @Resolver()
 @UseGuards(AuthGuard)

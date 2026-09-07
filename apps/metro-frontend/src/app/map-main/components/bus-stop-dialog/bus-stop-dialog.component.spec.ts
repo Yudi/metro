@@ -4,8 +4,8 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { FavoritesService, LoggerService } from '@metro/shared/api';
-import { GeographyGraphQLService } from '../../services/geography-graphql.service';
-import { RealtimeWebsocketService } from '../../services/realtime-websocket.service';
+import { GeographyGraphQLService } from '../../geography/geography-graphql.service';
+import { RealtimeWebsocketService } from '../../realtime/realtime-websocket.service';
 import {
   BusStopDialogComponent,
   BusStopDialogData,

@@ -4,7 +4,7 @@ import {
   computed,
   input,
 } from '@angular/core';
-import { LiteSearchStop } from '../../../services/lite-search.service';
+import { LiteSearchStop } from '../../../shared/search/lite-search.service';
 
 @Component({
   selector: 'app-lite-bike-availability',

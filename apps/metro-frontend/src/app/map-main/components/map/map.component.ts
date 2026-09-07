@@ -10,47 +10,36 @@ import {
   ChangeDetectionStrategy,
   DestroyRef,
   isDevMode,
-  signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 
-import { MapService, MapOptions } from '../../services/map.service';
+import { MapService, MapOptions } from './map.service';
 import { MapStateService } from './map-state.service';
 import { MapDataLoaderService } from './map-data-loader.service';
 import { MapDisplayService } from './map-display.service';
 import { MapInteractionService } from './map-interaction.service';
 import { LayerSettingsDialogComponent } from './layer-settings-dialog/layer-settings-dialog.component';
-import {
-  FavoritesService,
-  LoggerService,
-  RailGraphqlService,
-} from '@metro/shared/api';
-import { RealtimeVehicleLayerService } from '../../services/realtime-vehicle-layer.service';
-import { CptmVehicleLayerService } from '../../services/cptm-vehicle-layer.service';
-import { BikeStationsService } from '../../services/bike-stations.service';
-import { LayerType } from '../../services/map-layer.service';
-import { VectorTileLayerType } from '../../services/vector-tile-layer.service';
+import { LoggerService, RailGraphqlService } from '@metro/shared/api';
+import { RealtimeVehicleLayerService } from '../../realtime/realtime-vehicle-layer.service';
+import { CptmVehicleLayerService } from '../../realtime/cptm-vehicle-layer.service';
+import { BikeStationsService } from '../../geography/bike-stations.service';
+import { LayerType } from './layers/map-layer.service';
+import { VectorTileLayerType } from './vector-tiles/vector-tile-layer.service';
 import { MapHeaderComponent } from './map-header/map-header.component';
 import { MapStatusBarComponent } from './map-status-bar/map-status-bar.component';
 import { MapFabMenuComponent } from './map-fab-menu/map-fab-menu.component';
 import { MapSelectionsPanelComponent } from './map-selections-panel/map-selections-panel.component';
 import { MapFooterComponent } from './map-footer/map-footer.component';
 import { GeolocationService } from '@metro/shared/geolocation';
-import { ActivatedRoute, ParamMap } from '@angular/router';
-import { UserLocationLayerService } from '../../services/user-location-layer.service';
+import { ActivatedRoute } from '@angular/router';
+import { UserLocationLayerService } from './user-location-layer.service';
 import {
-  FavoriteList,
-  getRailLineByCode,
-  getRailLineById,
-  SAO_PAULO_CITY_CENTER_COORDINATES,
-} from '@metro/shared/utils';
-import {
-  MAP_VIEW_STATE_RESTORE_PARAM,
-  MapViewStateStorageService,
-  SavedMapViewState,
-} from '../../services/map-view-state-storage.service';
+  DEFAULT_MAP_CENTER,
+  DEFAULT_MAP_ZOOM,
+  MapRouteStateService,
+} from './map-route-state.service';
 
 @Component({
   selector: 'app-map',
@@ -82,16 +71,9 @@ export class MapComponent implements AfterViewInit, OnDestroy {
   private geolocationService = inject(GeolocationService);
   private userLocationLayer = inject(UserLocationLayerService);
   private route = inject(ActivatedRoute);
-  private favoritesService = inject(FavoritesService);
   private railService = inject(RailGraphqlService);
-  private mapViewStateStorage = inject(MapViewStateStorageService);
+  private routeStateService = inject(MapRouteStateService);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly appliedFavoriteSelections = new Set<string>();
-  private readonly persistenceReady = signal(false);
-  private isApplyingSavedState = false;
-  private appliedSavedStateForNavigation = false;
-  private lastDefaultStateRequest =
-    this.mapViewStateStorage.defaultStateRequests();
   private initializationTimer: ReturnType<typeof setTimeout> | null = null;
   private initialDataTimer: ReturnType<typeof setTimeout> | null = null;
   private destroyed = false;
@@ -125,17 +107,17 @@ export class MapComponent implements AfterViewInit, OnDestroy {
   readonly isDevMode = isDevMode();
 
   /** Default view used when no explicit center is provided via query params */
-  static readonly DEFAULT_CENTER: [number, number] = [
-    ...SAO_PAULO_CITY_CENTER_COORDINATES,
-  ];
-  static readonly DEFAULT_ZOOM = 11;
+  static readonly DEFAULT_CENTER: [number, number] = [...DEFAULT_MAP_CENTER];
+  static readonly DEFAULT_ZOOM = DEFAULT_MAP_ZOOM;
 
   constructor() {
     this.railService
       .fetchSpecialServices()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => {
-        this.applyRouteState(this.route.snapshot.queryParamMap);
+        this.routeStateService.applyRouteState(
+          this.route.snapshot.queryParamMap,
+        );
       });
     // Set up display update callbacks
     this.mapState.setUpdateDisplayCallback(() =>
@@ -164,13 +146,11 @@ export class MapComponent implements AfterViewInit, OnDestroy {
     });
 
     effect(() => {
-      const favorites = this.favoritesService.favorites();
+      const favorites = this.routeStateService.favorites();
       this.bikeStationsService.stations();
       this.railService.specialServices();
 
-      untracked(() => {
-        this.autoSelectFavorites(favorites);
-      });
+      untracked(() => this.routeStateService.applyFavorites(favorites));
     });
 
     // Watch bike layer visibility and activate/disconnect service accordingly
@@ -207,12 +187,9 @@ export class MapComponent implements AfterViewInit, OnDestroy {
       });
     });
 
-    this.setupDefaultStateRequestHandler();
-    this.setupMapStatePersistence();
-
     // Apply query params present on initial navigation (e.g. ?bike=true)
     try {
-      this.applyRouteState(this.route.snapshot.queryParamMap);
+      this.routeStateService.applyRouteState(this.route.snapshot.queryParamMap);
     } catch (err) {
       this.logger.error('Failed to apply initial query params to map', err);
     }
@@ -220,7 +197,7 @@ export class MapComponent implements AfterViewInit, OnDestroy {
     // React to future changes to query params while on the page
     this.route.queryParamMap
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((pm) => this.applyRouteState(pm));
+      .subscribe((pm) => this.routeStateService.applyRouteState(pm));
   }
 
   ngAfterViewInit(): void {
@@ -268,7 +245,9 @@ export class MapComponent implements AfterViewInit, OnDestroy {
 
       // Re-apply query params now that the map exists (centers / zooms)
       try {
-        this.applyRouteState(this.route.snapshot.queryParamMap);
+        this.routeStateService.applyRouteState(
+          this.route.snapshot.queryParamMap,
+        );
       } catch (err) {
         this.logger.error('Failed to apply query params after map init', err);
       }
@@ -301,7 +280,7 @@ export class MapComponent implements AfterViewInit, OnDestroy {
           return;
         }
         this.loadInitialData();
-        this.persistenceReady.set(true);
+        this.routeStateService.markPersistenceReady();
       }, 100);
     }, 1000);
   }
@@ -312,495 +291,6 @@ export class MapComponent implements AfterViewInit, OnDestroy {
     this.logger.info(
       'Map initialization complete - subway data served via Vector Tiles',
     );
-  }
-
-  private setupDefaultStateRequestHandler(): void {
-    effect(() => {
-      const requestCount = this.mapViewStateStorage.defaultStateRequests();
-      if (requestCount === this.lastDefaultStateRequest) {
-        return;
-      }
-
-      this.lastDefaultStateRequest = requestCount;
-      untracked(() => {
-        this.applyDefaultMapState();
-      });
-    });
-  }
-
-  private setupMapStatePersistence(): void {
-    effect((onCleanup) => {
-      const state = this.captureMapViewState();
-      if (!this.persistenceReady() || this.isApplyingSavedState || !state) {
-        return;
-      }
-
-      const timeoutId = setTimeout(() => {
-        this.mapViewStateStorage.saveLastState(state);
-      }, 350);
-
-      onCleanup(() => clearTimeout(timeoutId));
-    });
-  }
-
-  private captureMapViewState(): SavedMapViewState | null {
-    const center = this.mapService.center();
-    const zoom = this.mapService.zoomLevel();
-    const layerService = this.mapService.getLayerService();
-    const vectorTileService = this.mapService.getVectorTileLayerService();
-
-    if (!center || zoom === null) {
-      return null;
-    }
-
-    return {
-      center,
-      zoom,
-      displayMode: this.mapState.displayMode(),
-      nearbyCenter: this.mapState.nearbyCenter(),
-      nearbyRadius: this.mapState.nearbyRadius(),
-      layers: {
-        [LayerType.BIKE]: layerService.isLayerVisible(LayerType.BIKE),
-      },
-      vectorLayers: {
-        [VectorTileLayerType.RAIL_STATIONS]: vectorTileService.isLayerVisible(
-          VectorTileLayerType.RAIL_STATIONS,
-        ),
-        [VectorTileLayerType.RAIL_ROUTES]: vectorTileService.isLayerVisible(
-          VectorTileLayerType.RAIL_ROUTES,
-        ),
-      },
-      selections: {
-        routeIds: Array.from(this.mapState.selectedRoutes().keys()),
-        stopIds: Array.from(this.mapState.selectedStops().keys()),
-        bikeStationIds: Array.from(this.mapState.selectedBikeStations().keys()),
-      },
-    };
-  }
-
-  private applyRouteState(params: ParamMap | Record<string, unknown>): void {
-    if (this.shouldRestoreSavedState(params)) {
-      void this.restoreLastMapState();
-      return;
-    }
-
-    this.applyQueryParams(params);
-  }
-
-  private shouldRestoreSavedState(
-    params: ParamMap | Record<string, unknown>,
-  ): boolean {
-    const value = this.getParamValue(params, MAP_VIEW_STATE_RESTORE_PARAM);
-    return value === '1' || value === 'true';
-  }
-
-  private async restoreLastMapState(): Promise<void> {
-    if (!this.mapService.getMap()) {
-      return;
-    }
-
-    if (this.appliedSavedStateForNavigation) {
-      return;
-    }
-
-    this.appliedSavedStateForNavigation = true;
-    const savedState = await this.mapViewStateStorage.readLastState();
-    if (!savedState) {
-      this.applyDefaultMapState();
-      return;
-    }
-
-    await this.applySavedMapState(savedState);
-  }
-
-  private async applySavedMapState(state: SavedMapViewState): Promise<void> {
-    this.isApplyingSavedState = true;
-
-    try {
-      this.interactionService.clearAllSelections(false);
-
-      const layerService = this.mapService.getLayerService();
-      const vectorTileService = this.mapService.getVectorTileLayerService();
-
-      layerService.setLayerVisibility(
-        LayerType.BIKE,
-        state.layers[LayerType.BIKE] ?? false,
-      );
-      vectorTileService.setLayerVisibility(
-        VectorTileLayerType.RAIL_STATIONS,
-        state.vectorLayers[VectorTileLayerType.RAIL_STATIONS] ?? true,
-      );
-      vectorTileService.setLayerVisibility(
-        VectorTileLayerType.RAIL_ROUTES,
-        state.vectorLayers[VectorTileLayerType.RAIL_ROUTES] ?? false,
-      );
-
-      if (state.layers[LayerType.BIKE]) {
-        await this.bikeStationsService.activate();
-        this.mapState.setBikeStations(this.bikeStationsService.stations());
-      }
-
-      for (const routeId of state.selections.routeIds) {
-        await this.restoreRouteSelection(routeId);
-      }
-
-      for (const stopId of state.selections.stopIds) {
-        await this.interactionService.addStopToSelection(stopId, false);
-      }
-
-      for (const stationId of state.selections.bikeStationIds) {
-        this.interactionService.addBikeStationToSelection(stationId, false);
-      }
-
-      this.mapState.nearbyRadius.set(state.nearbyRadius);
-      this.mapState.nearbyCenter.set(state.nearbyCenter);
-      this.mapState.displayMode.set(state.displayMode);
-
-      if (state.displayMode === 'nearby' && state.nearbyCenter) {
-        this.dataLoader.loadNearbyStops(
-          state.nearbyCenter.lat,
-          state.nearbyCenter.lon,
-        );
-      } else {
-        this.dataLoader.syncVectorTileFilters();
-      }
-
-      this.mapService.centerOn(state.center, state.zoom);
-      this.displayService.updateMapDisplay();
-    } catch (error) {
-      this.logger.error('Failed to restore saved map state', error);
-    } finally {
-      this.isApplyingSavedState = false;
-    }
-  }
-
-  private async restoreRouteSelection(routeId: string): Promise<void> {
-    const specialService = this.railService
-      .specialServices()
-      .find((service) => service.code === routeId);
-    if (specialService) {
-      this.interactionService.addSpecialRailLineToSelection(
-        specialService,
-        false,
-      );
-      return;
-    }
-
-    if (getRailLineById(routeId)) {
-      this.interactionService.addRailLineToSelection(routeId, false);
-      return;
-    }
-
-    await this.interactionService.addRouteToSelection(routeId, false);
-  }
-
-  private applyDefaultMapState(): void {
-    this.isApplyingSavedState = true;
-
-    try {
-      this.interactionService.clearAllSelections(false);
-      this.mapState.displayMode.set('selected');
-      this.mapState.nearbyCenter.set(null);
-      this.mapState.nearbyRadius.set(1000);
-      this.displayService.clearExploreLocation();
-      this.displayService.clearNearbyFeatures();
-      this.mapService
-        .getLayerService()
-        .setLayerVisibility(LayerType.BIKE, false);
-      this.mapService
-        .getVectorTileLayerService()
-        .setLayerVisibility(VectorTileLayerType.RAIL_STATIONS, true);
-      this.mapService
-        .getVectorTileLayerService()
-        .setLayerVisibility(VectorTileLayerType.RAIL_ROUTES, false);
-      this.mapService.centerOn(
-        MapComponent.DEFAULT_CENTER,
-        MapComponent.DEFAULT_ZOOM,
-      );
-      this.dataLoader.syncVectorTileFilters();
-      this.displayService.updateMapDisplay();
-    } finally {
-      this.isApplyingSavedState = false;
-    }
-
-    const state = this.captureMapViewState();
-    if (this.persistenceReady() && state) {
-      this.mapViewStateStorage.saveLastState(state);
-    }
-  }
-
-  private getParamValue(
-    params: ParamMap | Record<string, unknown>,
-    key: string,
-  ): string | null {
-    if (
-      !!params &&
-      typeof (params as ParamMap).has === 'function' &&
-      typeof (params as ParamMap).get === 'function'
-    ) {
-      return (params as ParamMap).get(key);
-    }
-
-    const value = (params as Record<string, unknown>)[key];
-    return typeof value === 'string' ? value : null;
-  }
-
-  private autoSelectFavorites(favorites: FavoriteList): void {
-    for (const routeId of favorites.busRoute) {
-      this.applyFavoriteSelection(`busRoute:${routeId}`, () => {
-        void this.interactionService.addRouteToSelection(routeId, false);
-      });
-    }
-
-    for (const stationId of favorites.bikeStation) {
-      this.applyFavoriteSelection(`bikeStation:${stationId}`, () => {
-        this.mapService
-          .getLayerService()
-          .setLayerVisibility(LayerType.BIKE, true);
-        this.interactionService.addBikeStationToSelection(stationId, false);
-      });
-    }
-
-    for (const lineCode of favorites.railLine) {
-      const specialService = this.railService
-        .specialServices()
-        .find((service) => service.code === lineCode);
-      if (specialService) {
-        this.applyFavoriteSelection(`railLine:${lineCode}`, () => {
-          this.interactionService.addSpecialRailLineToSelection(
-            specialService,
-            false,
-          );
-        });
-        continue;
-      }
-
-      const lineId = this.getRailFavoriteLineId(lineCode);
-      if (!lineId) {
-        continue;
-      }
-
-      this.applyFavoriteSelection(`railLine:${lineId}`, () => {
-        this.interactionService.addRailLineToSelection(lineId, false);
-      });
-    }
-
-    if (favorites.railStation.length > 0) {
-      this.mapService
-        .getVectorTileLayerService()
-        .setLayerVisibility(VectorTileLayerType.RAIL_STATIONS, true);
-    }
-  }
-
-  private applyFavoriteSelection(key: string, select: () => void): void {
-    if (this.appliedFavoriteSelections.has(key)) {
-      return;
-    }
-
-    this.appliedFavoriteSelections.add(key);
-    select();
-  }
-
-  private getRailFavoriteLineId(value: string): string | null {
-    const numericCode = Number(value);
-    if (Number.isFinite(numericCode)) {
-      return getRailLineByCode(numericCode)?.lineId ?? null;
-    }
-
-    return value;
-  }
-
-  /**
-   * Apply query parameters to toggle specific map layers.
-   * Supported params:
-   *  - bike=true|1|yes
-   *  - busStops=true|1|yes
-   *  - busRoutes=true|1|yes
-   *  - subwayStations=true|1|yes
-   *  - subwayRoutes=true|1|yes
-   *
-   * Only params that are present are applied (no-op otherwise).
-   */
-  private applyQueryParams(params: ParamMap | Record<string, unknown>): void {
-    /**
-     * Type-guard to distinguish ParamMap from a plain record.
-     * Ensures TS understands that `has`/`get` exist and are callable.
-     */
-    const isParamMap = (p: ParamMap | Record<string, unknown>): p is ParamMap =>
-      !!p &&
-      typeof (p as ParamMap).has === 'function' &&
-      typeof (p as ParamMap).get === 'function';
-
-    const paramHas = (k: string) =>
-      isParamMap(params)
-        ? params.has(k)
-        : Object.prototype.hasOwnProperty.call(params, k);
-
-    const paramGet = (k: string): string | null =>
-      isParamMap(params)
-        ? (params.get(k) as string | null)
-        : ((params[k] as string | null) ?? null);
-
-    const parseBoolean = (v: string | null) => {
-      if (v === null) return null;
-      const s = String(v).toLowerCase().trim();
-      return ['1', 'true', 'yes', 'on'].includes(s);
-    };
-
-    const layerSvc = this.mapService.getLayerService();
-    const vtSvc = this.mapService.getVectorTileLayerService();
-
-    const specialLineCode = paramGet('railLine');
-    if (specialLineCode) {
-      const specialService = this.railService
-        .specialServices()
-        .find((service) => service.code === specialLineCode);
-      if (specialService) {
-        this.applyFavoriteSelection(`queryRailLine:${specialLineCode}`, () => {
-          this.interactionService.addSpecialRailLineToSelection(
-            specialService,
-            false,
-          );
-        });
-      }
-    }
-
-    const mappings: Array<{
-      param: string;
-      kind: 'layer' | 'vector' | 'feature';
-      id?: string;
-    }> = [
-      { param: 'bike', kind: 'layer', id: LayerType.BIKE },
-      {
-        param: 'subwayStations',
-        kind: 'vector',
-        id: VectorTileLayerType.RAIL_STATIONS,
-      },
-      {
-        param: 'subwayRoutes',
-        kind: 'vector',
-        id: VectorTileLayerType.RAIL_ROUTES,
-      },
-      {
-        param: 'busStops',
-        kind: 'feature',
-      },
-      {
-        param: 'busRoutes',
-        kind: 'feature',
-      },
-      {
-        param: 'railStations',
-        kind: 'feature',
-      },
-    ];
-
-    for (const m of mappings) {
-      // only apply when param is present
-      if (!paramHas(m.param)) {
-        continue;
-      }
-      const raw = paramGet(m.param);
-      const enabled = parseBoolean(raw);
-
-      if (enabled === null && m.kind !== 'feature') {
-        continue;
-      }
-
-      switch (m.kind) {
-        case 'feature': {
-          const parseIds = (key: string) =>
-            (paramGet(key) ?? '')
-              .split(',')
-              .map((v) => v.trim())
-              .filter(Boolean);
-
-          const routes = parseIds('busRoutes');
-          const stops = parseIds('busStops');
-          const stations = parseIds('railStations');
-
-          routes.forEach((r) => this.addRouteToSelection(r, false));
-          stops.forEach((s) => this.interactionService.addStopToSelection(s));
-          stations.forEach((s) =>
-            this.interactionService.addStopToSelection(s),
-          );
-
-          break;
-        }
-        case 'vector':
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-          vtSvc.setLayerVisibility(m.id as VectorTileLayerType, enabled!);
-          this.logger.debug('Applied query param layer (vector)', {
-            param: m.param,
-            enabled,
-          });
-          break;
-        case 'layer':
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-          layerSvc.setLayerVisibility(m.id as LayerType, enabled!);
-          this.logger.debug('Applied query param layer', {
-            param: m.param,
-            enabled,
-          });
-      }
-    }
-
-    // --- center / zoom handling ---
-    const getNum = (keys: string[]) => {
-      for (const k of keys) {
-        if (paramHas(k)) {
-          const raw = paramGet(k);
-          if (raw == null) return null;
-          const n = Number(raw);
-          if (!Number.isFinite(n)) return null;
-          return n;
-        }
-      }
-      return null;
-    };
-
-    const lat = getNum(['lat', 'latitude']);
-    const lon = getNum(['lon', 'lng', 'longitude']);
-    const zoom = getNum(['zoom', 'z']);
-
-    const isValidLat = (v: number | null) => v !== null && v >= -90 && v <= 90;
-    const isValidLon = (v: number | null) =>
-      v !== null && v >= -180 && v <= 180;
-    const isValidZoom = (v: number | null) => v !== null && v >= 0 && v <= 28;
-
-    if (isValidLat(lat) && isValidLon(lon)) {
-      // If no zoom is provided, keep current zoom level
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const useZoom = isValidZoom(zoom) ? zoom! : undefined;
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        this.mapService.centerOn([lon!, lat!], useZoom);
-        this.logger.debug('Applied query param center/zoom', {
-          lat,
-          lon,
-          zoom: useZoom,
-        });
-      } catch (err) {
-        this.logger.error('Failed to apply center/zoom from query params', err);
-      }
-    } else if (isValidZoom(zoom) && (lat === null || lon === null)) {
-      // If only zoom is provided, apply it with default center
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        this.mapService.centerOn(MapComponent.DEFAULT_CENTER, zoom!);
-        this.logger.debug('Applied query param zoom with default center', {
-          zoom,
-        });
-      } catch (err) {
-        this.logger.error('Failed to apply zoom from query params', err);
-      }
-    } else if (lat !== null || lon !== null || zoom !== null) {
-      this.logger.warn('Ignoring invalid center/zoom query params', {
-        lat,
-        lon,
-        zoom,
-      });
-    }
   }
 
   // Map navigation controls

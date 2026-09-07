@@ -6,20 +6,8 @@ import {
   CreateGTFSDatasetDto,
   GTFSDatasetResponseDto,
 } from '../dto/gtfs-dataset.dto';
-
-interface FeedDatasetRow {
-  source: string;
-  file_hash: string;
-  file_size: number;
-  version: string | null;
-  last_updated: Date;
-  completed: boolean;
-}
-
-interface FeedFileRow {
-  file_name: string;
-  record_count: number | null;
-}
+import { FeedDatasetRow, FeedFileRow } from './gtfs-database.types';
+import { withCause } from './data-import-error.utils';
 
 @Injectable()
 export class GTFSDatabaseService {
@@ -528,14 +516,4 @@ export class GTFSDatabaseService {
       throw withCause(`Clear data failed: ${errorMessage}`, error);
     }
   }
-}
-
-function withCause(message: string, cause: unknown): Error {
-  const wrapped = new Error(message);
-  Object.defineProperty(wrapped, 'cause', {
-    configurable: true,
-    enumerable: false,
-    value: cause,
-  });
-  return wrapped;
 }

@@ -11,7 +11,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatIconModule } from '@angular/material/icon';
 
-import { TypesenseRoute } from '../../../../services/typesense-search.service';
+import { TypesenseRoute } from '../../../../search/typesense-search.service';
 import {
   AGENCIES_DATA,
   getAgencyIconPath,

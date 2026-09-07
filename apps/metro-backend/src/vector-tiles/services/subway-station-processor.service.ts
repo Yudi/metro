@@ -1,43 +1,10 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { haversineDistanceKm } from '../../common/utils/geo-distance.util';
 import {
-  getStationDisplayName,
-  isStationMergeException,
-  normalizeStationName,
-  shouldMergeStations,
-  extractLineCodeFromAgency,
-  getRailLineByCode,
-  SAO_PAULO_CITY_CENTER,
-} from '@metro/shared/utils';
-
-/**
- * Raw station data from the database query
- */
-interface RawStation {
-  id: number;
-  stop_id: string;
-  stop_name: string;
-  stop_lat: number;
-  stop_lon: number;
-  agencies: string[];
-  route_short_names: string[];
-}
-
-/**
- * Processed station ready for database insertion
- */
-interface ProcessedStation {
-  stopId: string;
-  mergedStopIds: string[];
-  name: string;
-  originalName: string;
-  latitude: number;
-  longitude: number;
-  agencies: string[];
-  lines: string[];
-  routeShortNames: string[];
-}
+  ProcessedStation,
+  RawStation,
+  mergeSubwayStations,
+} from './subway-station-merge.utils';
 
 /**
  * Service responsible for processing and merging subway stations.
@@ -234,7 +201,7 @@ export class SubwayStationProcessorService implements OnModuleInit {
       }
 
       // Step 2: Merge stations with identical names
-      const mergedStations = this.mergeStations(rawStations);
+      const mergedStations = mergeSubwayStations(rawStations);
       this.logger.debug(`Merged into ${mergedStations.length} unique stations`);
 
       // Step 3: Persist to database (replace existing data)
@@ -280,186 +247,6 @@ export class SubwayStationProcessorService implements OnModuleInit {
     `;
 
     return stations;
-  }
-
-  /**
-   * Merge stations with identical normalized names
-   */
-  private mergeStations(stations: RawStation[]): ProcessedStation[] {
-    // Group stations by mergeable name
-    const stationGroups = new Map<string, RawStation[]>();
-
-    for (const station of stations) {
-      const normalizedName = normalizeStationName(
-        station.stop_name,
-      ).toLowerCase();
-
-      if (isStationMergeException(station.stop_name)) {
-        const groupKey = this.getExceptionStationGroupKey(
-          normalizedName,
-          station.route_short_names || [],
-        );
-        const group = stationGroups.get(groupKey);
-
-        if (group) {
-          group.push(station);
-        } else {
-          stationGroups.set(groupKey, [station]);
-        }
-
-        continue;
-      }
-
-      // Find existing group that should be merged with this station
-      let groupKey: string | null = null;
-
-      for (const [existingKey, existingGroup] of stationGroups.entries()) {
-        const existingStation = existingGroup[0];
-        if (shouldMergeStations(station.stop_name, existingStation.stop_name)) {
-          groupKey = existingKey;
-          break;
-        }
-      }
-
-      // Use normalized name as key if no existing group found. If the
-      // normalized key already belongs to a non-mergeable station, create a
-      // unique key instead of collapsing both stations into one group.
-      if (!groupKey) {
-        groupKey = normalizedName;
-
-        if (stationGroups.has(groupKey)) {
-          let suffix = 2;
-          while (stationGroups.has(`${normalizedName}::${suffix}`)) {
-            suffix += 1;
-          }
-          groupKey = `${normalizedName}::${suffix}`;
-        }
-      }
-
-      const group = stationGroups.get(groupKey);
-      if (group) {
-        group.push(station);
-      } else {
-        stationGroups.set(groupKey, [station]);
-      }
-    }
-
-    // Process each group into a merged station
-    const mergedStations: ProcessedStation[] = [];
-
-    for (const group of stationGroups.values()) {
-      if (group.length === 1) {
-        // Single station, no merging needed
-        const station = group[0];
-        mergedStations.push({
-          stopId: station.stop_id,
-          mergedStopIds: [station.stop_id],
-          name: getStationDisplayName(
-            station.stop_name,
-            this.getPrimaryRouteLineCode(station.route_short_names || []),
-          ),
-          originalName: station.stop_name,
-          latitude: station.stop_lat,
-          longitude: station.stop_lon,
-          agencies: station.agencies || [],
-          lines: this.getLineNames(station.route_short_names || []),
-          routeShortNames: station.route_short_names || [],
-        });
-      } else {
-        // Multiple stations - merge them
-        const merged = this.mergeStationGroup(group);
-        mergedStations.push(merged);
-      }
-    }
-
-    return mergedStations;
-  }
-
-  /**
-   * Merge a group of stations into a single processed station
-   */
-  private mergeStationGroup(group: RawStation[]): ProcessedStation {
-    // Find the station closest to city center (primary station)
-    const primaryStation = group.reduce((closest, current) => {
-      const closestDistance = haversineDistanceKm(
-        closest.stop_lat,
-        closest.stop_lon,
-        SAO_PAULO_CITY_CENTER.latitude,
-        SAO_PAULO_CITY_CENTER.longitude,
-      );
-      const currentDistance = haversineDistanceKm(
-        current.stop_lat,
-        current.stop_lon,
-        SAO_PAULO_CITY_CENTER.latitude,
-        SAO_PAULO_CITY_CENTER.longitude,
-      );
-      return currentDistance < closestDistance ? current : closest;
-    });
-
-    // Aggregate all agencies
-    const allAgencies = new Set<string>();
-    for (const station of group) {
-      if (station.agencies) {
-        for (const agency of station.agencies) {
-          allAgencies.add(agency);
-        }
-      }
-    }
-
-    // Aggregate all route short names
-    const allRouteShortNames = new Set<string>();
-    for (const station of group) {
-      if (station.route_short_names) {
-        for (const name of station.route_short_names) {
-          allRouteShortNames.add(name);
-        }
-      }
-    }
-
-    return {
-      stopId: primaryStation.stop_id,
-      mergedStopIds: group.map((s) => s.stop_id),
-      name: getStationDisplayName(
-        primaryStation.stop_name,
-        this.getPrimaryRouteLineCode(primaryStation.route_short_names || []),
-      ),
-      originalName: primaryStation.stop_name,
-      latitude: primaryStation.stop_lat,
-      longitude: primaryStation.stop_lon,
-      agencies: Array.from(allAgencies).sort(),
-      lines: this.getLineNames(Array.from(allRouteShortNames)),
-      routeShortNames: Array.from(allRouteShortNames).sort(),
-    };
-  }
-
-  private getExceptionStationGroupKey(
-    normalizedName: string,
-    routeShortNames: string[],
-  ): string {
-    const lineCode = this.getPrimaryRouteLineCode(routeShortNames);
-    return `${normalizedName}::line:${lineCode ?? 'unknown'}`;
-  }
-
-  private getPrimaryRouteLineCode(
-    routeShortNames: string[],
-  ): number | undefined {
-    const lineCodes = routeShortNames
-      .map((routeShortName) => extractLineCodeFromAgency(routeShortName))
-      .filter((lineCode): lineCode is number => lineCode !== undefined)
-      .sort((left, right) => left - right);
-
-    return lineCodes[0];
-  }
-
-  private getLineNames(routeShortNames: string[]): string[] {
-    return routeShortNames
-      .map((routeShortName) => {
-        const lineCode = extractLineCodeFromAgency(routeShortName);
-        return lineCode
-          ? (getRailLineByCode(lineCode)?.colorName ?? routeShortName)
-          : routeShortName;
-      })
-      .sort();
   }
 
   /**

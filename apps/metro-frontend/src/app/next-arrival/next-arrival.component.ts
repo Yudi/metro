@@ -15,10 +15,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDialog } from '@angular/material/dialog';
 
-import {
-  StopSearchService,
-  StopSearchResult,
-} from './services/stop-search.service';
+import { StopSearchService, StopSearchResult } from './stop-search.service';
 import {
   SearchResultCardComponent,
   SearchResult,
@@ -31,7 +28,7 @@ import {
   BusStopDialogComponent,
   BusStopDialogData,
 } from '../map-main/components/bus-stop-dialog/bus-stop-dialog.component';
-import { GeographyGraphQLService } from '../map-main/services/geography-graphql.service';
+import { GeographyGraphQLService } from '../map-main/geography/geography-graphql.service';
 import { GeolocationService } from '@metro/shared/geolocation';
 import { LoggerService } from '@metro/shared/api';
 import { getUniqueAgencies } from '@metro/shared/utils';

@@ -2,7 +2,7 @@ import { Service, signal, computed } from '@angular/core';
 import {
   BusRouteGraphQL,
   BusStopGraphQL,
-} from '../../services/geography-graphql.service';
+} from '../../geography/geography-graphql.service';
 import {
   BusShapeWithRoute,
   DisplayMode,

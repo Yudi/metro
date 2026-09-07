@@ -9,335 +9,58 @@ import {
   signal,
   Signal,
 } from '@angular/core';
-import Dexie, { liveQuery, Table } from 'dexie';
+import { liveQuery } from 'dexie';
 // eslint-disable-next-line @nx/enforce-module-boundaries
 import { firebaseIdToken, firebaseUser } from '@metro/shared/firebase';
-import {
-  FavoriteList,
-  FavoriteTypes,
-  createEmptyFavorites,
-} from '@metro/shared/utils';
+import { createEmptyFavorites } from '@metro/shared/utils';
+import type { FavoriteList, FavoriteTypes } from '@metro/shared/utils';
 import { firstValueFrom } from 'rxjs';
+import type {
+  DashboardFavoriteSelections,
+  DashboardSelectionRecord,
+  FavoriteMutationResult,
+  FavoriteOutboxRecord,
+  FavoriteRecord,
+  FavoriteSnapshotResult,
+  GraphqlResponse,
+  UserFavoritesResult,
+} from './favorites.models';
+import {
+  ANONYMOUS_FAVORITES_SCOPE,
+  MAX_FAVORITES_PER_SCOPE,
+  classifyGraphqlErrors,
+  classifyFavoriteSyncError,
+  favoriteTypes,
+  getDashboardSelectionKey,
+  getFavoriteKey,
+  getFavoritesScope,
+  normalizeFavoriteCodeValue,
+  normalizeFavoriteSnapshot,
+  replayFavoriteOperations,
+  FavoriteSyncFailure,
+} from './favorites.helpers';
+import { FavoritesDatabase } from './favorites.database';
 
-// Anonymous favorites are copied to an empty account during its first
-// successful sync. The import decision is retained per account so a later
-// login cannot restore favorites the user deliberately removed.
-export const ANONYMOUS_FAVORITES_SCOPE = 'anonymous';
-export const FAVORITE_CODE_MAX_LENGTH = 128;
-const MAX_FAVORITES_PER_SCOPE = 500;
-const FAVORITES_DATABASE_NAME = 'metro-favorites';
+export {
+  ANONYMOUS_FAVORITES_SCOPE,
+  FAVORITE_CODE_MAX_LENGTH,
+  classifyFavoriteSyncError,
+  getFavoritesScope,
+  replayFavoriteOperations,
+} from './favorites.helpers';
+export type {
+  DashboardFavoriteSelections,
+  FavoriteOperation,
+  FavoriteOutboxRecord,
+  FavoriteOutboxStatus,
+  FavoriteSyncErrorInfo,
+  FavoriteSyncErrorKind,
+} from './favorites.models';
+
 const FAVORITE_SYNC_ERROR_MESSAGE =
   'Não foi possível sincronizar seus favoritos. Revise os favoritos pendentes e tente novamente.';
 const FAVORITE_LIMIT_ERROR_MESSAGE =
   'Você já atingiu o limite de 500 favoritos.';
-
-const favoriteTypes: FavoriteTypes[] = [
-  'bikeStation',
-  'railStation',
-  'railLine',
-  'busStop',
-  'busRoute',
-];
-
-export type FavoriteOperation = 'add' | 'remove' | 'replace';
-export type FavoriteOutboxStatus = 'pending' | 'dead-letter';
-
-interface FavoriteRecord {
-  key: string;
-  scope: string;
-  type: FavoriteTypes;
-  code: string;
-  updatedAt: number;
-}
-
-interface LegacyFavoriteRecord {
-  key: string;
-  type: FavoriteTypes;
-  code: string;
-  updatedAt: number;
-  scope?: string;
-}
-
-interface DashboardSelectionRecord {
-  key: string;
-  scope: string;
-  values: string[];
-  updatedAt: number;
-}
-
-interface LegacyDashboardSelectionRecord {
-  key: string;
-  values: string[];
-  updatedAt: number;
-  scope?: string;
-}
-
-interface AnonymousFavoritesImportRecord {
-  scope: string;
-  importedAt: number;
-}
-
-export interface FavoriteOutboxRecord {
-  operationId: string;
-  scope: string;
-  status?: FavoriteOutboxStatus;
-  attempts?: number;
-  lastError?: string;
-  operation: FavoriteOperation;
-  type?: FavoriteTypes;
-  code?: string;
-  favorites?: FavoriteList;
-  createdAt: number;
-}
-
-export type FavoriteSyncErrorKind = 'transient' | 'terminal';
-
-export interface FavoriteSyncErrorInfo {
-  kind: FavoriteSyncErrorKind;
-  reason: string;
-}
-
-class FavoriteSyncFailure extends Error {
-  constructor(
-    readonly kind: FavoriteSyncErrorKind,
-    readonly reason: string,
-  ) {
-    super(reason);
-    this.name = 'FavoriteSyncFailure';
-  }
-}
-
-export function classifyFavoriteSyncError(
-  error: unknown,
-): FavoriteSyncErrorInfo {
-  if (error instanceof FavoriteSyncFailure) {
-    return { kind: error.kind, reason: error.reason };
-  }
-
-  const status = readHttpStatus(error);
-  if (
-    status === 0 ||
-    status === 408 ||
-    status === 425 ||
-    status === 429 ||
-    (status !== null && status >= 500)
-  ) {
-    return { kind: 'transient', reason: `http-${status ?? 'unknown'}` };
-  }
-
-  if (
-    status === 400 ||
-    status === 401 ||
-    status === 403 ||
-    status === 409 ||
-    status === 422
-  ) {
-    return { kind: 'terminal', reason: `http-${status}` };
-  }
-
-  // Only explicitly recognized transport failures are retryable. Unknown
-  // errors are terminal so malformed local records or an unexpected contract
-  // cannot create an endless background loop.
-  return { kind: 'terminal', reason: 'unknown' };
-}
-
-interface GraphqlResponse<T> {
-  data?: T;
-  errors?: readonly unknown[];
-}
-
-interface FavoriteSnapshotResult {
-  revision?: number;
-  favorites?: FavoriteList;
-}
-
-interface FavoriteSyncResult extends FavoriteSnapshotResult {
-  success?: boolean;
-  conflict?: boolean;
-  message?: string;
-}
-
-interface UserFavoritesResult {
-  userFavoritesSnapshot?: FavoriteSnapshotResult;
-}
-
-interface FavoriteMutationResult {
-  syncFavorites?: FavoriteSyncResult;
-}
-
-export interface DashboardFavoriteSelections {
-  railStationLines: Record<string, string[]>;
-  busStopRoutes: Record<string, string[]>;
-}
-
-export function getFavoritesScope(userId: string | null | undefined): string {
-  return userId ? `user:${userId}` : ANONYMOUS_FAVORITES_SCOPE;
-}
-
-function getFavoriteKey(
-  scope: string,
-  type: FavoriteTypes,
-  code: string,
-): string {
-  return `${scope}:${type}:${code}`;
-}
-
-function getDashboardSelectionKey(
-  scope: string,
-  group: keyof DashboardFavoriteSelections,
-  id: string,
-): string {
-  return `${scope}:${group}:${id}`;
-}
-
-function isValidFavoriteCode(code: string): boolean {
-  if (code.length === 0 || code.length > FAVORITE_CODE_MAX_LENGTH) {
-    return false;
-  }
-
-  return Array.from(code).every((character) => {
-    const codePoint = character.codePointAt(0) ?? 0;
-    return codePoint > 0x1f && codePoint !== 0x7f;
-  });
-}
-
-function normalizeFavoriteCodeValue(code: unknown): string | null {
-  if (typeof code !== 'string') {
-    return null;
-  }
-
-  const normalized = code.trim();
-  return isValidFavoriteCode(normalized) ? normalized : null;
-}
-
-function normalizeFavoriteSnapshot(value: unknown): FavoriteList {
-  const favorites = createEmptyFavorites();
-
-  if (!value || typeof value !== 'object') {
-    return favorites;
-  }
-
-  const rawFavorites = value as Partial<Record<FavoriteTypes, unknown>>;
-  let total = 0;
-  for (const type of favoriteTypes) {
-    const codes = rawFavorites[type];
-    if (Array.isArray(codes)) {
-      const normalizedCodes = Array.from(
-        new Set(
-          codes.flatMap((code) => {
-            const normalized = normalizeFavoriteCodeValue(code);
-            return normalized ? [normalized] : [];
-          }),
-        ),
-      );
-      const available = Math.max(0, MAX_FAVORITES_PER_SCOPE - total);
-      favorites[type] = normalizedCodes.slice(0, available);
-      total += favorites[type].length;
-    }
-  }
-
-  return favorites;
-}
-
-export function replayFavoriteOperations(
-  favorites: FavoriteList,
-  operations: FavoriteOutboxRecord[],
-): FavoriteList {
-  return operations.reduce((current, operation) => {
-    if (operation.operation === 'replace') {
-      return operation.favorites
-        ? normalizeFavoriteSnapshot(operation.favorites)
-        : current;
-    }
-    if (!operation.type || !operation.code) {
-      return current;
-    }
-
-    const next = normalizeFavoriteSnapshot(current);
-    if (operation.operation === 'add') {
-      next[operation.type] = Array.from(
-        new Set([...next[operation.type], operation.code]),
-      );
-    } else {
-      next[operation.type] = next[operation.type].filter(
-        (code) => code !== operation.code,
-      );
-    }
-    return next;
-  }, normalizeFavoriteSnapshot(favorites));
-}
-
-class FavoritesDatabase extends Dexie {
-  favorites!: Table<FavoriteRecord, string>;
-  dashboardSelections!: Table<DashboardSelectionRecord, string>;
-  outbox!: Table<FavoriteOutboxRecord, string>;
-  anonymousFavoritesImports!: Table<AnonymousFavoritesImportRecord, string>;
-
-  constructor() {
-    super(FAVORITES_DATABASE_NAME);
-    this.version(1).stores({
-      favorites: '&key, type, code, updatedAt',
-    });
-    this.version(2).stores({
-      favorites: '&key, type, code, updatedAt',
-      dashboardSelections: '&key, updatedAt',
-    });
-    this.version(3)
-      .stores({
-        favorites: '&key, [scope+type], scope, type, code, updatedAt',
-        dashboardSelections: '&key, scope, updatedAt',
-        outbox: '&operationId, scope, operation, type, code, createdAt',
-      })
-      .upgrade(async (tx) => {
-        const favoriteTable = tx.table('favorites');
-        const oldFavorites =
-          (await favoriteTable.toArray()) as LegacyFavoriteRecord[];
-        await favoriteTable.clear();
-        if (oldFavorites.length > 0) {
-          await favoriteTable.bulkPut(
-            oldFavorites.map((record) => ({
-              ...record,
-              scope: ANONYMOUS_FAVORITES_SCOPE,
-              key: getFavoriteKey(
-                ANONYMOUS_FAVORITES_SCOPE,
-                record.type,
-                record.code,
-              ),
-            })),
-          );
-        }
-
-        const dashboardTable = tx.table('dashboardSelections');
-        const oldDashboardSelections =
-          (await dashboardTable.toArray()) as LegacyDashboardSelectionRecord[];
-        await dashboardTable.clear();
-        if (oldDashboardSelections.length > 0) {
-          await dashboardTable.bulkPut(
-            oldDashboardSelections.map((record) => {
-              const separatorIndex = record.key.indexOf(':');
-              const group = record.key.slice(
-                0,
-                separatorIndex,
-              ) as keyof DashboardFavoriteSelections;
-              const id = record.key.slice(separatorIndex + 1);
-              const scope = ANONYMOUS_FAVORITES_SCOPE;
-              return {
-                ...record,
-                scope,
-                key: getDashboardSelectionKey(scope, group, id),
-              };
-            }),
-          );
-        }
-      });
-    this.version(4).stores({
-      favorites: '&key, [scope+type], scope, type, code, updatedAt',
-      dashboardSelections: '&key, scope, updatedAt',
-      outbox: '&operationId, scope, operation, type, code, createdAt',
-      anonymousFavoritesImports: '&scope, importedAt',
-    });
-  }
-}
 
 @Service()
 export class FavoritesService implements OnDestroy {
@@ -1383,53 +1106,4 @@ export class FavoritesService implements OnDestroy {
 
     return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   }
-}
-
-function classifyGraphqlErrors(
-  errors: readonly unknown[],
-): FavoriteSyncErrorKind {
-  const codes = errors.flatMap((error) => {
-    if (!isRecord(error) || !isRecord(error['extensions'])) {
-      return [];
-    }
-    const code = error['extensions']['code'];
-    return typeof code === 'string' ? [code.toUpperCase()] : [];
-  });
-
-  if (
-    codes.some((code) =>
-      ['BAD_USER_INPUT', 'UNAUTHENTICATED', 'FORBIDDEN', 'CONFLICT'].includes(
-        code,
-      ),
-    )
-  ) {
-    return 'terminal';
-  }
-
-  return 'transient';
-}
-
-function readHttpStatus(error: unknown): number | null {
-  if (!isRecord(error)) {
-    return null;
-  }
-
-  const status = error['status'];
-  if (typeof status === 'number' && Number.isInteger(status)) {
-    return status;
-  }
-
-  const nested = error['error'];
-  if (isRecord(nested)) {
-    const nestedStatus = nested['status'];
-    if (typeof nestedStatus === 'number' && Number.isInteger(nestedStatus)) {
-      return nestedStatus;
-    }
-  }
-
-  return null;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
 }

@@ -28,7 +28,6 @@ import {
   getRailStationIdentityKey,
   getRailStationIdentityFromFavoriteKey,
   hasFetchableNextTrain,
-  mergeFavoriteRailLineOptions,
   normalizeHexColor,
   sortRailLineCodes,
   toTitleCase,
@@ -46,65 +45,23 @@ import { catchError, of, Subscription } from 'rxjs';
 import { LineStatusGridComponent } from '../home/components/line-status-grid/line-status-grid.component';
 import {
   BusRouteGraphQL,
-  BusStopGraphQL,
   GeographyGraphQLService,
-} from '../map-main/services/geography-graphql.service';
+} from '../map-main/geography/geography-graphql.service';
 import { StopArrivalsComponent } from '../map-main/components/stop-arrivals/stop-arrivals.component';
-import { NextTrainCardComponent } from '../shared/components/next-train-card/next-train-card.component';
-
-interface BusRouteInsight {
-  routeId: string;
-  shortName: string;
-  longName: string;
-  color?: string;
-  textColor?: string;
-  sourceAgency?: string;
-  sourceId?: string;
-  supportsRealtime?: boolean;
-  fares?: Array<{ price: number; currency: string }>;
-}
-
-interface BusStopInsight extends BusStopGraphQL {
-  routeShortNames: string[];
-}
-
-interface RailStationInsight {
-  key: string;
-  name: string;
-  lineCodes: number[];
-  lines: FavoriteRailLineOption[];
-}
-
-interface MergedRailStationInsight {
-  id: string;
-  name: string;
-  lines: string[];
-}
-
-interface AgencyIdentity {
-  name: string;
-  iconPath: string | null;
-}
-
-interface BusFavoritesLookupResponse {
-  data: {
-    multipleBusRoutes: BusRouteInsight[];
-    multipleBusStops: Array<{
-      id: string;
-      stopId: string;
-      name: string;
-      latitude: number;
-      longitude: number;
-      isSubwayStation: boolean;
-      agencies?: string[];
-      routeShortNames?: string[];
-      sourceAgency?: string;
-      sourceId?: string;
-      platformCode?: string;
-      mergedStopIds?: string[];
-    }>;
-  };
-}
+import { NextTrainCardComponent } from '../next-train/components/next-train-card/next-train-card.component';
+import type {
+  AgencyIdentity,
+  BusFavoritesLookupResponse,
+  BusRouteInsight,
+  BusStopInsight,
+  MergedRailStationInsight,
+  RailStationInsight,
+} from './insights-dashboard.types';
+import {
+  BUS_FAVORITES_LOOKUP_QUERY,
+  MERGED_RAIL_STATIONS_QUERY,
+} from './insights-dashboard.queries';
+import { addRailStationGroup } from './insights-dashboard.utils';
 
 @Component({
   selector: 'app-insights-dashboard',
@@ -164,7 +121,7 @@ export class InsightsDashboardComponent {
           stationName,
         );
 
-        this.addRailStationGroup(groups, groupKey, {
+        addRailStationGroup(groups, groupKey, {
           key: groupKey,
           name: stationName,
           lineCodes: sortRailLineCodes(lines.map((line) => line.lineCode)),
@@ -382,38 +339,7 @@ export class InsightsDashboardComponent {
 
     return this.http
       .post<BusFavoritesLookupResponse>('/api/graphql', {
-        query: `
-          query BusFavoritesLookup($routeIds: [ID!]!, $stopIds: [ID!]!) {
-            multipleBusRoutes(ids: $routeIds) {
-              routeId
-              shortName
-              longName
-              color
-              textColor
-              sourceAgency
-              sourceId
-              supportsRealtime
-              fares {
-                price
-                currency
-              }
-            }
-            multipleBusStops(ids: $stopIds) {
-              id
-              stopId
-              name
-              latitude
-              longitude
-              isSubwayStation
-              agencies
-              routeShortNames
-              sourceAgency
-              sourceId
-              platformCode
-              mergedStopIds
-            }
-          }
-        `,
+        query: BUS_FAVORITES_LOOKUP_QUERY,
         variables: {
           routeIds,
           stopIds,
@@ -502,15 +428,7 @@ export class InsightsDashboardComponent {
           mergedRailStations: MergedRailStationInsight[];
         };
       }>('/api/graphql', {
-        query: `
-          query MergedRailStationsForInsights {
-            mergedRailStations {
-              id
-              name
-              lines
-            }
-          }
-        `,
+        query: MERGED_RAIL_STATIONS_QUERY,
       })
       .pipe(
         catchError(() => of(null)),
@@ -519,30 +437,6 @@ export class InsightsDashboardComponent {
       .subscribe((response) => {
         this.mergedRailStations.set(response?.data.mergedRailStations ?? []);
       });
-  }
-
-  private addRailStationGroup(
-    groups: Map<string, RailStationInsight>,
-    key: string,
-    station: RailStationInsight,
-  ): void {
-    const existing = groups.get(key);
-
-    if (!existing) {
-      groups.set(key, {
-        ...station,
-        lineCodes: sortRailLineCodes(station.lineCodes),
-      });
-      return;
-    }
-
-    groups.set(key, {
-      ...existing,
-      lineCodes: sortRailLineCodes([
-        ...new Set([...existing.lineCodes, ...station.lineCodes]),
-      ]),
-      lines: mergeFavoriteRailLineOptions(existing.lines, station.lines),
-    });
   }
 
   private pruneBusRouteState(stopIds: string[]): void {

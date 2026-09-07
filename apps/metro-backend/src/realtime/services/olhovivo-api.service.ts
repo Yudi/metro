@@ -7,8 +7,17 @@ import {
   StopArrivalResponse,
   LineArrivalResponse,
   LineSearchResult,
-  VehiclePosition,
 } from '../dto/realtime.dto';
+import {
+  normalizeLineArrivalResponse,
+  normalizePositionResponse,
+  normalizeStopArrivalResponse,
+} from './olhovivo-response.utils';
+import {
+  formatUpstreamFailure,
+  getHttpStatus,
+  isAuthenticationError,
+} from './olhovivo-error.utils';
 
 /**
  * Service to interact with SPTrans OlhoVivo API
@@ -171,10 +180,12 @@ export class OlhoVivoApiService implements OnModuleInit {
         `Fetched positions for ${totalLines} lines, ${totalVehicles} vehicles total`,
       );
 
-      return this.normalizePositionResponse(response.data);
+      return normalizePositionResponse(response.data, () =>
+        this.logger.warn('Ignoring OlhoVivo vehicle with an invalid prefix'),
+      );
     } catch (error) {
       // If authentication expired, retry once
-      if (this.isAuthenticationError(error)) {
+      if (isAuthenticationError(error)) {
         this.logger.warn(
           'Auth error fetching all positions, re-authenticating...',
         );
@@ -194,7 +205,9 @@ export class OlhoVivoApiService implements OnModuleInit {
 
         this.throwIfNullResponse(response.data, 'Posicao');
 
-        return this.normalizePositionResponse(response.data);
+        return normalizePositionResponse(response.data, () =>
+          this.logger.warn('Ignoring OlhoVivo vehicle with an invalid prefix'),
+        );
       }
 
       this.logger.error(
@@ -227,10 +240,12 @@ export class OlhoVivoApiService implements OnModuleInit {
         `Previsao/Parada?codigoParada=${codigoParada}`,
       );
 
-      return this.normalizeStopArrivalResponse(response.data);
+      return normalizeStopArrivalResponse(response.data, () =>
+        this.logger.warn('Ignoring OlhoVivo vehicle with an invalid prefix'),
+      );
     } catch (error) {
       // If authentication expired, retry once
-      if (this.isAuthenticationError(error)) {
+      if (isAuthenticationError(error)) {
         this.logger.warn(
           `Auth error on stop ${codigoParada}, re-authenticating...`,
         );
@@ -253,7 +268,9 @@ export class OlhoVivoApiService implements OnModuleInit {
           `Previsao/Parada?codigoParada=${codigoParada}`,
         );
 
-        return this.normalizeStopArrivalResponse(response.data);
+        return normalizeStopArrivalResponse(response.data, () =>
+          this.logger.warn('Ignoring OlhoVivo vehicle with an invalid prefix'),
+        );
       }
 
       this.logger.error(
@@ -286,10 +303,12 @@ export class OlhoVivoApiService implements OnModuleInit {
         `Previsao/Linha?codigoLinha=${codigoLinha}`,
       );
 
-      return this.normalizeLineArrivalResponse(response.data);
+      return normalizeLineArrivalResponse(response.data, () =>
+        this.logger.warn('Ignoring OlhoVivo vehicle with an invalid prefix'),
+      );
     } catch (error) {
       // If authentication expired, retry once
-      if (this.isAuthenticationError(error)) {
+      if (isAuthenticationError(error)) {
         this.isAuthenticated = false;
         this.cookieJar = null;
         await this.ensureAuthenticated();
@@ -309,7 +328,9 @@ export class OlhoVivoApiService implements OnModuleInit {
           `Previsao/Linha?codigoLinha=${codigoLinha}`,
         );
 
-        return this.normalizeLineArrivalResponse(response.data);
+        return normalizeLineArrivalResponse(response.data, () =>
+          this.logger.warn('Ignoring OlhoVivo vehicle with an invalid prefix'),
+        );
       }
 
       this.logger.error(
@@ -344,10 +365,12 @@ export class OlhoVivoApiService implements OnModuleInit {
         `Previsao?codigoParada=${codigoParada}&codigoLinha=${codigoLinha}`,
       );
 
-      return this.normalizeStopArrivalResponse(response.data);
+      return normalizeStopArrivalResponse(response.data, () =>
+        this.logger.warn('Ignoring OlhoVivo vehicle with an invalid prefix'),
+      );
     } catch (error) {
       // If authentication expired, retry once
-      if (this.isAuthenticationError(error)) {
+      if (isAuthenticationError(error)) {
         this.isAuthenticated = false;
         this.cookieJar = null;
         await this.ensureAuthenticated();
@@ -367,7 +390,9 @@ export class OlhoVivoApiService implements OnModuleInit {
           `Previsao?codigoParada=${codigoParada}&codigoLinha=${codigoLinha}`,
         );
 
-        return this.normalizeStopArrivalResponse(response.data);
+        return normalizeStopArrivalResponse(response.data, () =>
+          this.logger.warn('Ignoring OlhoVivo vehicle with an invalid prefix'),
+        );
       }
 
       this.logger.error(
@@ -424,7 +449,7 @@ export class OlhoVivoApiService implements OnModuleInit {
       return response.data;
     } catch (error) {
       // If authentication expired, retry once
-      if (this.isAuthenticationError(error)) {
+      if (isAuthenticationError(error)) {
         this.logger.warn(
           `Auth error searching for "${termosBusca}", re-authenticating...`,
         );
@@ -469,113 +494,10 @@ export class OlhoVivoApiService implements OnModuleInit {
     }
   }
 
-  private normalizePositionResponse(
-    response: PositionResponse,
-  ): PositionResponse {
-    return {
-      ...response,
-      l: (response.l ?? []).map((line) => {
-        const vehicles = this.normalizeVehiclePositions(line.vs);
-        return { ...line, qv: vehicles.length, vs: vehicles };
-      }),
-    };
-  }
-
-  private normalizeStopArrivalResponse(
-    response: StopArrivalResponse,
-  ): StopArrivalResponse {
-    if (!response.p) {
-      return response;
-    }
-
-    return {
-      ...response,
-      p: {
-        ...response.p,
-        l: (response.p.l ?? []).map((line) => {
-          const vehicles = this.normalizeVehiclePositions(line.vs);
-          return { ...line, qv: vehicles.length, vs: vehicles };
-        }),
-      },
-    };
-  }
-
-  private normalizeLineArrivalResponse(
-    response: LineArrivalResponse,
-  ): LineArrivalResponse {
-    return {
-      ...response,
-      ps: (response.ps ?? []).map((stop) => ({
-        ...stop,
-        vs: this.normalizeVehiclePositions(stop.vs),
-      })),
-    };
-  }
-
-  private normalizeVehiclePositions(
-    vehicles: VehiclePosition[] | undefined,
-  ): VehiclePosition[] {
-    return (vehicles ?? []).flatMap((vehicle) => {
-      const rawPrefix = (vehicle as { p: unknown }).p;
-      if (
-        typeof rawPrefix !== 'number' &&
-        (typeof rawPrefix !== 'string' || !rawPrefix.trim())
-      ) {
-        this.logger.warn('Ignoring OlhoVivo vehicle with an invalid prefix');
-        return [];
-      }
-
-      const prefix = Number(rawPrefix);
-
-      if (!Number.isSafeInteger(prefix) || prefix <= 0) {
-        this.logger.warn('Ignoring OlhoVivo vehicle with an invalid prefix');
-        return [];
-      }
-
-      return [{ ...vehicle, p: prefix }];
-    });
-  }
-
-  /**
-   * Check if error is authentication-related
-   */
-  private isAuthenticationError(error: unknown): boolean {
-    // Check if it's a 401 or 403 error
-    if (error && typeof error === 'object' && 'response' in error) {
-      const response = (error as { response?: { status?: number } }).response;
-      return response?.status === 401 || response?.status === 403;
-    }
-    return false;
-  }
-
   /**
    * Get authentication status
    */
   getAuthenticationStatus(): boolean {
     return this.isAuthenticated;
   }
-}
-
-function getHttpStatus(error: unknown): number | undefined {
-  if (!error || typeof error !== 'object' || !('response' in error)) {
-    return undefined;
-  }
-
-  return (error as { response?: { status?: number } }).response?.status;
-}
-
-function formatUpstreamFailure(error: unknown): string {
-  const status = getHttpStatus(error);
-  if (status) {
-    return `HTTP ${status}`;
-  }
-
-  if (error && typeof error === 'object' && 'code' in error) {
-    const code = String(error.code);
-    if (/^[A-Za-z0-9._-]{1,40}$/.test(code)) {
-      return `request failed (${code})`;
-    }
-  }
-
-  return 'request failed';
 }

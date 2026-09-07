@@ -2,7 +2,7 @@ import { Service, inject } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { LoggerService } from '@metro/shared/api';
-import { BikeStationsService } from '../../services/bike-stations.service';
+import { BikeStationsService } from '../../geography/bike-stations.service';
 import { SearchDialogComponent } from '../search-dialog/search-dialog.component';
 import { MapDetailsDialogService } from './map-details-dialog.service';
 import { MapDisplayService } from './map-display.service';

@@ -21,8 +21,8 @@ import {
 } from './vector-tiles.service';
 import { RailVectorTileService } from './services/rail-vector-tile.service';
 import { SubwayStationProcessorService } from './services/subway-station-processor.service';
-import { DevelopmentOnlyGuard } from '../shared/guards/development-only.guard';
-import { DevOnly } from '../shared/decorators/development-only.decorator';
+import { DevelopmentOnlyGuard } from '../common/guards/development-only.guard';
+import { DevOnly } from '../common/decorators/development-only.decorator';
 
 /**
  * Controller for serving Mapbox Vector Tiles (MVT)

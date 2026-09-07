@@ -4,260 +4,32 @@ import {
   moduleMetadata,
   applicationConfig,
 } from '@storybook/angular';
-import {
-  MatDialogModule,
-  MatDialogRef,
-  MAT_DIALOG_DATA,
-} from '@angular/material/dialog';
+import { MatDialogModule } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDividerModule } from '@angular/material/divider';
 import { SubwayStationDialogComponent } from './subway-station-dialog.component';
-import { StationNameService } from '../../services/station-name.service';
-import { LoggerService } from '@metro/shared/api';
-import { RailGraphqlService, API_BASE_URL } from '@metro/shared/api';
-import type { BusStopGraphQL } from '../../services/geography-graphql.service';
 import {
   L1_NORMAL,
   L1_CLOSED,
   L2_NORMAL,
   L8_NORMAL,
   L9_NORMAL,
-  createMockRailGraphqlService,
-  type MockRailServiceOptions,
 } from '@metro/storybook-mocks';
 import {
-  NextTrainWebsocketService,
-  NextTrainArrival,
-  StationTrainData,
-} from '../../services/next-train-websocket.service';
-import { signal } from '@angular/core';
-
-// Mock Data: Paraíso Station (L1 Azul + L2 Verde)
-
-const PARAISO: BusStopGraphQL = {
-  id: 'paraiso-1',
-  stopId: '99999',
-  name: 'Paraíso',
-  description:
-    'Estação Paraíso do Metrô, ligação entre L1 (Azul) e L2 (Verde).',
-  latitude: -23.578,
-  longitude: -46.635,
-  isSubwayStation: true,
-  agencies: ['METRO'],
-  routeShortNames: ['L1', 'L2'],
-};
-
-const JABAQUARA: BusStopGraphQL = {
-  ...PARAISO,
-  id: 'jabaquara-1',
-  stopId: 'jabaquara-1',
-  name: 'Jabaquara-Comitê Paralímpico Brasileiro',
-  description: 'Estação terminal da Linha 1 - Azul.',
-  routeShortNames: ['L1'],
-};
-
-const SAO_JUDAS: BusStopGraphQL = {
-  ...PARAISO,
-  id: 'sao-judas-1',
-  stopId: 'sao-judas-1',
-  name: 'São Judas',
-  description: 'Estação São Judas da Linha 1 - Azul.',
-  routeShortNames: ['L1'],
-};
-
-const SANTA_CRUZ: BusStopGraphQL = {
-  ...PARAISO,
-  id: 'santa-cruz-1',
-  stopId: 'santa-cruz-1',
-  name: 'Santa Cruz',
-  description: 'Integração entre as linhas 1 - Azul e 5 - Lilás.',
-  routeShortNames: ['L1', 'L5'],
-};
-
-const SANTANA: BusStopGraphQL = {
-  ...PARAISO,
-  id: 'santana-1',
-  stopId: 'santana-1',
-  name: 'Santana',
-  description: 'Estação Santana da Linha 1 - Azul.',
-  routeShortNames: ['L1'],
-};
-
-const VILA_DAS_BELEZAS: BusStopGraphQL = {
-  ...PARAISO,
-  id: 'vila-das-belezas-1',
-  stopId: 'vila-das-belezas-1',
-  name: 'Vila das Belezas',
-  description: 'Estação Vila das Belezas da Linha 5 - Lilás.',
-  routeShortNames: ['L5'],
-};
-
-// Mock Data: Pinheiros Station (L9 Esmeralda) - has next train feature
-
-const PINHEIROS: BusStopGraphQL = {
-  id: 'pinheiros-1',
-  stopId: '88888',
-  name: 'Pinheiros',
-  description: 'Estação Pinheiros da Linha 9 - Esmeralda (ViaMobilidade).',
-  latitude: -23.567,
-  longitude: -46.702,
-  isSubwayStation: true,
-  agencies: ['VIAMOBILIDADE'],
-  routeShortNames: ['L9'],
-};
-
-// Mock next train data for Pinheiros (L9)
-const PINHEIROS_TRAINS: NextTrainArrival[] = [
-  {
-    destinationCode: 'VAG',
-    destinationName: 'Varginha',
-    trainCurrentStationName: 'Villa Lobos–Jaguaré',
-    arrivalTime: '21:04',
-    isAtPlatform: false,
-    isTrainStopped: false,
-  },
-  {
-    destinationCode: 'OSA',
-    destinationName: 'Osasco',
-    trainCurrentStationName: 'Pinheiros',
-    arrivalTime: '21:00',
-    isAtPlatform: true,
-    isTrainStopped: true,
-  },
-];
-
-// Mock Data: Osasco Station (L8 Diamante + L9 Esmeralda) - multi-line station
-
-const OSASCO: BusStopGraphQL = {
-  id: 'osasco-1',
-  stopId: '77777',
-  name: 'Osasco',
-  description:
-    'Estação Osasco, servida pela Linha 8 - Diamante e Linha 9 - Esmeralda.',
-  latitude: -23.532,
-  longitude: -46.791,
-  isSubwayStation: true,
-  agencies: ['VIAMOBILIDADE'],
-  routeShortNames: ['L8', 'L9'],
-};
-
-// Mock next train data for Osasco (L8 and L9)
-const OSASCO_L8_TRAINS: NextTrainArrival[] = [
-  {
-    destinationCode: 'JPR',
-    destinationName: 'Júlio Prestes',
-    trainCurrentStationName: 'Comandante Sampaio',
-    arrivalTime: '14:35',
-    isAtPlatform: false,
-    isTrainStopped: false,
-  },
-  {
-    destinationCode: 'IPV',
-    destinationName: 'Itapevi',
-    trainCurrentStationName: 'Presidente Altino',
-    arrivalTime: '14:38',
-    isAtPlatform: false,
-    isTrainStopped: true,
-  },
-];
-
-const OSASCO_L9_TRAINS: NextTrainArrival[] = [
-  {
-    destinationCode: 'VAG',
-    destinationName: 'Varginha',
-    trainCurrentStationName: 'Presidente Altino',
-    arrivalTime: '14:40',
-    isAtPlatform: false,
-    isTrainStopped: false,
-  },
-];
-
-// Mock NextTrainWebsocketService Factory
-
-type SubscriptionKey = `${string}:${string}`;
-
-interface MockNextTrainEntry {
-  lineCode: string;
-  stationCode: string;
-  trains: NextTrainArrival[];
-}
-
-function createMockNextTrainService(
-  entries: MockNextTrainEntry[],
-): Partial<NextTrainWebsocketService> {
-  const dataMap = new Map<SubscriptionKey, StationTrainData>();
-
-  for (const entry of entries) {
-    const key: SubscriptionKey = `${entry.lineCode}:${entry.stationCode}`;
-    dataMap.set(key, {
-      trains: entry.trains,
-      hasError: false,
-      dataReceived: true,
-      processing: false,
-      operationClosed: false,
-      outOfSchedule: false,
-    });
-  }
-
-  return {
-    connected: signal(true),
-    lastUpdate: signal(Date.now()),
-    stationData: signal(dataMap),
-    subscribe: () => () => undefined,
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
-    unsubscribe: () => {},
-    getTrains: (lineCode: 'L8' | 'L9', stationCode: string) => {
-      const key: SubscriptionKey = `${lineCode}:${stationCode}`;
-      return dataMap.get(key)?.trains ?? [];
-    },
-  };
-}
-
-// Provider Factory
-
-function createProviders(
-  stop: BusStopGraphQL,
-  serviceOpts: MockRailServiceOptions,
-  nextTrainData: MockNextTrainEntry[] = [],
-) {
-  return [
-    {
-      provide: MatDialogRef,
-      useValue: { close: () => console.log('dialog closed') },
-    },
-    {
-      provide: MAT_DIALOG_DATA,
-      useValue: { stop },
-    },
-    {
-      provide: StationNameService,
-      useValue: {
-        normalizeStationName: (name: string) => name,
-        formatStationName: (name: string) => name,
-      },
-    },
-    {
-      provide: LoggerService,
-      useValue: {
-        debug: (...logArgs: unknown[]) => console.debug('[story] ', ...logArgs),
-        error: (...logArgs: unknown[]) => console.error('[story] ', ...logArgs),
-      },
-    },
-    {
-      provide: API_BASE_URL,
-      useValue: 'http://localhost',
-    },
-    {
-      provide: RailGraphqlService,
-      useValue: createMockRailGraphqlService(serviceOpts),
-    },
-    {
-      provide: NextTrainWebsocketService,
-      useValue: createMockNextTrainService(nextTrainData),
-    },
-  ];
-}
+  PARAISO,
+  JABAQUARA,
+  SAO_JUDAS,
+  SANTA_CRUZ,
+  SANTANA,
+  VILA_DAS_BELEZAS,
+  PINHEIROS,
+  PINHEIROS_TRAINS,
+  OSASCO,
+  OSASCO_L8_TRAINS,
+  OSASCO_L9_TRAINS,
+  createSubwayStationDialogProviders,
+} from './subway-station-dialog.stories.fixtures';
 
 // Meta
 
@@ -289,7 +61,7 @@ type Story = StoryObj<SubwayStationDialogComponent>;
 export const Default: Story = {
   decorators: [
     applicationConfig({
-      providers: createProviders(PARAISO, {
+      providers: createSubwayStationDialogProviders(PARAISO, {
         cached: null,
         isFresh: true,
         fetchKind: 'normal',
@@ -305,7 +77,7 @@ export const Default: Story = {
 export const BathroomWithAccessNote: Story = {
   decorators: [
     applicationConfig({
-      providers: createProviders(JABAQUARA, {
+      providers: createSubwayStationDialogProviders(JABAQUARA, {
         cached: null,
         isFresh: true,
         fetchKind: 'normal',
@@ -321,7 +93,7 @@ export const BathroomWithAccessNote: Story = {
 export const BathroomsInPaidAndFreeAreas: Story = {
   decorators: [
     applicationConfig({
-      providers: createProviders(SANTA_CRUZ, {
+      providers: createSubwayStationDialogProviders(SANTA_CRUZ, {
         cached: null,
         isFresh: true,
         fetchKind: 'normal',
@@ -337,7 +109,7 @@ export const BathroomsInPaidAndFreeAreas: Story = {
 export const WithoutBathrooms: Story = {
   decorators: [
     applicationConfig({
-      providers: createProviders(SAO_JUDAS, {
+      providers: createSubwayStationDialogProviders(SAO_JUDAS, {
         cached: null,
         isFresh: true,
         fetchKind: 'normal',
@@ -353,7 +125,7 @@ export const WithoutBathrooms: Story = {
 export const BathroomLocationUnknown: Story = {
   decorators: [
     applicationConfig({
-      providers: createProviders(SANTANA, {
+      providers: createSubwayStationDialogProviders(SANTANA, {
         cached: null,
         isFresh: true,
         fetchKind: 'normal',
@@ -369,7 +141,7 @@ export const BathroomLocationUnknown: Story = {
 export const BathroomInfoUnknown: Story = {
   decorators: [
     applicationConfig({
-      providers: createProviders(VILA_DAS_BELEZAS, {
+      providers: createSubwayStationDialogProviders(VILA_DAS_BELEZAS, {
         cached: null,
         isFresh: true,
         fetchKind: 'normal',
@@ -386,7 +158,7 @@ export const BathroomInfoUnknown: Story = {
 export const Loading: Story = {
   decorators: [
     applicationConfig({
-      providers: createProviders(PARAISO, {
+      providers: createSubwayStationDialogProviders(PARAISO, {
         cached: null,
         isFresh: false,
         fetchKind: 'normal',
@@ -402,7 +174,7 @@ export const Loading: Story = {
 export const WithCachedData: Story = {
   decorators: [
     applicationConfig({
-      providers: createProviders(PARAISO, {
+      providers: createSubwayStationDialogProviders(PARAISO, {
         cached: {
           lines: [L1_NORMAL, L2_NORMAL],
           lastUpdated: new Date(),
@@ -423,7 +195,7 @@ export const WithCachedData: Story = {
 export const WithIssues: Story = {
   decorators: [
     applicationConfig({
-      providers: createProviders(PARAISO, {
+      providers: createSubwayStationDialogProviders(PARAISO, {
         cached: null,
         isFresh: true,
         fetchKind: 'issue',
@@ -439,7 +211,7 @@ export const WithIssues: Story = {
 export const StatusUnavailable: Story = {
   decorators: [
     applicationConfig({
-      providers: createProviders(PARAISO, {
+      providers: createSubwayStationDialogProviders(PARAISO, {
         cached: null,
         isFresh: true,
         fetchKind: 'unavailable',
@@ -455,7 +227,7 @@ export const StatusUnavailable: Story = {
 export const FetchError: Story = {
   decorators: [
     applicationConfig({
-      providers: createProviders(PARAISO, {
+      providers: createSubwayStationDialogProviders(PARAISO, {
         cached: null,
         isFresh: false,
         fetchKind: 'error',
@@ -471,7 +243,7 @@ export const FetchError: Story = {
 export const NoLinesFound: Story = {
   decorators: [
     applicationConfig({
-      providers: createProviders(
+      providers: createSubwayStationDialogProviders(
         { ...PARAISO, routeShortNames: [] },
         {
           cached: null,
@@ -490,7 +262,7 @@ export const NoLinesFound: Story = {
 export const OperationClosed: Story = {
   decorators: [
     applicationConfig({
-      providers: createProviders(PARAISO, {
+      providers: createSubwayStationDialogProviders(PARAISO, {
         cached: {
           lines: [
             L1_CLOSED,
@@ -519,7 +291,7 @@ export const OperationClosed: Story = {
 export const StaleCacheRefreshing: Story = {
   decorators: [
     applicationConfig({
-      providers: createProviders(PARAISO, {
+      providers: createSubwayStationDialogProviders(PARAISO, {
         cached: {
           lines: [L1_NORMAL, L2_NORMAL],
           lastUpdated: new Date(Date.now() - 5 * 60 * 1000),
@@ -542,7 +314,7 @@ export const StaleCacheRefreshing: Story = {
 export const L9WithNextTrain: Story = {
   decorators: [
     applicationConfig({
-      providers: createProviders(
+      providers: createSubwayStationDialogProviders(
         PINHEIROS,
         {
           cached: {
@@ -567,7 +339,7 @@ export const L9WithNextTrain: Story = {
 export const L9TrainAtPlatform: Story = {
   decorators: [
     applicationConfig({
-      providers: createProviders(
+      providers: createSubwayStationDialogProviders(
         PINHEIROS,
         {
           cached: {
@@ -598,7 +370,7 @@ export const L9TrainAtPlatform: Story = {
 export const L9LoadingNextTrain: Story = {
   decorators: [
     applicationConfig({
-      providers: createProviders(
+      providers: createSubwayStationDialogProviders(
         PINHEIROS,
         {
           cached: {
@@ -625,7 +397,7 @@ export const L9LoadingNextTrain: Story = {
 export const MultiLineStationOsasco: Story = {
   decorators: [
     applicationConfig({
-      providers: createProviders(
+      providers: createSubwayStationDialogProviders(
         OSASCO,
         {
           cached: {

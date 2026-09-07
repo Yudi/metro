@@ -3,11 +3,11 @@ import {
   LiteBusRoute,
   LiteRouteRailConnection,
   LiteSearchStop,
-} from '../../../services/lite-search.service';
+} from '../../../shared/search/lite-search.service';
 import {
   LiteArrivalLine,
   LiteStopArrivalUpdate,
-} from '../../../services/lite-realtime.service';
+} from '../../../shared/realtime/lite-realtime.service';
 import { LiteBusStopDetail } from './lite-bus-stop-detail';
 
 describe('LiteBusStopDetail', () => {

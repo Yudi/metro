@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UserResolver } from './user.resolver';
 import { PrismaService } from '../prisma/prisma.service';
-import { AuthGuard } from '../shared/guards/auth.guard';
+import { AuthGuard } from '../common/guards/auth.guard';
 import { AuthService } from './auth.service';
 
 describe('UserResolver', () => {

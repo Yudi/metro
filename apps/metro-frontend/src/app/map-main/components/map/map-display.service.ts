@@ -1,17 +1,19 @@
 import { Service, inject } from '@angular/core';
 import { Feature } from 'ol';
 import { Point } from 'ol/geom';
-import { MapService } from '../../services/map.service';
-import { LayerType } from '../../services/map-layer.service';
-import { GeographyGraphQLService } from '../../services/geography-graphql.service';
+import { MapService } from './map.service';
+import { LayerType } from './layers/map-layer.service';
+import { GeographyGraphQLService } from '../../geography/geography-graphql.service';
 import { MapStateService } from './map-state.service';
-import { BusShapeWithRoute, FeatureCreationSource } from './map.types';
-import { FeatureFactoryService } from '../../utils/feature-factory.service';
+import { FeatureCreationSource } from './map.types';
+import { FeatureFactoryService } from './feature-factory.service';
 import { LoggerService } from '@metro/shared/api';
-import { isSubwayShape } from '../../utils/transit-utils';
+import { isSubwayShape } from '../../geography/transit-utils';
 import { fromLonLat } from 'ol/proj';
 import { SAO_PAULO_CITY_CENTER_COORDINATES } from '@metro/shared/utils';
-import { createBikeStationFeatureProperties } from '../../utils/bike-feature-properties.utils';
+import { createBikeStationFeatureProperties } from './layers/bike-feature-properties.utils';
+import { MapSelectionDisplayService } from './map-selection-display.service';
+import { updatePreservedFeaturesCreationSource } from './map-feature-source.utils';
 
 @Service()
 export class MapDisplayService {
@@ -20,6 +22,7 @@ export class MapDisplayService {
   private mapState = inject(MapStateService);
   private featureFactory = inject(FeatureFactoryService);
   private logger = inject(LoggerService);
+  private readonly selectionDisplayService = inject(MapSelectionDisplayService);
 
   /**
    * Update map display with layered approach
@@ -42,7 +45,7 @@ export class MapDisplayService {
     this.updateBikeStations();
     this.updateSubwayRoutes();
     this.updateBusRoutesAndStops();
-    this.updateSelectedFeatures();
+    this.selectionDisplayService.updateSelectedFeatures();
   }
 
   /**
@@ -301,11 +304,15 @@ export class MapDisplayService {
         allSelectedIds,
       );
       // Update preserved features to have SELECTION as creation source
-      this.updatePreservedFeaturesCreationSource(
+      updatePreservedFeaturesCreationSource(
+        layerService,
+        this.logger,
         LayerType.BUS_ROUTES,
         allSelectedIds,
       );
-      this.updatePreservedFeaturesCreationSource(
+      updatePreservedFeaturesCreationSource(
+        layerService,
+        this.logger,
         LayerType.BUS_STOPS,
         allSelectedIds,
       );
@@ -398,231 +405,19 @@ export class MapDisplayService {
     );
   }
 
-  /**
-   * Update selected features layer (avoid blinking by checking existing features)
-   * Selected features are rendered in SELECTION layer so they persist when category layers are hidden
-   */
-  private updateSelectedFeatures(): void {
-    const layerService = this.mapService.getLayerService();
-
-    // Get currently selected items from state (Map-based)
-    const selectedRouteIds = new Set(this.mapState.selectedRoutes().keys());
-    const selectedStopIds = new Set(this.mapState.selectedStops().keys());
-    const selectedBikeStationIds = new Set(
-      this.mapState.selectedBikeStations().keys(),
-    );
-
-    // Get current selection layer features
-    const currentSelectionFeatures = layerService.getFeaturesFromLayer(
-      LayerType.SELECTION,
-    );
-
-    // Build target selection IDs from state
-    const targetSelectionIds = new Set([
-      ...selectedRouteIds,
-      ...selectedStopIds,
-      ...selectedBikeStationIds,
-      // Add shape IDs for selected routes
-      ...this.mapState
-        .displayedShapes()
-        .filter(
-          (shape) =>
-            shape.routeInfo && selectedRouteIds.has(shape.routeInfo.routeId),
-        )
-        .map((shape) => shape.id),
-    ]);
-
-    // Remove features that are no longer selected
-    const featuresToRemove = currentSelectionFeatures.filter((feature) => {
-      const featureId = feature.getId()?.toString();
-      const routeId = feature.getProperties()['routeId'] as string | undefined;
-      const stopId = feature.getProperties()['stopId'] as string | undefined;
-      const stationId = feature.getProperties()['stationId'] as
-        | string
-        | undefined;
-      const creationSource = feature.getProperties()['creationSource'] as
-        | FeatureCreationSource
-        | undefined;
-
-      // Check if this feature should still be selected
-      if (creationSource === FeatureCreationSource.EXPLORE) {
-        return false;
-      }
-      if (featureId && targetSelectionIds.has(featureId)) {
-        return false; // Keep it
-      }
-      if (routeId && selectedRouteIds.has(routeId)) {
-        return false; // Keep it - route is still selected
-      }
-      if (stopId && selectedStopIds.has(stopId)) {
-        return false; // Keep it - stop is still selected
-      }
-      if (stationId && selectedBikeStationIds.has(stationId)) {
-        return false; // Keep it - bike station is still selected
-      }
-      return true; // Remove it
-    });
-
-    featuresToRemove.forEach((feature) => {
-      layerService.removeFeature(LayerType.SELECTION, feature);
-      this.logger.debug('Removed deselected feature from SELECTION layer', {
-        featureId: feature.getId(),
-      });
-    });
-
-    if (
-      selectedRouteIds.size === 0 &&
-      selectedStopIds.size === 0 &&
-      selectedBikeStationIds.size === 0
-    ) {
-      this.logger.debug('No selections remaining');
-      return;
-    }
-
-    this.logger.debug('Updating selection layer');
-
-    // Add selected shapes from displayedShapes
-    this.mapState.displayedShapes().forEach((shape) => {
-      if (shape.routeInfo && selectedRouteIds.has(shape.routeInfo.routeId)) {
-        const feature = this.featureFactory.createShapeFeature(
-          shape,
-          FeatureCreationSource.SELECTION,
-        );
-
-        // Check if already in selection to avoid duplicates
-        const alreadyExists = currentSelectionFeatures.some(
-          (f) =>
-            f.getId() === feature.getId() || this.featuresAreEqual(f, feature),
-        );
-
-        if (!alreadyExists) {
-          layerService.addFeature(LayerType.SELECTION, feature);
-          this.logger.debug(
-            `Added selected shape ${shape.id} to SELECTION layer`,
-          );
-        }
-      }
-    });
-
-    // Add selected stops from displayedStops
-    this.mapState.displayedStops().forEach((stop) => {
-      if (selectedStopIds.has(stop.stopId)) {
-        const feature = this.featureFactory.createStopFeature(
-          stop,
-          FeatureCreationSource.SELECTION,
-        );
-
-        // Check if already in selection to avoid duplicates
-        const alreadyExists = currentSelectionFeatures.some(
-          (f) =>
-            f.getId() === feature.getId() || this.featuresAreEqual(f, feature),
-        );
-
-        if (!alreadyExists) {
-          layerService.addFeature(LayerType.SELECTION, feature);
-          this.logger.debug(
-            `Added selected stop ${stop.stopId} to SELECTION layer`,
-          );
-        }
-      }
-    });
-
-    // Add selected bike stations to SELECTION layer
-    this.mapState.bikeStations().forEach((station) => {
-      if (selectedBikeStationIds.has(station.stationId)) {
-        const feature = this.featureFactory.createBikeStationFeature(
-          station,
-          true, // isSelected
-          FeatureCreationSource.SELECTION,
-        );
-
-        // Check if already in selection to avoid duplicates
-        const alreadyExists = currentSelectionFeatures.some(
-          (f) => f.getId() === feature.getId(),
-        );
-
-        if (!alreadyExists) {
-          layerService.addFeature(LayerType.SELECTION, feature);
-          this.logger.debug(
-            `Added selected bike station ${station.stationId} to SELECTION layer`,
-          );
-        }
-      }
-    });
-  }
-
-  /**
-   * Add a selected feature to the selection layer
-   */
+  /** Add a feature to the dedicated selection layer. */
   addToSelectionLayer(feature: Feature): void {
-    const layerService = this.mapService.getLayerService();
-
-    // Override creation source to selection when user manually selects a feature
-    feature.setProperties({
-      ...feature.getProperties(),
-      creationSource: FeatureCreationSource.SELECTION,
-    });
-
-    // Check if feature exists in other layers and move it
-    const subwayRouteFeatures = layerService.getFeaturesFromLayer(
-      LayerType.RAIL_ROUTES,
-    );
-    const matchingFeature = subwayRouteFeatures.find(
-      (f) => f.getId() === feature.getId() || this.featuresAreEqual(f, feature),
-    );
-
-    if (matchingFeature) {
-      // Update creation source of existing feature and move it
-      matchingFeature.setProperties({
-        ...matchingFeature.getProperties(),
-        creationSource: FeatureCreationSource.SELECTION,
-      });
-      layerService.moveFeature(
-        matchingFeature,
-        LayerType.RAIL_ROUTES,
-        LayerType.SELECTION,
-      );
-    } else {
-      // Add directly to selection layer
-      layerService.addFeature(LayerType.SELECTION, feature);
-    }
+    this.selectionDisplayService.addToSelectionLayer(feature);
   }
 
-  /**
-   * Remove a feature from the selection layer
-   */
+  /** Return a selected feature to its category layer or remove it. */
   removeFromSelectionLayer(feature: Feature): void {
-    const layerService = this.mapService.getLayerService();
-    const isSubwayRoute = feature.getProperties()['isSubwayRoute'];
-
-    if (isSubwayRoute) {
-      // Move back to subway routes layer if it's a subway route
-      layerService.moveFeature(
-        feature,
-        LayerType.SELECTION,
-        LayerType.RAIL_ROUTES,
-      );
-    } else {
-      // Just remove it
-      layerService.removeFeature(LayerType.SELECTION, feature);
-    }
+    this.selectionDisplayService.removeFromSelectionLayer(feature);
   }
 
-  /**
-   * Clear selection layer
-   */
+  /** Clear the dedicated selection layer. */
   clearSelectionLayer(): void {
-    const layerService = this.mapService.getLayerService();
-    layerService.clearLayer(LayerType.SELECTION);
-  }
-
-  /**
-   * Check if two features represent the same thing
-   */
-  private featuresAreEqual(f1: Feature, f2: Feature): boolean {
-    const id1 = f1.getProperties()['id'];
-    const id2 = f2.getProperties()['id'];
-    return id1 && id2 && id1 === id2;
+    this.selectionDisplayService.clearSelectionLayer();
   }
 
   /**
@@ -636,14 +431,6 @@ export class MapDisplayService {
     if (stop.isSubwayStation) return true;
     const stopIdNum = parseInt(stop.stopId, 10);
     return !isNaN(stopIdNum) && stopIdNum <= 19045;
-  }
-
-  /**
-   * Check if a shape is currently selected
-   */
-  private isShapeSelected(shape: BusShapeWithRoute): boolean {
-    if (!shape.routeInfo) return false;
-    return this.mapState.selectedRoutes().has(shape.routeInfo.routeId);
   }
 
   // Map navigation controls
@@ -702,50 +489,5 @@ export class MapDisplayService {
   clearFeaturesBySource(source: FeatureCreationSource): void {
     const layerService = this.mapService.getLayerService();
     layerService.removeFeaturesByCreationSourceFromAllLayers(source);
-  }
-
-  /**
-   * Check if a feature represents a currently selected route/stop and should be preserved
-   */
-  private isFeatureSelected(feature: Feature): boolean {
-    const featureId = feature.getId()?.toString();
-    if (!featureId) return false;
-
-    const selectedRoutes = this.mapState.selectedRoutes();
-    const selectedStops = this.mapState.selectedStops();
-
-    // Check if this feature represents a selected route or stop
-    return selectedRoutes.has(featureId) || selectedStops.has(featureId);
-  }
-
-  /**
-   * Update creation source of preserved features to reflect their current status
-   */
-  private updatePreservedFeaturesCreationSource(
-    layerType: LayerType,
-    selectedIds: Set<string>,
-  ): void {
-    const layerService = this.mapService.getLayerService();
-    const features = layerService.getFeaturesFromLayer(layerType);
-
-    features.forEach((feature) => {
-      const featureId = feature.getId()?.toString();
-      const currentSource = feature.getProperties()['creationSource'];
-
-      if (
-        featureId &&
-        selectedIds.has(featureId) &&
-        currentSource === FeatureCreationSource.ROUTE_DISPLAY
-      ) {
-        // Update the creation source to SELECTION since this feature is now preserved due to selection
-        feature.getProperties()['creationSource'] =
-          FeatureCreationSource.SELECTION;
-        this.logger.debug('Updated feature creation source', {
-          featureId,
-          from: currentSource,
-          to: FeatureCreationSource.SELECTION,
-        });
-      }
-    });
   }
 }

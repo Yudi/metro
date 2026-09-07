@@ -33,10 +33,10 @@ import {
   SearchResultUnion,
 } from '../entities/search.entity';
 import { SearchFiltersInput } from '../dto/search.input';
-import { DevelopmentOnlyGuard } from '../../shared/guards/development-only.guard';
-import { DevOnly } from '../../shared/decorators/development-only.decorator';
-import type { GraphQLLoaders } from '../../shared/graphql/loaders.service';
-import { Loaders } from '../../shared/graphql/loaders.decorator';
+import { DevelopmentOnlyGuard } from '../../common/guards/development-only.guard';
+import { DevOnly } from '../../common/decorators/development-only.decorator';
+import type { GraphQLLoaders } from '../../common/graphql/loaders.service';
+import { Loaders } from '../../common/graphql/loaders.decorator';
 import {
   RAIL_LINES,
   getRailLineByCode,

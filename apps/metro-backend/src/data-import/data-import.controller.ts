@@ -13,8 +13,8 @@ import {
   GTFSDatasetResponseDto,
   ImportStatusDto,
 } from './dto/gtfs-dataset.dto';
-import { DevelopmentOnlyGuard } from '../shared/guards/development-only.guard';
-import { DevOnly } from '../shared/decorators/development-only.decorator';
+import { DevelopmentOnlyGuard } from '../common/guards/development-only.guard';
+import { DevOnly } from '../common/decorators/development-only.decorator';
 
 @ApiTags('GTFS Data Import')
 @Controller('gtfs')

@@ -32,31 +32,28 @@ import {
   TypesenseSearchService,
   TypesenseSearchResponse,
   NearbyStopsResponse,
-  TypesenseSearchResult,
-  TypesenseRoute,
-  TypesenseStop,
-} from '../../../services/typesense-search.service';
+} from '../../../search/typesense-search.service';
 import { GeolocationService } from '@metro/shared/geolocation';
 
 import {
-  normalizeStationName,
-  shouldMergeStations,
-  toTitleCase,
   hardNormalizeString,
   SpecialRailService,
   extractLineCodesFromRouteNames,
   getLiveTrainTrackingApiIds,
-  mapTypesenseStopToTransitSearchResult,
-  getBusAgencyOrder,
 } from '@metro/shared/utils';
-import { GeographyGraphQLService } from '../../services/geography-graphql.service';
+import { GeographyGraphQLService } from '../../geography/geography-graphql.service';
 import {
   SearchResult,
   SearchResultCardComponent,
-  SearchResultType,
 } from './search-result-card/search-result-card.component';
 import { LoggerService, RailGraphqlService } from '@metro/shared/api';
 import { forkJoin } from 'rxjs';
+import {
+  mapNearbyStop,
+  mapTypesenseResult,
+  mergeSubwayStationResults,
+  orderSearchResults,
+} from './search-dialog.utils';
 
 @Component({
   selector: 'app-search-dialog',
@@ -316,101 +313,44 @@ export class SearchDialogComponent implements AfterViewInit {
     }
 
     const results = response.results
-      .map((result: TypesenseSearchResult): SearchResult | null => {
-        const document = result.document;
-
-        if (result.type === 'route') {
-          const route = document as TypesenseRoute;
-          const isRailLine = route.source === 'rail';
-          return {
-            id: route.id,
-            name: isRailLine ? route.route_long_name : route.route_short_name,
-            type: 'route' as SearchResultType,
-            description: isRailLine
-              ? route.route_short_name
-              : route.route_long_name,
-            routeData: route,
-            latitude: undefined,
-            longitude: undefined,
-            source: route.source || 'gtfs',
-          };
-        } else {
-          const stop = document as TypesenseStop;
-          const stopResult = mapTypesenseStopToTransitSearchResult(stop);
-
-          return stopResult
-            ? {
-                ...stopResult,
-                type: stopResult.type as SearchResultType,
-              }
-            : null;
-        }
-      })
-      .filter(
-        (result): result is SearchResult => result !== null,
-      ) as SearchResult[];
-
-    const orderedResults = results
-      .map((result, index) => ({ result, index }))
-      .sort((a, b) => {
-        if (a.result.type !== 'route' || b.result.type !== 'route') {
-          return a.index - b.index;
-        }
-
-        const aRoute = a.result.routeData;
-        const bRoute = b.result.routeData;
-        if (!aRoute || !bRoute) {
-          return a.index - b.index;
-        }
-
-        return (
-          getBusAgencyOrder({
-            routeId: aRoute.route_id,
-            sourceAgency: aRoute.sourceAgency,
-          }) -
-            getBusAgencyOrder({
-              routeId: bRoute.route_id,
-              sourceAgency: bRoute.sourceAgency,
-            }) || a.index - b.index
-        );
-      })
-      .map(({ result }) => result);
+      .map(mapTypesenseResult)
+      .filter((result): result is SearchResult => result !== null);
+    const orderedResults = orderSearchResults(results);
 
     this.logger.debug(
       '[processSearchResults] Before merge:',
       orderedResults
-        .filter((r) => r.type === 'subway_station')
-        .map((r) => ({
-          id: r.id,
-          name: r.name,
-          routes: r.routes,
-          source: r.source,
+        .filter((result) => result.type === 'subway_station')
+        .map((result) => ({
+          id: result.id,
+          name: result.name,
+          routes: result.routes,
+          source: result.source,
         })),
     );
 
-    // Merge duplicate subway stations
     const specialResults = this.getMatchingSpecialServices(specialServices);
     const mergedResults = [
       ...specialResults,
-      ...this.mergeSubwayStationResults(orderedResults),
+      ...mergeSubwayStationResults(orderedResults),
     ];
 
     this.logger.debug(
       '[processSearchResults] After merge:',
       mergedResults
-        .filter((r) => r.type === 'subway_station')
-        .map((r) => ({
-          id: r.id,
-          name: r.name,
-          routes: r.routes,
-          source: r.source,
+        .filter((result) => result.type === 'subway_station')
+        .map((result) => ({
+          id: result.id,
+          name: result.name,
+          routes: result.routes,
+          source: result.source,
         })),
     );
 
     this.searchResults.set(mergedResults);
-
-    // Fetch routes for GTFS stops only (GPKG stations already have line info)
-    const gtfsStops = mergedResults.filter((r) => r.source === 'gtfs');
+    const gtfsStops = mergedResults.filter(
+      (result) => result.source === 'gtfs',
+    );
     if (gtfsStops.length > 0) {
       this.fetchRoutesForStops(gtfsStops);
     }
@@ -442,26 +382,14 @@ export class SearchDialogComponent implements AfterViewInit {
     }
 
     const results = response.stops
-      .map((stop: TypesenseStop): SearchResult | null => {
-        const stopResult = mapTypesenseStopToTransitSearchResult(stop);
-
-        return stopResult
-          ? {
-              ...stopResult,
-              type: stopResult.type as SearchResultType,
-            }
-          : null;
-      })
-      .filter(
-        (result): result is SearchResult => result !== null,
-      ) as SearchResult[];
-
-    // Merge duplicate subway stations
-    const mergedResults = this.mergeSubwayStationResults(results);
+      .map(mapNearbyStop)
+      .filter((result): result is SearchResult => result !== null);
+    const mergedResults = mergeSubwayStationResults(results);
     this.searchResults.set(mergedResults);
 
-    // Fetch routes for GTFS stops only (GPKG stations already have line info)
-    const gtfsStops = mergedResults.filter((r) => r.source === 'gtfs');
+    const gtfsStops = mergedResults.filter(
+      (result) => result.source === 'gtfs',
+    );
     if (gtfsStops.length > 0) {
       this.fetchRoutesForStops(gtfsStops);
     }
@@ -514,68 +442,5 @@ export class SearchDialogComponent implements AfterViewInit {
           this.logger.error('Failed to fetch routes for stops', error);
         },
       });
-  }
-
-  /** Merge subway station results that represent the same physical location */
-  private mergeSubwayStationResults(results: SearchResult[]): SearchResult[] {
-    // Separate subway stations from other results
-    const subwayStations = results.filter((r) => r.type === 'subway_station');
-    if (subwayStations.length === 0) {
-      return results;
-    }
-
-    const stationGroups = this.groupSubwayStations(subwayStations);
-    const mergedStationByFirstId = new Map<string, SearchResult>();
-    const duplicateStationIds = new Set<string>();
-
-    for (const stations of stationGroups) {
-      const base = stations[0];
-      const allRoutes = new Set<string>();
-
-      stations.forEach((station, index) => {
-        station.routes?.forEach((route) => allRoutes.add(route));
-        if (index > 0) {
-          duplicateStationIds.add(station.id);
-        }
-      });
-
-      mergedStationByFirstId.set(base.id, {
-        ...base,
-        name: toTitleCase(normalizeStationName(base.name)),
-        routes: Array.from(allRoutes).sort(),
-      });
-    }
-
-    return results
-      .map((result) => {
-        if (result.type !== 'subway_station') {
-          return result;
-        }
-
-        if (duplicateStationIds.has(result.id)) {
-          return null;
-        }
-
-        return mergedStationByFirstId.get(result.id) ?? result;
-      })
-      .filter((result): result is SearchResult => result !== null);
-  }
-
-  private groupSubwayStations(stations: SearchResult[]): SearchResult[][] {
-    const groups: SearchResult[][] = [];
-
-    for (const station of stations) {
-      const group = groups.find((items) =>
-        shouldMergeStations(station.name, items[0].name),
-      );
-
-      if (group) {
-        group.push(station);
-      } else {
-        groups.push([station]);
-      }
-    }
-
-    return groups;
   }
 }

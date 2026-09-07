@@ -11,11 +11,11 @@ import { emptyFavorites } from '@metro/shared/utils';
 import { GeolocationService } from '@metro/shared/geolocation';
 import { MapMainComponent } from './map-main.component';
 
-import { BikeStationsService } from './services/bike-stations.service';
-import { RealtimeWebsocketService } from './services/realtime-websocket.service';
-import { RealtimeVehicleLayerService } from './services/realtime-vehicle-layer.service';
-import { CptmVehicleLayerService } from './services/cptm-vehicle-layer.service';
-import { UserLocationLayerService } from './services/user-location-layer.service';
+import { BikeStationsService } from './geography/bike-stations.service';
+import { RealtimeWebsocketService } from './realtime/realtime-websocket.service';
+import { RealtimeVehicleLayerService } from './realtime/realtime-vehicle-layer.service';
+import { CptmVehicleLayerService } from './realtime/cptm-vehicle-layer.service';
+import { UserLocationLayerService } from './components/map/user-location-layer.service';
 
 describe('Bus', () => {
   let component: MapMainComponent;

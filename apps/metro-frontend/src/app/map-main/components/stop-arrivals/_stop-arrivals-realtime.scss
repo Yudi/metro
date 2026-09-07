@@ -1,0 +1,256 @@
+.compact-card {
+  margin: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+
+  mat-card-content {
+    padding: 0;
+  }
+
+  .loading-state,
+  .no-data-state {
+    min-height: 96px;
+    padding: 18px 12px;
+
+    mat-icon {
+      width: 28px;
+      height: 28px;
+      margin-bottom: 4px;
+      font-size: 28px;
+    }
+
+    p {
+      margin: 4px 0;
+      font-size: 13px;
+    }
+  }
+
+  .arrivals-list {
+    gap: 8px;
+  }
+
+  .arrival-line {
+    padding: 10px;
+    background: var(--mat-sys-surface-container-lowest);
+
+    &:hover {
+      background: var(--mat-sys-surface-container-low);
+    }
+  }
+
+  .line-header {
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+  }
+
+  .line-info {
+    gap: 8px;
+  }
+
+  .line-code {
+    min-width: 54px;
+    padding: 4px 6px;
+    font-size: 13px;
+    text-align: center;
+  }
+
+  .line-destination {
+    font-size: 12px;
+  }
+
+  .vehicles-list {
+    gap: 6px;
+  }
+
+  .vehicle-arrival {
+    min-height: 36px;
+    padding: 6px 8px;
+  }
+
+  .vehicle-id,
+  .arrival-time {
+    font-size: 12px;
+  }
+
+  .arrival-countdown {
+    font-size: 13px;
+  }
+
+  .show-vehicles-button {
+    min-height: 32px;
+    margin-top: 6px;
+    font-size: 12px;
+  }
+}
+
+.loading-state,
+.no-data-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  text-align: center;
+
+  mat-icon {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+    color: var(--mat-sys-outline);
+    margin-bottom: 16px;
+  }
+
+  p {
+    margin: 8px 0;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  .hint {
+    font-size: 12px;
+    opacity: 0.7;
+  }
+}
+
+.arrivals-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.arrival-line {
+  padding: 12px;
+  background: var(--mat-sys-surface-container);
+  border-radius: 8px;
+  border: 1px solid var(--mat-sys-outline-variant);
+
+  &:hover {
+    background: color-mix(
+      in srgb,
+      var(--mat-sys-primary-container) 22%,
+      var(--mat-sys-surface-container)
+    );
+  }
+}
+
+.line-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--mat-sys-outline-variant);
+}
+
+.line-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.line-code {
+  font-weight: bold;
+  color: var(--mat-sys-on-primary);
+  font-size: 16px;
+  padding: 4px 8px;
+  background: var(--mat-sys-primary);
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.line-destination {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  color: var(--mat-sys-on-surface);
+  min-width: 0;
+
+  .small-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+.vehicle-count {
+  font-size: 12px;
+  color: var(--mat-sys-on-secondary-container);
+  padding: 2px 8px;
+  background: var(--mat-sys-secondary-container);
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.vehicles-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.show-vehicles-button {
+  margin-top: 8px;
+  border-radius: 8px;
+
+  mat-icon {
+    width: 18px;
+    height: 18px;
+    font-size: 18px;
+  }
+}
+
+.vehicle-arrival {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  background: var(--mat-sys-surface);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  transition: background 0.2s;
+
+  &:hover {
+    background: var(--mat-sys-surface-container-high);
+  }
+}
+
+.vehicle-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vehicle-id {
+  font-size: 13px;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.accessible-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  color: var(--mat-sys-primary);
+}
+
+.arrival-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.arrival-countdown {
+  font-weight: bold;
+  color: var(--mat-sys-tertiary);
+  font-size: 14px;
+}
+
+.arrival-time {
+  font-size: 13px;
+  color: var(--mat-sys-on-surface-variant);
+  font-family: monospace;
+}

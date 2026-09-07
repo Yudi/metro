@@ -7,7 +7,7 @@ import {
   ChangeDetectionStrategy,
 } from '@angular/core';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { RealtimeWebsocketService } from '../../services/realtime-websocket.service';
+import { RealtimeWebsocketService } from '../../realtime/realtime-websocket.service';
 import { BreathingAnimationService } from '../../../shared/services/breathing-animation.service';
 
 /**

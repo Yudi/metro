@@ -1,4 +1,4 @@
-import { BusInformationService } from '../../services/bus-information.service';
+import { BusInformationService } from '../bus-information/bus-information.service';
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
@@ -8,12 +8,12 @@ import {
   GeographyGraphQLService,
   RouteRailConnectionGraphQL,
   ScheduledBusDepartureGraphQL,
-} from '../../services/geography-graphql.service';
+} from '../../geography/geography-graphql.service';
 import {
   LineWithVehicles,
   RealtimeWebsocketService,
   StopArrivalUpdate,
-} from '../../services/realtime-websocket.service';
+} from '../../realtime/realtime-websocket.service';
 import { StopArrivalsComponent } from './stop-arrivals.component';
 
 describe('StopArrivalsComponent', () => {

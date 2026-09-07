@@ -5,7 +5,7 @@ import { provideRouter } from '@angular/router';
 import { ApiService, FavoritesService } from '@metro/shared/api';
 import { emptyFavorites } from '@metro/shared/utils';
 import { of } from 'rxjs';
-import { GeographyGraphQLService } from '../map-main/services/geography-graphql.service';
+import { GeographyGraphQLService } from '../map-main/geography/geography-graphql.service';
 import { InsightsDashboardComponent } from './insights-dashboard.component';
 
 describe('InsightsDashboardComponent', () => {

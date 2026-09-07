@@ -2,7 +2,7 @@ import { Meta, StoryObj, applicationConfig } from '@storybook/angular';
 import { signal } from '@angular/core';
 import { MapFooterComponent } from './map-footer.component';
 import { RealtimeStatusComponent } from '../../realtime-status/realtime-status.component';
-import { RealtimeWebsocketService } from '../../../services/realtime-websocket.service';
+import { RealtimeWebsocketService } from '../../../realtime/realtime-websocket.service';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { OLHOVIVO_POLL_INTERVAL_MS } from '@metro/shared/utils';

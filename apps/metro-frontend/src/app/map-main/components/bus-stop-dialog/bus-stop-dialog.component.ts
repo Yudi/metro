@@ -17,7 +17,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import {
   BusStopGraphQL,
   BusRouteGraphQL,
-} from '../../services/geography-graphql.service';
+} from '../../geography/geography-graphql.service';
 import { FavoritesService, LoggerService } from '@metro/shared/api';
 import { StopArrivalsComponent } from '../stop-arrivals/stop-arrivals.component';
 import {

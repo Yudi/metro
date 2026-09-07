@@ -8,20 +8,7 @@ import {
   Prisma,
   historical_incident_event_type,
 } from '../../generated/prisma/client';
-import {
-  getRailLineByCode,
-  getStationName as getStaticStationName,
-  isKnownRailLineCode,
-  isActualCptmLine,
-  isSpecialCptmLine,
-} from '@metro/shared/utils';
-import type {
-  DirectionHeadway,
-  ExtendedNextTrainLineCode,
-  NextTrainLineCode,
-  StationHeadway,
-} from '@metro/shared/utils';
-import type { RailStatusCode } from '@metro/shared/utils';
+import type { StationHeadway } from '@metro/shared/utils';
 import { RailRealtimeSourcePort } from '@metro/rail-integration-contracts';
 import type { RailLine } from '../rail/entities/rail-line-status.entity';
 import { HistoricalDataFilterInput } from './dto/historical-data.input';
@@ -31,51 +18,40 @@ import {
 } from './entities/historical-data.entity';
 import { PrismaService } from '../prisma/prisma.service';
 import { randomUUID } from 'node:crypto';
+import type {
+  HeadwayCalculationSamples,
+  RecordHeadwayErrorParams,
+  RecordRetrievalIssueParams,
+  RecordRetrievalRecoveredParams,
+} from './historical.types';
+import {
+  BACKEND_LIFECYCLE_SOURCE,
+  DEFAULT_HISTORY_LIMIT,
+  RAIL_STATUS_SOURCE,
+  buildHeadwaySnapshotData,
+  buildHeadwayWhere,
+  buildIncidentWhere,
+  buildRailEventData,
+  clampHistoryLimit,
+  compactJsonObject,
+  countsRailStatusAsIncident,
+  errorToJsonObject,
+  getRailAgency,
+  getStaticHistoricalStationName,
+  isExternalRailLine,
+  isKnownHistoricalRailLine,
+  sanitizeHeadwayErrors,
+  sanitizeHeadwayMetadata,
+  sanitizeIncidentMetadata,
+  withHeadwayStationNames,
+} from './historical-data.utils';
 
-export interface RecordRetrievalIssueParams {
-  source: string;
-  attemptedAt: Date;
-}
-
-export interface RecordRetrievalRecoveredParams {
-  source: string;
-  recoveredAt: Date;
-}
-
-export interface RecordHeadwayErrorParams {
-  lineCode: string;
-  stationCode: string;
-  direction?: string;
-  source?: string;
-  observedAt?: Date;
-  sampleCount?: number;
-  bucket?: string;
-  bucketLabel?: string;
-  reason: string;
-  error?: unknown;
-  metadata?: Prisma.InputJsonValue;
-}
-
-export interface HeadwayCalculationSamples {
-  intervalsSeconds: number[];
-  discardedIntervalCount: number;
-  minimumIntervals: number;
-  maximumPassages: number;
-  targetBucket?: string;
-  selectedBucket?: string;
-}
-
-const DEFAULT_HISTORY_LIMIT = 100;
-const MAX_HISTORY_LIMIT = 500;
-const BACKEND_LIFECYCLE_SOURCE = 'backend_lifecycle';
-const RAIL_STATUS_SOURCE = 'rail_status';
-const NON_INCIDENT_RAIL_STATUS_CODES = new Set<RailStatusCode>([
-  'OperacaoNormal',
-  'OperacaoTransitoria',
-  'OperacaoEspecial',
-  'OperacaoDiferenciada',
-  'OperacaoEncerrada',
-]);
+export type {
+  HeadwayCalculationSamples,
+  RecordHeadwayErrorParams,
+  RecordRetrievalIssueParams,
+  RecordRetrievalRecoveredParams,
+} from './historical.types';
 
 @Injectable()
 export class HistoricalService implements OnModuleInit, OnModuleDestroy {
@@ -105,7 +81,7 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
     limit = DEFAULT_HISTORY_LIMIT,
     offset = 0,
   ): Promise<HistoricalDataEntity> {
-    const take = this.clampLimit(limit);
+    const take = clampHistoryLimit(limit);
     const skip = Math.max(0, offset);
     const includeIncidents = filter?.includeIncidents ?? true;
     const includeHeadway = filter?.includeHeadway ?? true;
@@ -113,7 +89,7 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
     const [incidents, headwaySnapshots] = await Promise.all([
       includeIncidents
         ? this.prisma.historicalIncidentEvent.findMany({
-            where: this.buildIncidentWhere(filter),
+            where: buildIncidentWhere(filter),
             orderBy: { observedAt: 'desc' },
             take,
             skip,
@@ -121,7 +97,7 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
         : Promise.resolve([]),
       includeHeadway
         ? this.prisma.historicalHeadwaySnapshot.findMany({
-            where: this.buildHeadwayWhere(filter),
+            where: buildHeadwayWhere(filter),
             orderBy: { observedAt: 'desc' },
             take,
             skip,
@@ -129,20 +105,22 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
         : Promise.resolve([]),
     ]);
 
-    const enrichedHeadwaySnapshots =
-      await this.withHeadwayStationNames(headwaySnapshots);
+    const enrichedHeadwaySnapshots = await withHeadwayStationNames(
+      headwaySnapshots,
+      this.resolveStationName.bind(this),
+    );
 
     return {
       incidents: incidents.map((event) => ({
         ...event,
         eventType: event.eventType as HistoricalIncidentEventType,
-        metadata: this.sanitizeIncidentMetadata(event.metadata),
+        metadata: sanitizeIncidentMetadata(event.metadata),
       })),
       headwaySnapshots: enrichedHeadwaySnapshots.map((snapshot) => ({
         ...snapshot,
         samples: snapshot.samples ?? undefined,
-        errors: this.sanitizeHeadwayErrors(snapshot.errors),
-        metadata: this.sanitizeHeadwayMetadata(snapshot.metadata),
+        errors: sanitizeHeadwayErrors(snapshot.errors),
+        metadata: sanitizeHeadwayMetadata(snapshot.metadata),
       })),
     };
   }
@@ -151,7 +129,7 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
     lines: RailLine[],
     metadata?: Prisma.InputJsonValue,
   ): Promise<void> {
-    const knownLines = lines.filter((line) => isKnownRailLineCode(line.code));
+    const knownLines = lines.filter(isKnownHistoricalRailLine);
 
     await this.runSafely('record rail status history', async () => {
       await Promise.all(
@@ -182,7 +160,7 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
             title: 'Falha na recuperação de dados externos',
             description:
               'A recuperação de dados externos falhou temporariamente.',
-            metadata: this.compactJsonObject({
+            metadata: compactJsonObject({
               attemptedAt: params.attemptedAt.toISOString(),
             }),
           },
@@ -231,11 +209,12 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
 
       await this.prisma.historicalHeadwaySnapshot.createMany({
         data: headway.directions.map((direction) =>
-          this.buildHeadwaySnapshotData(
+          buildHeadwaySnapshotData(
             headway,
             direction,
             samplesByDirection.get(direction.direction),
             stationName,
+            this.getRequiredRailAgency.bind(this),
           ),
         ),
       });
@@ -259,11 +238,9 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
           bucket: params.bucket,
           bucketLabel: params.bucketLabel,
           source: params.source ?? 'headway_tracking',
-          errors: this.compactJsonObject({
+          errors: compactJsonObject({
             reason: params.reason,
-            error: params.error
-              ? this.errorToJsonObject(params.error)
-              : undefined,
+            error: params.error ? errorToJsonObject(params.error) : undefined,
           }),
           metadata: params.metadata,
         },
@@ -282,7 +259,7 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
           source: this.backendInstanceSource,
           severity: 'normal',
           title: 'Instância do backend online',
-          metadata: this.compactJsonObject({
+          metadata: compactJsonObject({
             pid: process.pid,
             nodeEnv: process.env.NODE_ENV,
           }),
@@ -350,7 +327,7 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
         title: 'Instância do backend possivelmente ficou offline',
         description:
           'O processo anterior não registrou um desligamento limpo antes desta inicialização.',
-        metadata: this.compactJsonObject({
+        metadata: compactJsonObject({
           previousOnlineEventId: latestLifecycleEvent.id,
           detectionReason: 'previous_online_without_offline_event',
         }),
@@ -368,7 +345,7 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
           severity: 'warning',
           title: 'Instância do backend offline',
           description: reason,
-          metadata: this.compactJsonObject({
+          metadata: compactJsonObject({
             pid: process.pid,
             reason,
           }),
@@ -397,7 +374,7 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
         orderBy: { observedAt: 'desc' },
       });
 
-      const countsAsIncident = this.countsRailStatusAsIncident(line.statusCode);
+      const countsAsIncident = countsRailStatusAsIncident(line.statusCode);
       const eventType = countsAsIncident
         ? historical_incident_event_type.RAIL_STATUS_INCIDENT
         : historical_incident_event_type.RAIL_STATUS_RECOVERED;
@@ -421,7 +398,11 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
 
       await tx.historicalIncidentEvent.create({
         data: {
-          ...this.buildRailEventData(line, metadata),
+          ...buildRailEventData(
+            line,
+            metadata,
+            this.getRequiredRailAgency.bind(this),
+          ),
           eventType,
           title: recoveredFromIncident
             ? `${line.line}: operação recuperada`
@@ -441,279 +422,11 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private countsRailStatusAsIncident(statusCode: RailStatusCode): boolean {
-    return !NON_INCIDENT_RAIL_STATUS_CODES.has(statusCode);
-  }
-
-  private buildRailEventData(
-    line: RailLine,
-    metadata?: Prisma.InputJsonValue,
-  ): Omit<Prisma.HistoricalIncidentEventCreateInput, 'eventType' | 'title'> {
-    return {
-      observedAt: new Date(),
-      source: RAIL_STATUS_SOURCE,
-      provider: 'merged_rail_status',
-      lineCode: `L${line.code}`,
-      lineNumber: line.code,
-      lineName: line.line,
-      agency: this.getRequiredRailAgency(line.code),
-      statusCode: line.statusCode,
-      statusLabel: line.statusLabel,
-      statusColor: line.statusColor,
-      severity: this.getRailSeverity(line),
-      description: line.description,
-      incidentCategory: line.incidentCategory,
-      detail: line.detail,
-      metadata,
-    };
-  }
-
-  private buildHeadwaySnapshotData(
-    headway: StationHeadway,
-    direction: DirectionHeadway,
-    samples?: HeadwayCalculationSamples,
-    stationName?: string,
-  ): Prisma.HistoricalHeadwaySnapshotCreateManyInput {
-    return {
-      observedAt: new Date(headway.updatedAt),
-      lineCode: headway.lineCode,
-      agency: this.getRequiredRailAgency(headway.lineCode),
-      stationCode: headway.stationCode,
-      stationName,
-      direction: direction.direction,
-      averageSeconds: direction.averageSeconds,
-      sampleCount: direction.sampleCount,
-      bucket: direction.bucket,
-      bucketLabel: direction.bucketLabel,
-      isFallback: direction.isFallback ?? false,
-      samples: samples ? this.buildHeadwaySamplesJson(samples) : undefined,
-      source: 'headway_tracking',
-      metadata: this.compactJsonObject({
-        updatedAt: new Date(headway.updatedAt).toISOString(),
-      }),
-    };
-  }
-
-  private buildHeadwaySamplesJson(
-    samples: HeadwayCalculationSamples,
-  ): Prisma.InputJsonObject {
-    return this.compactJsonObject({
-      method: 'intervals_between_detected_passages',
-      intervalsSeconds: samples.intervalsSeconds,
-      intervalCount: samples.intervalsSeconds.length,
-      discardedIntervalCount: samples.discardedIntervalCount,
-      minimumIntervals: samples.minimumIntervals,
-      maximumPassages: samples.maximumPassages,
-      targetBucket: samples.targetBucket,
-      selectedBucket: samples.selectedBucket,
-    });
-  }
-
-  private buildIncidentWhere(
-    filter?: HistoricalDataFilterInput,
-  ): Prisma.HistoricalIncidentEventWhereInput {
-    return this.compactWhere<Prisma.HistoricalIncidentEventWhereInput>({
-      observedAt: this.buildDateFilter(filter),
-      eventType: filter?.eventTypes?.length
-        ? { in: filter.eventTypes as historical_incident_event_type[] }
-        : undefined,
-      source: filter?.sources?.length ? { in: filter.sources } : undefined,
-      lineCode: filter?.lineCodes?.length
-        ? { in: filter.lineCodes }
-        : undefined,
-      lineNumber: filter?.lineNumbers?.length
-        ? { in: filter.lineNumbers }
-        : undefined,
-      statusCode: filter?.statusCodes?.length
-        ? { in: filter.statusCodes }
-        : undefined,
-    });
-  }
-
-  private buildHeadwayWhere(
-    filter?: HistoricalDataFilterInput,
-  ): Prisma.HistoricalHeadwaySnapshotWhereInput {
-    return this.compactWhere<Prisma.HistoricalHeadwaySnapshotWhereInput>({
-      observedAt: this.buildDateFilter(filter),
-      source: filter?.sources?.length ? { in: filter.sources } : undefined,
-      lineCode: filter?.lineCodes?.length
-        ? { in: filter.lineCodes }
-        : undefined,
-      stationCode: filter?.stationCodes?.length
-        ? { in: filter.stationCodes }
-        : undefined,
-      stationName: filter?.stationNames?.length
-        ? { in: filter.stationNames }
-        : undefined,
-      direction: filter?.directions?.length
-        ? { in: filter.directions }
-        : undefined,
-    });
-  }
-
-  private buildDateFilter(
-    filter?: HistoricalDataFilterInput,
-  ): Prisma.DateTimeFilter | undefined {
-    if (!filter?.from && !filter?.to) {
-      return undefined;
-    }
-
-    return this.compactWhere<Prisma.DateTimeFilter>({
-      gte: filter.from,
-      lte: filter.to,
-    });
-  }
-
-  private clampLimit(limit: number): number {
-    if (!Number.isFinite(limit)) {
-      return DEFAULT_HISTORY_LIMIT;
-    }
-    return Math.min(Math.max(Math.trunc(limit), 1), MAX_HISTORY_LIMIT);
-  }
-
-  private getRailSeverity(line: RailLine): string {
-    if (line.statusCode === 'DadosIndisponiveis') {
-      return 'unavailable';
-    }
-
-    switch (line.statusColor) {
-      case 'vermelho':
-        return 'critical';
-      case 'amarelo':
-        return 'warning';
-      case 'cinza':
-        return 'closed';
-      case 'verde':
-      default:
-        return 'normal';
-    }
-  }
-
-  private errorToJsonObject(error: unknown): Prisma.InputJsonObject {
-    if (error instanceof Error) {
-      return this.compactJsonObject({
-        name: error.name,
-        message: error.message,
-      });
-    }
-
-    return {
-      message: String(error),
-    };
-  }
-
-  private sanitizeIncidentMetadata(value: Prisma.JsonValue | null): unknown {
-    return this.pickPublicJsonFields(value, [
-      'attemptedAt',
-      'detectionReason',
-      'reason',
-    ]);
-  }
-
-  private sanitizeHeadwayMetadata(value: Prisma.JsonValue | null): unknown {
-    return this.pickPublicJsonFields(value, ['updatedAt', 'minSamples']);
-  }
-
-  private sanitizeHeadwayErrors(value: Prisma.JsonValue | null): unknown {
-    return this.pickPublicJsonFields(value, ['reason']);
-  }
-
-  private pickPublicJsonFields(
-    value: Prisma.JsonValue | null,
-    allowedFields: string[],
-  ): Prisma.InputJsonObject | undefined {
-    if (!value || Array.isArray(value) || typeof value !== 'object') {
-      return undefined;
-    }
-
-    const output: Record<string, Prisma.InputJsonValue> = {};
-    for (const field of allowedFields) {
-      const candidate = value[field];
-      if (
-        typeof candidate === 'string' ||
-        typeof candidate === 'number' ||
-        typeof candidate === 'boolean'
-      ) {
-        output[field] =
-          typeof candidate === 'string' ? candidate.slice(0, 256) : candidate;
-      }
-    }
-
-    return Object.keys(output).length > 0 ? output : undefined;
-  }
-
-  private compactJsonObject(
-    input: Record<string, Prisma.InputJsonValue | undefined>,
-  ): Prisma.InputJsonObject {
-    const output: Record<string, Prisma.InputJsonValue> = {};
-
-    for (const [key, value] of Object.entries(input)) {
-      if (value !== undefined) {
-        output[key] = value;
-      }
-    }
-
-    return output;
-  }
-
-  private compactWhere<T extends object>(input: Partial<T>): T {
-    const output: Partial<T> = {};
-
-    for (const [key, value] of Object.entries(input)) {
-      if (value !== undefined) {
-        output[key as keyof T] = value as T[keyof T];
-      }
-    }
-
-    return output as T;
-  }
-
-  private async withHeadwayStationNames<
-    T extends {
-      lineCode: string;
-      stationCode: string;
-      stationName?: string | null;
-    },
-  >(snapshots: T[]): Promise<T[]> {
-    const missingStationNames = new Map<string, T>();
-
-    for (const snapshot of snapshots) {
-      if (snapshot.stationName) continue;
-      missingStationNames.set(
-        `${snapshot.lineCode}:${snapshot.stationCode}`,
-        snapshot,
-      );
-    }
-
-    if (missingStationNames.size === 0) {
-      return snapshots;
-    }
-
-    const resolvedNames = new Map<string, string | undefined>();
-    await Promise.all(
-      [...missingStationNames.keys()].map(async (key) => {
-        const [lineCode, stationCode] = key.split(':') as [string, string];
-        resolvedNames.set(
-          key,
-          await this.resolveStationName(lineCode, stationCode),
-        );
-      }),
-    );
-
-    return snapshots.map((snapshot) => ({
-      ...snapshot,
-      stationName:
-        snapshot.stationName ??
-        resolvedNames.get(`${snapshot.lineCode}:${snapshot.stationCode}`) ??
-        null,
-    }));
-  }
-
   private async resolveStationName(
     lineCode: string,
     stationCode: string,
   ): Promise<string | undefined> {
-    if (this.isExternalRailLine(lineCode)) {
+    if (isExternalRailLine(lineCode)) {
       try {
         return await this.externalRailProvider.getStationName(
           lineCode,
@@ -727,45 +440,17 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    if (this.isStaticNextTrainLine(lineCode)) {
-      return getStaticStationName(lineCode, stationCode);
-    }
-
-    return undefined;
-  }
-
-  private isExternalRailLine(
-    lineCode: string,
-  ): lineCode is ExtendedNextTrainLineCode {
-    return isActualCptmLine(lineCode) || isSpecialCptmLine(lineCode);
-  }
-
-  private isStaticNextTrainLine(
-    lineCode: string,
-  ): lineCode is NextTrainLineCode {
-    return lineCode === 'L4' || lineCode === 'L8' || lineCode === 'L9';
+    return getStaticHistoricalStationName(lineCode, stationCode);
   }
 
   private getRequiredRailAgency(lineCode: string | number): string {
-    const lineNumber =
-      typeof lineCode === 'number'
-        ? lineCode
-        : this.parseRailLineNumber(lineCode);
-    const agency =
-      lineNumber === undefined
-        ? undefined
-        : getRailLineByCode(lineNumber)?.agency;
+    const agency = getRailAgency(lineCode);
 
     if (!agency) {
       throw new Error(`No transit agency configured for line ${lineCode}`);
     }
 
     return agency;
-  }
-
-  private parseRailLineNumber(lineCode: string): number | undefined {
-    const match = lineCode.match(/L?(\d+)/i);
-    return match ? Number.parseInt(match[1], 10) : undefined;
   }
 
   private async withIncidentLock<T>(

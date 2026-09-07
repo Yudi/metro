@@ -35,13 +35,13 @@ import {
   previousHistoryPage,
   sliceHistoryPage,
   uniqueHistoryOptions,
-} from '../shared/history-view.utils';
-import { HistoryPaginationComponent } from '../shared/history-pagination.component';
-import { HistoryDateRangeFieldsComponent } from '../shared/history-date-range-fields.component';
+} from '../shared/history/history-view.utils';
+import { HistoryPaginationComponent } from '../shared/history/history-pagination.component';
+import { HistoryDateRangeFieldsComponent } from '../shared/history/history-date-range-fields.component';
 import {
   HistoryAgencyIdentityComponent,
   HistoryLineIdentityComponent,
-} from '../shared/history-transit-identity.component';
+} from '../shared/history/history-transit-identity.component';
 
 interface HeadwayHistoryRow {
   snapshot: HistoricalHeadwaySnapshot;

@@ -16,16 +16,12 @@ import { RealtimeMessageType } from '../dto/realtime.dto';
 import type {
   SubscriptionRequest,
   PositionResponse,
-  StopArrivalResponse,
-  StopArrivalUpdate,
-  VehiclePositionUpdate,
 } from '../dto/realtime.dto';
-
-type PositionCacheEntry = [
-  string,
-  { data: PositionResponse; timestamp: number },
-];
-type StopArrivalCacheEntry = { data: StopArrivalResponse; timestamp: number };
+import {
+  buildStopArrivalMessage,
+  buildVehiclePositionsMessage,
+  countVehicles,
+} from '../realtime-message.utils';
 
 /**
  * WebSocket gateway for real-time bus data
@@ -170,7 +166,7 @@ export class RealtimeGateway
         }
       }
 
-      const totalVehicles = this.countVehicles(routeCacheEntries);
+      const totalVehicles = countVehicles(routeCacheEntries);
 
       // Send immediate cached response with all directions combined
       this.logger.debug(
@@ -179,7 +175,7 @@ export class RealtimeGateway
 
       client.emit(
         RealtimeMessageType.VEHICLE_POSITIONS,
-        this.buildVehiclePositionsMessage(routeShortName, routeCacheEntries),
+        buildVehiclePositionsMessage(routeShortName, routeCacheEntries),
       );
     } else {
       // No cached data - trigger immediate poll
@@ -205,7 +201,7 @@ export class RealtimeGateway
           }
         }
 
-        const totalVehicles = this.countVehicles(freshCacheEntries);
+        const totalVehicles = countVehicles(freshCacheEntries);
 
         this.logger.debug(
           `Sending fresh data for route ${routeShortName} (${totalVehicles} vehicles across ${freshCacheEntries.length} direction(s))`,
@@ -213,7 +209,7 @@ export class RealtimeGateway
 
         client.emit(
           RealtimeMessageType.VEHICLE_POSITIONS,
-          this.buildVehiclePositionsMessage(routeShortName, freshCacheEntries),
+          buildVehiclePositionsMessage(routeShortName, freshCacheEntries),
         );
       } else {
         this.logger.warn(
@@ -312,7 +308,7 @@ export class RealtimeGateway
       );
       client.emit(
         RealtimeMessageType.ARRIVAL_PREDICTIONS,
-        this.buildStopArrivalMessage(stopCode, cachedData),
+        buildStopArrivalMessage(stopCode, cachedData),
       );
     } else {
       // No cached data - trigger immediate poll
@@ -332,7 +328,7 @@ export class RealtimeGateway
         );
         client.emit(
           RealtimeMessageType.ARRIVAL_PREDICTIONS,
-          this.buildStopArrivalMessage(stopCode, freshData),
+          buildStopArrivalMessage(stopCode, freshData),
         );
       } else {
         this.logger.warn(
@@ -424,7 +420,7 @@ export class RealtimeGateway
           `Broadcasting vehicle positions for route ${routeShortName}: ${totalVehicles} vehicles across ${cacheEntries.length} direction(s) to ${subscribedClients.length} client(s)`,
         );
 
-        const message = this.buildVehiclePositionsMessage(
+        const message = buildVehiclePositionsMessage(
           routeShortName,
           cacheEntries,
         );
@@ -455,7 +451,7 @@ export class RealtimeGateway
           `Broadcasting arrival predictions for stop ${stopCode}: ${linesCount} lines to ${subscribedClients.length} client(s)`,
         );
 
-        const message = this.buildStopArrivalMessage(stopCode, cache);
+        const message = buildStopArrivalMessage(stopCode, cache);
 
         // Emit to each subscribed client individually
         for (const clientId of subscribedClients) {
@@ -465,57 +461,6 @@ export class RealtimeGateway
         }
       }
     }
-  }
-
-  private buildVehiclePositionsMessage(
-    routeShortName: string,
-    cacheEntries: PositionCacheEntry[],
-  ): {
-    type: RealtimeMessageType.VEHICLE_POSITIONS;
-    data: VehiclePositionUpdate;
-  } {
-    const latestTimestamp = Math.max(
-      ...cacheEntries.map(([, entry]) => entry.timestamp),
-    );
-
-    return {
-      type: RealtimeMessageType.VEHICLE_POSITIONS,
-      data: {
-        routeShortName,
-        hr: cacheEntries[0][1].data.hr,
-        l: cacheEntries.flatMap(([, entry]) => entry.data.l || []),
-        cacheTimestamp: latestTimestamp,
-      },
-    };
-  }
-
-  private countVehicles(cacheEntries: PositionCacheEntry[]): number {
-    return cacheEntries.reduce(
-      (sum, [, entry]) =>
-        sum +
-        (entry.data.l?.reduce(
-          (lineSum, line) => lineSum + (line.vs?.length ?? 0),
-          0,
-        ) ?? 0),
-      0,
-    );
-  }
-
-  private buildStopArrivalMessage(
-    stopCode: string,
-    cache: StopArrivalCacheEntry,
-  ): {
-    type: RealtimeMessageType.ARRIVAL_PREDICTIONS;
-    data: StopArrivalUpdate;
-  } {
-    return {
-      type: RealtimeMessageType.ARRIVAL_PREDICTIONS,
-      data: {
-        stopCode,
-        ...cache.data,
-        cacheTimestamp: cache.timestamp,
-      },
-    };
   }
 
   private emitSubscriptionError(client: Socket, message: string): void {

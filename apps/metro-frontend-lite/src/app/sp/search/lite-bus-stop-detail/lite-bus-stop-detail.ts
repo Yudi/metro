@@ -13,11 +13,11 @@ import {
   LiteRouteRailConnectionStation,
   LiteSearchStop,
   type LiteScheduledBusDeparture,
-} from '../../../services/lite-search.service';
+} from '../../../shared/search/lite-search.service';
 import {
   LiteArrivalLine,
   LiteStopArrivalUpdate,
-} from '../../../services/lite-realtime.service';
+} from '../../../shared/realtime/lite-realtime.service';
 import { LiteChip, LiteSpinner } from '@metro/shared/lite-ui';
 import {
   getLineCodesFromColorNames,

@@ -3,14 +3,14 @@ import { RailService } from './rail.service';
 import { RailResolver } from './rail.resolver';
 import { RailCacheService } from './rail-cache.service';
 import { RailApiService } from './rail-api.service';
-import { RailSpecialResolver } from './rail-special.resolver';
-import { RailSpecialLinesService } from './rail-special-lines.service';
+import { RailSpecialResolver } from './special/rail-special.resolver';
+import { RailSpecialLinesService } from './special/rail-special-lines.service';
 import { RailHolidayService } from './rail-holiday.service';
-import { RailSpecialInfoService } from './rail-special-info.service';
+import { RailSpecialInfoService } from './special/rail-special-info.service';
 import { RailIntegrationClientModule } from '../rail-integration/rail-integration-client.module';
-import { RailSpecialServicesService } from './rail-special-services.service';
-import { RailIncidentHistoryController } from './rail-incident-history.controller';
-import { RailIncidentHistoryService } from './rail-incident-history.service';
+import { RailSpecialServicesService } from './special/rail-special-services.service';
+import { RailIncidentHistoryController } from './history/rail-incident-history.controller';
+import { RailIncidentHistoryService } from './history/rail-incident-history.service';
 
 @Module({
   imports: [RailIntegrationClientModule],

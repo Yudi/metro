@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { FavoritesResolver } from './favorites.resolver';
 import { PrismaService } from '../prisma/prisma.service';
-import { AuthGuard } from '../shared/guards/auth.guard';
+import { AuthGuard } from '../common/guards/auth.guard';
 import { AuthService } from './auth.service';
 import {
   FAVORITE_CODE_MAX_LENGTH,

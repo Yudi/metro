@@ -8,17 +8,14 @@ import { CsvProcessingService } from './services/csv-processing.service';
 import { RustGtfsService } from './services/rust-gtfs.service';
 import { DataImportHooksService } from './services/data-import-hooks.service';
 import { GTFSConfig, GTFSFeed } from './config/gtfs.config';
-import {
-  GTFSFileInfo,
-  ImportProgress,
-  GTFSProcessingResult,
-} from './types/gtfs.types';
+import { ImportProgress, GTFSProcessingResult } from './types/gtfs.types';
 import { ImportStatusDto } from './dto/gtfs-dataset.dto';
 import {
   ImportLockService,
   TRANSIT_CATALOG_IMPORT_LOCK,
 } from '../common/import-lock.service';
 import type { ImportLockOptions } from '../common/import-lock.service';
+import { GtfsFeedImportFacade } from './gtfs-feed-import.facade';
 
 class ImportFailureError extends Error {
   constructor(readonly result: GTFSProcessingResult) {
@@ -39,6 +36,7 @@ export class DataImportService implements OnModuleInit {
   };
   private currentImportRunId = 0;
   private statusResetTimer?: ReturnType<typeof setTimeout>;
+  private readonly feedImportFacade: GtfsFeedImportFacade;
 
   constructor(
     private readonly fileOperationsService: FileOperationsService,
@@ -48,7 +46,21 @@ export class DataImportService implements OnModuleInit {
     private readonly rustGtfsService: RustGtfsService,
     private readonly dataImportHooksService: DataImportHooksService,
     private readonly importLockService: ImportLockService,
-  ) {}
+  ) {
+    this.feedImportFacade = new GtfsFeedImportFacade({
+      fileOperationsService: this.fileOperationsService,
+      zipProcessingService: this.zipProcessingService,
+      gtfsDatabaseService: this.gtfsDatabaseService,
+      csvProcessingService: this.csvProcessingService,
+      rustGtfsService: this.rustGtfsService,
+      tempDir: this.tempDir,
+      logger: this.logger,
+      getImportStatus: () => this.currentImportStatus,
+      updateImportStatus: this.updateImportStatus.bind(this),
+      withTimeout: this.withTimeout.bind(this),
+      getRustDatabaseUrl: this.getRustDatabaseUrl.bind(this),
+    });
+  }
 
   async onModuleInit() {
     await this.ensureTempDir();
@@ -352,218 +364,7 @@ export class DataImportService implements OnModuleInit {
     feed: GTFSFeed,
     forceReimport = false,
   ): Promise<GTFSProcessingResult> {
-    const feedDefinition = GTFSConfig.getFeedDefinition(feed);
-    const feedTempDir = path.join(this.tempDir, feed);
-    const zipFileName = `${feed}.zip`;
-    const zipFilePath = path.join(feedTempDir, zipFileName);
-    const extractDir = path.join(feedTempDir, 'extracted');
-    let sourceDir: string | undefined;
-    let shouldCleanupTemp = true;
-    let catalogMutationStarted = false;
-    let candidateSignature: string | undefined;
-
-    try {
-      // Prefer an explicitly configured local snapshot when present. The
-      // default production path resolves the remote feed each run.
-      const localSnapshotPath = feedDefinition.localSnapshotPath;
-      const hasLocalSnapshot = localSnapshotPath
-        ? await this.fileOperationsService.fileExists(
-            path.join(localSnapshotPath, 'agency.txt'),
-          )
-        : false;
-      if (localSnapshotPath && !hasLocalSnapshot) {
-        throw new Error(
-          `Configured ${feed} GTFS snapshot is missing agency.txt: ${localSnapshotPath}`,
-        );
-      }
-
-      let fileHash: string;
-      let fileSize: number;
-      let extractedFiles: GTFSFileInfo[];
-
-      if (hasLocalSnapshot && localSnapshotPath) {
-        sourceDir = localSnapshotPath;
-        shouldCleanupTemp = false;
-        this.updateImportStatus(
-          'processing',
-          10,
-          `Reading ${feed} GTFS snapshot...`,
-        );
-        [fileHash, fileSize, extractedFiles] = await Promise.all([
-          this.fileOperationsService.calculateDirectoryHash(sourceDir),
-          this.fileOperationsService.getDirectorySize(sourceDir),
-          this.zipProcessingService.analyzeDirectory(sourceDir),
-        ]);
-      } else {
-        const downloadUrl =
-          feed === 'artesp'
-            ? await this.fileOperationsService.resolveCkanResourceUrl(
-                GTFSConfig.ARTESP_CKAN_PACKAGE_URL,
-              )
-            : feedDefinition.downloadUrl;
-        if (!downloadUrl) {
-          throw new Error(`No GTFS download URL configured for ${feed}`);
-        }
-
-        // Step 1: Download GTFS file
-        this.updateImportStatus(
-          'downloading',
-          10,
-          `Downloading ${feed} GTFS data...`,
-        );
-        await this.withTimeout(
-          (signal) =>
-            this.fileOperationsService.downloadFile(
-              downloadUrl,
-              zipFilePath,
-              GTFSConfig.DOWNLOAD_TIMEOUT_MS,
-              GTFSConfig.MAX_GTFS_ZIP_BYTES,
-              signal,
-            ),
-          GTFSConfig.DOWNLOAD_TIMEOUT_MS,
-          `${feed} download timeout`,
-        );
-
-        // Step 2: Calculate file hash
-        this.updateImportStatus(
-          'processing',
-          20,
-          `Calculating ${feed} GTFS file hash...`,
-        );
-        [fileHash, fileSize] = await Promise.all([
-          this.fileOperationsService.calculateFileHash(zipFilePath),
-          this.fileOperationsService.getFileSize(zipFilePath),
-        ]);
-
-        // Step 3: Extract and analyze files
-        this.updateImportStatus(
-          'processing',
-          40,
-          `Extracting ${feed} GTFS ZIP file...`,
-        );
-        extractedFiles = await this.zipProcessingService.extractAndAnalyzeFiles(
-          zipFilePath,
-          extractDir,
-        );
-        sourceDir = extractDir;
-      }
-
-      this.logger.debug(
-        `${feed} GTFS source: ${(fileSize / 1024 / 1024).toFixed(
-          2,
-        )} MB, hash: ${fileHash.substring(0, 8)}...`,
-      );
-      candidateSignature = fileHash;
-
-      // Step 4: Check if we already have this version
-      const isCurrentHash = forceReimport
-        ? false
-        : await this.gtfsDatabaseService.isCurrentHash(fileHash, feed);
-      if (isCurrentHash) {
-        this.logger.debug(`${feed} GTFS data unchanged, skipping import`);
-        if (shouldCleanupTemp) {
-          await this.fileOperationsService.cleanup(zipFilePath, extractDir);
-        }
-
-        return {
-          success: true,
-          filesProcessed: 0,
-          recordsImported: 0,
-          skippedFiles: ['All files (no changes detected)'],
-          errors: [],
-          dataChanged: false,
-          sourceSignature: fileHash,
-          feed,
-        };
-      }
-
-      // Step 5: Create/update dataset record before mutating raw tables.
-      this.updateImportStatus(
-        'processing',
-        30,
-        `Updating ${feed} dataset record...`,
-      );
-      const dataset = await this.gtfsDatabaseService.createOrUpdateDataset(
-        {
-          fileHash,
-          fileSize,
-          version: new Date().toISOString().split('T')[0], // Use date as version
-        },
-        feed,
-      );
-      catalogMutationStarted = true;
-
-      await this.gtfsDatabaseService.prepareDatasetForImport(
-        dataset.id,
-        extractedFiles.map((file) => file.fileName),
-        feed,
-      );
-
-      // Save file information to database
-      await this.gtfsDatabaseService.upsertDatasetFiles(
-        dataset.id,
-        extractedFiles,
-        feed,
-      );
-      await this.gtfsDatabaseService.clearOptionalTables(
-        feed,
-        extractedFiles.map((file) => file.fileName),
-      );
-
-      // Step 6: Process files intelligently
-      this.updateImportStatus(
-        'processing',
-        50,
-        `Processing ${feed} GTFS files...`,
-      );
-      const result = await this.processGTFSFiles(
-        dataset.id,
-        sourceDir ?? extractDir,
-        extractedFiles,
-        feed,
-      );
-
-      result.dataChanged = true;
-      result.sourceSignature = fileHash;
-      result.feed = feed;
-
-      if (result.success) {
-        await this.gtfsDatabaseService.completeDataset(feed);
-      }
-
-      // Step 7: Cleanup
-      if (shouldCleanupTemp) {
-        this.updateImportStatus(
-          'processing',
-          90,
-          `Cleaning up ${feed} temporary files...`,
-        );
-        await this.fileOperationsService.cleanup(zipFilePath, extractDir);
-      }
-
-      this.logger.debug(`${feed} GTFS import completed successfully`);
-      return result;
-    } catch (error) {
-      // Cleanup on error
-      if (shouldCleanupTemp) {
-        await this.fileOperationsService.cleanup(zipFilePath, extractDir);
-      }
-      if (catalogMutationStarted) {
-        const message =
-          error instanceof Error ? error.message : 'Unknown error';
-        return {
-          success: false,
-          filesProcessed: 0,
-          recordsImported: 0,
-          skippedFiles: [],
-          errors: [`${feed}: ${message}`],
-          dataChanged: true,
-          sourceSignature: candidateSignature,
-          feed,
-        };
-      }
-      throw error;
-    }
+    return this.feedImportFacade.performFeedImport(feed, forceReimport);
   }
 
   /**
@@ -575,139 +376,12 @@ export class DataImportService implements OnModuleInit {
     extractedFiles: { fileName: string; fileHash: string; fileSize: number }[],
     feed: GTFSFeed = 'sptrans',
   ): Promise<GTFSProcessingResult> {
-    const result: GTFSProcessingResult = {
-      success: true,
-      filesProcessed: 0,
-      recordsImported: 0,
-      skippedFiles: [],
-      errors: [],
-    };
-
-    // Get processing order
-    const processingOrder = GTFSConfig.getProcessingOrder();
-    const filesToProcess = processingOrder.filter((fileName) =>
-      extractedFiles.some((f) => f.fileName === fileName),
+    return this.feedImportFacade.processGTFSFiles(
+      datasetId,
+      extractDir,
+      extractedFiles,
+      feed,
     );
-
-    const extractedFileNames = new Set(
-      extractedFiles.map((file) => file.fileName),
-    );
-    for (const requiredFile of GTFSConfig.getRequiredFiles(feed)) {
-      if (!extractedFileNames.has(requiredFile)) {
-        result.success = false;
-        result.errors.push(`Missing required GTFS file: ${requiredFile}`);
-      }
-    }
-
-    this.currentImportStatus.totalFiles =
-      filesToProcess.length +
-      GTFSConfig.getRequiredFiles(feed).filter(
-        (fileName) => !extractedFileNames.has(fileName),
-      ).length;
-    this.currentImportStatus.processedFiles = 0;
-
-    for (const fileName of filesToProcess) {
-      const fileInfo = extractedFiles.find((f) => f.fileName === fileName);
-      if (!fileInfo) continue;
-
-      try {
-        this.currentImportStatus.currentFile = fileName;
-        this.updateImportStatus(
-          'processing',
-          50 +
-            (this.currentImportStatus.processedFiles / filesToProcess.length) *
-              40,
-          `Processing ${fileName}...`,
-        );
-
-        // Process every file in a changed feed. A matching file hash from a
-        // historical dataset does not prove that its rows are present in the
-        // currently active physical tables.
-        const filePath = path.join(extractDir, fileName);
-        let recordCount = 0;
-
-        // Check if this file should be processed with Rust tool
-        if (GTFSConfig.isRustProcessed(fileName)) {
-          this.logger.debug(`Processing ${fileName} with Rust tool...`);
-
-          // Get database URL from environment (needed for Rust tool)
-          const dbUrl = process.env.DATABASE_URL;
-          if (!dbUrl) {
-            throw new Error('DATABASE_URL environment variable not set');
-          }
-
-          // Prisma's `schema` URL option is not understood by the Rust
-          // importer. Preserve every other option (including sslmode and
-          // application settings) so both clients use the same connection
-          // security and database parameters.
-          const rustDbUrl = this.getRustDatabaseUrl(dbUrl);
-
-          // Process shapes with Rust tool directly to PostGIS
-          await this.rustGtfsService.processShapes(
-            filePath,
-            rustDbUrl,
-            4326,
-            feed,
-          );
-
-          // Count records in the file for reporting
-          recordCount =
-            await this.csvProcessingService.countCsvRecords(filePath);
-
-          this.logger.debug(
-            `Rust tool processed ${fileName}: ${recordCount} records`,
-          );
-        } else {
-          // Process with regular CSV processing service
-          recordCount = await this.csvProcessingService.processCsvFile(
-            filePath,
-            fileName,
-            feed,
-          );
-        }
-
-        // Update file record
-        await this.gtfsDatabaseService.updateFileRecord(
-          datasetId,
-          fileName,
-          recordCount,
-          feed,
-        );
-
-        result.filesProcessed++;
-        result.recordsImported += recordCount;
-        this.currentImportStatus.processedFiles++;
-
-        this.logger.debug(`Processed ${fileName}: ${recordCount} records`);
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : 'Unknown error';
-        if (GTFSConfig.isRequiredFile(fileName, feed)) {
-          this.logger.error(`Failed to process ${fileName}:`, errorMessage);
-          result.errors.push(`${fileName}: ${errorMessage}`);
-          result.success = false;
-        } else {
-          this.logger.warn(
-            `Skipping optional ${fileName} after processing failure: ${errorMessage}`,
-          );
-          try {
-            await this.gtfsDatabaseService.clearOptionalTable(fileName, feed);
-            result.skippedFiles.push(fileName);
-          } catch (clearError) {
-            const clearMessage =
-              clearError instanceof Error
-                ? clearError.message
-                : 'Unknown clear error';
-            result.success = false;
-            result.errors.push(
-              `${fileName}: failed to clear stale optional table: ${clearMessage}`,
-            );
-          }
-        }
-      }
-    }
-
-    return result;
   }
 
   /**

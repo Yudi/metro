@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { BusInformationComponent } from './bus-information.component';
 import { routeNoticeView } from './bus-notice-view';
-import type { OperationalNotice } from '../../services/bus-information.service';
+import type { OperationalNotice } from './bus-information.service';
 
 const notice: OperationalNotice = {
   sourceId: '1',

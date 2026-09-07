@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/angular';
-import { LiteSearchStop } from '../../../services/lite-search.service';
+import { LiteSearchStop } from '../../../shared/search/lite-search.service';
 import { LiteBikeAvailability } from './lite-bike-availability';
 
 const station: LiteSearchStop = {

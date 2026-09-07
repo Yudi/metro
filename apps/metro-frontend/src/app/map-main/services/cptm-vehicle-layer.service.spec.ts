@@ -143,6 +143,31 @@ describe('CptmVehicleLayerService', () => {
     expect(styles).toHaveLength(3);
   });
 
+  it('removes estimates that disappear from an authoritative refresh', () => {
+    service.subscribeToLine('L8');
+    vehicles.set(
+      new Map([
+        [
+          'L8',
+          [
+            createVehicle({
+              id: 'estimate-uuid',
+              estimated: true,
+              validUntil: Date.now() + 20_000,
+            }),
+          ],
+        ],
+      ]),
+    );
+    refreshMarkers();
+    expect(getFeatures()).toHaveLength(1);
+
+    vehicles.set(new Map([['L8', []]]));
+    refreshMarkers();
+
+    expect(getFeatures()).toHaveLength(0);
+  });
+
   it('removes line markers when its owned stream is released', () => {
     service.subscribeToLine('L8');
     vehicles.set(

@@ -268,6 +268,12 @@ export class CptmVehiclePollingService implements OnModuleDestroy {
                 lineCode,
                 await this.mapContext.getContext(lineCode),
               );
+            if (!Array.isArray(vehicles)) {
+              this.logger.warn(
+                `Ignoring malformed vehicle snapshot for ${lineCode}`,
+              );
+              return { lineCode, vehicles: [], error: true };
+            }
             return { lineCode, vehicles, error: false };
           } catch (error) {
             this.logger.error(`Error fetching vehicles for ${lineCode}`, error);

@@ -372,6 +372,21 @@ export class NextTrainWebsocketService implements OnDestroy {
     this.socket.on('disconnect', () => {
       this.logger.debug('Disconnected from next train WebSocket');
       this.connected.set(false);
+      // Estimated positions are snapshots, not a durable cache. Drop them on
+      // disconnect so reconnect cannot re-render an old prediction before its
+      // first fresh vehicle update arrives. Measured positions remain available
+      // as the existing degraded state.
+      this._cptmVehicles.update((map) => {
+        const newMap = new Map<TrackedRailLineCode, TrackedRailVehicle[]>();
+        for (const [lineCode, vehicles] of map) {
+          newMap.set(
+            lineCode,
+            vehicles.filter((vehicle) => vehicle.estimated !== true),
+          );
+        }
+        return newMap;
+      });
+      this.latestVehicleUpdateTimestamps.clear();
     });
 
     this.socket.on(NEXT_TRAIN_UPDATE_EVENT, (data: NextTrainUpdate) => {
@@ -452,6 +467,20 @@ export class NextTrainWebsocketService implements OnDestroy {
   }
 
   private handleCptmVehicleUpdate(update: CptmVehicleUpdate): void {
+    if (
+      !update ||
+      typeof update !== 'object' ||
+      typeof update.lineCode !== 'string' ||
+      !hasExternalRailVehicles(update.lineCode) ||
+      !Array.isArray(update.vehicles) ||
+      typeof update.timestamp !== 'number' ||
+      !Number.isFinite(update.timestamp)
+    ) {
+      this.logger.warn('Ignoring malformed CPTM vehicle update');
+      return;
+    }
+
+    const vehicles = update.vehicles.filter(isRenderableTrackedRailVehicle);
     const latestTimestamp = this.latestVehicleUpdateTimestamps.get(
       update.lineCode,
     );
@@ -468,7 +497,10 @@ export class NextTrainWebsocketService implements OnDestroy {
 
     this._cptmVehicles.update((map) => {
       const newMap = new Map(map);
-      newMap.set(update.lineCode, update.vehicles);
+      // Every vehicle event is a complete line snapshot.  Replacing the array,
+      // including with [], is what removes predictions that disappeared from
+      // the refreshed source response.
+      newMap.set(update.lineCode, vehicles);
       return newMap;
     });
 
@@ -479,7 +511,7 @@ export class NextTrainWebsocketService implements OnDestroy {
     this.updateLastUpdateTimestamp(update.timestamp);
 
     this.logger.debug(
-      `Received ${update.type} CPTM vehicle update for ${update.lineCode}: ${update.vehicles.length} vehicle(s)`,
+      `Received ${update.type} CPTM vehicle update for ${update.lineCode}: ${vehicles.length} vehicle(s)`,
     );
   }
 
@@ -488,4 +520,34 @@ export class NextTrainWebsocketService implements OnDestroy {
     const next = Number.isFinite(timestamp) ? timestamp : Date.now();
     this.lastUpdate.set(current === null ? next : Math.max(current, next));
   }
+}
+
+function isRenderableTrackedRailVehicle(
+  value: unknown,
+): value is TrackedRailVehicle {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+
+  const vehicle = value as Partial<TrackedRailVehicle>;
+  const latitude = vehicle.lat;
+  const longitude = vehicle.lng;
+  return (
+    typeof vehicle.id === 'string' &&
+    typeof vehicle.prefix === 'string' &&
+    Boolean(vehicle.id || vehicle.prefix) &&
+    typeof latitude === 'number' &&
+    Number.isFinite(latitude) &&
+    typeof longitude === 'number' &&
+    Number.isFinite(longitude) &&
+    latitude >= -90 &&
+    latitude <= 90 &&
+    longitude >= -180 &&
+    longitude <= 180 &&
+    (vehicle.estimated === undefined || typeof vehicle.estimated === 'boolean') &&
+    (vehicle.validUntil === undefined || Number.isFinite(vehicle.validUntil)) &&
+    (vehicle.destination === undefined || typeof vehicle.destination === 'string') &&
+    (vehicle.estimatedPositionDescription === undefined ||
+      typeof vehicle.estimatedPositionDescription === 'string')
+  );
 }

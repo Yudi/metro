@@ -73,4 +73,24 @@ describe('CptmVehiclePollingService', () => {
     ]);
     await service.onModuleDestroy();
   });
+
+  it('does not replace the last snapshot with a malformed provider response', async () => {
+    const provider = { getVehiclesForLine: jest.fn().mockResolvedValue([vehicle]) };
+    const service = new CptmVehiclePollingService(provider as never, {
+      getContext: jest.fn().mockResolvedValue(undefined),
+    } as never);
+    const listener = jest.fn();
+    service.onPollComplete(listener);
+    service.subscribe('client', 'L9');
+    await service['activePoll'];
+    listener.mockClear();
+
+    provider.getVehiclesForLine.mockResolvedValue(null as never);
+    await service['poll']();
+
+    expect(service.getCached('L9')?.vehicles).toEqual([vehicle]);
+    expect(listener).not.toHaveBeenCalled();
+    await service.onModuleDestroy();
+  });
+
 });

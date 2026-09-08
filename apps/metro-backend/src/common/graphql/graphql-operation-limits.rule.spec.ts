@@ -2,8 +2,12 @@ import { buildSchema, parse, validate } from 'graphql';
 import { graphqlOperationLimitsRule } from './graphql-operation-limits.rule';
 
 const schema = buildSchema(`
-  type Query { node: Node! }
+  type Query {
+    node: Node!
+    busServiceIntervals(routeCodes: [String!]!): IntervalsResult!
+  }
   type Node { value: String, child: Node! }
+  type IntervalsResult { status: String! }
 `);
 
 describe('graphqlOperationLimitsRule', () => {
@@ -55,5 +59,42 @@ describe('graphqlOperationLimitsRule', () => {
         }),
       ]),
     );
+  });
+
+  it('rejects multiple expensive service interval queries', () => {
+    const errors = validate(
+      schema,
+      parse(`
+        query Intervals {
+          first: busServiceIntervals(routeCodes: ["875A-10"]) { status }
+          second: busServiceIntervals(routeCodes: ["875A-10"]) { status }
+        }
+      `),
+      [graphqlOperationLimitsRule],
+    );
+
+    expect(errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          extensions: {
+            code: 'BUS_SERVICE_INTERVAL_QUERY_LIMIT_EXCEEDED',
+          },
+        }),
+      ]),
+    );
+  });
+
+  it('accepts one service interval query', () => {
+    const errors = validate(
+      schema,
+      parse(`
+        query Intervals {
+          busServiceIntervals(routeCodes: ["875A-10"]) { status }
+        }
+      `),
+      [graphqlOperationLimitsRule],
+    );
+
+    expect(errors).toEqual([]);
   });
 });

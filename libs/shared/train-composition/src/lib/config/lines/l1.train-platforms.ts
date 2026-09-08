@@ -248,7 +248,21 @@ export const L1_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
         direction: { destinationCodes: ['JAB'] },
         disembarkingSide: 'right',
         platformType: 'overlapping',
-        features: [],
+        features: [
+          {
+            id: 'l1-pso-jab-escalator-both-rear-door-5',
+            type: 'escalator-both',
+            label:
+              'Escada rolante de subida e descida na 5ª porta, contando de trás para frente',
+            anchor: { type: 'door', carPosition: 5, doorPosition: 4 },
+          },
+          {
+            id: 'l1-pso-jab-stairs-rear-door-3',
+            type: 'stairs',
+            label: 'Escada na 3ª porta, contando de trás para frente',
+            anchor: { type: 'door', carPosition: 6, doorPosition: 2 },
+          },
+        ],
       },
       {
         id: 'l1-pso-towards-tuc',

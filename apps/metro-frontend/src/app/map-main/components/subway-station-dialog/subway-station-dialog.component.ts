@@ -34,6 +34,8 @@ import {
   hardNormalizeString,
   resolveStationBathroomInfo,
   StationBathroomStatus,
+  SpecialRailLineStatus,
+  SPECIAL_RAIL_LINE_CODES,
 } from '@metro/shared/utils';
 import { DialogHeaderComponent } from '../../../shared/components/dialog-header/dialog-header.component';
 import { NextTrainCardComponent } from '../../../next-train/components/next-train-card/next-train-card.component';
@@ -75,6 +77,7 @@ export class SubwayStationDialogComponent implements OnInit {
 
   // State signals
   readonly subwayLines = signal<RailLineStatus[]>([]);
+  readonly specialLines = signal<SpecialRailLineStatus[]>([]);
   readonly loadingStatus = signal(true); // Loading status only, not line list
   readonly lastUpdated = signal<Date | null>(null);
   readonly errorMessage = signal<string | null>(null);
@@ -121,6 +124,45 @@ export class SubwayStationDialogComponent implements OnInit {
   readonly staticLineInfo = computed(() => {
     const codes = this.lineCodes();
     return RAIL_LINES.filter((line) => codes.includes(line.code));
+  });
+
+  readonly stationStatusCards = computed(() => {
+    const cards: {
+      code: number | string;
+      name: string;
+      colorHex: string;
+      status: (Pick<RailLineStatus, 'statusCode' | 'statusLabel'> &
+        Partial<Pick<RailLineStatus, 'description' | 'detail'>>) | undefined;
+      hasIssue: boolean;
+    }[] = this.staticLineInfo().map((line) => {
+      const status = this.getLineStatus(line.code);
+      return {
+        code: line.code,
+        name: line.colorName,
+        colorHex: line.colorHex,
+        status,
+        hasIssue: status ? this.lineHasIssue(status) : false,
+      };
+    });
+
+    if (
+      this.lineCodes().includes(13) &&
+      hardNormalizeString(this.displayName) ===
+        hardNormalizeString('Aeroporto-Guarulhos')
+    ) {
+      const status = this.specialLines().find(
+        (line) => line.code === SPECIAL_RAIL_LINE_CODES.AEROMOVEL_GRU,
+      );
+      cards.push({
+        code: SPECIAL_RAIL_LINE_CODES.AEROMOVEL_GRU,
+        name: status?.line ?? 'Aeromóvel GRU',
+        colorHex: status?.colorHex ?? '#186dbf',
+        status,
+        hasIssue: status ? this.railService.hasIssue(status.statusCode) : false,
+      });
+    }
+
+    return cards;
   });
 
   readonly bathroomInfo = computed(() => {
@@ -269,6 +311,7 @@ export class SubwayStationDialogComponent implements OnInit {
         codes.includes(line.code),
       );
       this.subwayLines.set(stationLines);
+      this.specialLines.set(cached.specialLines ?? []);
       this.lastUpdated.set(cached.lastUpdated);
       this.loadingStatus.set(false);
 
@@ -299,6 +342,7 @@ export class SubwayStationDialogComponent implements OnInit {
           codes.includes(line.code),
         );
         this.subwayLines.set(stationLines);
+        this.specialLines.set(status.specialLines ?? []);
         this.lastUpdated.set(status.lastUpdated);
         this.loadingStatus.set(false);
 
@@ -332,6 +376,7 @@ export class SubwayStationDialogComponent implements OnInit {
           codes.includes(line.code),
         );
         this.subwayLines.set(stationLines);
+        this.specialLines.set(status.specialLines ?? []);
         this.lastUpdated.set(status.lastUpdated);
 
         // Update error message if present

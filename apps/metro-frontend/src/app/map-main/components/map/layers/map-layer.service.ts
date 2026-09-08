@@ -268,7 +268,7 @@ export class MapLayerService {
   }
 
   /**
-   * Find which layer(s) contain a specific feature
+   * Find which layers contain a specific feature
    * Useful for debugging
    */
   findFeatureLayer(feature: Feature): LayerType[] {

@@ -312,7 +312,7 @@ export class RailIntegrationClientService
         lastError = error;
         if (!this.isTransient(error) || attempt === this.maxAttempts) {
           this.logger.error(
-            `Rail integration gRPC ${method} failed after ${attempt} attempt(s): ${this.formatGrpcError(error)}`,
+            `Rail integration gRPC ${method} failed after ${attempt} attempt${attempt === 1 ? '' : 's'}: ${this.formatGrpcError(error)}`,
           );
           throw error;
         }

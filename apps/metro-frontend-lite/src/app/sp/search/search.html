@@ -49,7 +49,7 @@
     </lite-icon-button>
     <div class="results-title">
       <h2>@if (isNearbyMode()) { Paradas próximas } @else { Resultados }</h2>
-      <span class="results-count">{{ results().length }} encontrado(s)</span>
+      <span class="results-count">{{ results().length }} {{ results().length === 1 ? 'encontrado' : 'encontrados' }}</span>
     </div>
     <lite-button variant="ghost" size="sm" (buttonClick)="onNewSearch()">
       Nova busca

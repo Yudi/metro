@@ -54,9 +54,9 @@ export class PostGISService {
     `;
 
     this.logger.debug(
-      `Shape ${shapeId} is shared by ${routeCheck.length} route(s): ${routeCheck
-        .map((r) => r.route_short_name)
-        .join(', ')}`,
+      `Shape ${shapeId} is shared by ${routeCheck.length} route${
+        routeCheck.length === 1 ? '' : 's'
+      }: ${routeCheck.map((r) => r.route_short_name).join(', ')}`,
     );
 
     return {

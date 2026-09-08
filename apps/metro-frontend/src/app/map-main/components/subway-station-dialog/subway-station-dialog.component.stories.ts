@@ -13,10 +13,14 @@ import {
   L1_NORMAL,
   L1_CLOSED,
   L2_NORMAL,
+  L13_NORMAL,
   L8_NORMAL,
   L9_NORMAL,
 } from '@metro/storybook-mocks';
 import {
+  AEROMOVEL_GRU_CLOSED,
+  AEROMOVEL_GRU_OPEN,
+  AEROPORTO_GUARULHOS,
   PARAISO,
   JABAQUARA,
   SAO_JUDAS,
@@ -66,6 +70,88 @@ export const Default: Story = {
         isFresh: true,
         fetchKind: 'normal',
         fetchDelayMs: 0,
+      }),
+    }),
+  ],
+};
+
+/**
+ * Aeroporto-Guarulhos: Aeromóvel GRU operating normally, matching the home status card.
+ */
+export const AeromovelGruOpen: Story = {
+  decorators: [
+    applicationConfig({
+      providers: createSubwayStationDialogProviders(AEROPORTO_GUARULHOS, {
+        cached: {
+          lines: [L13_NORMAL],
+          specialLines: [AEROMOVEL_GRU_OPEN],
+          lastUpdated: new Date(),
+          success: true,
+          errorMessage: null,
+        },
+        isFresh: true,
+        fetchKind: 'normal',
+        fetchDelayMs: 0,
+      }),
+    }),
+  ],
+};
+
+/**
+ * Aeroporto-Guarulhos: Aeromóvel GRU closed after operating hours.
+ */
+export const AeromovelGruClosed: Story = {
+  decorators: [
+    applicationConfig({
+      providers: createSubwayStationDialogProviders(AEROPORTO_GUARULHOS, {
+        cached: {
+          lines: [L13_NORMAL],
+          specialLines: [AEROMOVEL_GRU_CLOSED],
+          lastUpdated: new Date(),
+          success: true,
+          errorMessage: null,
+        },
+        isFresh: true,
+        fetchKind: 'normal',
+        fetchDelayMs: 0,
+      }),
+    }),
+  ],
+};
+
+/**
+ * Aeroporto-Guarulhos: station status is available, but the Aeromóvel status is missing.
+ */
+export const AeromovelGruUnavailable: Story = {
+  decorators: [
+    applicationConfig({
+      providers: createSubwayStationDialogProviders(AEROPORTO_GUARULHOS, {
+        cached: {
+          lines: [L13_NORMAL],
+          specialLines: [],
+          lastUpdated: new Date(),
+          success: true,
+          errorMessage: null,
+        },
+        isFresh: true,
+        fetchKind: 'normal',
+        fetchDelayMs: 0,
+      }),
+    }),
+  ],
+};
+
+/**
+ * Aeroporto-Guarulhos: shows the Aeromóvel status skeleton while status is loading.
+ */
+export const AeromovelGruLoading: Story = {
+  decorators: [
+    applicationConfig({
+      providers: createSubwayStationDialogProviders(AEROPORTO_GUARULHOS, {
+        cached: null,
+        isFresh: false,
+        fetchKind: 'normal',
+        fetchDelayMs: 3000,
       }),
     }),
   ],

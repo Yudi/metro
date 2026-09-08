@@ -170,7 +170,7 @@ export class RealtimeGateway
 
       // Send immediate cached response with all directions combined
       this.logger.debug(
-        `Sending immediate cached data for route ${routeShortName} (${totalVehicles} vehicles across ${routeCacheEntries.length} direction(s))`,
+        `Sending immediate cached data for route ${routeShortName} (${totalVehicles} vehicle${totalVehicles === 1 ? '' : 's'} across ${routeCacheEntries.length} direction${routeCacheEntries.length === 1 ? '' : 's'})`,
       );
 
       client.emit(
@@ -204,7 +204,7 @@ export class RealtimeGateway
         const totalVehicles = countVehicles(freshCacheEntries);
 
         this.logger.debug(
-          `Sending fresh data for route ${routeShortName} (${totalVehicles} vehicles across ${freshCacheEntries.length} direction(s))`,
+          `Sending fresh data for route ${routeShortName} (${totalVehicles} vehicle${totalVehicles === 1 ? '' : 's'} across ${freshCacheEntries.length} direction${freshCacheEntries.length === 1 ? '' : 's'})`,
         );
 
         client.emit(
@@ -417,7 +417,7 @@ export class RealtimeGateway
 
       if (subscribedClients.length > 0) {
         this.logger.debug(
-          `Broadcasting vehicle positions for route ${routeShortName}: ${totalVehicles} vehicles across ${cacheEntries.length} direction(s) to ${subscribedClients.length} client(s)`,
+          `Broadcasting vehicle positions for route ${routeShortName}: ${totalVehicles} vehicle${totalVehicles === 1 ? '' : 's'} across ${cacheEntries.length} direction${cacheEntries.length === 1 ? '' : 's'} to ${subscribedClients.length} client${subscribedClients.length === 1 ? '' : 's'}`,
         );
 
         const message = buildVehiclePositionsMessage(
@@ -448,7 +448,7 @@ export class RealtimeGateway
 
       if (subscribedClients.length > 0) {
         this.logger.debug(
-          `Broadcasting arrival predictions for stop ${stopCode}: ${linesCount} lines to ${subscribedClients.length} client(s)`,
+          `Broadcasting arrival predictions for stop ${stopCode}: ${linesCount} line${linesCount === 1 ? '' : 's'} to ${subscribedClients.length} client${subscribedClients.length === 1 ? '' : 's'}`,
         );
 
         const message = buildStopArrivalMessage(stopCode, cache);

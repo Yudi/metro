@@ -115,7 +115,9 @@ export class ZipProcessingService {
 
     if (analysisErrors.length > 0) {
       throw withCause(
-        `GTFS archive analysis failed for ${analysisErrors.length} file(s): ${analysisErrors.join('; ')}`,
+        `GTFS archive analysis failed for ${analysisErrors.length} file${
+          analysisErrors.length === 1 ? '' : 's'
+        }: ${analysisErrors.join('; ')}`,
         firstAnalysisCause,
       );
     }

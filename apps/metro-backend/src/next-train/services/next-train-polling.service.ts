@@ -93,7 +93,7 @@ export class NextTrainPollingService implements OnModuleDestroy {
     clients.add(clientId);
 
     this.logger.debug(
-      `Client ${clientId} subscribed to ${key} (${clients.size} subscriber(s))`,
+      `Client ${clientId} subscribed to ${key} (${clients.size} subscriber${clients.size === 1 ? '' : 's'})`,
     );
 
     this.ensurePolling(lineCode);
@@ -113,7 +113,7 @@ export class NextTrainPollingService implements OnModuleDestroy {
     if (clients) {
       clients.delete(clientId);
       this.logger.debug(
-        `Client ${clientId} unsubscribed from ${key} (${clients.size} subscriber(s) remaining)`,
+        `Client ${clientId} unsubscribed from ${key} (${clients.size} subscriber${clients.size === 1 ? '' : 's'} remaining)`,
       );
 
       if (clients.size === 0) {
@@ -132,7 +132,7 @@ export class NextTrainPollingService implements OnModuleDestroy {
       if (clients.has(clientId)) {
         clients.delete(clientId);
         this.logger.debug(
-          `Client ${clientId} unsubscribed from ${key} (${clients.size} subscriber(s) remaining)`,
+          `Client ${clientId} unsubscribed from ${key} (${clients.size} subscriber${clients.size === 1 ? '' : 's'} remaining)`,
         );
 
         if (clients.size === 0) {
@@ -470,7 +470,7 @@ export class NextTrainPollingService implements OnModuleDestroy {
   }
 
   private notifyPollComplete(deltas: StationDelta[]): void {
-    this.logger.debug(`Broadcasting ${deltas.length} delta update(s)`);
+    this.logger.debug(`Broadcasting ${deltas.length} delta update${deltas.length === 1 ? '' : 's'}`);
     for (const listener of this.pollCompleteListeners) {
       try {
         listener(deltas);

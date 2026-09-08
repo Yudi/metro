@@ -15,7 +15,7 @@
         <span class="route-code">{{ line.c }}</span>
         <span class="route-destination">→ {{ getLineDestination(line) }}</span>
         @if (line.qv > 0) {
-        <span class="vehicle-count">{{ line.qv }} veículo(s)</span>
+        <span class="vehicle-count">{{ line.qv }} {{ line.qv === 1 ? 'veículo' : 'veículos' }}</span>
         }
       </div>
 

@@ -397,7 +397,7 @@ export class NextTrainWebsocketService implements OnDestroy {
     this.logger.debug(
       `Received ${update.type} update for ${key}: ${
         update.trains.length
-      } train(s)${update.processing ? ' (processing)' : ''}${
+      } train${update.trains.length === 1 ? '' : 's'}${update.processing ? ' (processing)' : ''}${
         update.hasError ? ' (API error)' : ''
       }${update.operationClosed ? ' (operation closed)' : ''}`,
     );
@@ -448,7 +448,7 @@ export class NextTrainWebsocketService implements OnDestroy {
     this.updateLastUpdateTimestamp(update.timestamp);
 
     this.logger.debug(
-      `Received ${update.type} CPTM vehicle update for ${update.lineCode}: ${vehicles.length} vehicle(s)`,
+      `Received ${update.type} CPTM vehicle update for ${update.lineCode}: ${vehicles.length} vehicle${vehicles.length === 1 ? '' : 's'}`,
     );
   }
 

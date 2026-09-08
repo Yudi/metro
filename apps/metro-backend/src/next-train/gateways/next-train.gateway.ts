@@ -351,7 +351,7 @@ export class NextTrainGateway
       }
 
       this.logger.debug(
-        `Sent CPTM vehicle delta for ${delta.lineCode} to ${subscribers.size} client(s)`,
+        `Sent CPTM vehicle delta for ${delta.lineCode} to ${subscribers.size} client${subscribers.size === 1 ? '' : 's'}`,
       );
     }
   }

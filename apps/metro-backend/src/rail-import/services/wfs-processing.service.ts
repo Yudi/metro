@@ -125,7 +125,7 @@ export class WFSProcessingService {
 
     if (rejectedCount > 0) {
       this.logger.warn(
-        `Skipped ${rejectedCount} malformed feature(s) from ${source.typeName}; first rejection: ${firstRejection}`,
+        `Skipped ${rejectedCount} malformed feature${rejectedCount === 1 ? '' : 's'} from ${source.typeName}; first rejection: ${firstRejection}`,
       );
     }
 

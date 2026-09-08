@@ -93,7 +93,7 @@ export class CptmVehiclePollingService implements OnModuleDestroy {
     clients.add(clientId);
 
     this.logger.debug(
-      `Client ${clientId} subscribed to ${lineCode} vehicles (${clients.size} subscriber(s))`,
+      `Client ${clientId} subscribed to ${lineCode} vehicles (${clients.size} subscriber${clients.size === 1 ? '' : 's'})`,
     );
 
     const alreadyPolling = this.pollTimer !== null;
@@ -120,7 +120,7 @@ export class CptmVehiclePollingService implements OnModuleDestroy {
     if (clients) {
       clients.delete(clientId);
       this.logger.debug(
-        `Client ${clientId} unsubscribed from ${lineCode} vehicles (${clients.size} subscriber(s) remaining)`,
+        `Client ${clientId} unsubscribed from ${lineCode} vehicles (${clients.size} subscriber${clients.size === 1 ? '' : 's'} remaining)`,
       );
 
       if (clients.size === 0) {
@@ -140,7 +140,7 @@ export class CptmVehiclePollingService implements OnModuleDestroy {
       if (clients.has(clientId)) {
         clients.delete(clientId);
         this.logger.debug(
-          `Client ${clientId} unsubscribed from ${lineCode} vehicles (${clients.size} subscriber(s) remaining)`,
+          `Client ${clientId} unsubscribed from ${lineCode} vehicles (${clients.size} subscriber${clients.size === 1 ? '' : 's'} remaining)`,
         );
 
         if (clients.size === 0) {
@@ -331,7 +331,7 @@ export class CptmVehiclePollingService implements OnModuleDestroy {
       // Notify listeners
       if (deltas.length > 0) {
         this.logger.debug(
-          `Broadcasting ${deltas.length} CPTM vehicle delta(s)`,
+          `Broadcasting ${deltas.length} CPTM vehicle delta${deltas.length === 1 ? '' : 's'}`,
         );
         for (const listener of this.pollCompleteListeners) {
           try {

@@ -412,7 +412,7 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
             `${failure.id ?? 'unknown'}: ${failure.error ?? 'unknown error'}`,
         )
         .join('; ');
-      const message = `Typesense rejected ${failures.length} malformed ${baseName} document(s): ${details}`;
+      const message = `Typesense rejected ${failures.length} malformed ${baseName} document${failures.length === 1 ? '' : 's'}: ${details}`;
       throw new Error(message);
     }
 

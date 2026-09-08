@@ -6,6 +6,10 @@ import {
   RailGraphqlService,
   API_BASE_URL,
 } from '@metro/shared/api';
+import {
+  SPECIAL_RAIL_LINE_CODES,
+  SpecialRailLineStatus,
+} from '@metro/shared/utils';
 import type { BusStopGraphQL } from '../../geography/geography-graphql.service';
 import {
   createMockRailGraphqlService,
@@ -73,6 +77,36 @@ export const VILA_DAS_BELEZAS: BusStopGraphQL = {
   name: 'Vila das Belezas',
   description: 'Estação Vila das Belezas da Linha 5 - Lilás.',
   routeShortNames: ['L5'],
+};
+
+export const AEROPORTO_GUARULHOS: BusStopGraphQL = {
+  ...PARAISO,
+  id: 'aeroporto-guarulhos-1',
+  stopId: 'AGU',
+  name: 'Aeroporto-Guarulhos',
+  description:
+    'Estação Aeroporto-Guarulhos da Linha 13 - Jade, com acesso ao Aeromóvel GRU.',
+  agencies: ['CPTM'],
+  routeShortNames: ['Jade'],
+};
+
+export const AEROMOVEL_GRU_OPEN: SpecialRailLineStatus = {
+  code: SPECIAL_RAIL_LINE_CODES.AEROMOVEL_GRU,
+  colorName: 'Azul',
+  colorHex: '#186dbf',
+  line: 'Aeromóvel GRU',
+  statusCode: 'OperacaoNormal',
+  statusLabel: 'Aberto',
+  statusColor: 'verde',
+  nextDepartures: [],
+  issues: [],
+};
+
+export const AEROMOVEL_GRU_CLOSED: SpecialRailLineStatus = {
+  ...AEROMOVEL_GRU_OPEN,
+  statusCode: 'OperacaoEncerrada',
+  statusLabel: 'Operação Encerrada',
+  statusColor: 'cinza',
 };
 
 export const PINHEIROS: BusStopGraphQL = {

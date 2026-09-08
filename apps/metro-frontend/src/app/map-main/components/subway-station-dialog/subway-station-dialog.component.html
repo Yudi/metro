@@ -39,31 +39,28 @@
         <span>{{ errorMessage() }}</span>
       </div>
     }
-    @if (staticLineInfo().length > 0) {
+    @if (stationStatusCards().length > 0) {
       <!-- Always show lines immediately using static info, status loads in background -->
       <div class="subway-lines-grid">
-        @for (staticLine of staticLineInfo(); track staticLine.code) {
+        @for (card of stationStatusCards(); track card.code) {
           <div
             class="subway-line-card"
-            [class.has-issue]="
-              getLineStatus(staticLine.code) &&
-              lineHasIssue(getLineStatus(staticLine.code)!)
-            "
+            [class.has-issue]="card.hasIssue"
           >
             <div
               class="line-badge"
-              [style.background-color]="staticLine.colorHex"
+              [style.background-color]="card.colorHex"
             >
-              {{ staticLine.code }}
+              {{ card.code }}
             </div>
             <div class="line-details">
-              <span class="line-name">{{ staticLine.colorName }}</span>
-              @if (loadingStatus() && !getLineStatus(staticLine.code)) {
+              <span class="line-name">{{ card.name }}</span>
+              @if (loadingStatus() && !card.status) {
                 <!-- Skeleton for status while loading -->
                 <div class="status-badge status-skeleton">
                   <span class="status-skeleton-bar"></span>
                 </div>
-              } @else if (getLineStatus(staticLine.code); as line) {
+              } @else if (card.status; as line) {
                 <!-- Real status loaded -->
                 <div class="status-badge" [attr.data-status]="line.statusCode">
                   <span class="status-dot"></span>
@@ -77,7 +74,7 @@
                 </div>
               }
             </div>
-            @if (getLineStatus(staticLine.code); as line) {
+            @if (card.status; as line) {
               @if (
                 line.description &&
                 line.statusCode !== "OperacaoNormal" &&

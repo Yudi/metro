@@ -96,7 +96,7 @@ export class RealtimePollingService implements OnModuleDestroy {
     this.routeSubscriptionCounts.set(routeShortName, subscriptionCount);
     this.subscriptions.routeShortNames.add(routeShortName);
     this.logger.debug(
-      `Subscribed to route: ${routeShortName} (${subscriptionCount} subscriber(s))`,
+      `Subscribed to route: ${routeShortName} (${subscriptionCount} subscriber${subscriptionCount === 1 ? '' : 's'})`,
     );
     this.ensurePolling();
     return true;
@@ -121,7 +121,7 @@ export class RealtimePollingService implements OnModuleDestroy {
       `Unsubscribed from route: ${routeShortName} (${Math.max(
         subscriptionCount,
         0,
-      )} subscriber(s))`,
+      )} subscriber${subscriptionCount === 1 ? '' : 's'})`,
     );
     this.cleanupPolling();
   }
@@ -146,7 +146,7 @@ export class RealtimePollingService implements OnModuleDestroy {
     this.stopSubscriptionCounts.set(stopCode, subscriptionCount);
     this.subscriptions.stopCodes.add(stopCode);
     this.logger.debug(
-      `Subscribed to stop: ${stopCode} (${subscriptionCount} subscriber(s))`,
+      `Subscribed to stop: ${stopCode} (${subscriptionCount} subscriber${subscriptionCount === 1 ? '' : 's'})`,
     );
     this.ensurePolling();
     return true;
@@ -171,7 +171,7 @@ export class RealtimePollingService implements OnModuleDestroy {
       `Unsubscribed from stop: ${stopCode} (${Math.max(
         subscriptionCount,
         0,
-      )} subscriber(s))`,
+      )} subscriber${subscriptionCount === 1 ? '' : 's'})`,
     );
     this.cleanupPolling();
   }
@@ -255,7 +255,7 @@ export class RealtimePollingService implements OnModuleDestroy {
     }
 
     this.logger.debug(
-      `Polling vehicle positions for ${this.subscriptions.routeShortNames.size} subscribed route(s)`,
+      `Polling vehicle positions for ${this.subscriptions.routeShortNames.size} subscribed route${this.subscriptions.routeShortNames.size === 1 ? '' : 's'}`,
     );
     try {
       const allData = await this.olhoVivoApi.getAllPositions();

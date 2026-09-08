@@ -187,7 +187,9 @@ export async function importStops(
   if (validationResult.invalid.length > 0) {
     const firstInvalid = validationResult.invalid[0];
     context.warn(
-      `Skipped ${validationResult.invalid.length} malformed stop row(s) from ${fileName}; first rejection: ${firstInvalid.errors.join(', ')}`,
+      `Skipped ${validationResult.invalid.length} malformed stop row${
+        validationResult.invalid.length === 1 ? '' : 's'
+      } from ${fileName}; first rejection: ${firstInvalid.errors.join(', ')}`,
     );
   }
 

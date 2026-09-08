@@ -68,7 +68,9 @@ export class CsvProcessingService {
 
     if (rejectedCount > 0) {
       this.logger.warn(
-        `Skipped ${rejectedCount} malformed row(s) from ${fileName}; first rejection: ${firstRejection}`,
+        `Skipped ${rejectedCount} malformed row${
+          rejectedCount === 1 ? '' : 's'
+        } from ${fileName}; first rejection: ${firstRejection}`,
       );
     }
 

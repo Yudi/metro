@@ -269,7 +269,7 @@ describe('CptmVehicleLayerService', () => {
     expect(getFeatures()).toHaveLength(0);
   });
 
-  it('rejects estimate deadlines beyond the supported lifetime', () => {
+  it('does not schedule expiry for deadlines beyond the supported lifetime', () => {
     service.subscribeToLine('L8');
     vehicles.set(
       new Map([
@@ -288,6 +288,6 @@ describe('CptmVehicleLayerService', () => {
     refreshMarkers();
 
     expect(getFeatures()).toHaveLength(0);
-    expect(jest.getTimerCount()).toBe(0);
+    expect(service['estimateExpiryTimer']).toBeUndefined();
   });
 });

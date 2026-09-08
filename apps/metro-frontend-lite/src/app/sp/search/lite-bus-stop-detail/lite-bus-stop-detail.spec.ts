@@ -92,13 +92,19 @@ describe('LiteBusStopDetail', () => {
     expect(stationNames).toEqual(['Vila Madalena']);
   });
 
-  it('renders the station distance while preserving agency and line metadata', () => {
+  it('renders the circular line number beside the station name and preserves distance', () => {
     const station = fixture.nativeElement.querySelector(
       '.rail-service .rail-station',
     ) as HTMLElement;
 
-    expect(station.querySelector('small')?.textContent?.trim()).toBe(
-      'metro · Verde',
+    expect(
+      station.querySelector('.station-line-badge')?.textContent?.trim(),
+    ).toBe('2');
+    expect(
+      station.querySelector('.station-line-badge')?.getAttribute('aria-label'),
+    ).toBe('Linha 2');
+    expect(station.querySelector('.rail-station-name')?.textContent?.trim()).toBe(
+      'Vila Madalena',
     );
     expect(
       station.querySelector('.rail-station-distance')?.textContent?.trim(),

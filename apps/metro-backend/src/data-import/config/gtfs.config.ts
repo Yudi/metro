@@ -67,6 +67,9 @@ export class GTFSConfig {
    */
   static readonly IMPORT_LOCK_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 hours
 
+  /** Maximum buffered size for CKAN package metadata. */
+  static readonly MAX_CKAN_METADATA_BYTES = 1024 * 1024; // 1 MB
+
   /**
    * ZIP safety limits for downloaded GTFS archives.
    */

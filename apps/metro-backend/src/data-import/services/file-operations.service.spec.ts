@@ -74,7 +74,10 @@ describe('FileOperationsService', () => {
     ).resolves.toBe('https://dadosabertos.artesp.sp.gov.br/feed.zip');
     expect(httpService.get).toHaveBeenCalledWith(
       'https://dadosabertos.artesp.sp.gov.br/api/3/action/package_show?id=gtfs',
-      expect.objectContaining({ responseType: 'json' }),
+      expect.objectContaining({
+        responseType: 'json',
+        maxContentLength: 1024 * 1024,
+      }),
     );
   });
 });

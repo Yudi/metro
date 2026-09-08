@@ -6,6 +6,7 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { createReadStream, createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
+import { GTFSConfig } from '../config/gtfs.config';
 
 const HTTP_URL_PATTERN = /^https?:\/\/[^\s]+$/iu;
 
@@ -117,6 +118,7 @@ export class FileOperationsService {
         this.httpService.get<unknown>(packageUrl, {
           responseType: 'json',
           timeout: timeoutMs,
+          maxContentLength: GTFSConfig.MAX_CKAN_METADATA_BYTES,
           headers: {
             'User-Agent': 'Projeto-Transporte-Metropolitano-Backend/1.0',
           },

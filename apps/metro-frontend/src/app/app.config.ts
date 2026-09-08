@@ -32,7 +32,7 @@ import { environment } from '../environments/environment';
 import { MatIconRegistry } from '@angular/material/icon';
 import { provideServiceWorker } from '@angular/service-worker';
 import {
-  firebaseAuthInterceptor,
+  createFirebaseAuthInterceptor,
   provideAuth,
   provideFirebase,
 } from '@metro/shared/firebase';
@@ -51,7 +51,7 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(
       withFetch(),
       withInterceptors([
-        firebaseAuthInterceptor,
+        createFirebaseAuthInterceptor(environment.apiUrl),
         graphqlQueryTimeoutInterceptor,
       ]),
     ),

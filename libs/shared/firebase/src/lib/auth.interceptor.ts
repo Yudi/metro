@@ -1,18 +1,31 @@
 import { HttpInterceptorFn } from '@angular/common/http';
 import { firebaseIdToken } from './auth.signal';
 
-export const firebaseAuthInterceptor: HttpInterceptorFn = (req, next) => {
-  const token = firebaseIdToken();
+export function createFirebaseAuthInterceptor(
+  apiBaseUrl: string,
+): HttpInterceptorFn {
+  const baseUrls = [apiBaseUrl.replace(/\/+$/, ''), '/api'];
 
-  if (!token || !req.url.startsWith('/api')) {
-    return next(req);
-  }
+  return (req, next) => {
+    const token = firebaseIdToken();
 
-  const authReq = req.clone({
-    setHeaders: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+    const requestUrl = req.url.split(/[?#]/, 1)[0];
+    const isApiRequest = baseUrls.some(
+      (baseUrl) => requestUrl === baseUrl || requestUrl.startsWith(`${baseUrl}/`),
+    );
 
-  return next(authReq);
-};
+    if (!token || !isApiRequest) {
+      return next(req);
+    }
+
+    const authReq = req.clone({
+      setHeaders: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    return next(authReq);
+  };
+}
+
+export const firebaseAuthInterceptor = createFirebaseAuthInterceptor('/api');

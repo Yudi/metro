@@ -20,6 +20,11 @@ module.exports = {
       assets: [
         "apps/metro-backend/src/assets",
         {
+          input: "libs/shared/bus-itinerary-contracts/src/assets/grpc",
+          glob: "*.proto",
+          output: "assets/grpc",
+        },
+        {
           input: "libs/shared/rail-integration-contracts/src/assets/grpc",
           glob: "*.proto",
           output: "assets/grpc",

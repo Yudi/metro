@@ -48,6 +48,7 @@ export class ToolbarComponent {
   private readonly safeBackPaths = new Set([
     '/',
     '/proxima-chegada',
+    '/itinerarios',
     '/proximo-trem',
     '/painel',
     '/mapa',

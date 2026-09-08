@@ -93,6 +93,9 @@ export function parseNoticeDetail(
   const title = $('#conteudo h1').text().replace(/\s+/g, ' ').trim();
   const body = $('#conteudo .conteudo-interno .col-md-9').first().clone();
   body.find('script, style, iframe, form, nav').remove();
+  body.find('*').addBack().contents().each((_, node) => {
+    if (node.type === 'text') node.data = node.data.replace(/\s+/g, ' ');
+  });
   body.find('br').replaceWith('\n');
   body.find('p, li, h2, h3, div').append('\n');
   const description = body

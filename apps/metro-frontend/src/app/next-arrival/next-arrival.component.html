@@ -1,31 +1,14 @@
 <div class="main-container">
   <h1 class="global-header">Próxima chegada</h1>
   <div class="search-container">
-    <mat-form-field appearance="outline" class="search-field">
-      <mat-label>Estação ou ponto de ônibus</mat-label>
-      <input
-        matInput
-        type="text"
-        #searchInput
-        placeholder="Digite o nome da estação ou ponto..."
-        [value]="searchQuery()"
-        (input)="onSearchInput($event)"
-        autocomplete="off"
-      />
-      <mat-icon matPrefix>search</mat-icon>
-      @if (isSearching()) {
-        <mat-spinner matSuffix diameter="20"></mat-spinner>
-      } @else if (searchQuery() || nearbyMode()) {
-        <button
-          matSuffix
-          mat-icon-button
-          aria-label="Limpar"
-          (click)="onClearSearch()"
-        >
-          <mat-icon>close</mat-icon>
-        </button>
-      }
-    </mat-form-field>
+    <app-transit-search-field
+      class="search-field"
+      [query]="searchQuery()"
+      [loading]="isSearching()"
+      [clearable]="searchQuery().length > 0 || nearbyMode()"
+      (queryChange)="onSearchQueryChange($event)"
+      (cleared)="onClearSearch()"
+    />
 
     <button
       mat-mini-fab

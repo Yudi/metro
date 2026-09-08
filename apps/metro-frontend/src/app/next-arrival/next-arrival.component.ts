@@ -2,13 +2,10 @@ import {
   Component,
   inject,
   ChangeDetectionStrategy,
-  ElementRef,
   ViewChild,
   AfterViewInit,
   effect,
 } from '@angular/core';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -33,17 +30,17 @@ import { GeolocationService } from '@metro/shared/geolocation';
 import { LoggerService } from '@metro/shared/api';
 import { getUniqueAgencies } from '@metro/shared/utils';
 import { HttpClient } from '@angular/common/http';
+import { TransitSearchFieldComponent } from '../shared/components/transit-search-field/transit-search-field.component';
 
 @Component({
   selector: 'app-next-arrival',
   imports: [
-    MatFormFieldModule,
-    MatInputModule,
     MatIconModule,
     MatButtonModule,
     MatProgressSpinnerModule,
     MatTooltipModule,
     SearchResultCardComponent,
+    TransitSearchFieldComponent,
   ],
   providers: [StopSearchService],
   templateUrl: './next-arrival.component.html',
@@ -51,8 +48,8 @@ import { HttpClient } from '@angular/common/http';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class NextArrivalComponent implements AfterViewInit {
-  @ViewChild('searchInput')
-  private readonly searchInputRef!: ElementRef<HTMLInputElement>;
+  @ViewChild(TransitSearchFieldComponent)
+  private readonly searchFieldRef?: TransitSearchFieldComponent;
 
   private readonly searchService = inject(StopSearchService);
   private readonly geolocationService = inject(GeolocationService);
@@ -89,13 +86,12 @@ export class NextArrivalComponent implements AfterViewInit {
   ngAfterViewInit(): void {
     // Auto-focus search input on load
     setTimeout(() => {
-      this.searchInputRef?.nativeElement?.focus();
+      this.searchFieldRef?.focus();
     }, 100);
   }
 
-  onSearchInput(event: Event): void {
-    const target = event.target as HTMLInputElement;
-    this.searchService.search(target.value, [
+  onSearchQueryChange(query: string): void {
+    this.searchService.search(query, [
       'busRoute',
       'railLine',
       'busStop',
@@ -105,7 +101,7 @@ export class NextArrivalComponent implements AfterViewInit {
 
   onClearSearch(): void {
     this.searchService.clear();
-    this.searchInputRef?.nativeElement?.focus();
+    this.searchFieldRef?.focus();
   }
 
   /** Toggle nearby search mode */
@@ -115,7 +111,7 @@ export class NextArrivalComponent implements AfterViewInit {
     if (this.nearbyMode()) {
       // Turning off nearby search
       this.searchService.clear();
-      this.searchInputRef?.nativeElement?.focus();
+      this.searchFieldRef?.focus();
       return;
     }
 

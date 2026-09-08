@@ -20,6 +20,13 @@ export class MenuComponent {
   public firebaseUser = firebaseUser;
 
   public readonly menuList: menuList = {
+    Ônibus: [
+      {
+        label: 'Itinerários',
+        icon: 'route',
+        route: '/itinerarios',
+      },
+    ],
     Mapa: [
       {
         label: 'Metrô e trem',

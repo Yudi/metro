@@ -1,0 +1,9 @@
+{
+  "name": "bus-itinerary-contracts",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/shared/bus-itinerary-contracts/src",
+  "projectType": "library",
+  "tags": [],
+  "// targets": "to see all targets run: nx show project bus-itinerary-contracts --web",
+  "targets": {}
+}

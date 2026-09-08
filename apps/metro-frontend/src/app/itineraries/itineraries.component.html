@@ -1,0 +1,474 @@
+<main class="itineraries">
+  <h1 class="global-header">Itinerários</h1>
+  <app-transit-search-field
+    label="Número ou nome da linha"
+    placeholder="Ex.: 477A-10 ou Terminal Pinheiros"
+    [query]="query()"
+    [loading]="searchState().loading"
+    [clearable]="!!query()"
+    (queryChange)="query.set($event)"
+    (cleared)="query.set('')"
+  />
+
+  @if (query()) {
+    <section
+      class="search-results"
+      aria-label="Resultados da busca"
+      aria-live="polite"
+      [attr.aria-busy]="searchState().loading"
+    >
+      @if (searchState().loading) {
+        <p>Buscando linhas…</p>
+      } @else if (searchState().error) {
+        <p role="alert">
+          Não foi possível buscar as linhas. Tente digitar novamente.
+        </p>
+      } @else if (query().trim().length < 2) {
+        <p>Digite pelo menos 2 caracteres para buscar.</p>
+      } @else if (!searchState().results.length) {
+        <p>Nenhuma linha encontrada. Tente outro número ou destino.</p>
+      } @else {
+        @for (result of searchState().results; track result.id) {
+          <app-search-result-card
+            [result]="result"
+            (resultClick)="selectRoute($event)"
+          />
+        }
+      }
+    </section>
+  }
+
+  @if (routeId()) {
+    <section
+      aria-label="Informações da linha"
+      [attr.aria-busy]="detailState().loading"
+    >
+      @if (detailState().loading) {
+        <mat-progress-bar
+          mode="indeterminate"
+          aria-label="Carregando itinerário"
+        />
+        <p role="status">Carregando itinerário e horários…</p>
+      } @else if (detailState().error && !route()) {
+        <div class="empty-state" role="alert">
+          <h2>Não foi possível carregar esta linha</h2>
+          <p>Tente novamente para consultar o itinerário.</p>
+          <button mat-flat-button (click)="retryCount.update(incrementRetry)">
+            Tentar novamente
+          </button>
+        </div>
+      } @else if (route(); as route) {
+        <header class="route-heading">
+          <div>
+            <h2>
+              <span
+                class="route-badge"
+                [style.background-color]="routeColor()"
+                [style.color]="routeTextColor()"
+                >{{ route.shortName }}</span
+              >
+              <span class="route-name">{{ route.longName }}</span>
+            </h2>
+            <p class="agency">
+              @if (agencyLogo(); as logo) {
+                <img [ngSrc]="logo" width="28" height="28" alt="" />
+              }
+              {{ agency() }}
+            </p>
+          </div>
+          <a mat-stroked-button routerLink="/mapa" [queryParams]="mapParams()">
+            <mat-icon>map</mat-icon>Ver no mapa
+          </a>
+        </header>
+
+        <div class="controls">
+          @if (published(); as published) {
+            <mat-form-field appearance="outline">
+              <mat-label>Dia de operação</mat-label>
+              <mat-select
+                [value]="publishedDayKind()"
+                (selectionChange)="publishedDayKind.set($event.value)"
+              >
+                @for (day of published.days; track day.kind) {
+                  <mat-option [value]="day.kind">{{
+                    dayLabels[day.kind]
+                  }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="direction-field">
+              <mat-label>Sentido</mat-label>
+              <mat-select
+                [value]="publishedDirection()?.id"
+                [disabled]="!publishedDay()?.directions?.length"
+                placeholder="Sem sentido publicado"
+                (selectionChange)="publishedDirectionId.set($event.value)"
+              >
+                @for (
+                  direction of publishedDay()?.directions;
+                  track direction.id
+                ) {
+                  <mat-option [value]="direction.id">{{
+                    direction.headsign
+                  }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          } @else {
+            <mat-form-field appearance="outline">
+              <mat-label>Dia da viagem</mat-label>
+              <mat-select
+                [value]="serviceDate()"
+                (selectionChange)="selectDate($event.value)"
+              >
+                @for (day of days; track day.value) {
+                  <mat-option [value]="day.value"
+                    >{{ day.label }} ·
+                    {{ day.value | date: "dd/MM" : "UTC" }}</mat-option
+                  >
+                }
+              </mat-select>
+            </mat-form-field>
+            @if (patterns().length) {
+              <mat-form-field appearance="outline" class="direction-field">
+                <mat-label>Sentido e percurso</mat-label>
+                <mat-select
+                  [value]="pattern()?.id"
+                  (selectionChange)="selectedPatternId.set($event.value)"
+                >
+                  @for (option of patternOptions(); track option.value) {
+                    <mat-option [value]="option.value">{{
+                      option.label
+                    }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            }
+          }
+        </div>
+
+        <dl class="route-facts">
+          <div>
+            <dt>
+              Funcionamento ·
+              {{
+                published()
+                  ? dayLabels[publishedDayKind()]
+                  : (serviceDate() | date: "dd/MM" : "UTC")
+              }}
+            </dt>
+            <dd>{{ operatingWindow() || "Sem horário publicado" }}</dd>
+          </div>
+          @if (!published()) {
+            <div>
+              <dt>Duração programada</dt>
+              <dd>{{ duration() }}</dd>
+            </div>
+          }
+          <div>
+            <dt>Tarifa</dt>
+            <dd>{{ fares() }}</dd>
+          </div>
+        </dl>
+        @if (publishedTravelTimes().length) {
+          <div class="travel-summary">
+            <h3>Tempo estimado de viagem</h3>
+            <dl class="travel-times">
+              @for (time of publishedTravelTimes(); track time.label) {
+                <div>
+                  <dt>{{ time.label }}</dt>
+                  <dd>{{ time.value }}</dd>
+                </div>
+              }
+            </dl>
+          </div>
+        }
+
+        @if (publishedState().loading) {
+          <p class="supporting" role="status">
+            Consultando programação completa da linha…
+          </p>
+        } @else if (publishedRouteId() && !published()) {
+          <p class="supporting">
+            A programação detalhada está indisponível. Confira abaixo os dados
+            publicados no GTFS.
+          </p>
+        }
+
+        @if (published() || pattern()) {
+          <div class="detail-columns">
+            <section aria-labelledby="schedule-heading">
+              <h3 id="schedule-heading" class="section-title">
+                <mat-icon aria-hidden="true">schedule</mat-icon>Intervalos entre
+                saídas
+              </h3>
+              @if (published()) {
+                <p class="supporting">
+                  Programação habitual de
+                  {{ dayLabels[publishedDayKind()].toLowerCase() }}. Feriados e
+                  alterações operacionais podem ter horários diferentes.
+                </p>
+              }
+              @if (!published() && pattern()?.intervals?.length) {
+                <p class="supporting">
+                  Intervalos programados. Não são previsões de chegada.
+                </p>
+                <dl class="intervals">
+                  @for (interval of pattern()?.intervals; track $index) {
+                    <div>
+                      <dt>
+                        {{ timeLabel(interval.startTime) }} –
+                        {{ timeLabel(interval.endTime) }}
+                      </dt>
+                      <dd>
+                        A cada
+                        {{ intervalMinutes(interval.headwaySeconds) }} min
+                      </dd>
+                    </div>
+                  }
+                </dl>
+              }
+              @if (calculatedIntervals().length) {
+                <p class="supporting">
+                  Mínimo e máximo entre partidas, calculados com os horários
+                  publicados. Não são previsões de chegada.
+                </p>
+                <dl class="intervals">
+                  @for (
+                    interval of calculatedIntervals();
+                    track interval.startTime
+                  ) {
+                    <div>
+                      <dt>
+                        {{ timeLabel(interval.startTime) }} –
+                        {{ timeLabel(interval.endTime) }}
+                      </dt>
+                      <dd>{{ interval.label }}</dd>
+                    </div>
+                  }
+                </dl>
+              }
+              @if (visibleDepartures().length) {
+                @if (!published()) {
+                  <p class="supporting">
+                    Horários programados para o dia selecionado.
+                  </p>
+                }
+                @if (calculatedIntervals().length) {
+                  <button
+                    mat-button
+                    type="button"
+                    [attr.aria-expanded]="showDepartureTimes()"
+                    aria-controls="exact-departures"
+                    (click)="showDepartureTimes.set(!showDepartureTimes())"
+                  >
+                    <mat-icon>{{
+                      showDepartureTimes() ? "expand_less" : "expand_more"
+                    }}</mat-icon>
+                    {{
+                      showDepartureTimes()
+                        ? "Ocultar horários de partida"
+                        : "Ver " +
+                          visibleDepartures().length +
+                          " horários de partida"
+                    }}
+                  </button>
+                }
+                @if (!calculatedIntervals().length || showDepartureTimes()) {
+                  <div id="exact-departures">
+                    <p class="supporting">
+                      Cores alternadas separam as partidas por hora.
+                    </p>
+                    @for (group of departureGroups(); track group.label) {
+                      <div
+                        class="departure-group"
+                        [class.alternate-hour]="group.alternate"
+                      >
+                        <ul
+                          class="departures"
+                          [attr.aria-label]="
+                            'Partidas na faixa de ' + group.label
+                          "
+                        >
+                          @for (departure of group.times; track departure) {
+                            <li>{{ timeLabel(departure) }}</li>
+                          }
+                        </ul>
+                      </div>
+                    }
+                  </div>
+                }
+              }
+              @if (
+                !visibleDepartures().length &&
+                (published() || !pattern()?.intervals?.length)
+              ) {
+                <p>
+                  Não há horários publicados para este percurso no dia
+                  selecionado.
+                </p>
+              }
+              <p class="supporting">
+                O trânsito e alterações operacionais podem afetar a viagem.
+              </p>
+            </section>
+            <section aria-labelledby="stops-heading">
+              @if (published()) {
+                <h3 id="stops-heading" class="section-title">
+                  <mat-icon aria-hidden="true">route</mat-icon>Itinerário por
+                  vias
+                </h3>
+                @if (publishedDirection()?.streets?.length) {
+                  <ol class="stops">
+                    @for (
+                      street of publishedDirection()?.streets;
+                      track $index
+                    ) {
+                      <li [class.has-notice]="!!street.notices?.length">
+                        @if (street.notices?.length) {
+                          <mat-icon
+                            class="street-warning"
+                            aria-label="Via com aviso"
+                            >warning_amber</mat-icon
+                          >
+                        }
+                        {{ street.name }}
+                        @if (street.number) {
+                          <span class="supporting">{{ street.number }}</span>
+                        }
+                        @for (notice of street.notices; track $index) {
+                          <p class="street-notice">
+                            <mat-icon aria-hidden="true">info</mat-icon
+                            >{{ notice }}
+                          </p>
+                        }
+                      </li>
+                    }
+                  </ol>
+                } @else {
+                  <p>
+                    O itinerário por vias não foi publicado para este sentido e
+                    dia.
+                  </p>
+                }
+              } @else {
+                <h3 id="stops-heading" class="section-title">
+                  <mat-icon aria-hidden="true">route</mat-icon>Itinerário
+                  <span class="supporting"
+                    >{{ pattern()?.stops?.length }} paradas</span
+                  >
+                </h3>
+                @if (pattern()?.stops?.length) {
+                  <ol class="stops">
+                    @for (stop of pattern()?.stops; track $index) {
+                      <li>{{ stop.name }}</li>
+                    }
+                  </ol>
+                } @else {
+                  <p>As paradas deste percurso não estão disponíveis.</p>
+                }
+              }
+            </section>
+          </div>
+        } @else {
+          <div class="empty-state">
+            @if (detailState().error) {
+              <h3>Itinerário indisponível</h3>
+              <p>Não foi possível consultar as viagens desta linha.</p>
+              <button
+                mat-stroked-button
+                (click)="retryCount.update(incrementRetry)"
+              >
+                Tentar novamente
+              </button>
+            } @else {
+              <h3>Nenhuma viagem publicada para este dia</h3>
+              <p>
+                Escolha outro dia para consultar os percursos disponíveis. A
+                ausência de dados não confirma que a linha esteja fora de
+                operação.
+              </p>
+            }
+          </div>
+        }
+        @if (noticeCode()) {
+          <section
+            class="notices"
+            aria-labelledby="notice-heading"
+            aria-live="polite"
+          >
+            <h3 id="notice-heading" class="section-title">
+              <mat-icon aria-hidden="true">campaign</mat-icon>Avisos da SPTrans
+            </h3>
+            @if (noticeState(); as state) {
+              @if (state.status === "UNAVAILABLE") {
+                <p>Não foi possível consultar os avisos desta linha.</p>
+              } @else {
+                @if (state.status === "STALE") {
+                  <p>Consulta desatualizada. Os avisos podem ter mudado.</p>
+                }
+                @if (notices().length) {
+                  <app-bus-information
+                    [routeCode]="noticeCode()"
+                    [notices]="notices()"
+                    [stale]="state.status === 'STALE'"
+                    [lastUpdated]="state.lastUpdated"
+                  />
+                  <p class="supporting">
+                    Publicações podem se referir a alterações já encerradas.
+                    Confira o período de cada aviso.
+                  </p>
+                } @else {
+                  <p>
+                    Nenhum aviso encontrado para esta linha na última consulta.
+                  </p>
+                }
+                @if (state.lastUpdated) {
+                  <p class="supporting">
+                    Consultado em
+                    {{
+                      state.lastUpdated | date: "dd/MM/yyyy HH:mm" : "-0300"
+                    }}.
+                  </p>
+                }
+              }
+            } @else {
+              <p>Consultando avisos…</p>
+            }
+          </section>
+        }
+
+        <dl class="operator-details">
+          <div>
+            <dt>
+              {{ published() ? "Empresa operadora" : "Agência / operadora" }}
+            </dt>
+            <dd>{{ operator() }}</dd>
+          </div>
+          @if (published()?.consortiumName; as consortium) {
+            <div>
+              <dt>Consórcio</dt>
+              <dd>{{ consortium }}</dd>
+            </div>
+          }
+        </dl>
+      } @else {
+        <div class="empty-state">
+          <h2>Linha não encontrada</h2>
+          <p>Busque pelo número ou nome para selecionar outra linha.</p>
+        </div>
+      }
+    </section>
+  } @else if (!query()) {
+    <section class="empty-state">
+      <h2>Encontre o caminho da sua linha</h2>
+      <p>
+        Busque uma linha da SPTrans ou Artesp para consultar sentidos, paradas,
+        horários e tarifas.
+      </p>
+      <p class="supporting">
+        Os avisos da SPTrans aparecem junto às informações da linha.
+      </p>
+    </section>
+  }
+</main>

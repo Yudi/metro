@@ -1,4 +1,11 @@
-<mat-card class="result-card" (click)="onCardClick()" tabindex="0">
+<mat-card
+  class="result-card"
+  role="button"
+  tabindex="0"
+  (click)="onCardClick()"
+  (keydown.enter)="$event.preventDefault(); onCardClick()"
+  (keydown.space)="$event.preventDefault(); onCardClick()"
+>
   <mat-card-content>
     <div class="result-header">
       @if (result().type === "route" && result().routeData; as route) {

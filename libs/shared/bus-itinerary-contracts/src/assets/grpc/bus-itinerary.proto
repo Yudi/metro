@@ -1,0 +1,38 @@
+syntax = "proto3";
+package metro.bus.itinerary.v1;
+
+service BusItineraryService {
+  rpc GetPublishedRouteInformation (RouteRequest) returns (PublishedRouteInformation);
+}
+
+message RouteRequest { string route_code = 1; }
+message PublishedRouteInformation {
+  string status = 1;
+  string route_code = 2;
+  string last_updated = 3;
+  string operator_name = 4;
+  string consortium_name = 5;
+  repeated ServiceDay days = 6;
+}
+message ServiceDay {
+  string kind = 1;
+  repeated Direction directions = 2;
+}
+message Direction {
+  string id = 1;
+  string headsign = 2;
+  repeated string departures = 3;
+  repeated Street streets = 4;
+  repeated TravelTime travel_times = 5;
+  string start_time = 6;
+  string end_time = 7;
+}
+message Street {
+  string name = 1;
+  string number = 2;
+  repeated string notices = 3;
+}
+message TravelTime {
+  string period = 1;
+  int32 minutes = 2;
+}

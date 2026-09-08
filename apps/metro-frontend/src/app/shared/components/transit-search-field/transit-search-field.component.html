@@ -1,0 +1,26 @@
+<mat-form-field appearance="outline" class="search-field">
+  <mat-label>{{ label() }}</mat-label>
+  <input
+    matInput
+    type="search"
+    #searchInput
+    [placeholder]="placeholder()"
+    [value]="query()"
+    (input)="onInput($event)"
+    autocomplete="off"
+  />
+  <mat-icon matPrefix aria-hidden="true">search</mat-icon>
+  @if (loading()) {
+    <mat-spinner matSuffix diameter="20" aria-label="Carregando"></mat-spinner>
+  } @else if (clearable()) {
+    <button
+      matSuffix
+      mat-icon-button
+      type="button"
+      aria-label="Limpar busca"
+      (click)="onClear()"
+    >
+      <mat-icon aria-hidden="true">close</mat-icon>
+    </button>
+  }
+</mat-form-field>

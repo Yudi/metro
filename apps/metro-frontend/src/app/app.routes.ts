@@ -12,6 +12,14 @@ export const routes: Routes = [
       ),
     children: [
       {
+        path: 'itinerarios',
+        loadComponent: () =>
+          import('./itineraries/itineraries.component').then(
+            (m) => m.ItinerariesComponent,
+          ),
+        title: 'Itinerários | Transporte Metropolitano de São Paulo',
+      },
+      {
         path: '',
         canActivate: [redirectRootToDashboardGuard],
         loadComponent: () =>

@@ -89,7 +89,14 @@ import {
     MatButtonModule,
   ],
   templateUrl: './stop-arrivals.component.html',
-  styleUrl: './stop-arrivals.component.scss',
+  styleUrls: [
+    './_stop-arrivals-base.scss',
+    './_stop-arrivals-schedule.scss',
+    './_stop-arrivals-realtime.scss',
+    './_stop-arrivals-rail.scss',
+    './_stop-arrivals-responsive.scss',
+    './_stop-arrivals-rail-heading.scss',
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class StopArrivalsComponent {

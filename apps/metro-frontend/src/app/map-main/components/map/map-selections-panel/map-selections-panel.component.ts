@@ -10,7 +10,6 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
 import { SelectedRoute, SelectedStop, SelectedBikeStation } from '../map.types';
 import {
-  AGENCIES_DATA,
   formatBusFare,
   getBusAgencyOrder,
   getAgencyIconPath,
@@ -21,7 +20,6 @@ import {
 } from '@metro/shared/utils';
 
 interface AgencyIdentity {
-  name: string;
   iconPath: string | null;
 }
 
@@ -119,13 +117,12 @@ export class MapSelectionsPanelComponent {
 
     if (agency) {
       return {
-        name: AGENCIES_DATA[agency].shortName,
         iconPath: getAgencyIconPath(agency),
       };
     }
 
     return sourceAgency
-      ? { name: sourceAgency.toUpperCase(), iconPath: null }
+      ? { iconPath: null }
       : null;
   }
 

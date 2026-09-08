@@ -124,12 +124,7 @@ $primary: var(--mat-sys-primary, #6750a4);
 .route-chip-content .agency-identity {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  min-width: 0;
   color: $on-surface-variant;
-  font-size: 0.7rem;
-  font-weight: 600;
-  white-space: nowrap;
 
   img,
   mat-icon {
@@ -138,11 +133,6 @@ $primary: var(--mat-sys-primary, #6750a4);
     flex: 0 0 auto;
     font-size: 16px;
     object-fit: contain;
-  }
-
-  span {
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 }
 

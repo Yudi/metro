@@ -97,10 +97,10 @@ export const appConfig: ApplicationConfig = {
         return true;
       },
     },
-    provideServiceWorker('ngsw-worker.js', {
+    provideServiceWorker('notification-worker.js', {
       enabled: !isDevMode(),
       registrationStrategy: 'registerWhenStable:30000',
-      type: 'module',
+      type: 'classic',
     }),
     provideAuth(environment.firebase),
   ],

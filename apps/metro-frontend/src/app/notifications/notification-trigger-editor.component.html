@@ -1,0 +1,303 @@
+<form class="trigger-editor" [formGroup]="form" (ngSubmit)="submit()">
+  <div class="editor-heading">
+    <div>
+      <h2>{{ title() }}</h2>
+      <p>Escolha quando e onde você quer receber este aviso. Cada ocorrência é avisada uma vez.</p>
+    </div>
+    <button
+      mat-icon-button
+      type="button"
+      aria-label="Fechar editor"
+      (click)="closed.emit()"
+    >
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  @if (saveError(); as error) {
+    <div class="editor-error" role="alert">
+      <mat-icon aria-hidden="true">error</mat-icon>
+      <span>{{ error }}</span>
+    </div>
+  }
+
+  @if (formError(); as error) {
+    <div class="editor-error" role="alert">
+      <mat-icon aria-hidden="true">error</mat-icon>
+      <span>{{ error }}</span>
+    </div>
+  }
+
+  <div class="editor-grid">
+    <mat-form-field appearance="outline" class="wide-field">
+      <mat-label>Nome do aviso</mat-label>
+      <input
+        matInput
+        formControlName="name"
+        maxlength="80"
+        autocomplete="off"
+        placeholder="Ex.: Minha ida para a faculdade"
+      />
+      @if (form.controls.name.hasError('required')) {
+        <mat-error>Informe um nome para este aviso.</mat-error>
+      } @else if (form.controls.name.hasError('maxlength')) {
+        <mat-error>Use até 80 caracteres.</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="wide-field">
+      <mat-label>Tipo de aviso</mat-label>
+      <mat-select formControlName="kind">
+        @for (kind of notificationKinds; track kind) {
+          <mat-option [value]="kind">{{ kindLabels[kind] }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <fieldset class="days-fieldset wide-field">
+      <legend>Dias da semana</legend>
+      <div class="day-options" role="group" aria-label="Dias da semana">
+        @for (day of dayOptions; track day.value) {
+          <button
+            type="button"
+            class="day-option"
+            [class.selected]="isDaySelected(day.value)"
+            [attr.aria-pressed]="isDaySelected(day.value)"
+            [attr.aria-label]="day.label"
+            (click)="toggleDay(day.value)"
+          >
+            {{ day.shortLabel }}
+          </button>
+        }
+      </div>
+      @if (submitted() && form.controls.days.value.length === 0) {
+        <small class="field-error">Selecione ao menos um dia.</small>
+      }
+    </fieldset>
+
+    <section class="windows-section wide-field" aria-labelledby="windows-title">
+      <div class="section-heading">
+        <div>
+          <h3 id="windows-title">Faixas de horário</h3>
+          <p>Uma faixa pode atravessar a meia-noite, como 22:00–01:00.</p>
+        </div>
+        <button
+          mat-stroked-button
+          type="button"
+          [disabled]="windows.length >= 8"
+          (click)="addWindow()"
+        >
+          <mat-icon>add</mat-icon>
+          Adicionar faixa
+        </button>
+      </div>
+
+      <div class="window-list" formArrayName="windows">
+        @for (window of windows.controls; track $index; let index = $index) {
+          <div class="window-row" [formGroupName]="index">
+            <mat-form-field appearance="outline">
+              <mat-label>Início</mat-label>
+              <input matInput type="time" formControlName="start" />
+            </mat-form-field>
+            <span class="window-separator" aria-hidden="true">até</span>
+            <mat-form-field appearance="outline">
+              <mat-label>Fim</mat-label>
+              <input matInput type="time" formControlName="end" />
+            </mat-form-field>
+            <button
+              mat-icon-button
+              type="button"
+              [disabled]="windows.length <= 1"
+              [attr.aria-label]="'Remover faixa ' + (index + 1)"
+              (click)="removeWindow(index)"
+            >
+              <mat-icon>delete</mat-icon>
+            </button>
+          </div>
+        }
+      </div>
+    </section>
+
+    <section class="targets-section wide-field" aria-labelledby="targets-title">
+      <div class="section-heading">
+        <div>
+          <h3 id="targets-title">{{ targetKindLabel() | titlecase }}</h3>
+          <p>Busque pelo nome dos destinos disponíveis.</p>
+        </div>
+      </div>
+
+      <mat-form-field appearance="outline" class="target-search-field">
+        <mat-label>Buscar {{ targetKindLabel() }}</mat-label>
+        <input
+          matInput
+          type="search"
+          autocomplete="off"
+          placeholder="Digite um nome"
+          [value]="targetSearch()"
+          (input)="onTargetSearch($event)"
+        />
+        @if (targetLoading()) {
+          <mat-spinner matSuffix diameter="18"></mat-spinner>
+        } @else {
+          <mat-icon matSuffix>search</mat-icon>
+        }
+      </mat-form-field>
+
+      @if (targetError()) {
+        <p class="target-message" role="alert">
+          Não foi possível buscar os destinos. Tente novamente.
+        </p>
+      } @else if (targetSearch().trim() && !targetLoading() && targetResults().length === 0) {
+        <p class="target-message">Nenhum destino encontrado.</p>
+      } @else if (!targetSearch().trim()) {
+        <p class="target-message">Digite para buscar {{ targetKindLabel() }} disponíveis.</p>
+      }
+
+      @if (targetResults().length > 0) {
+        <div class="target-results" role="listbox" aria-label="Resultados da busca">
+          @for (target of targetResults(); track target.id) {
+            @let presentation = targetPresentation(target);
+            <button
+              type="button"
+              class="target-result"
+              [disabled]="!target.available || isTargetSelected(target.id)"
+              [attr.aria-label]="target.label"
+              (click)="selectTarget(target)"
+            >
+              <span class="target-copy">
+                @if (presentation.label) {
+                  <span>{{ presentation.label }}</span>
+                }
+                @if (presentation.railLine; as line) {
+                  <app-history-line-identity
+                    [badge]="line.code"
+                    [name]="line.name"
+                    [badgeOnly]="target.kind === 'rail_station'"
+                    [badgeShape]="target.kind === 'rail_station' ? 'round' : 'rectangle'"
+                    [badgeBackgroundColor]="line.colorHex"
+                    [badgeTextColor]="line.textColor"
+                  />
+                }
+              </span>
+              @if (isTargetSelected(target.id)) {
+                <mat-icon aria-hidden="true">check</mat-icon>
+              } @else if (!target.available) {
+                <small>Indisponível</small>
+              }
+            </button>
+          }
+        </div>
+      }
+
+      <div class="selected-targets" aria-label="Destinos selecionados">
+        @if (selectedTargets().length === 0) {
+          <span class="target-message">Selecione ao menos um destino.</span>
+        } @else {
+          @for (target of selectedTargets(); track target.id) {
+            @let presentation = targetPresentation(target);
+            <span class="target-chip">
+              <span class="target-chip-copy">
+                @if (presentation.label) {
+                  <span>{{ presentation.label }}</span>
+                }
+                @if (presentation.railLine; as line) {
+                  <app-history-line-identity
+                    [badge]="line.code"
+                    [name]="line.name"
+                    [badgeOnly]="target.kind === 'rail_station'"
+                    [badgeShape]="target.kind === 'rail_station' ? 'round' : 'rectangle'"
+                    [badgeBackgroundColor]="line.colorHex"
+                    [badgeTextColor]="line.textColor"
+                  />
+                }
+              </span>
+              <button
+                type="button"
+                [attr.aria-label]="'Remover ' + target.label"
+                (click)="removeTarget(target)"
+              >
+                <mat-icon aria-hidden="true">close</mat-icon>
+              </button>
+            </span>
+          }
+        }
+      </div>
+    </section>
+
+    @if (isArrivalKind()) {
+      <section class="smart-section arrival-section wide-field" aria-labelledby="arrival-title">
+        <div class="section-heading">
+          <div>
+            <h3 id="arrival-title">Próximas chegadas</h3>
+            <p>
+              Procure previsões dentro das faixas escolhidas. Se não houver
+              previsão no horizonte, nenhum aviso é enviado.
+            </p>
+          </div>
+        </div>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Avisar quando faltar até</mat-label>
+          <mat-select formControlName="arrivalLeadMinutes">
+            <mat-option [value]="2">2 minutos</mat-option>
+            <mat-option [value]="5">5 minutos</mat-option>
+            <mat-option [value]="10">10 minutos</mat-option>
+            <mat-option [value]="15">15 minutos</mat-option>
+            <mat-option [value]="30">30 minutos</mat-option>
+          </mat-select>
+          <mat-hint>Somente previsões dentro das faixas serão avisadas.</mat-hint>
+        </mat-form-field>
+      </section>
+    } @else if (isSmartKind()) {
+      <section class="smart-section wide-field" aria-labelledby="smart-title">
+        <div class="section-heading">
+          <div>
+            <h3 id="smart-title">Aviso antecipado</h3>
+            <p>
+              Antecipe apenas alterações importantes. Cada ocorrência é avisada
+              uma vez; avisos normais seguem as faixas.
+            </p>
+          </div>
+          <mat-slide-toggle formControlName="smart">
+            Ativar aviso antecipado
+          </mat-slide-toggle>
+        </div>
+
+        <div class="smart-fields">
+          @if (form.controls.smart.value) {
+            <mat-form-field appearance="outline">
+              <mat-label>Antecedência</mat-label>
+              <input matInput type="number" min="0" max="60" formControlName="leadMinutes" />
+              <span matTextSuffix>min</span>
+              <mat-hint>De 0 a 60 minutos</mat-hint>
+            </mat-form-field>
+          }
+        </div>
+      </section>
+    }
+
+    @if (isRailStatus()) {
+      <mat-form-field appearance="outline" class="wide-field">
+        <mat-label>Quando avisar sobre a operação</mat-label>
+        <mat-select formControlName="statusMode">
+          <mat-option value="abnormal">Somente quando houver alteração</mat-option>
+          <mat-option value="all">Sempre que o status mudar</mat-option>
+        </mat-select>
+      </mat-form-field>
+    }
+  </div>
+
+  <div class="editor-actions">
+    <button mat-button type="button" [disabled]="busy()" (click)="closed.emit()">
+      Cancelar
+    </button>
+    <button mat-flat-button color="primary" type="submit" [disabled]="busy()">
+      @if (busy()) {
+        <mat-spinner diameter="18"></mat-spinner>
+      } @else {
+        <mat-icon>save</mat-icon>
+      }
+      Salvar aviso
+    </button>
+  </div>
+</form>

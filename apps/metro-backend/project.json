@@ -5,6 +5,12 @@
   "projectType": "application",
   "tags": [],
   "targets": {
+    "test-notification-integration": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "NODE_OPTIONS=--experimental-vm-modules bun x jest --config apps/metro-backend/jest.notification-integration.config.ts --runInBand"
+      }
+    },
     "build": {
       "executor": "nx:run-commands",
       "options": {

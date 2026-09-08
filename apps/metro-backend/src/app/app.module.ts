@@ -32,6 +32,7 @@ import { ObservabilityModule } from '../observability/observability.module';
 import { validatePublicEnvironment } from './public-environment.validation';
 import { RequestContextModule } from '../common/request-context/request-context.module';
 import { createGraphQLTimingPlugin } from '../observability/graphql-timing.plugin';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 const isProduction = process.env.NODE_ENV === 'production';
 @Module({
@@ -98,6 +99,7 @@ const isProduction = process.env.NODE_ENV === 'production';
     VectorTilesModule,
     NextTrainModule,
     UserModule,
+    NotificationsModule,
     HistoricalModule,
     ObservabilityModule,
     LoadersModule,

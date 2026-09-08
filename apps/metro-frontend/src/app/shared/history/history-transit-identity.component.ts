@@ -8,6 +8,7 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
       @if (badge() !== null) {
         <span
           class="line-badge"
+          [class.round]="badgeShape() === 'round'"
           aria-hidden="true"
           [style.backgroundColor]="badgeBackgroundColor()"
           [style.color]="badgeTextColor()"
@@ -15,7 +16,9 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
           {{ badge() }}
         </span>
       }
-      <strong>{{ name() }}</strong>
+      @if (!badgeOnly()) {
+        <strong>{{ name() }}</strong>
+      }
     </div>
   `,
   styles: `
@@ -38,12 +41,21 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
       min-width: 32px;
       padding: 0 6px;
     }
+
+    .line-badge.round {
+      border-radius: 50%;
+      min-height: 24px;
+      min-width: 24px;
+      padding: 0;
+    }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class HistoryLineIdentityComponent {
   readonly name = input.required<string>();
   readonly badge = input<string | number | null>(null);
+  readonly badgeOnly = input(false);
+  readonly badgeShape = input<'rectangle' | 'round'>('rectangle');
   readonly badgeBackgroundColor = input<string>();
   readonly badgeTextColor = input<string>();
 }

@@ -1,6 +1,11 @@
 import { validatePublicEnvironment } from './public-environment.validation';
 
 describe('validatePublicEnvironment', () => {
+  it('requires complete optional Web Push configuration', () => {
+    const base = { DATABASE_URL: 'postgresql://db/metro' };
+    expect(() => validatePublicEnvironment({ ...base, VAPID_PUBLIC_KEY: 'a'.repeat(87) })).toThrow('Configure VAPID');
+    expect(validatePublicEnvironment({ ...base, VAPID_PUBLIC_KEY: 'a'.repeat(87), VAPID_PRIVATE_KEY: 'b'.repeat(43), VAPID_SUBJECT: 'mailto:operations@example.com' }).VAPID_SUBJECT).toBe('mailto:operations@example.com');
+  });
   it('accepts required configuration and typed optional dependencies', () => {
     expect(
       validatePublicEnvironment({

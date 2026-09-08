@@ -26,5 +26,6 @@ import { BusPublishedRouteInformationService } from './bus-published-route-infor
     BusNoticeService,
     BusNoticeHttpClient,
   ],
+  exports: [BusNoticeService],
 })
 export class BusInformationModule {}

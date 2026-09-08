@@ -34,6 +34,7 @@ import { RailMapContextService } from './services/rail-map-context.service';
     NextTrainPollingService,
     CptmVehiclePollingService,
     HeadwayTrackingService,
+    NextTrainResolver,
   ],
 })
 export class NextTrainModule {}

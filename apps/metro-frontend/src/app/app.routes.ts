@@ -12,6 +12,14 @@ export const routes: Routes = [
       ),
     children: [
       {
+        path: 'itinerarios/:agency/:line',
+        loadComponent: () =>
+          import('./itineraries/itineraries.component').then(
+            (m) => m.ItinerariesComponent,
+          ),
+        title: 'Itinerários | Transporte Metropolitano de São Paulo',
+      },
+      {
         path: 'itinerarios',
         loadComponent: () =>
           import('./itineraries/itineraries.component').then(
@@ -105,6 +113,14 @@ export const routes: Routes = [
             (m) => m.FavoritesComponent,
           ),
         title: 'Favoritos | Transporte Metropolitano de São Paulo',
+      },
+      {
+        path: 'notifications',
+        loadComponent: () =>
+          import('./notifications/notifications.component').then(
+            (m) => m.NotificationsComponent,
+          ),
+        title: 'Notificações | Transporte Metropolitano de São Paulo',
       },
     ],
   },

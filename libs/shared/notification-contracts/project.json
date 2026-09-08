@@ -1,0 +1,12 @@
+{
+  "name": "shared-notification-contracts",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/shared/notification-contracts/src",
+  "projectType": "library",
+  "tags": [],
+  "// targets": "to see all targets run: nx show project shared-notification-contracts --web",
+  "targets": {
+    "test": { "executor": "@nx/jest:jest", "options": { "jestConfig": "libs/shared/notification-contracts/jest.config.cts" } },
+    "lint": { "executor": "@nx/eslint:lint", "options": { "lintFilePatterns": ["libs/shared/notification-contracts/**/*.ts"] } }
+  }
+}

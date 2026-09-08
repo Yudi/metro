@@ -197,6 +197,8 @@ model User {
   alert_subscriptions AlertSubscription[]
   data_requests       dataRequest[]
   favorites           Favorite[]
+  notificationTriggers NotificationTrigger[]
+  notificationIssueReceipts NotificationIssueReceipt[]
 }
 
 model Favorite {
@@ -221,14 +223,103 @@ model PushSubscription {
   endpoint   String  @unique
   p256dh     String
   auth       String
+  label      String? @db.VarChar(120)
   user_agent String?
 
   created_at   DateTime  @default(now()) @db.Timestamptz
   last_seen_at DateTime? @db.Timestamptz
 
   user User? @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  notificationDeliveries NotificationDelivery[]
 
   @@map("push_subscriptions")
+}
+
+model NotificationTrigger {
+  id                String   @id @default(uuid(7)) @db.Uuid
+  userId            String
+  config            Json
+  revision          Int      @default(0)
+  enabled           Boolean  @default(true)
+  nextEvaluationAt  DateTime @default(now()) @db.Timestamptz
+  claimToken        String?  @db.VarChar(128)
+  claimUntil        DateTime? @db.Timestamptz
+  createdAt         DateTime @default(now()) @db.Timestamptz
+  updatedAt         DateTime @updatedAt @db.Timestamptz
+
+  user          User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targets       NotificationTriggerTarget[]
+  deliveries    NotificationDelivery[]
+
+  @@index([userId])
+  @@index([nextEvaluationAt, claimUntil])
+  @@map("notification_triggers")
+}
+
+model NotificationTarget {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  identityKey String   @unique @db.VarChar(180)
+  kind        String   @db.VarChar(32)
+  label       String   @db.VarChar(160)
+  descriptor  Json
+  available   Boolean  @default(true)
+  observationClass   String? @db.VarChar(32)
+  observationEpisode String? @db.Uuid
+  observationAt       DateTime? @db.Timestamptz
+
+  triggers NotificationTriggerTarget[]
+
+  @@index([kind, available, label])
+  @@map("notification_targets")
+}
+
+model NotificationTriggerTarget {
+  triggerId String @db.Uuid
+  targetId  String @db.Uuid
+
+  trigger NotificationTrigger @relation(fields: [triggerId], references: [id], onDelete: Cascade)
+  target  NotificationTarget  @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@id([triggerId, targetId])
+  @@index([targetId])
+  @@map("notification_trigger_targets")
+}
+
+model NotificationDelivery {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  triggerId      String   @db.Uuid
+  subscriptionId String   @db.Uuid
+  revision       Int      @default(0)
+  fingerprint    String   @db.VarChar(128)
+  payload        Json
+  expiresAt      DateTime @db.Timestamptz
+  sentAt         DateTime? @db.Timestamptz
+  dispatchStartedAt DateTime? @db.Timestamptz
+  claimToken     String?  @db.VarChar(128)
+  claimUntil     DateTime? @db.Timestamptz
+  attempts       Int      @default(0)
+  nextAttemptAt  DateTime @default(now()) @db.Timestamptz
+  createdAt      DateTime @default(now()) @db.Timestamptz
+
+  trigger      NotificationTrigger @relation(fields: [triggerId], references: [id], onDelete: Cascade)
+  subscription PushSubscription   @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([triggerId, subscriptionId, fingerprint])
+  @@index([nextAttemptAt, expiresAt, sentAt])
+  @@index([claimUntil])
+  @@map("notification_deliveries")
+}
+
+model NotificationIssueReceipt {
+  userId    String
+  issueKey  String   @db.VarChar(180)
+  createdAt DateTime @default(now()) @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, issueKey])
+  @@index([createdAt])
+  @@map("notification_issue_receipts")
 }
 
 model AlertSubscription {

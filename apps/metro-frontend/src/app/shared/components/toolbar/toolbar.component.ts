@@ -58,6 +58,7 @@ export class ToolbarComponent {
     '/sobre',
     '/menu',
     '/favoritos',
+    '/notifications',
   ]);
 
   readonly items: ToolbarItem[] = [

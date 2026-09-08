@@ -1,0 +1,306 @@
+<main class="notifications-page">
+  <header class="page-header">
+    <div>
+      <h1>Notificações</h1>
+      <p>
+        Crie avisos para acompanhar o transporte no horário que combina com a
+        sua rotina.
+      </p>
+    </div>
+    @if (pageState() === 'ready' || pageState() === 'error') {
+      <button
+        mat-icon-button
+        type="button"
+        aria-label="Atualizar notificações"
+        [disabled]="refreshing()"
+        (click)="refreshConfiguration()"
+      >
+        @if (refreshing()) {
+          <mat-spinner diameter="20"></mat-spinner>
+        } @else {
+          <mat-icon>refresh</mat-icon>
+        }
+      </button>
+    }
+  </header>
+
+  @switch (pageState()) {
+    @case ('authenticating') {
+      <section class="state-panel" aria-live="polite">
+        <mat-spinner diameter="36"></mat-spinner>
+        <h2>Verificando sua conta</h2>
+        <p>Aguarde enquanto carregamos suas configurações.</p>
+      </section>
+    }
+    @case ('signed-out') {
+      <section class="state-panel" aria-labelledby="signed-out-title">
+        <mat-icon class="state-icon" aria-hidden="true">lock</mat-icon>
+        <h2 id="signed-out-title">Entre para configurar avisos</h2>
+        <p>
+          Seus avisos ficam sincronizados na conta para aparecerem em todos os
+          seus dispositivos.
+        </p>
+        <button mat-flat-button color="primary" type="button" (click)="login()">
+          <mat-icon>login</mat-icon>
+          Fazer login com o Google
+        </button>
+      </section>
+    }
+    @case ('loading') {
+      <section class="state-panel" aria-live="polite">
+        <mat-spinner diameter="36"></mat-spinner>
+        <h2>Carregando seus avisos</h2>
+        <p>Buscando configurações salvas na sua conta.</p>
+      </section>
+    }
+    @case ('error') {
+      <section class="state-panel" aria-labelledby="load-error-title">
+        <mat-icon class="state-icon error-icon" aria-hidden="true">cloud_off</mat-icon>
+        <h2 id="load-error-title">Não foi possível carregar as notificações</h2>
+        <p>{{ errorMessage() }}</p>
+        <button mat-stroked-button type="button" (click)="refreshConfiguration()">
+          <mat-icon>refresh</mat-icon>
+          Tentar novamente
+        </button>
+      </section>
+    }
+    @case ('ready') {
+      @if (configuration(); as configuration) {
+        @if (!configuration.available) {
+          <div class="delivery-warning" role="status">
+            <mat-icon aria-hidden="true">notifications_off</mat-icon>
+            <span>
+              A entrega de notificações está indisponível neste ambiente.
+              Você ainda pode criar e editar avisos sincronizados na conta.
+            </span>
+          </div>
+        } @else {
+          <mat-card appearance="outlined" class="push-panel">
+            <mat-card-header>
+              <mat-icon mat-card-avatar>notifications</mat-icon>
+              <mat-card-title>Receba avisos neste dispositivo</mat-card-title>
+              <mat-card-subtitle>
+                Ative as notificações uma vez para receber os avisos que você criar.
+              </mat-card-subtitle>
+            </mat-card-header>
+            <mat-card-content>
+              @if (pushError(); as error) {
+                <div class="inline-error" role="alert">
+                  <mat-icon aria-hidden="true">error</mat-icon>
+                  <span>{{ error }}</span>
+                </div>
+              }
+
+              @if (!pushSupported()) {
+                <div class="push-state" aria-live="polite">
+                  <mat-icon aria-hidden="true">phonelink_erase</mat-icon>
+                  <div>
+                    <strong>Navegador incompatível</strong>
+                    <p>Use um navegador com suporte a notificações.</p>
+                  </div>
+                </div>
+              } @else if (permission() === 'denied') {
+                <div class="push-state" aria-live="polite">
+                  <mat-icon aria-hidden="true">notifications_off</mat-icon>
+                  <div>
+                    <strong>Permissão bloqueada</strong>
+                    <p>
+                      Libere as notificações nas configurações do navegador e
+                      atualize esta página.
+                    </p>
+                  </div>
+                </div>
+              } @else if (currentDevice(); as currentDevice) {
+                <div class="push-state enabled-state" aria-live="polite">
+                  <mat-icon aria-hidden="true">notifications_active</mat-icon>
+                  <div>
+                    <strong>Notificações ativas</strong>
+                    <p>{{ currentDevice.label }} está pronto para receber avisos.</p>
+                  </div>
+                </div>
+              } @else {
+                <div class="push-state" aria-live="polite">
+                  <mat-icon aria-hidden="true">notifications_none</mat-icon>
+                  <div>
+                    <strong>Ative as notificações</strong>
+                    <p>
+                      O navegador pedirá sua permissão somente quando você tocar
+                      no botão abaixo.
+                    </p>
+                  </div>
+                  @if (configuration.publicKey) {
+                    <button
+                      mat-flat-button
+                      color="primary"
+                      type="button"
+                      [disabled]="pushBusy()"
+                      (click)="enableNotifications()"
+                    >
+                      @if (pushBusy()) {
+                        <mat-spinner diameter="18"></mat-spinner>
+                      } @else {
+                        <mat-icon>notifications</mat-icon>
+                      }
+                      Ativar notificações
+                    </button>
+                  }
+                </div>
+              }
+
+              @if (devices().length > 0) {
+                <div class="devices-block">
+                  <h3>Dispositivos autorizados</h3>
+                  <ul class="device-list">
+                    @for (device of devices(); track device.id) {
+                      <li>
+                        <mat-icon aria-hidden="true">devices</mat-icon>
+                        <span class="device-copy">
+                          <strong>{{ device.label }}</strong>
+                          <small>Ativado em {{ deviceDate(device) }}</small>
+                        </span>
+                        @if (isCurrentDevice(device)) {
+                          <span class="device-badge">Este dispositivo</span>
+                        }
+                        <button
+                          mat-icon-button
+                          type="button"
+                          [disabled]="pushBusy()"
+                          [attr.aria-label]="'Remover ' + device.label"
+                          (click)="removeDevice(device)"
+                        >
+                          <mat-icon>delete</mat-icon>
+                        </button>
+                      </li>
+                    }
+                  </ul>
+                </div>
+              }
+            </mat-card-content>
+          </mat-card>
+
+        }
+
+        @if (operationError(); as error) {
+            <div class="operation-error" role="alert">
+              <mat-icon aria-hidden="true">error</mat-icon>
+              <span>{{ error }}</span>
+              <button mat-button type="button" (click)="reloadAfterOperationError()">
+                Descartar edição e recarregar
+              </button>
+            </div>
+          }
+
+          <section class="triggers-section" aria-labelledby="triggers-title">
+            <div class="section-heading">
+              <div>
+                <h2 id="triggers-title">Seus avisos</h2>
+                <p>
+                  {{ triggers().length }}
+                  {{ triggers().length === 1 ? 'aviso configurado' : 'avisos configurados' }}
+                </p>
+              </div>
+              <button
+                mat-flat-button
+                color="primary"
+                type="button"
+                [disabled]="editingTriggerId() !== null"
+                (click)="startNewTrigger()"
+              >
+                <mat-icon>add</mat-icon>
+                Novo aviso
+              </button>
+            </div>
+
+            @if (editingTriggerId() === 'new') {
+              <app-notification-trigger-editor
+                [trigger]="null"
+                [busy]="pendingTriggerId() === 'editor'"
+                [saveError]="operationError()"
+                (saved)="saveTrigger($event)"
+                (closed)="cancelEditing()"
+              />
+            }
+
+            @if (triggers().length === 0 && editingTriggerId() !== 'new') {
+              <div class="empty-state">
+                <mat-icon aria-hidden="true">notifications_none</mat-icon>
+                <h3>Nenhum aviso configurado</h3>
+                <p>
+                  Crie um aviso para acompanhar uma linha, estação ou ponto no
+                  período que você escolher.
+                </p>
+                <button mat-stroked-button type="button" (click)="startNewTrigger()">
+                  <mat-icon>add</mat-icon>
+                  Criar primeiro aviso
+                </button>
+              </div>
+            } @else {
+              <div class="trigger-list" aria-label="Avisos configurados">
+                @for (trigger of triggers(); track trigger.id) {
+                  <article class="trigger-row" [class.disabled-row]="!trigger.enabled">
+                    <div class="trigger-copy">
+                      <div class="trigger-title-row">
+                        <mat-icon aria-hidden="true">notifications</mat-icon>
+                        <h3>{{ trigger.name }}</h3>
+                        @if (!trigger.enabled) {
+                          <span class="status-badge">Pausado</span>
+                        }
+                      </div>
+                      <p class="trigger-kind">{{ kindLabel(trigger.kind) }}</p>
+                      <p class="trigger-meta">
+                        <span>{{ scheduleSummary(trigger) }}</span>
+                        <span aria-hidden="true">•</span>
+                        <span>{{ targetSummary(trigger) }}</span>
+                      </p>
+                    </div>
+                    <div class="trigger-actions">
+                      <mat-slide-toggle
+                        [checked]="trigger.enabled"
+                        [disabled]="pendingTriggerId() !== null || deletingTriggerId() !== null"
+                        [aria-label]="(trigger.enabled ? 'Desativar ' : 'Ativar ') + trigger.name"
+                        (change)="toggleTrigger(trigger, $event.checked)"
+                      >
+                        {{ trigger.enabled ? 'Ativo' : 'Inativo' }}
+                      </mat-slide-toggle>
+                      <button
+                        mat-icon-button
+                        type="button"
+                        [disabled]="pendingTriggerId() !== null || deletingTriggerId() !== null"
+                        [attr.aria-label]="'Editar ' + trigger.name"
+                        (click)="editTrigger(trigger)"
+                      >
+                        <mat-icon>edit</mat-icon>
+                      </button>
+                      <button
+                        mat-icon-button
+                        type="button"
+                        [disabled]="pendingTriggerId() !== null || deletingTriggerId() !== null"
+                        [attr.aria-label]="'Excluir ' + trigger.name"
+                        (click)="deleteTrigger(trigger)"
+                      >
+                        @if (deletingTriggerId() === trigger.id) {
+                          <mat-spinner diameter="18"></mat-spinner>
+                        } @else {
+                          <mat-icon>delete</mat-icon>
+                        }
+                      </button>
+                    </div>
+                  </article>
+
+                  @if (editingTriggerId() === trigger.id) {
+                    <app-notification-trigger-editor
+                      [trigger]="editingTrigger()"
+                      [busy]="pendingTriggerId() === 'editor'"
+                      [saveError]="operationError()"
+                      (saved)="saveTrigger($event)"
+                      (closed)="cancelEditing()"
+                    />
+                  }
+                }
+              </div>
+            }
+          </section>
+        }
+        }
+      }
+</main>

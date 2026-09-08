@@ -112,6 +112,7 @@ describe('RailIntegrationClientService', () => {
   });
 
   it('preserves generic vehicle display metadata across transport', async () => {
+    jest.spyOn(Date, 'now').mockReturnValue(1_789_000_000_000);
     const vehicle = {
       id: 'opaque-id',
       prefix: '',
@@ -126,6 +127,38 @@ describe('RailIntegrationClientService', () => {
       getVehiclesForLine: unarySuccess({ vehicles: [vehicle] }),
     });
     await expect(service.getVehiclesForLine('L9')).resolves.toEqual([vehicle]);
+    service.onModuleDestroy();
+  });
+
+  it('rejects estimated vehicles with an unbounded validity period', async () => {
+    const now = 1_789_000_000_000;
+    jest.spyOn(Date, 'now').mockReturnValue(now);
+    const service = createServiceWithClient({
+      getVehiclesForLine: unarySuccess({
+        vehicles: [
+          {
+            id: 'malicious-estimate',
+            estimated: true,
+            validUntil: Number.MAX_SAFE_INTEGER,
+          },
+          {
+            id: 'short-lived-estimate',
+            estimated: true,
+            validUntil: now + 60_000,
+          },
+          { id: 'measured-vehicle', estimated: false },
+        ],
+      }),
+    });
+
+    await expect(service.getVehiclesForLine('L9')).resolves.toEqual([
+      {
+        id: 'short-lived-estimate',
+        estimated: true,
+        validUntil: now + 60_000,
+      },
+      { id: 'measured-vehicle', estimated: false },
+    ]);
     service.onModuleDestroy();
   });
 

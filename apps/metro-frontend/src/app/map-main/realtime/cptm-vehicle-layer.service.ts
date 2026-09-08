@@ -25,6 +25,8 @@ import {
   type NextTrainSubscriptionRelease,
 } from '../../next-train/next-train-websocket.service';
 
+const MAX_VEHICLE_ESTIMATE_TTL_MS = 5 * 60_000;
+
 /** Service to manage tracked rail vehicle markers on the map. */
 @Service()
 export class CptmVehicleLayerService implements OnDestroy {
@@ -300,8 +302,18 @@ export class CptmVehicleLayerService implements OnDestroy {
       vehicle.lat <= 90 &&
       vehicle.lng >= -180 &&
       vehicle.lng <= 180 &&
+      this.hasValidEstimateDeadline(vehicle, now)
+    );
+  }
+
+  private hasValidEstimateDeadline(
+    vehicle: TrackedRailVehicle,
+    now: number,
+  ): boolean {
+    return (
       Number.isFinite(vehicle.validUntil) &&
-      (vehicle.validUntil as number) > now
+      (vehicle.validUntil as number) > now &&
+      (vehicle.validUntil as number) <= now + MAX_VEHICLE_ESTIMATE_TTL_MS
     );
   }
 
@@ -420,8 +432,7 @@ export class CptmVehicleLayerService implements OnDestroy {
       for (const vehicle of vehicles) {
         if (
           vehicle.estimated === true &&
-          Number.isFinite(vehicle.validUntil) &&
-          (vehicle.validUntil as number) > now
+          this.hasValidEstimateDeadline(vehicle, now)
         ) {
           nextExpiry = Math.min(nextExpiry, (vehicle.validUntil as number) + 1);
         }

@@ -41,6 +41,7 @@ const DEFAULT_READINESS_DEADLINE_MS = 5_000;
 const DEFAULT_MAX_ATTEMPTS = 3;
 const DEFAULT_RETRY_DELAY_MS = 250;
 const MAX_RETRY_DELAY_MS = 2_000;
+const MAX_VEHICLE_ESTIMATE_TTL_MS = 5 * 60_000;
 
 interface StationNameResponse {
   stationName?: string;
@@ -250,7 +251,15 @@ export class RailIntegrationClientService
       lineCode,
       mapContext,
     });
-    return response.vehicles ?? [];
+    const now = Date.now();
+    return (response.vehicles ?? []).filter(
+      (vehicle) =>
+        vehicle.estimated !== true ||
+        (Number.isFinite(vehicle.validUntil) &&
+          (vehicle.validUntil as number) > now &&
+          (vehicle.validUntil as number) <=
+            now + MAX_VEHICLE_ESTIMATE_TTL_MS),
+    );
   }
 
   async getAvailableSpecialRailServices(): Promise<SpecialRailService[]> {

@@ -268,4 +268,26 @@ describe('CptmVehicleLayerService', () => {
     jest.advanceTimersByTime(1);
     expect(getFeatures()).toHaveLength(0);
   });
+
+  it('rejects estimate deadlines beyond the supported lifetime', () => {
+    service.subscribeToLine('L8');
+    vehicles.set(
+      new Map([
+        [
+          'L8',
+          [
+            createVehicle({
+              estimated: true,
+              validUntil: Number.MAX_SAFE_INTEGER,
+            }),
+          ],
+        ],
+      ]),
+    );
+
+    refreshMarkers();
+
+    expect(getFeatures()).toHaveLength(0);
+    expect(jest.getTimerCount()).toBe(0);
+  });
 });

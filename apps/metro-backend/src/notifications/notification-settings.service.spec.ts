@@ -168,9 +168,15 @@ describe('NotificationSettingsService', () => {
     });
   });
 
+  it('allows the 500th trigger', async () => {
+    prisma.notificationTrigger.count.mockResolvedValueOnce(499);
+    prisma.notificationTrigger.create.mockResolvedValueOnce({ id: triggerId, revision: 0, config: triggerInput, targets: [] });
+    await expect(service.saveTrigger('user-id', triggerInput)).resolves.toMatchObject({ id: triggerId });
+  });
+
   it('enforces the trigger cap after locking the account row', async () => {
     prisma.notificationTrigger.count.mockResolvedValueOnce(
-      MAX_NOTIFICATION_TRIGGERS_PER_USER,
+      500,
     );
 
     await expect(service.saveTrigger('user-id', triggerInput)).rejects.toThrow(

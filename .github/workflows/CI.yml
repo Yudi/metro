@@ -117,8 +117,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Each suite starts its own server on port 4200, so use separate runners.
-        project: [metro-frontend-e2e, metro-frontend-lite-e2e]
+        include:
+          # Each application suite starts its own server on port 4200, so use
+          # separate runners. Storybook has its own built-asset runner.
+          - project: metro-frontend-e2e
+            target: e2e
+          - project: metro-frontend-lite-e2e
+            target: e2e
+          - project: metro-frontend-e2e
+            target: notification-stories
 
     steps:
       - name: Checkout trusted source
@@ -138,8 +145,12 @@ jobs:
       - name: Install Chromium
         run: bunx playwright install --with-deps chromium
 
+      - name: Build frontend Storybook
+        if: matrix.target == 'notification-stories'
+        run: bunx nx run metro-frontend:build-storybook:ci
+
       - name: Run browser product flows
-        run: bunx nx run ${{ matrix.project }}:e2e
+        run: bunx nx run ${{ matrix.project }}:${{ matrix.target }}
 
   browser-e2e:
     name: Browser smoke flows

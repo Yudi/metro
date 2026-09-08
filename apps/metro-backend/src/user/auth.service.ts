@@ -1,11 +1,19 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { auth } from 'firebase-admin';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class AuthService {
+  constructor(private readonly prisma: PrismaService) {}
+
   async verifyToken(token: string): Promise<false | string> {
     try {
       const user = await auth().verifyIdToken(token);
+      await this.prisma.user.upsert({
+        where: { id: user.uid },
+        create: { id: user.uid },
+        update: { last_login: new Date() },
+      });
       return user.uid;
     } catch (error) {
       if (isInvalidCredentialError(error)) {

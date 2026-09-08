@@ -22,6 +22,9 @@ export default defineConfig({
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
   },
+  // Storybook specs use their own built-asset runner and port. Keep them out
+  // of the application smoke suite, which serves the frontend on port 4200.
+  testIgnore: '**/notifications-storybook.spec.ts',
   /* Run your local dev server before starting the tests */
   webServer: {
     command: 'bunx nx run metro-frontend:serve-static:ci',

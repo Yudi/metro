@@ -1,5 +1,6 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import { auth } from 'firebase-admin';
+import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from './auth.service';
 
 jest.mock('firebase-admin', () => ({
@@ -8,7 +9,8 @@ jest.mock('firebase-admin', () => ({
 
 describe('AuthService', () => {
   const verifyIdToken = jest.fn();
-  const service = new AuthService();
+  const upsert = jest.fn();
+  const service = new AuthService({ user: { upsert } } as unknown as PrismaService);
 
   beforeEach(() => {
     jest.resetAllMocks();
@@ -19,12 +21,14 @@ describe('AuthService', () => {
     verifyIdToken.mockResolvedValue({ uid: 'user-id' });
 
     await expect(service.verifyToken('token')).resolves.toBe('user-id');
+    expect(upsert).toHaveBeenCalledWith({ where: { id: 'user-id' }, create: { id: 'user-id' }, update: { last_login: expect.any(Date) } });
   });
 
   it('returns false for an invalid or expired credential', async () => {
     verifyIdToken.mockRejectedValue({ code: 'auth/id-token-expired' });
 
     await expect(service.verifyToken('token')).resolves.toBe(false);
+    expect(upsert).not.toHaveBeenCalled();
   });
 
   it('surfaces verifier infrastructure failures', async () => {

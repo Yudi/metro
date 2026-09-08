@@ -6,6 +6,7 @@ import { NotificationSnapshotService } from './notification-snapshot.service';
 import { buildNotificationMessage, notificationHash } from './notification-message';
 import { nextNotificationEvaluation } from './notification-next-evaluation';
 import { notificationIssueIdentity } from './notification-issue-identity';
+import { notificationRetentionExpiry } from './notification-retention';
 
 @Injectable()
 export class NotificationEngineService {
@@ -14,13 +15,16 @@ export class NotificationEngineService {
 
   /** Indexed due work, bounded pages and durable leases shared by all replicas. */
   async evaluateDue(now = new Date()): Promise<void> {
+    const cutoff = new Date(now);
+    cutoff.setUTCFullYear(cutoff.getUTCFullYear() - 2);
     const due = await this.prisma.notificationTrigger.findMany({
-      where: { enabled: true, nextEvaluationAt: { lte: now }, OR: [{ claimUntil: null }, { claimUntil: { lt: now } }] },
+      where: { user: { last_login: { gt: cutoff } }, enabled: true, nextEvaluationAt: { lte: now }, OR: [{ claimUntil: null }, { claimUntil: { lt: now } }] },
       orderBy: { nextEvaluationAt: 'asc' }, take: 500,
-      include: { targets: { include: { target: true } } },
+      include: { user: { select: { last_login: true } }, targets: { include: { target: true } } },
     });
     for (let offset = 0; offset < due.length; offset += 8) {
       await Promise.all(due.slice(offset, offset + 8).map(async trigger => {
+      if (notificationRetentionExpiry(trigger.user.last_login) <= now) return;
       const claimToken = randomUUID();
       const claimed = await this.prisma.notificationTrigger.updateMany({
         where: { id: trigger.id, revision: trigger.revision, enabled: true, nextEvaluationAt: { lte: now }, OR: [{ claimUntil: null }, { claimUntil: { lt: now } }] },

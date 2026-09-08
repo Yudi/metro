@@ -9,18 +9,23 @@ describe('notification delivery', () => {
   const updateMany = jest.fn();
   const findUnique = jest.fn();
   const deleteMany = jest.fn();
-  const prisma = { notificationDelivery: { updateMany, findUnique }, pushSubscription: { deleteMany } } as unknown as PrismaService;
+  const findFirst = jest.fn();
+  const transaction = { $queryRaw: jest.fn(), notificationDelivery: { updateMany, findFirst } };
+  const prisma = { notificationDelivery: { updateMany, findUnique }, pushSubscription: { deleteMany },
+    $transaction: jest.fn(async (callback: (tx: typeof transaction) => unknown) => callback(transaction)),
+  } as unknown as PrismaService;
   const config = { get: () => 'configured' } as unknown as ConfigService;
   const service = new NotificationPushService(prisma, config);
   const delivery = () => ({
     id: 'd', triggerId: 't', subscriptionId: 's', revision: 1, attempts: 1,
     expiresAt: new Date('2026-09-07T11:35:00Z'), payload: { notification: { data: { important: true } } },
     trigger: { enabled: true, revision: 1, userId: 'u', config: { name: 'Ida', enabled: true, days: [1], windows: [{ start: '08:00', end: '09:00' }], timezone: 'America/Sao_Paulo', smart: false, leadMinutes: 30, intervalMinutes: 15, kind: 'rail_status', targetIds: ['target'], statusMode: 'abnormal' } },
-    subscription: { endpoint: 'https://fcm.googleapis.com/push/test', p256dh: 'key', auth: 'auth', user_id: 'u' },
+    subscription: { endpoint: 'https://fcm.googleapis.com/push/test', p256dh: 'key', auth: 'auth', user_id: 'u', user: { last_login: now } },
   });
   beforeEach(() => {
     jest.useFakeTimers().setSystemTime(now);
     jest.clearAllMocks();
+    findFirst.mockResolvedValue(null);
     updateMany.mockResolvedValue({ count: 1 });
     findUnique.mockImplementation(async () => ({ ...delivery(), claimToken: updateMany.mock.calls[0][0].data.claimToken }));
     jest.mocked(webPush.sendNotification).mockResolvedValue({ statusCode: 201, body: '', headers: {} });
@@ -36,9 +41,10 @@ describe('notification delivery', () => {
     await service.deliver('d', now);
     expect(webPush.sendNotification).not.toHaveBeenCalled();
   });
-  it.each(['revision', 'disabled', 'owner', 'window'])('rechecks %s immediately before sending', async reason => {
+  it.each(['revision', 'disabled', 'owner', 'window', 'inactive'])('rechecks %s immediately before sending', async reason => {
     findUnique.mockImplementation(async () => {
       const row = delivery();
+      if (reason === 'inactive') row.subscription.user.last_login = new Date('2024-09-07T11:30:00Z');
       if (reason === 'revision') row.trigger.revision = 2;
       if (reason === 'disabled') row.trigger.enabled = false;
       if (reason === 'owner') row.subscription.user_id = 'another';
@@ -47,6 +53,42 @@ describe('notification delivery', () => {
     });
     await service.deliver('d', now);
     expect(webPush.sendNotification).not.toHaveBeenCalled();
+  });
+  it('drops overlapping trigger pushes instead of queuing a burst', async () => {
+    findFirst.mockResolvedValue({ id: 'another-trigger-delivery' });
+    await service.deliver('d', now);
+    expect(webPush.sendNotification).not.toHaveBeenCalled();
+    expect(transaction.$queryRaw).toHaveBeenCalled();
+    expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: {
+      subscriptionId: 's', dispatchStartedAt: { gt: new Date(now.getTime() - 60_000) },
+    } }));
+    expect(updateMany).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ expiresAt: now }) }));
+  });
+  it.each([false, true])('revalidates retention reminders after login: %s', async loggedIn => {
+    findUnique.mockImplementation(async () => ({
+      ...delivery(), trigger: null,
+      subscription: { ...delivery().subscription, user: { last_login: loggedIn ? now : new Date('2024-09-14T11:30:00Z') } },
+      retentionExpiresAt: new Date('2026-09-14T11:30:00Z'),
+      retentionKey: '2026-09-14T11:30:00.000Z:7',
+      claimToken: updateMany.mock.calls[0][0].data.claimToken,
+    }));
+    await service.deliver('d', now);
+    expect(webPush.sendNotification).toHaveBeenCalledTimes(loggedIn ? 0 : 1);
+  });
+  it('defers a retention reminder during cooldown without consuming retries', async () => {
+    findUnique.mockImplementation(async () => ({
+      ...delivery(), trigger: null,
+      subscription: { ...delivery().subscription, user: { last_login: new Date('2024-09-14T11:30:00Z') } },
+      retentionExpiresAt: new Date('2026-09-14T11:30:00Z'),
+      retentionKey: '2026-09-14T11:30:00.000Z:7',
+      claimToken: updateMany.mock.calls[0][0].data.claimToken,
+    }));
+    findFirst.mockResolvedValue({ id: 'recent' });
+    await service.deliver('d', now);
+    expect(webPush.sendNotification).not.toHaveBeenCalled();
+    expect(updateMany).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({
+      nextAttemptAt: new Date(now.getTime() + 60_000), attempts: { decrement: 1 },
+    }) }));
   });
   it('removes expired push subscriptions on 410', async () => {
     jest.mocked(webPush.sendNotification).mockRejectedValue({ statusCode: 410 });

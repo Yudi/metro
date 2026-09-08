@@ -199,6 +199,8 @@ model User {
   favorites           Favorite[]
   notificationTriggers NotificationTrigger[]
   notificationIssueReceipts NotificationIssueReceipt[]
+
+  @@index([last_login])
 }
 
 model Favorite {
@@ -287,7 +289,7 @@ model NotificationTriggerTarget {
 
 model NotificationDelivery {
   id             String   @id @default(uuid(7)) @db.Uuid
-  triggerId      String   @db.Uuid
+  triggerId      String?  @db.Uuid
   subscriptionId String   @db.Uuid
   revision       Int      @default(0)
   fingerprint    String   @db.VarChar(128)
@@ -301,10 +303,15 @@ model NotificationDelivery {
   nextAttemptAt  DateTime @default(now()) @db.Timestamptz
   createdAt      DateTime @default(now()) @db.Timestamptz
 
-  trigger      NotificationTrigger @relation(fields: [triggerId], references: [id], onDelete: Cascade)
+  retentionKey String? @db.VarChar(128)
+  retentionExpiresAt DateTime? @db.Timestamptz
+
+  trigger      NotificationTrigger? @relation(fields: [triggerId], references: [id], onDelete: Cascade)
   subscription PushSubscription   @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
   @@unique([triggerId, subscriptionId, fingerprint])
+  @@unique([subscriptionId, retentionKey])
+  @@index([subscriptionId, dispatchStartedAt])
   @@index([nextAttemptAt, expiresAt, sentAt])
   @@index([claimUntil])
   @@map("notification_deliveries")

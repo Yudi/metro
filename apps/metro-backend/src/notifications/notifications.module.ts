@@ -15,8 +15,10 @@ import { NotificationEngineService } from './notification-engine.service';
 import { NotificationPushService } from './notification-push.service';
 import { NotificationQueueService } from './notification-queue.service';
 
+import { NotificationRetentionService } from './notification-retention.service';
+
 @Module({
   imports: [PrismaModule, RailModule, NextTrainModule, RealtimeModule, RailIntegrationClientModule, GeographyModule, BusInformationModule],
-  providers: [AuthService, NotificationTargetsService, NotificationSettingsService, NotificationsResolver, NotificationSnapshotService, NotificationEngineService, NotificationPushService, NotificationQueueService],
+  providers: [NotificationRetentionService, AuthService, NotificationTargetsService, NotificationSettingsService, NotificationsResolver, NotificationSnapshotService, NotificationEngineService, NotificationPushService, NotificationQueueService],
 })
 export class NotificationsModule {}

@@ -24,7 +24,7 @@ describe('notification evaluation to durable outbox integration', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     jest.useFakeTimers().setSystemTime(now);
-    findMany.mockResolvedValue([{ id: 'trigger', userId: 'user', revision: 1, config, targets: [{ target: { id: 'target', available: true } }] }]);
+    findMany.mockResolvedValue([{ id: 'trigger', userId: 'user', user: { last_login: now }, revision: 1, config, targets: [{ target: { id: 'target', available: true } }] }]);
     updateMany.mockResolvedValue({ count: 1 });
     prisma.$transaction.mockImplementation(async callback => callback(prisma));
     read.mockResolvedValue([{ title: 'Linha 1', body: 'Velocidade reduzida', fingerprint: 'incident', important: true, normal: false, observedAt: new Date('2026-09-07T10:00:00Z'), url: '/' }]);
@@ -38,7 +38,7 @@ describe('notification evaluation to durable outbox integration', () => {
     expect(createMany).toHaveBeenCalledWith({ data: [expect.objectContaining({ triggerId: 'trigger', subscriptionId: 'device', revision: 1, expiresAt: new Date('2026-09-07T11:05:00Z') })], skipDuplicates: true });
   });
   it('gives an edited revision a distinct periodic delivery key', async () => {
-    const row = { id: 'trigger', userId: 'user', revision: 1, config: { ...config, kind: 'rail_headway' }, targets: [{ target: { id: 'target', available: true } }] };
+    const row = { id: 'trigger', userId: 'user', user: { last_login: now }, revision: 1, config: { ...config, kind: 'rail_headway' }, targets: [{ target: { id: 'target', available: true } }] };
     findMany.mockResolvedValue([row]);
     await engine.evaluateDue(now);
     findMany.mockResolvedValue([{ ...row, revision: 2 }]);
@@ -46,7 +46,7 @@ describe('notification evaluation to durable outbox integration', () => {
     expect(createMany.mock.calls[0][0].data[0].fingerprint).not.toBe(createMany.mock.calls[1][0].data[0].fingerprint);
   });
   it('delivers each normal recovery once within the same window', async () => {
-    findMany.mockResolvedValue([{ id: 'trigger', userId: 'user', revision: 1, config: { ...config, statusMode: 'all' }, targets: [{ target: { id: 'target', available: true } }] }]);
+    findMany.mockResolvedValue([{ id: 'trigger', userId: 'user', user: { last_login: now }, revision: 1, config: { ...config, statusMode: 'all' }, targets: [{ target: { id: 'target', available: true } }] }]);
     const fingerprints: string[] = [];
     for (const [index, normal] of [true, false, true, true].entries()) {
       const at = new Date(now.getTime() + index * 60_000);
@@ -67,7 +67,7 @@ describe('notification evaluation to durable outbox integration', () => {
     expect(prisma.notificationIssueReceipt.createMany).toHaveBeenCalledTimes(1);
   });
   it('enforces the arrival cooldown across adjacent schedule slots', async () => {
-    findMany.mockResolvedValue([{ id: 'trigger', userId: 'user', revision: 1, config: { ...config, kind: 'rail_arrivals' }, targets: [{ target: { id: 'target', available: true } }] }]);
+    findMany.mockResolvedValue([{ id: 'trigger', userId: 'user', user: { last_login: now }, revision: 1, config: { ...config, kind: 'rail_arrivals' }, targets: [{ target: { id: 'target', available: true } }] }]);
     read.mockResolvedValue([{ title: 'Próximos trens', body: '', fingerprint: 'arrival', important: false, normal: true, observedAt: now, url: '/', arrivals: [{ destination: 'Luz', expectedAt: now.getTime() + 120_000 }] }]);
     prisma.notificationDelivery.findFirst.mockResolvedValueOnce({ id: 'recent-update' });
     await engine.evaluateDue(now);
@@ -81,6 +81,13 @@ describe('notification evaluation to durable outbox integration', () => {
   it('does not write work after a concurrent edit invalidates its lease', async () => {
     updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 }).mockResolvedValue({ count: 1 });
     await engine.evaluateDue(now);
+    expect(createMany).not.toHaveBeenCalled();
+  });
+  it('does not evaluate a user at the retention boundary', async () => {
+    findMany.mockResolvedValue([{ id: 'trigger', userId: 'user', user: { last_login: new Date('2024-09-07T11:00:00Z') }, revision: 1, config, targets: [] }]);
+    await engine.evaluateDue(now);
+    expect(read).not.toHaveBeenCalled();
+    expect(updateMany).not.toHaveBeenCalled();
     expect(createMany).not.toHaveBeenCalled();
   });
   it('skips unavailable transit data instead of inventing normal service', async () => {

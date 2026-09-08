@@ -5,22 +5,24 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationEngineService } from './notification-engine.service';
 import { NotificationPushService } from './notification-push.service';
 
+import { NotificationRetentionService } from './notification-retention.service';
+
 const QUEUE = 'metro-notifications';
 @Injectable()
 export class NotificationQueueService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(NotificationQueueService.name);
   private queue?: Queue;
   private worker?: Worker;
-  constructor(private readonly config: ConfigService, private readonly prisma: PrismaService, private readonly engine: NotificationEngineService, private readonly push: NotificationPushService) {}
+  constructor(private readonly config: ConfigService, private readonly prisma: PrismaService, private readonly engine: NotificationEngineService, private readonly push: NotificationPushService, private readonly retention: NotificationRetentionService) {}
 
   onApplicationBootstrap(): void {
     void this.start().catch(() => this.logger.error('Notification scheduler could not initialize.'));
   }
 
   private async start(): Promise<void> {
-    if (!this.config.get('VAPID_PUBLIC_KEY') || !this.config.get('VAPID_PRIVATE_KEY') || !this.config.get('VAPID_SUBJECT')) {
+    const pushEnabled = Boolean(this.config.get('VAPID_PUBLIC_KEY') && this.config.get('VAPID_PRIVATE_KEY') && this.config.get('VAPID_SUBJECT'));
+    if (!pushEnabled) {
       this.logger.log('Notifications are disabled until VAPID configuration is supplied.');
-      return;
     }
     const url = new URL(this.config.get<string>('REDIS_URL', 'redis://localhost:6379'));
     const connection = {
@@ -32,9 +34,11 @@ export class NotificationQueueService implements OnApplicationBootstrap, OnModul
     this.queue.on('error', () => this.logger.error('Notification queue connection failed.'));
     this.worker = new Worker(QUEUE, async job => {
       if (job.name === 'tick') {
+        if (!pushEnabled) return;
         await this.engine.evaluateDue();
         await this.reconcileDeliveries();
       } else if (job.name === 'cleanup') {
+        await this.retention.maintain();
         await this.engine.cleanup();
       } else if (job.name === 'deliver' && typeof job.data.id === 'string') {
         await this.push.deliver(job.data.id);
@@ -43,7 +47,7 @@ export class NotificationQueueService implements OnApplicationBootstrap, OnModul
     this.worker.on('error', () => this.logger.error('Notification worker connection failed.'));
     this.worker.on('failed', () => this.logger.warn('Notification job failed; durable work remains available for reconciliation.'));
     await this.queue.upsertJobScheduler('notification-tick', { every: 15_000 }, { name: 'tick', data: {} });
-    await this.queue.upsertJobScheduler('notification-cleanup', { every: 86_400_000 }, { name: 'cleanup', data: {} });
+    await this.queue.upsertJobScheduler('notification-cleanup', { every: 3_600_000 }, { name: 'cleanup', data: {} });
   }
 
   async reconcileDeliveries(now = new Date()): Promise<void> {

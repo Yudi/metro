@@ -7,7 +7,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { catchError, distinctUntilChanged, map, of, startWith, switchMap, timer } from 'rxjs';
+import { catchError, distinctUntilChanged, map, merge, of, startWith, switchMap, timer } from 'rxjs';
 import { formatBusFare, getAgencyIconPath, getContrastColor, normalizeHexColor, TransitAgency } from '@metro/shared/utils';
 import type { PublishedDayKind, PublishedRouteDirection, PublishedRouteInformation } from '@metro/shared/bus-itinerary-contracts';
 import { TypesenseSearchService } from '../search/typesense-search.service';
@@ -61,6 +61,9 @@ export class ItinerariesComponent {
   private readonly params = toSignal(this.activatedRoute.queryParamMap, {
     initialValue: this.activatedRoute.snapshot.queryParamMap,
   });
+  private readonly pathParams = toSignal(this.activatedRoute.paramMap, {
+    initialValue: this.activatedRoute.snapshot.paramMap,
+  });
   readonly today = saoPauloServiceDate();
   readonly days = Array.from({ length: 7 }, (_, index) => {
     const date = new Date(`${this.today}T12:00:00Z`);
@@ -71,7 +74,13 @@ export class ItinerariesComponent {
     const date = this.params().get('dia');
     return this.days.some((day) => day.value === date) ? date as string : this.today;
   });
-  readonly routeId = computed(() => this.params().get('linha')?.trim() ?? '');
+  readonly routeId = computed(() => {
+    const agency = this.pathParams().get('agency');
+    const line = this.pathParams().get('line');
+    return agency && line
+      ? agency === 'sptrans' ? line : `${agency}:${line}`
+      : '';
+  });
   readonly query = signal('');
   readonly retryCount = signal(0);
   readonly incrementRetry = (value: number) => value + 1;
@@ -197,14 +206,20 @@ export class ItinerariesComponent {
   readonly mapParams = computed(() => ({ busRoutes: this.route()?.routeId, subwayStations: '1', subwayRoutes: '1', bike: '0' }));
 
   constructor() {
-    this.activatedRoute.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.selectedPatternId.set(''));
+    merge(this.activatedRoute.paramMap, this.activatedRoute.queryParamMap).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.selectedPatternId.set(''));
   }
 
   selectRoute(result: SearchResult): void {
     if (!result.routeData) return;
+    const route = result.routeData;
+    const separator = route.route_id.indexOf(':');
+    const agency = separator >= 0 ? route.route_id.slice(0, separator)
+      : route.sourceAgency?.toLowerCase() || 'sptrans';
+    const line = separator >= 0 ? route.route_id.slice(separator + 1) : route.route_id;
     this.query.set('');
-    void this.router.navigate([], { relativeTo: this.activatedRoute,
-      queryParams: { linha: result.routeData.route_id }, queryParamsHandling: 'merge' });
+    this.selectedPatternId.set('');
+    void this.router.navigate(['/itinerarios', agency, line], {
+      queryParams: { dia: this.params().get('dia') } });
   }
 
   selectDate(date: string): void {

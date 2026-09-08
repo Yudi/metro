@@ -32,23 +32,23 @@ interface ItinerariesStoryArgs {
 }
 
 const paramsByState: Record<StoryState, Record<string, string>> = {
-  sptrans: { linha: SPTRANS_ROUTE.route_id },
-  artesp: { linha: ARTESP_ROUTE.route_id },
+  sptrans: { agency: 'sptrans', line: SPTRANS_ROUTE.route_id },
+  artesp: { agency: 'artesp', line: ARTESP_ROUTE.route_id.slice('artesp:'.length) },
   empty: {},
-  unavailable: { linha: 'sptrans:unavailable' },
+  unavailable: { agency: 'sptrans', line: 'unavailable' },
 };
 
 function createActivatedRoute(state: StoryState): {
+  paramMap: BehaviorSubject<ParamMap>;
   queryParamMap: BehaviorSubject<ParamMap>;
-  snapshot: { queryParamMap: ParamMap };
+  snapshot: { paramMap: ParamMap; queryParamMap: ParamMap };
 } {
-  const queryParamMap = new BehaviorSubject(
-    convertToParamMap(paramsByState[state]),
-  );
-
+  const queryParamMap = new BehaviorSubject(convertToParamMap({}));
+  const paramMap = new BehaviorSubject(convertToParamMap(paramsByState[state]));
   return {
+    paramMap,
     queryParamMap,
-    snapshot: { queryParamMap: queryParamMap.value },
+    snapshot: { paramMap: paramMap.value, queryParamMap: queryParamMap.value },
   };
 }
 

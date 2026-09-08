@@ -14,20 +14,20 @@ const itinerary = (sourceAgency = 'sptrans'): RouteItinerary => ({
 });
 
 describe('ItinerariesComponent', () => {
-  const params = new BehaviorSubject(convertToParamMap({ linha: 'example' }));
+  const params = new BehaviorSubject(convertToParamMap({ agency: 'sptrans', line: 'example' }));
   const load = jest.fn();
   const notices = jest.fn();
   const published = jest.fn();
 
   beforeEach(async () => {
-    params.next(convertToParamMap({ linha: 'example' }));
+    params.next(convertToParamMap({ agency: 'sptrans', line: 'example' }));
     load.mockReset().mockReturnValue(of(itinerary()));
     notices.mockReset().mockReturnValue(of({ status: 'AVAILABLE', lastUpdated: null, notices: [] }));
     published.mockReset().mockReturnValue(of({ status: 'UNAVAILABLE', days: [] }));
     await TestBed.configureTestingModule({
       imports: [ItinerariesComponent],
       providers: [provideRouter([]),
-        { provide: ActivatedRoute, useValue: { queryParamMap: params, snapshot: { queryParamMap: params.value } } },
+        { provide: ActivatedRoute, useValue: { paramMap: params, queryParamMap: of(convertToParamMap({})), snapshot: { paramMap: params.value, queryParamMap: convertToParamMap({}) } } },
         { provide: ItinerariesService, useValue: { load, published } },
         { provide: TypesenseSearchService, useValue: { search: jest.fn().mockReturnValue(of({ success: true, results: [] })) } },
         { provide: BusInformationService, useValue: { notices } },
@@ -55,7 +55,7 @@ describe('ItinerariesComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Gratuita no domingo');
     expect(fixture.nativeElement.textContent).not.toContain('Domingão Tarifa Zero');
     load.mockReturnValue(of(itinerary('artesp')));
-    params.next(convertToParamMap({ linha: 'artesp:example' }));
+    params.next(convertToParamMap({ agency: 'artesp', line: 'example' }));
     fixture.detectChanges();
     await fixture.whenStable();
     expect(fixture.componentInstance.sundayFree()).toBe(false);
@@ -109,7 +109,7 @@ describe('ItinerariesComponent', () => {
     fixture.detectChanges();
     await fixture.whenStable();
     expect(first.observed).toBe(true);
-    params.next(convertToParamMap({ linha: 'another' }));
+    params.next(convertToParamMap({ agency: 'sptrans', line: 'another' }));
     fixture.detectChanges();
     await fixture.whenStable();
     expect(first.observed).toBe(false);

@@ -17,6 +17,7 @@ import { BusInformationService, BusNoticesResult } from '../map-main/components/
 import { BusInformationComponent } from '../map-main/components/bus-information/bus-information.component';
 import { routeNoticeView } from '../map-main/components/bus-information/bus-notice-view';
 import { TransitSearchFieldComponent } from '../shared/components/transit-search-field/transit-search-field.component';
+import { ScheduledDeparturesComponent } from '../shared/components/scheduled-departures/scheduled-departures.component';
 import { ItinerariesService, ItineraryPattern, RouteItinerary } from './itineraries.service';
 import { summarizeDepartureIntervals } from './departure-intervals';
 
@@ -46,7 +47,7 @@ export function serviceDayKind(date: string): PublishedDayKind {
   selector: 'app-itineraries',
   imports: [DatePipe, NgOptimizedImage, RouterLink, MatButtonModule, MatFormFieldModule, MatIconModule,
     MatSelectModule, MatProgressBarModule, TransitSearchFieldComponent,
-    SearchResultCardComponent, BusInformationComponent],
+    SearchResultCardComponent, BusInformationComponent, ScheduledDeparturesComponent],
   templateUrl: './itineraries.component.html',
   styleUrl: './itineraries.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -165,16 +166,6 @@ export class ItinerariesComponent {
   })) ?? []);
   readonly operator = computed(() => this.published()?.operatorName || this.data()?.operatorName || 'Não informada');
   readonly visibleDepartures = computed(() => [...new Set(this.published() ? this.publishedDirection()?.departures ?? [] : this.pattern()?.departures ?? [])]);
-  readonly departureGroups = computed(() => {
-    const groups = new Map<string, string[]>();
-    for (const departure of this.visibleDepartures()) {
-      const hour = departure.split(':')[0];
-      groups.set(hour, [...(groups.get(hour) ?? []), departure]);
-    }
-    return [...groups.entries()].map(([hour, times], index) => ({
-      label: serviceTimeLabel(`${hour}:00`), times, alternate: index % 2 === 1,
-    }));
-  });
   readonly calculatedIntervals = computed(() => summarizeDepartureIntervals(this.visibleDepartures()).map((interval) => ({
     ...interval,
     label: interval.minimumMinutes === interval.maximumMinutes

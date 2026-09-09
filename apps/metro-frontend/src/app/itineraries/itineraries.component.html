@@ -279,23 +279,10 @@
                     <p class="supporting">
                       Cores alternadas separam as partidas por hora.
                     </p>
-                    @for (group of departureGroups(); track group.label) {
-                      <div
-                        class="departure-group"
-                        [class.alternate-hour]="group.alternate"
-                      >
-                        <ul
-                          class="departures"
-                          [attr.aria-label]="
-                            'Partidas na faixa de ' + group.label
-                          "
-                        >
-                          @for (departure of group.times; track departure) {
-                            <li>{{ timeLabel(departure) }}</li>
-                          }
-                        </ul>
-                      </div>
-                    }
+                    <app-scheduled-departures
+                      [times]="visibleDepartures()"
+                      [formatTime]="timeLabel"
+                    />
                   </div>
                 }
               }

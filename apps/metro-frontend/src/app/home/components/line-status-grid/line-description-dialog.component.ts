@@ -10,6 +10,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { FavoritesService } from '@metro/shared/api';
 import { Router } from '@angular/router';
 import { SpecialRailIssue } from '@metro/shared/utils';
+import { ScheduledDeparturesComponent } from '../../../shared/components/scheduled-departures/scheduled-departures.component';
 
 export interface LineScheduleSection {
   title: string;
@@ -34,7 +35,12 @@ export interface LineDescriptionDialogData {
 
 @Component({
   selector: 'app-line-description-dialog',
-  imports: [MatDialogModule, MatButtonModule, MatIconModule],
+  imports: [
+    MatDialogModule,
+    MatButtonModule,
+    MatIconModule,
+    ScheduledDeparturesComponent,
+  ],
   template: `
     <h2 mat-dialog-title>{{ data.title }}</h2>
     <mat-dialog-content class="line-description-content">
@@ -57,14 +63,10 @@ export interface LineDescriptionDialogData {
                 }
               </div>
 
-              <div
-                class="time-grid"
-                [attr.aria-label]="'Horários de partida: ' + section.title"
-              >
-                @for (time of section.times; track time) {
-                  <span class="time-chip">{{ formatScheduleTime(time) }}</span>
-                }
-              </div>
+              <app-scheduled-departures
+                [times]="section.times"
+                [ariaLabel]="'Partidas na faixa de ' + section.title + ': '"
+              />
             </section>
           }
         </div>
@@ -193,28 +195,6 @@ export interface LineDescriptionDialogData {
       font-size: 0.88rem;
     }
 
-    .time-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(4.4rem, 1fr));
-      gap: 0.45rem;
-    }
-
-    .time-chip {
-      display: inline-flex;
-      min-height: 2rem;
-      align-items: center;
-      justify-content: center;
-      padding: 0.2rem 0.45rem;
-      border: 1px solid var(--mat-sys-outline-variant);
-      border-radius: 999px;
-      background: var(--mat-sys-surface-container-low);
-      color: var(--mat-sys-on-surface);
-      font-size: 0.9rem;
-      font-variant-numeric: tabular-nums;
-      font-weight: 650;
-      line-height: 1;
-    }
-
     .issue-section {
       display: flex;
       flex-direction: column;
@@ -271,9 +251,6 @@ export interface LineDescriptionDialogData {
         padding: 0.8rem;
       }
 
-      .time-grid {
-        grid-template-columns: repeat(auto-fit, minmax(3.9rem, 1fr));
-      }
     }
   `,
 })
@@ -295,14 +272,6 @@ export class LineDescriptionDialogComponent {
 
     return this.favoriteHovered() ? 'favorite' : 'favorite_border';
   });
-
-  formatScheduleTime(time: string): string {
-    const [hour = time, minute = '00'] = time.split(':');
-    const formattedHour =
-      hour === '00' ? '00' : String(Number.parseInt(hour, 10));
-
-    return minute === '00' ? `${formattedHour}h` : `${formattedHour}h${minute}`;
-  }
 
   close(): void {
     this.dialogRef.close();

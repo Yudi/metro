@@ -180,10 +180,7 @@ describe('bus route itinerary service', () => {
       prisma as unknown as PrismaService,
     );
 
-    const result = await service.getItinerary(
-      'artesp:001',
-      '2026-09-07',
-    );
+    const result = await service.getItinerary('artesp:001', '2026-09-07');
 
     expect(result.status).toBe('AVAILABLE');
     expect(result.route?.sourceAgency).toBe('artesp');

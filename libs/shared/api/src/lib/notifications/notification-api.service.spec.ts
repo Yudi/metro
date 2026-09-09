@@ -46,9 +46,7 @@ describe('NotificationApiService', () => {
     service.getConfiguration().subscribe(result);
 
     const request = httpTesting.expectOne('/api/graphql');
-    expect(request.request.body.query).toContain(
-      'notificationConfiguration',
-    );
+    expect(request.request.body.query).toContain('notificationConfiguration');
     request.flush({ data: { notificationConfiguration: configuration } });
 
     expect(result).toHaveBeenCalledWith(configuration);
@@ -132,9 +130,7 @@ describe('NotificationApiService', () => {
       })
       .subscribe(deviceId);
     request = httpTesting.expectOne('/api/graphql');
-    expect(request.request.body.query).toContain(
-      'registerNotificationDevice',
-    );
+    expect(request.request.body.query).toContain('registerNotificationDevice');
     request.flush({ data: { registerNotificationDevice: 'device-1' } });
     expect(deviceId).toHaveBeenCalledWith('device-1');
 

@@ -121,9 +121,7 @@ export class MapSelectionsPanelComponent {
       };
     }
 
-    return sourceAgency
-      ? { iconPath: null }
-      : null;
+    return sourceAgency ? { iconPath: null } : null;
   }
 
   private isTransitAgency(value: string): value is TransitAgency {

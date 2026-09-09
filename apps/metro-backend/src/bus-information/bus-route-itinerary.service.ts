@@ -1,6 +1,9 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { mapBusRoute, normalizeBusSourceAgency } from '../geography/services/bus-catalog.utils';
+import {
+  mapBusRoute,
+  normalizeBusSourceAgency,
+} from '../geography/services/bus-catalog.utils';
 import {
   BusRouteItinerary,
   BusRouteItineraryFrequencyWindow,
@@ -329,7 +332,10 @@ export class BusRouteItineraryService {
       if (!isGtfsTime(row.startTime) || !isGtfsTime(row.endTime)) {
         throw new Error('Invalid frequency time');
       }
-      if (!Number.isSafeInteger(row.headwaySeconds) || row.headwaySeconds <= 0) {
+      if (
+        !Number.isSafeInteger(row.headwaySeconds) ||
+        row.headwaySeconds <= 0
+      ) {
         throw new Error('Invalid frequency headway');
       }
       if (gtfsTimeSeconds(row.endTime) <= gtfsTimeSeconds(row.startTime)) {
@@ -476,7 +482,9 @@ export class BusRouteItineraryService {
 }
 
 function isGtfsTime(value: string | null | undefined): value is string {
-  return typeof value === 'string' && /^(\d{1,2}):([0-5]\d):([0-5]\d)$/.test(value);
+  return (
+    typeof value === 'string' && /^(\d{1,2}):([0-5]\d):([0-5]\d)$/.test(value)
+  );
 }
 
 function gtfsTimeSeconds(value: string): number {

@@ -131,8 +131,10 @@ export class SubwayStationDialogComponent implements OnInit {
       code: number | string;
       name: string;
       colorHex: string;
-      status: (Pick<RailLineStatus, 'statusCode' | 'statusLabel'> &
-        Partial<Pick<RailLineStatus, 'description' | 'detail'>>) | undefined;
+      status:
+        | (Pick<RailLineStatus, 'statusCode' | 'statusLabel'> &
+            Partial<Pick<RailLineStatus, 'description' | 'detail'>>)
+        | undefined;
       hasIssue: boolean;
     }[] = this.staticLineInfo().map((line) => {
       const status = this.getLineStatus(line.code);

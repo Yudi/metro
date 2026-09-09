@@ -1,7 +1,5 @@
 import { ConfigService } from '@nestjs/config';
-import type {
-  NotificationTrigger,
-} from '@metro/shared/notification-contracts';
+import type { NotificationTrigger } from '@metro/shared/notification-contracts';
 import { NotificationRealtimeService } from './notification-realtime.service';
 
 const trigger: NotificationTrigger = {
@@ -27,9 +25,14 @@ describe('NotificationRealtimeService', () => {
     const received: Array<{ userId: string; event: unknown }> = [];
     service.onEvent((userId, event) => received.push({ userId, event }));
 
-    await expect(service.publishTriggerUpsert('account-a', trigger)).resolves.toBe(1);
     await expect(
-      service.publishDeviceRemoved('account-a', '018f3a37-9c5e-7a8b-8c2d-000000000003'),
+      service.publishTriggerUpsert('account-a', trigger),
+    ).resolves.toBe(1);
+    await expect(
+      service.publishDeviceRemoved(
+        'account-a',
+        '018f3a37-9c5e-7a8b-8c2d-000000000003',
+      ),
     ).resolves.toBe(2);
     await expect(service.getCurrentRevision('account-a')).resolves.toBe(2);
 
@@ -58,7 +61,9 @@ describe('NotificationRealtimeService', () => {
     const listener = jest.fn();
     service.onEvent(listener);
 
-    await expect(service.publishTriggerUpsert('account-a', trigger)).resolves.toBe(0);
+    await expect(
+      service.publishTriggerUpsert('account-a', trigger),
+    ).resolves.toBe(0);
     await expect(service.getCurrentRevision('account-a')).resolves.toBe(0);
     expect(listener).not.toHaveBeenCalled();
   });
@@ -77,7 +82,9 @@ describe('NotificationRealtimeService', () => {
     internals.publisher = publisher;
     internals.redisAvailable = true;
 
-    await expect(service.publishTriggerUpsert('account-a', trigger)).resolves.toBe(9);
+    await expect(
+      service.publishTriggerUpsert('account-a', trigger),
+    ).resolves.toBe(9);
 
     expect(publisher.eval).toHaveBeenCalledWith(
       expect.stringContaining("redis.call('PUBLISH'"),

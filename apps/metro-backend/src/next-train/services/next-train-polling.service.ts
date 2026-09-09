@@ -470,7 +470,9 @@ export class NextTrainPollingService implements OnModuleDestroy {
   }
 
   private notifyPollComplete(deltas: StationDelta[]): void {
-    this.logger.debug(`Broadcasting ${deltas.length} delta update${deltas.length === 1 ? '' : 's'}`);
+    this.logger.debug(
+      `Broadcasting ${deltas.length} delta update${deltas.length === 1 ? '' : 's'}`,
+    );
     for (const listener of this.pollCompleteListeners) {
       try {
         listener(deltas);

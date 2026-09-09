@@ -6,7 +6,10 @@ export function notificationRetentionExpiry(lastLogin: Date): Date {
   return expiry;
 }
 
-export function notificationRetentionStage(expiry: Date, now: Date): number | null {
+export function notificationRetentionStage(
+  expiry: Date,
+  now: Date,
+): number | null {
   const remaining = expiry.getTime() - now.getTime();
   if (remaining <= 0 || remaining > 7 * DAY_MS) return null;
   if (remaining <= DAY_MS) return 1;

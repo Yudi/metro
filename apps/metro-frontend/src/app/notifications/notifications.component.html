@@ -7,7 +7,7 @@
         sua rotina.
       </p>
     </div>
-    @if (pageState() === 'ready' || pageState() === 'error') {
+    @if (pageState() === "ready" || pageState() === "error") {
       <button
         mat-icon-button
         type="button"
@@ -25,14 +25,14 @@
   </header>
 
   @switch (pageState()) {
-    @case ('authenticating') {
+    @case ("authenticating") {
       <section class="state-panel" aria-live="polite">
         <mat-spinner diameter="36"></mat-spinner>
         <h2>Verificando sua conta</h2>
         <p>Aguarde enquanto carregamos suas configurações.</p>
       </section>
     }
-    @case ('signed-out') {
+    @case ("signed-out") {
       <section class="state-panel" aria-labelledby="signed-out-title">
         <mat-icon class="state-icon" aria-hidden="true">lock</mat-icon>
         <h2 id="signed-out-title">Entre para configurar avisos</h2>
@@ -46,32 +46,38 @@
         </button>
       </section>
     }
-    @case ('loading') {
+    @case ("loading") {
       <section class="state-panel" aria-live="polite">
         <mat-spinner diameter="36"></mat-spinner>
         <h2>Carregando seus avisos</h2>
         <p>Buscando configurações salvas na sua conta.</p>
       </section>
     }
-    @case ('error') {
+    @case ("error") {
       <section class="state-panel" aria-labelledby="load-error-title">
-        <mat-icon class="state-icon error-icon" aria-hidden="true">cloud_off</mat-icon>
+        <mat-icon class="state-icon error-icon" aria-hidden="true"
+          >cloud_off</mat-icon
+        >
         <h2 id="load-error-title">Não foi possível carregar as notificações</h2>
         <p>{{ errorMessage() }}</p>
-        <button mat-stroked-button type="button" (click)="refreshConfiguration()">
+        <button
+          mat-stroked-button
+          type="button"
+          (click)="refreshConfiguration()"
+        >
           <mat-icon>refresh</mat-icon>
           Tentar novamente
         </button>
       </section>
     }
-    @case ('ready') {
+    @case ("ready") {
       @if (configuration(); as configuration) {
         @if (!configuration.available) {
           <div class="delivery-warning" role="status">
             <mat-icon aria-hidden="true">notifications_off</mat-icon>
             <span>
-              A entrega de notificações está indisponível neste ambiente.
-              Você ainda pode criar e editar avisos sincronizados na conta.
+              A entrega de notificações está indisponível neste ambiente. Você
+              ainda pode criar e editar avisos sincronizados na conta.
             </span>
           </div>
         } @else {
@@ -80,7 +86,8 @@
               <mat-icon mat-card-avatar>notifications</mat-icon>
               <mat-card-title>Receba avisos neste dispositivo</mat-card-title>
               <mat-card-subtitle>
-                Ative as notificações uma vez para receber os avisos que você criar.
+                Ative as notificações uma vez para receber os avisos que você
+                criar.
               </mat-card-subtitle>
             </mat-card-header>
             <mat-card-content>
@@ -99,7 +106,7 @@
                     <p>Use um navegador com suporte a notificações.</p>
                   </div>
                 </div>
-              } @else if (permission() === 'denied') {
+              } @else if (permission() === "denied") {
                 <div class="push-state" aria-live="polite">
                   <mat-icon aria-hidden="true">notifications_off</mat-icon>
                   <div>
@@ -115,7 +122,9 @@
                   <mat-icon aria-hidden="true">notifications_active</mat-icon>
                   <div>
                     <strong>Notificações ativas</strong>
-                    <p>{{ currentDevice.label }} está pronto para receber avisos.</p>
+                    <p>
+                      {{ currentDevice.label }} está pronto para receber avisos.
+                    </p>
                   </div>
                 </div>
               } @else {
@@ -177,138 +186,169 @@
               }
             </mat-card-content>
           </mat-card>
-
         }
 
         @if (operationError(); as error) {
-            <div class="operation-error" role="alert">
-              <mat-icon aria-hidden="true">error</mat-icon>
-              <span>{{ error }}</span>
-              <button mat-button type="button" (click)="reloadAfterOperationError()">
-                Descartar edição e recarregar
-              </button>
+          <div class="operation-error" role="alert">
+            <mat-icon aria-hidden="true">error</mat-icon>
+            <span>{{ error }}</span>
+            <button
+              mat-button
+              type="button"
+              (click)="reloadAfterOperationError()"
+            >
+              Descartar edição e recarregar
+            </button>
+          </div>
+        }
+
+        <section class="triggers-section" aria-labelledby="triggers-title">
+          <div class="section-heading">
+            <div>
+              <h2 id="triggers-title">Seus avisos</h2>
+              <p>
+                {{ triggers().length }}
+                {{
+                  triggers().length === 1
+                    ? "aviso configurado"
+                    : "avisos configurados"
+                }}
+              </p>
             </div>
+            <button
+              mat-flat-button
+              color="primary"
+              type="button"
+              [disabled]="editingTriggerId() !== null"
+              (click)="startNewTrigger()"
+            >
+              <mat-icon>add</mat-icon>
+              Novo aviso
+            </button>
+          </div>
+
+          @if (editingTriggerId() === "new") {
+            <app-notification-trigger-editor
+              [trigger]="null"
+              [busy]="pendingTriggerId() === 'editor'"
+              [saveError]="operationError()"
+              (saved)="saveTrigger($event)"
+              (closed)="cancelEditing()"
+            />
           }
 
-          <section class="triggers-section" aria-labelledby="triggers-title">
-            <div class="section-heading">
-              <div>
-                <h2 id="triggers-title">Seus avisos</h2>
-                <p>
-                  {{ triggers().length }}
-                  {{ triggers().length === 1 ? 'aviso configurado' : 'avisos configurados' }}
-                </p>
-              </div>
+          @if (triggers().length === 0 && editingTriggerId() !== "new") {
+            <div class="empty-state">
+              <mat-icon aria-hidden="true">notifications_none</mat-icon>
+              <h3>Nenhum aviso configurado</h3>
+              <p>
+                Crie um aviso para acompanhar uma linha, estação ou ponto no
+                período que você escolher.
+              </p>
               <button
-                mat-flat-button
-                color="primary"
+                mat-stroked-button
                 type="button"
-                [disabled]="editingTriggerId() !== null"
                 (click)="startNewTrigger()"
               >
                 <mat-icon>add</mat-icon>
-                Novo aviso
+                Criar primeiro aviso
               </button>
             </div>
-
-            @if (editingTriggerId() === 'new') {
-              <app-notification-trigger-editor
-                [trigger]="null"
-                [busy]="pendingTriggerId() === 'editor'"
-                [saveError]="operationError()"
-                (saved)="saveTrigger($event)"
-                (closed)="cancelEditing()"
-              />
-            }
-
-            @if (triggers().length === 0 && editingTriggerId() !== 'new') {
-              <div class="empty-state">
-                <mat-icon aria-hidden="true">notifications_none</mat-icon>
-                <h3>Nenhum aviso configurado</h3>
-                <p>
-                  Crie um aviso para acompanhar uma linha, estação ou ponto no
-                  período que você escolher.
-                </p>
-                <button mat-stroked-button type="button" (click)="startNewTrigger()">
-                  <mat-icon>add</mat-icon>
-                  Criar primeiro aviso
-                </button>
-              </div>
-            } @else {
-              <div class="trigger-list" aria-label="Avisos configurados">
-                @for (trigger of triggers(); track trigger.id) {
-                  <article class="trigger-row" [class.disabled-row]="!trigger.enabled">
-                    <div class="trigger-copy">
-                      <div class="trigger-title-row">
-                        <mat-icon aria-hidden="true">notifications</mat-icon>
-                        <h3>{{ trigger.name }}</h3>
-                        @if (!trigger.enabled) {
-                          <span class="status-badge">Pausado</span>
-                        }
-                      </div>
-                      <p class="trigger-kind">{{ kindLabel(trigger.kind) }}</p>
-                      <p class="trigger-meta">
-                        <span>{{ scheduleSummary(trigger) }}</span>
-                        <span aria-hidden="true">•</span>
-                        <span class="trigger-targets" aria-label="Destinos do aviso">
-                          @if (trigger.targets.length === 0) {
-                            Destino indisponível
-                          } @else {
-                            @for (target of trigger.targets; track target.id) {
-                              <app-notification-target-identity [target]="target" />
-                            }
-                          }
-                        </span>
-                      </p>
+          } @else {
+            <div class="trigger-list" aria-label="Avisos configurados">
+              @for (trigger of triggers(); track trigger.id) {
+                <article
+                  class="trigger-row"
+                  [class.disabled-row]="!trigger.enabled"
+                >
+                  <div class="trigger-copy">
+                    <div class="trigger-title-row">
+                      <mat-icon aria-hidden="true">notifications</mat-icon>
+                      <h3>{{ trigger.name }}</h3>
+                      @if (!trigger.enabled) {
+                        <span class="status-badge">Pausado</span>
+                      }
                     </div>
-                    <div class="trigger-actions">
-                      <mat-slide-toggle
-                        [checked]="trigger.enabled"
-                        [disabled]="pendingTriggerId() !== null || deletingTriggerId() !== null"
-                        [aria-label]="(trigger.enabled ? 'Desativar ' : 'Ativar ') + trigger.name"
-                        (change)="toggleTrigger(trigger, $event.checked)"
+                    <p class="trigger-kind">{{ kindLabel(trigger.kind) }}</p>
+                    <p class="trigger-meta">
+                      <span>{{ scheduleSummary(trigger) }}</span>
+                      <span aria-hidden="true">•</span>
+                      <span
+                        class="trigger-targets"
+                        aria-label="Destinos do aviso"
                       >
-                        {{ trigger.enabled ? 'Ativo' : 'Inativo' }}
-                      </mat-slide-toggle>
-                      <button
-                        mat-icon-button
-                        type="button"
-                        [disabled]="pendingTriggerId() !== null || deletingTriggerId() !== null"
-                        [attr.aria-label]="'Editar ' + trigger.name"
-                        (click)="editTrigger(trigger)"
-                      >
-                        <mat-icon>edit</mat-icon>
-                      </button>
-                      <button
-                        mat-icon-button
-                        type="button"
-                        [disabled]="pendingTriggerId() !== null || deletingTriggerId() !== null"
-                        [attr.aria-label]="'Excluir ' + trigger.name"
-                        (click)="deleteTrigger(trigger)"
-                      >
-                        @if (deletingTriggerId() === trigger.id) {
-                          <mat-spinner diameter="18"></mat-spinner>
+                        @if (trigger.targets.length === 0) {
+                          Destino indisponível
                         } @else {
-                          <mat-icon>delete</mat-icon>
+                          @for (target of trigger.targets; track target.id) {
+                            <app-notification-target-identity
+                              [target]="target"
+                            />
+                          }
                         }
-                      </button>
-                    </div>
-                  </article>
+                      </span>
+                    </p>
+                  </div>
+                  <div class="trigger-actions">
+                    <mat-slide-toggle
+                      [checked]="trigger.enabled"
+                      [disabled]="
+                        pendingTriggerId() !== null ||
+                        deletingTriggerId() !== null
+                      "
+                      [aria-label]="
+                        (trigger.enabled ? 'Desativar ' : 'Ativar ') +
+                        trigger.name
+                      "
+                      (change)="toggleTrigger(trigger, $event.checked)"
+                    >
+                      {{ trigger.enabled ? "Ativo" : "Inativo" }}
+                    </mat-slide-toggle>
+                    <button
+                      mat-icon-button
+                      type="button"
+                      [disabled]="
+                        pendingTriggerId() !== null ||
+                        deletingTriggerId() !== null
+                      "
+                      [attr.aria-label]="'Editar ' + trigger.name"
+                      (click)="editTrigger(trigger)"
+                    >
+                      <mat-icon>edit</mat-icon>
+                    </button>
+                    <button
+                      mat-icon-button
+                      type="button"
+                      [disabled]="
+                        pendingTriggerId() !== null ||
+                        deletingTriggerId() !== null
+                      "
+                      [attr.aria-label]="'Excluir ' + trigger.name"
+                      (click)="deleteTrigger(trigger)"
+                    >
+                      @if (deletingTriggerId() === trigger.id) {
+                        <mat-spinner diameter="18"></mat-spinner>
+                      } @else {
+                        <mat-icon>delete</mat-icon>
+                      }
+                    </button>
+                  </div>
+                </article>
 
-                  @if (editingTriggerId() === trigger.id) {
-                    <app-notification-trigger-editor
-                      [trigger]="editingTrigger()"
-                      [busy]="pendingTriggerId() === 'editor'"
-                      [saveError]="operationError()"
-                      (saved)="saveTrigger($event)"
-                      (closed)="cancelEditing()"
-                    />
-                  }
+                @if (editingTriggerId() === trigger.id) {
+                  <app-notification-trigger-editor
+                    [trigger]="editingTrigger()"
+                    [busy]="pendingTriggerId() === 'editor'"
+                    [saveError]="operationError()"
+                    (saved)="saveTrigger($event)"
+                    (closed)="cancelEditing()"
+                  />
                 }
-              </div>
-            }
-          </section>
-        }
-        }
+              }
+            </div>
+          }
+        </section>
       }
+    }
+  }
 </main>

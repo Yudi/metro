@@ -32,6 +32,8 @@ describe('ScheduledDeparturesComponent', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('06h');
-    expect(fixture.nativeElement.querySelector('ul').ariaLabel).toContain('06h');
+    expect(fixture.nativeElement.querySelector('ul').ariaLabel).toContain(
+      '06h',
+    );
   });
 });

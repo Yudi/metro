@@ -10,7 +10,9 @@ jest.mock('firebase-admin', () => ({
 describe('AuthService', () => {
   const verifyIdToken = jest.fn();
   const upsert = jest.fn();
-  const service = new AuthService({ user: { upsert } } as unknown as PrismaService);
+  const service = new AuthService({
+    user: { upsert },
+  } as unknown as PrismaService);
 
   beforeEach(() => {
     jest.resetAllMocks();
@@ -21,7 +23,11 @@ describe('AuthService', () => {
     verifyIdToken.mockResolvedValue({ uid: 'user-id' });
 
     await expect(service.verifyToken('token')).resolves.toBe('user-id');
-    expect(upsert).toHaveBeenCalledWith({ where: { id: 'user-id' }, create: { id: 'user-id' }, update: { last_login: expect.any(Date) } });
+    expect(upsert).toHaveBeenCalledWith({
+      where: { id: 'user-id' },
+      create: { id: 'user-id' },
+      update: { last_login: expect.any(Date) },
+    });
   });
 
   it('returns false for an invalid or expired credential', async () => {

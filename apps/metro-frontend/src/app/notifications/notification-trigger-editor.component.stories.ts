@@ -51,8 +51,14 @@ const meta: Meta<NotificationTriggerEditorComponent> = {
         {
           provide: NotificationApiService,
           useValue: {
-            getTargets: (kind: 'rail_line' | 'rail_station' | 'bus_route' | 'bus_stop' | 'special_line') =>
-              of(kind === 'bus_route' ? [busDestination] : [destination]),
+            getTargets: (
+              kind:
+                | 'rail_line'
+                | 'rail_station'
+                | 'bus_route'
+                | 'bus_stop'
+                | 'special_line',
+            ) => of(kind === 'bus_route' ? [busDestination] : [destination]),
           },
         },
       ],

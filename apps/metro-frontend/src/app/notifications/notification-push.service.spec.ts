@@ -63,7 +63,10 @@ describe('NotificationPushService', () => {
 
     await expect(service.requestSubscription('public-key')).resolves.toEqual({
       endpoint: 'https://push.example/subscription',
-      label: notificationDeviceLabel(navigator.userAgent, navigator.maxTouchPoints),
+      label: notificationDeviceLabel(
+        navigator.userAgent,
+        navigator.maxTouchPoints,
+      ),
       keys: { p256dh: 'AQID', auth: 'BAUG' },
     });
     expect(requestSubscription).toHaveBeenCalledWith({
@@ -86,12 +89,19 @@ describe('NotificationPushService', () => {
 
   it('summarizes an existing subscription without requesting permission', async () => {
     TestBed.overrideProvider(SwPush, {
-      useValue: { isEnabled: true, requestSubscription, subscription: of(subscription) },
+      useValue: {
+        isEnabled: true,
+        requestSubscription,
+        subscription: of(subscription),
+      },
     });
     const service = TestBed.inject(NotificationPushService);
     await expect(service.existingSubscription()).resolves.toEqual({
       endpoint: subscription.endpoint,
-      label: notificationDeviceLabel(navigator.userAgent, navigator.maxTouchPoints),
+      label: notificationDeviceLabel(
+        navigator.userAgent,
+        navigator.maxTouchPoints,
+      ),
       keys: { p256dh: 'AQID', auth: 'BAUG' },
     });
     expect(requestSubscription).not.toHaveBeenCalled();

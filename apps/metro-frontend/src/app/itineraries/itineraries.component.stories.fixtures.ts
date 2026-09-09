@@ -1,12 +1,28 @@
-import type { OperationalNotice, BusNoticesResult } from '../map-main/components/bus-information/bus-information.service';
-import type { TypesenseRoute, TypesenseSearchResult } from '../search/typesense-search.service';
+import type {
+  OperationalNotice,
+  BusNoticesResult,
+} from '../map-main/components/bus-information/bus-information.service';
+import type {
+  TypesenseRoute,
+  TypesenseSearchResult,
+} from '../search/typesense-search.service';
 import type { PublishedRouteInformation } from '@metro/shared/bus-itinerary-contracts';
 import type { ItineraryPattern, RouteItinerary } from './itineraries.service';
 
-function scheduledTimes(start: number, end: number, interval: number): string[] {
-  const minutes = Array.from({ length: Math.floor((end - start) / interval) + 1 }, (_, index) => start + index * interval);
+function scheduledTimes(
+  start: number,
+  end: number,
+  interval: number,
+): string[] {
+  const minutes = Array.from(
+    { length: Math.floor((end - start) / interval) + 1 },
+    (_, index) => start + index * interval,
+  );
   if (minutes[minutes.length - 1] !== end) minutes.push(end);
-  return minutes.map((time) => `${String(Math.floor(time / 60)).padStart(2, '0')}:${String(time % 60).padStart(2, '0')}:00`);
+  return minutes.map(
+    (time) =>
+      `${String(Math.floor(time / 60)).padStart(2, '0')}:${String(time % 60).padStart(2, '0')}:00`,
+  );
 }
 
 function stops(
@@ -201,7 +217,13 @@ export const SPTRANS_PUBLISHED: PublishedRouteInformation = {
           startTime: '04:30:00',
           endTime: '25:10:00',
           streets: [
-            { name: 'Av. Paulista', number: '1000', notices: ['Exemplo: embarque temporariamente transferido para a próxima quadra durante o evento. Confira o período no aviso da linha.'] },
+            {
+              name: 'Av. Paulista',
+              number: '1000',
+              notices: [
+                'Exemplo: embarque temporariamente transferido para a próxima quadra durante o evento. Confira o período no aviso da linha.',
+              ],
+            },
             { name: 'Av. Rebouças', number: '2500' },
           ],
           travelTimes: [

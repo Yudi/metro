@@ -15,8 +15,16 @@ import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
-import { AuthService, authReady, firebaseIdToken, firebaseUser } from '@metro/shared/firebase';
-import { NotificationApiError, NotificationApiService } from '@metro/shared/api';
+import {
+  AuthService,
+  authReady,
+  firebaseIdToken,
+  firebaseUser,
+} from '@metro/shared/firebase';
+import {
+  NotificationApiError,
+  NotificationApiService,
+} from '@metro/shared/api';
 import type {
   NotificationConfiguration,
   NotificationConfigurationDelta,
@@ -104,12 +112,14 @@ export class NotificationsComponent {
   readonly devices = computed(() => this.configuration()?.devices ?? []);
   readonly currentDevice = computed(() => {
     const id = this.deviceId();
-    return id ? this.devices().find((device) => device.id === id) ?? null : null;
+    return id
+      ? (this.devices().find((device) => device.id === id) ?? null)
+      : null;
   });
   readonly editingTrigger = computed(() => {
     const id = this.editingTriggerId();
     return id && id !== 'new'
-      ? this.triggers().find((trigger) => trigger.id === id) ?? null
+      ? (this.triggers().find((trigger) => trigger.id === id) ?? null)
       : null;
   });
   readonly canEditTriggers = computed(
@@ -422,11 +432,16 @@ export class NotificationsComponent {
       this.pushError.set(null);
     } catch (error: unknown) {
       if (this.isCurrentSession(uid, generation)) {
-        if (error instanceof NotificationApiError && /outra conta|another account/i.test(error.message)) {
+        if (
+          error instanceof NotificationApiError &&
+          /outra conta|another account/i.test(error.message)
+        ) {
           try {
             await this.pushService.unsubscribe();
             if (this.isCurrentSession(uid, generation)) {
-              this.pushError.set('A assinatura anterior deste navegador foi desativada. Toque em Ativar notificações novamente para vincular esta conta.');
+              this.pushError.set(
+                'A assinatura anterior deste navegador foi desativada. Toque em Ativar notificações novamente para vincular esta conta.',
+              );
             }
             return;
           } catch {
@@ -446,11 +461,7 @@ export class NotificationsComponent {
   async removeDevice(device: NotificationDevice): Promise<void> {
     const uid = this.sessionUid;
     const generation = this.sessionGeneration;
-    if (
-      !uid ||
-      !this.isCurrentSession(uid, generation) ||
-      this.pushBusy()
-    ) {
+    if (!uid || !this.isCurrentSession(uid, generation) || this.pushBusy()) {
       return;
     }
 
@@ -597,7 +608,9 @@ export class NotificationsComponent {
       });
   }
 
-  private handleRealtimeEvent(event: NotificationConfigurationRealtimeEvent): void {
+  private handleRealtimeEvent(
+    event: NotificationConfigurationRealtimeEvent,
+  ): void {
     const uid = this.sessionUid;
     const generation = this.sessionGeneration;
     if (!uid || !this.isCurrentSession(uid, generation)) {
@@ -654,7 +667,9 @@ export class NotificationsComponent {
 
     const currentTriggers = current?.triggers ?? [];
     const currentDevices = current?.devices ?? [];
-    const incomingTriggerIds = new Set(incoming.triggers.map((trigger) => trigger.id));
+    const incomingTriggerIds = new Set(
+      incoming.triggers.map((trigger) => trigger.id),
+    );
     const triggers = incoming.triggers
       .filter((trigger) => !this.triggerTombstones.has(trigger.id))
       .map((trigger) => {
@@ -676,7 +691,9 @@ export class NotificationsComponent {
       }
     }
 
-    const incomingDeviceIds = new Set(incoming.devices.map((device) => device.id));
+    const incomingDeviceIds = new Set(
+      incoming.devices.map((device) => device.id),
+    );
     const devices = incoming.devices.filter(
       (device) => !this.deviceTombstones.has(device.id),
     );
@@ -699,7 +716,9 @@ export class NotificationsComponent {
       incoming.revision,
     );
     for (const [id, revision] of this.localTriggerUpserts) {
-      const incomingTrigger = incoming.triggers.find((trigger) => trigger.id === id);
+      const incomingTrigger = incoming.triggers.find(
+        (trigger) => trigger.id === id,
+      );
       if (incomingTrigger && incomingTrigger.revision >= revision) {
         this.localTriggerUpserts.delete(id);
       }
@@ -722,7 +741,11 @@ export class NotificationsComponent {
 
   private async backfillDeviceLabel(uid: string): Promise<void> {
     const device = this.currentDevice();
-    if (this.deviceLabelAttempted || !device || !/^(Dispositivo|Este dispositivo)$/iu.test(device.label.trim())) {
+    if (
+      this.deviceLabelAttempted ||
+      !device ||
+      !/^(Dispositivo|Este dispositivo)$/iu.test(device.label.trim())
+    ) {
       return;
     }
     this.deviceLabelAttempted = true;
@@ -730,17 +753,38 @@ export class NotificationsComponent {
     try {
       const input = await this.pushService.existingSubscription();
       const label = input?.label;
-      if (!input || !label || label === 'Dispositivo' || !this.isCurrentSession(uid, generation) || this.deviceId() !== device.id) {
+      if (
+        !input ||
+        !label ||
+        label === 'Dispositivo' ||
+        !this.isCurrentSession(uid, generation) ||
+        this.deviceId() !== device.id
+      ) {
         return;
       }
-      const id = await firstValueFrom(this.api.registerDevice(input).pipe(takeUntilDestroyed(this.destroyRef)));
-      if (!this.isCurrentSession(uid, generation) || id !== device.id || this.deviceId() !== device.id || this.deviceTombstones.has(id)) {
+      const id = await firstValueFrom(
+        this.api
+          .registerDevice(input)
+          .pipe(takeUntilDestroyed(this.destroyRef)),
+      );
+      if (
+        !this.isCurrentSession(uid, generation) ||
+        id !== device.id ||
+        this.deviceId() !== device.id ||
+        this.deviceTombstones.has(id)
+      ) {
         return;
       }
-      this.configuration.update((configuration) => configuration ? {
-        ...configuration,
-        devices: configuration.devices.map((item) => item.id === id ? { ...item, label } : item),
-      } : configuration);
+      this.configuration.update((configuration) =>
+        configuration
+          ? {
+              ...configuration,
+              devices: configuration.devices.map((item) =>
+                item.id === id ? { ...item, label } : item,
+              ),
+            }
+          : configuration,
+      );
     } catch {
       // Label enrichment is optional; keep the existing authorization usable
       // when its subscription cannot be read or refreshed.
@@ -923,9 +967,15 @@ export class NotificationsComponent {
     this.operationError.set(this.getErrorMessage(error));
   }
 
-  private closeEditorWhenRemoved(configuration: NotificationConfiguration): void {
+  private closeEditorWhenRemoved(
+    configuration: NotificationConfiguration,
+  ): void {
     const id = this.editingTriggerId();
-    if (id && id !== 'new' && !configuration.triggers.some((trigger) => trigger.id === id)) {
+    if (
+      id &&
+      id !== 'new' &&
+      !configuration.triggers.some((trigger) => trigger.id === id)
+    ) {
       this.editingTriggerId.set(null);
       this.operationError.set(
         'Este aviso não está mais disponível nesta conta e foi fechado.',
@@ -938,7 +988,10 @@ export class NotificationsComponent {
     configuration: NotificationConfiguration,
   ): void {
     const storedId = this.deviceId() ?? this.readStoredDeviceId(uid);
-    if (storedId && configuration.devices.some((device) => device.id === storedId)) {
+    if (
+      storedId &&
+      configuration.devices.some((device) => device.id === storedId)
+    ) {
       this.deviceId.set(storedId);
       return;
     }

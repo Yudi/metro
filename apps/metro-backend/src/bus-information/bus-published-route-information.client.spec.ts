@@ -20,7 +20,9 @@ const published = {
           id: 'outbound',
           headsign: 'Praça da Sé',
           departures: ['06:00:00'],
-          streets: [{ name: 'Rua Exemplo', number: '100', notices: ['Obra na via'] }],
+          streets: [
+            { name: 'Rua Exemplo', number: '100', notices: ['Obra na via'] },
+          ],
           travelTimes: [{ period: 'morning', minutes: 45 }],
           startTime: '05:00:00',
           endTime: '23:00:00',
@@ -52,9 +54,8 @@ describe('BusPublishedRouteInformationClient', () => {
     const client = new BusPublishedRouteInformationClient(
       config as unknown as ConfigService,
     );
-    const transport = (
-      client as unknown as { client: FakeBusItineraryClient }
-    ).client;
+    const transport = (client as unknown as { client: FakeBusItineraryClient })
+      .client;
     transport.getPublishedRouteInformation.mockImplementation(
       (_request, _options, callback) => callback(null, published),
     );
@@ -74,9 +75,8 @@ describe('BusPublishedRouteInformationClient', () => {
     const client = new BusPublishedRouteInformationClient(
       config as unknown as ConfigService,
     );
-    const transport = (
-      client as unknown as { client: FakeBusItineraryClient }
-    ).client;
+    const transport = (client as unknown as { client: FakeBusItineraryClient })
+      .client;
     transport.getPublishedRouteInformation.mockImplementation(
       (_request, _options, callback) =>
         callback(null, {
@@ -94,19 +94,16 @@ describe('BusPublishedRouteInformationClient', () => {
   });
 
   it('fails closed for an unavailable gRPC response', async () => {
-    const client = new BusPublishedRouteInformationClient(
-      { get: jest.fn().mockReturnValue('rail-private:50051') } as unknown as ConfigService,
-    );
-    const transport = (
-      client as unknown as { client: FakeBusItineraryClient }
-    ).client;
+    const client = new BusPublishedRouteInformationClient({
+      get: jest.fn().mockReturnValue('rail-private:50051'),
+    } as unknown as ConfigService);
+    const transport = (client as unknown as { client: FakeBusItineraryClient })
+      .client;
     transport.getPublishedRouteInformation.mockImplementation(
       (_request, _options, callback) =>
         callback(Object.assign(new Error('connection refused'), { code: 14 })),
     );
 
-    await expect(client.fetch('477A-10')).rejects.toThrow(
-      'connection refused',
-    );
+    await expect(client.fetch('477A-10')).rejects.toThrow('connection refused');
   });
 });

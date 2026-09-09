@@ -58,7 +58,10 @@ describe('NotificationsGateway', () => {
   function client(token?: string): {
     connected: boolean;
     data: Record<string, unknown>;
-    handshake: { auth: Record<string, unknown>; headers: Record<string, string> };
+    handshake: {
+      auth: Record<string, unknown>;
+      headers: Record<string, string>;
+    };
     join: jest.Mock;
     emit: jest.Mock;
     disconnect: jest.Mock;
@@ -114,7 +117,10 @@ describe('NotificationsGateway', () => {
     const socket = client('signed-token');
     await gateway.handleConnection(socket as never);
     socket.emit.mockClear();
-    settings.getConfiguration.mockResolvedValueOnce({ ...configuration, revision: 4 });
+    settings.getConfiguration.mockResolvedValueOnce({
+      ...configuration,
+      revision: 4,
+    });
 
     await gateway.handleResync(socket as never, { userId: 'other-account' });
 
@@ -128,13 +134,22 @@ describe('NotificationsGateway', () => {
   it('resynchronizes connected clients after Redis subscriber recovery', async () => {
     const first = client('signed-token');
     const second = client('signed-token');
-    (gateway.server.sockets as unknown as Map<string, unknown>).set('one', first);
-    (gateway.server.sockets as unknown as Map<string, unknown>).set('two', second);
+    (gateway.server.sockets as unknown as Map<string, unknown>).set(
+      'one',
+      first,
+    );
+    (gateway.server.sockets as unknown as Map<string, unknown>).set(
+      'two',
+      second,
+    );
     await gateway.handleConnection(first as never);
     await gateway.handleConnection(second as never);
     first.emit.mockClear();
     second.emit.mockClear();
-    settings.getConfiguration.mockResolvedValue({ ...configuration, revision: 5 });
+    settings.getConfiguration.mockResolvedValue({
+      ...configuration,
+      revision: 5,
+    });
 
     onTransportReset?.();
     await new Promise((resolve) => setImmediate(resolve));
@@ -152,7 +167,9 @@ describe('NotificationsGateway', () => {
   it('disconnects only this namespace on token expiry or snapshot failure', async () => {
     jest.useFakeTimers();
     const exp = Math.floor(Date.now() / 1000) + 1;
-    const payload = Buffer.from(JSON.stringify({ exp }), 'utf8').toString('base64url');
+    const payload = Buffer.from(JSON.stringify({ exp }), 'utf8').toString(
+      'base64url',
+    );
     const socket = client(`header.${payload}.signature`);
     await gateway.handleConnection(socket as never);
     jest.advanceTimersByTime(2_000);

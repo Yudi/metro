@@ -18,6 +18,8 @@ export default {
     '^@metro/shared/utils$': '<rootDir>/../../libs/shared/utils/src/index.ts',
   },
   moduleFileExtensions: ['ts', 'js', 'html'],
-  testMatch: ['<rootDir>/src/notifications/notification-persistence.integration.spec.ts'],
+  testMatch: [
+    '<rootDir>/src/notifications/notification-persistence.integration.spec.ts',
+  ],
   testTimeout: 30_000,
 };

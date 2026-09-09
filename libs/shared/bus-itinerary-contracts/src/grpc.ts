@@ -13,13 +13,27 @@ export function loadBusItineraryGrpcDefinition(additionalRoots: string[] = []) {
     join(process.cwd(), 'src/assets/grpc'),
     join(process.cwd(), 'libs/shared/bus-itinerary-contracts/src/assets/grpc'),
   ];
-  const path = roots.map((root) => join(root, 'bus-itinerary.proto')).find(existsSync);
+  const path = roots
+    .map((root) => join(root, 'bus-itinerary.proto'))
+    .find(existsSync);
   if (!path) throw new Error('Bus itinerary transport definition not found');
-  const loaded = loadPackageDefinition(loadSync(path, {
-    defaults: true, enums: String, keepCase: false, longs: Number, oneofs: false,
-  }));
+  const loaded = loadPackageDefinition(
+    loadSync(path, {
+      defaults: true,
+      enums: String,
+      keepCase: false,
+      longs: Number,
+      oneofs: false,
+    }),
+  );
   let value: unknown = loaded;
-  for (const key of ['metro', 'bus', 'itinerary', 'v1', 'BusItineraryService']) {
+  for (const key of [
+    'metro',
+    'bus',
+    'itinerary',
+    'v1',
+    'BusItineraryService',
+  ]) {
     if (!value || typeof value !== 'object' || !(key in value)) {
       throw new Error('Invalid bus itinerary transport definition');
     }

@@ -60,10 +60,17 @@ export function validatePublicEnvironment(
   const vapidPrivate = optionalString(input['VAPID_PRIVATE_KEY']);
   const vapidSubject = optionalString(input['VAPID_SUBJECT']);
   if (vapidPublic || vapidPrivate || vapidSubject) {
-    if (!vapidPublic || !vapidPrivate || !vapidSubject ||
-      !/^[A-Za-z0-9_-]{87}$/.test(vapidPublic) || !/^[A-Za-z0-9_-]{43}$/.test(vapidPrivate) ||
-      !/^(mailto:[^\s@]+@[^\s@]+|https:\/\/[^\s]+)$/.test(vapidSubject)) {
-      throw new Error('Configure VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY and VAPID_SUBJECT together with valid Web Push keys and a mailto: or HTTPS contact.');
+    if (
+      !vapidPublic ||
+      !vapidPrivate ||
+      !vapidSubject ||
+      !/^[A-Za-z0-9_-]{87}$/.test(vapidPublic) ||
+      !/^[A-Za-z0-9_-]{43}$/.test(vapidPrivate) ||
+      !/^(mailto:[^\s@]+@[^\s@]+|https:\/\/[^\s]+)$/.test(vapidSubject)
+    ) {
+      throw new Error(
+        'Configure VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY and VAPID_SUBJECT together with valid Web Push keys and a mailto: or HTTPS contact.',
+      );
     }
     environment.VAPID_PUBLIC_KEY = vapidPublic;
     environment.VAPID_PRIVATE_KEY = vapidPrivate;

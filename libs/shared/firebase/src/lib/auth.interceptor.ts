@@ -11,7 +11,8 @@ export function createFirebaseAuthInterceptor(
 
     const requestUrl = req.url.split(/[?#]/, 1)[0];
     const isApiRequest = baseUrls.some(
-      (baseUrl) => requestUrl === baseUrl || requestUrl.startsWith(`${baseUrl}/`),
+      (baseUrl) =>
+        requestUrl === baseUrl || requestUrl.startsWith(`${baseUrl}/`),
     );
 
     if (!token || !isApiRequest) {

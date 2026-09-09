@@ -14,8 +14,7 @@ import type {
   NotificationTrigger,
 } from '@metro/shared/notification-contracts';
 
-const NOTIFICATION_CONFIGURATION_CHANNEL =
-  'metro:notifications:configuration';
+const NOTIFICATION_CONFIGURATION_CHANNEL = 'metro:notifications:configuration';
 const NOTIFICATION_REVISION_KEY_PREFIX = 'metro:notifications:revision:';
 
 // Assigning the version and publishing the message in one Redis script keeps
@@ -64,8 +63,7 @@ export class NotificationRealtimeService
   private closed = false;
 
   constructor(private readonly config: ConfigService) {
-    this.distributedTransport =
-      Boolean(this.config.get('REDIS_URL'));
+    this.distributedTransport = Boolean(this.config.get('REDIS_URL'));
   }
 
   onModuleInit(): void {
@@ -189,7 +187,10 @@ export class NotificationRealtimeService
           userId: normalizedUserId,
           event: {
             type: 'delta',
-            delta: { ...input, revision: 0 } as NotificationRealtimeEnvelope['event']['delta'],
+            delta: {
+              ...input,
+              revision: 0,
+            } as NotificationRealtimeEnvelope['event']['delta'],
           },
         };
         const result = await this.publisher.eval(
@@ -214,7 +215,10 @@ export class NotificationRealtimeService
     this.rememberRevision(normalizedUserId, revision);
     const event: NotificationConfigurationDeltaEvent = {
       type: 'delta',
-      delta: { ...input, revision } as NotificationRealtimeEnvelope['event']['delta'],
+      delta: {
+        ...input,
+        revision,
+      } as NotificationRealtimeEnvelope['event']['delta'],
     };
     this.notify(normalizedUserId, event);
     return revision;

@@ -8,11 +8,15 @@
   "targets": {
     "notifications": {
       "executor": "nx:run-commands",
-      "options": { "command": "bun x playwright test --config apps/metro-frontend-e2e/notifications.playwright.config.ts" }
+      "options": {
+        "command": "bun x playwright test --config apps/metro-frontend-e2e/notifications.playwright.config.ts"
+      }
     },
     "notification-stories": {
       "executor": "nx:run-commands",
-      "options": { "command": "bun x playwright test --config apps/metro-frontend-e2e/notifications-storybook.playwright.config.ts" }
+      "options": {
+        "command": "bun x playwright test --config apps/metro-frontend-e2e/notifications-storybook.playwright.config.ts"
+      }
     }
   }
 }

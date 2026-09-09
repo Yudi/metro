@@ -120,7 +120,9 @@ describe('NotificationTriggerEditorComponent', () => {
     component.selectedTargets.set([selectedLine]);
     component.form.controls.targetIds.setValue([selectedLine.id]);
 
-    component.onTargetSearch({ target: { value: 'linha' } } as unknown as Event);
+    component.onTargetSearch({
+      target: { value: 'linha' },
+    } as unknown as Event);
     jest.advanceTimersByTime(250);
     expect(component.targetResults()).toEqual([]);
 
@@ -164,7 +166,10 @@ describe('NotificationTriggerEditorComponent', () => {
 
   it('searches identical text again after changing target kind', () => {
     jest.useFakeTimers();
-    const search = () => component.onTargetSearch({ target: { value: 'Pinheiros' } } as unknown as Event);
+    const search = () =>
+      component.onTargetSearch({
+        target: { value: 'Pinheiros' },
+      } as unknown as Event);
     search();
     jest.advanceTimersByTime(250);
     expect(getTargets).toHaveBeenLastCalledWith('rail_line', 'Pinheiros');
@@ -180,7 +185,9 @@ describe('NotificationTriggerEditorComponent', () => {
     jest.useFakeTimers();
     const oldResults = new Subject<NotificationTarget[]>();
     getTargets.mockReturnValue(oldResults);
-    component.onTargetSearch({ target: { value: 'Pinheiros' } } as unknown as Event);
+    component.onTargetSearch({
+      target: { value: 'Pinheiros' },
+    } as unknown as Event);
     jest.advanceTimersByTime(250);
     expect(oldResults.observed).toBe(true);
 

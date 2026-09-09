@@ -89,7 +89,7 @@ export class SearchBusStop implements SearchResult {
   @Field(() => Float) stop_lat!: number;
   @Field(() => Float) stop_lon!: number;
 
-  // full route objects (optional — resolved via ResolveField)
+  // full route objects (optional - resolved via ResolveField)
   @Field(() => [SearchBusRoute], {
     description: 'Resolved route objects (use ResolveField to populate)',
   })

@@ -40,7 +40,10 @@
                   </span>
                 </div>
                 @if (!compact() && line.qv > 0) {
-                  <span class="vehicle-count">{{ line.qv }} {{ line.qv === 1 ? 'veículo' : 'veículos' }}</span>
+                  <span class="vehicle-count"
+                    >{{ line.qv }}
+                    {{ line.qv === 1 ? "veículo" : "veículos" }}</span
+                  >
                 }
               </div>
 

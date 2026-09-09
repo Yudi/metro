@@ -102,7 +102,8 @@ describe('NotificationSettingsService', () => {
       },
     };
     prisma.$transaction.mockImplementation(
-      async (callback: (transaction: MockPrisma) => unknown) => callback(prisma),
+      async (callback: (transaction: MockPrisma) => unknown) =>
+        callback(prisma),
     );
     targets = { search: jest.fn().mockResolvedValue([]) };
     service = new NotificationSettingsService(
@@ -162,22 +163,29 @@ describe('NotificationSettingsService', () => {
       ],
     });
 
-    await expect(service.saveTrigger('user-id', paused)).resolves.toMatchObject({
-      id: triggerId,
-      targets: [{ id: targetId, available: false }],
-    });
+    await expect(service.saveTrigger('user-id', paused)).resolves.toMatchObject(
+      {
+        id: triggerId,
+        targets: [{ id: targetId, available: false }],
+      },
+    );
   });
 
   it('allows the 500th trigger', async () => {
     prisma.notificationTrigger.count.mockResolvedValueOnce(499);
-    prisma.notificationTrigger.create.mockResolvedValueOnce({ id: triggerId, revision: 0, config: triggerInput, targets: [] });
-    await expect(service.saveTrigger('user-id', triggerInput)).resolves.toMatchObject({ id: triggerId });
+    prisma.notificationTrigger.create.mockResolvedValueOnce({
+      id: triggerId,
+      revision: 0,
+      config: triggerInput,
+      targets: [],
+    });
+    await expect(
+      service.saveTrigger('user-id', triggerInput),
+    ).resolves.toMatchObject({ id: triggerId });
   });
 
   it('enforces the trigger cap after locking the account row', async () => {
-    prisma.notificationTrigger.count.mockResolvedValueOnce(
-      500,
-    );
+    prisma.notificationTrigger.count.mockResolvedValueOnce(500);
 
     await expect(service.saveTrigger('user-id', triggerInput)).rejects.toThrow(
       `até ${MAX_NOTIFICATION_TRIGGERS_PER_USER}`,
@@ -252,8 +260,12 @@ describe('NotificationSettingsService', () => {
   });
 
   it('validates push service hosts and standard key lengths before persistence', async () => {
-    expect(parsePushEndpoint('https://FCM.GOOGLEAPIS.COM:443/send/token')).toBe('https://fcm.googleapis.com/send/token');
-    expect(() => parsePushEndpoint('https://fcm.googleapis.com/send/token#duplicate')).toThrow();
+    expect(parsePushEndpoint('https://FCM.GOOGLEAPIS.COM:443/send/token')).toBe(
+      'https://fcm.googleapis.com/send/token',
+    );
+    expect(() =>
+      parsePushEndpoint('https://fcm.googleapis.com/send/token#duplicate'),
+    ).toThrow();
     expect(() => parsePushEndpoint('http://fcm.googleapis.com/send')).toThrow(
       'serviço de notificações HTTPS reconhecido',
     );
@@ -432,7 +444,16 @@ describe('NotificationSettingsService', () => {
       id: triggerId,
       revision: 0,
       config: triggerInput,
-      targets: [{ target: { id: targetId, kind: 'rail_line', label: 'Linha 1-Azul', available: true } }],
+      targets: [
+        {
+          target: {
+            id: targetId,
+            kind: 'rail_line',
+            label: 'Linha 1-Azul',
+            available: true,
+          },
+        },
+      ],
     });
 
     await withRealtime.saveTrigger('user-id', triggerInput);

@@ -37,4 +37,3 @@ describe('bus route itinerary GraphQL contract', () => {
     }
   });
 });
-

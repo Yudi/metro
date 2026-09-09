@@ -19,7 +19,10 @@ import { HeadwayTrackingService } from '../next-train/headway/headway-tracking.s
 import { NextTrainResolver } from '../next-train/next-train.resolver';
 import { BusNoticeService } from '../bus-information/bus-notice.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { notificationHash, type NotificationSnapshot } from './notification-message';
+import {
+  notificationHash,
+  type NotificationSnapshot,
+} from './notification-message';
 import {
   asSnapshotArray,
   boundsAround,
@@ -183,15 +186,23 @@ export class NotificationSnapshotService {
       case 'rail_status':
         return this.readRailStatus(descriptor, now).then(asSnapshotArray);
       case 'rail_headway':
-        return this.readRailHeadway(target, descriptor, now).then(asSnapshotArray);
+        return this.readRailHeadway(target, descriptor, now).then(
+          asSnapshotArray,
+        );
       case 'rail_arrivals':
-        return this.readRailArrivals(target, descriptor, now).then(asSnapshotArray);
+        return this.readRailArrivals(target, descriptor, now).then(
+          asSnapshotArray,
+        );
       case 'bus_arrivals':
-        return this.readBusArrivals(target, descriptor, now).then(asSnapshotArray);
+        return this.readBusArrivals(target, descriptor, now).then(
+          asSnapshotArray,
+        );
       case 'bus_notices':
         return this.readBusNoticesMany(descriptor, now);
       case 'special_departures':
-        return this.readSpecialDepartures(descriptor, now).then(asSnapshotArray);
+        return this.readSpecialDepartures(descriptor, now).then(
+          asSnapshotArray,
+        );
       default:
         return Promise.resolve([]);
     }
@@ -266,11 +277,17 @@ export class NotificationSnapshotService {
     }
 
     const line = getRailLineByCode(Number(lineCode.slice(1)));
-    const station = line?.stations.find((candidate) => candidate.code === stationCode);
+    const station = line?.stations.find(
+      (candidate) => candidate.code === stationCode,
+    );
     if (!station) return null;
 
     const headway = await this.headway.getHeadway(lineCode, stationCode);
-    if (!headway || headway.lineCode !== lineCode || headway.stationCode !== stationCode) {
+    if (
+      !headway ||
+      headway.lineCode !== lineCode ||
+      headway.stationCode !== stationCode
+    ) {
       return null;
     }
 
@@ -299,9 +316,10 @@ export class NotificationSnapshotService {
         isFallback: direction.isFallback ?? false,
       }))
       .filter((direction) => direction.direction.length > 0)
-      .sort((a, b) =>
-        a.direction.localeCompare(b.direction) ||
-        a.averageSeconds - b.averageSeconds,
+      .sort(
+        (a, b) =>
+          a.direction.localeCompare(b.direction) ||
+          a.averageSeconds - b.averageSeconds,
       );
     if (!directions.length) return null;
 
@@ -314,7 +332,12 @@ export class NotificationSnapshotService {
           )} min`,
       )
       .join(' · ');
-    const semantic = { kind: 'rail_headway', lineCode, stationCode, directions };
+    const semantic = {
+      kind: 'rail_headway',
+      lineCode,
+      stationCode,
+      directions,
+    };
 
     return {
       title: `Intervalo médio · ${station.name}`,
@@ -372,9 +395,10 @@ export class NotificationSnapshotService {
         arrivalTime: train.arrivalTime.trim(),
         isAtPlatform: train.isAtPlatform === true,
         // Anchor platform expiry to the observation, including cached reads.
-        expectedAt: train.isAtPlatform === true
-          ? fetchedAt + 30_000
-          : parseArrivalPrediction(train.arrivalTime, now),
+        expectedAt:
+          train.isAtPlatform === true
+            ? fetchedAt + 30_000
+            : parseArrivalPrediction(train.arrivalTime, now),
       }))
       .filter(
         (train) =>
@@ -469,7 +493,9 @@ export class NotificationSnapshotService {
           destination: destination.trim(),
           time: vehicle.t?.trim() ?? '',
         }))
-        .filter((arrival) => arrival.route && arrival.destination && arrival.time);
+        .filter(
+          (arrival) => arrival.route && arrival.destination && arrival.time,
+        );
     });
     if (!arrivals.length) return null;
 
@@ -558,32 +584,36 @@ export class NotificationSnapshotService {
           .sort(),
       }))
       .filter((notice) => notice.title && notice.description)
-      .sort((a, b) =>
-        a.title.localeCompare(b.title) || a.description.localeCompare(b.description),
+      .sort(
+        (a, b) =>
+          a.title.localeCompare(b.title) ||
+          a.description.localeCompare(b.description),
       );
     if (!notices.length) return [];
 
     const snapshots = notices.map((notice) => ({
-        title: notice.title,
-        body: notice.description,
-        // Source IDs, listed dates, collection timestamps, selected route, and
-        // list ordering are intentionally absent from the semantic event.
-        fingerprint: notificationHash(
-          stableJson({
-            kind: 'bus_notice',
-            title: normalizeSemanticText(notice.title),
-            description: normalizeSemanticText(notice.description),
-            periodText: normalizeSemanticText(notice.periodText),
-            routes: notice.routes,
-          }),
-        ),
-        important: true,
-        normal: false,
-        observedAt: new Date(observedAt),
-        url: '/',
-      }));
+      title: notice.title,
+      body: notice.description,
+      // Source IDs, listed dates, collection timestamps, selected route, and
+      // list ordering are intentionally absent from the semantic event.
+      fingerprint: notificationHash(
+        stableJson({
+          kind: 'bus_notice',
+          title: normalizeSemanticText(notice.title),
+          description: normalizeSemanticText(notice.description),
+          periodText: normalizeSemanticText(notice.periodText),
+          routes: notice.routes,
+        }),
+      ),
+      important: true,
+      normal: false,
+      observedAt: new Date(observedAt),
+      url: '/',
+    }));
     return Array.from(
-      new Map(snapshots.map((snapshot) => [snapshot.fingerprint, snapshot])).values(),
+      new Map(
+        snapshots.map((snapshot) => [snapshot.fingerprint, snapshot]),
+      ).values(),
     );
   }
 
@@ -596,30 +626,50 @@ export class NotificationSnapshotService {
 
     const lines = await this.specialRail.getSpecialLinesStatus();
     const line = lines.find((candidate) => candidate.code === code);
-    if (!line || UNKNOWN_RAIL_STATUSES.has(line.statusCode) || !line.nextDepartures.length) {
+    if (
+      !line ||
+      UNKNOWN_RAIL_STATUSES.has(line.statusCode) ||
+      !line.nextDepartures.length
+    ) {
       return null;
     }
 
     const departures = line.nextDepartures
-      .map((departure) => ({ label: departure.label.trim(), time: departure.time.trim() }))
-      .filter((departure) => departure.label && /^\d{2}:[0-5]\d$/.test(departure.time));
+      .map((departure) => ({
+        label: departure.label.trim(),
+        time: departure.time.trim(),
+      }))
+      .filter(
+        (departure) =>
+          departure.label && /^\d{2}:[0-5]\d$/.test(departure.time),
+      );
     if (!departures.length) return null;
     const issues = line.issues
-      .map((issue) => ({ code: issue.code, line: issue.line.trim(), description: issue.description.trim() }))
+      .map((issue) => ({
+        code: issue.code,
+        line: issue.line.trim(),
+        description: issue.description.trim(),
+      }))
       .filter((issue) => issue.line && issue.description)
-      .sort((a, b) => a.code - b.code || a.description.localeCompare(b.description));
+      .sort(
+        (a, b) => a.code - b.code || a.description.localeCompare(b.description),
+      );
     const normal = line.statusCode === 'OperacaoNormal';
 
     return {
       title: line.line,
-      body: departures.map((departure) => `${departure.label}: ${departure.time}`).join(' · '),
-      fingerprint: notificationHash(stableJson({
-        kind: 'special_departures',
-        code,
-        statusCode: line.statusCode,
-        departures,
-        issues,
-      })),
+      body: departures
+        .map((departure) => `${departure.label}: ${departure.time}`)
+        .join(' · '),
+      fingerprint: notificationHash(
+        stableJson({
+          kind: 'special_departures',
+          code,
+          statusCode: line.statusCode,
+          departures,
+          issues,
+        }),
+      ),
       important: !BENIGN_RAIL_STATUSES.has(line.statusCode),
       normal,
       observedAt: now,
@@ -641,7 +691,10 @@ export class NotificationSnapshotService {
     );
     let candidates: BusStopCandidate[];
     try {
-      candidates = (await this.geography.searchBusStops({ bounds, limit: 100 })) as BusStopCandidate[];
+      candidates = (await this.geography.searchBusStops({
+        bounds,
+        limit: 100,
+      })) as BusStopCandidate[];
     } catch {
       return { candidate: null, authoritative: false };
     }
@@ -673,9 +726,14 @@ export class NotificationSnapshotService {
             normalizeSemanticText(candidate.description ?? '') ===
               expectedDescription) &&
           (!expectedPlatform ||
-            normalizeSemanticText(candidate.platformCode ?? '') === expectedPlatform),
+            normalizeSemanticText(candidate.platformCode ?? '') ===
+              expectedPlatform),
       )
-      .sort((a, b) => a.distance - b.distance || a.candidate.stopId.localeCompare(b.candidate.stopId));
+      .sort(
+        (a, b) =>
+          a.distance - b.distance ||
+          a.candidate.stopId.localeCompare(b.candidate.stopId),
+      );
     // A semantic target must resolve to exactly one current source stop. A
     // nearest lexical tie-break could silently move a notification to the
     // wrong boarding point after a feed refresh.
@@ -744,7 +802,9 @@ export class NotificationSnapshotService {
 
   private readRouteName(value: unknown): string | null {
     const routeName = this.readNonEmptyText(value)?.toUpperCase();
-    return routeName && /^[0-9A-Z]{4}-\d{2}$/.test(routeName) ? routeName : null;
+    return routeName && /^[0-9A-Z]{4}-\d{2}$/.test(routeName)
+      ? routeName
+      : null;
   }
 
   private readCode(value: unknown): string | null {
@@ -760,7 +820,9 @@ export class NotificationSnapshotService {
 
   private readDescription(value: unknown): string | null {
     if (value === undefined || value === null) return null;
-    return typeof value === 'string' && value.length <= 2_000 ? value.trim() : null;
+    return typeof value === 'string' && value.length <= 2_000
+      ? value.trim()
+      : null;
   }
 
   private readFiniteNumber(value: unknown): number | null {

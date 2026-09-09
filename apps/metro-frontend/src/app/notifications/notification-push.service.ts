@@ -1,11 +1,5 @@
 import { isPlatformBrowser } from '@angular/common';
-import {
-  computed,
-  PLATFORM_ID,
-  Service,
-  inject,
-  signal,
-} from '@angular/core';
+import { computed, PLATFORM_ID, Service, inject, signal } from '@angular/core';
 import { SwPush } from '@angular/service-worker';
 import { firstValueFrom, take } from 'rxjs';
 import type { NotificationPushInput } from '@metro/shared/notification-contracts';
@@ -37,9 +31,7 @@ export class NotificationPushService {
     this._permission.set(this.readPermission());
   }
 
-  async requestSubscription(
-    publicKey: string,
-  ): Promise<NotificationPushInput> {
+  async requestSubscription(publicKey: string): Promise<NotificationPushInput> {
     if (!this.supported() || !this.swPush) {
       throw new Error('Este navegador não oferece notificações push.');
     }
@@ -56,11 +48,15 @@ export class NotificationPushService {
     if (!isPlatformBrowser(this.platformId) || !this.swPush?.isEnabled) {
       return null;
     }
-    const subscription = await firstValueFrom(this.swPush.subscription.pipe(take(1)));
+    const subscription = await firstValueFrom(
+      this.swPush.subscription.pipe(take(1)),
+    );
     return subscription ? this.subscriptionInput(subscription) : null;
   }
 
-  private subscriptionInput(subscription: PushSubscription): NotificationPushInput {
+  private subscriptionInput(
+    subscription: PushSubscription,
+  ): NotificationPushInput {
     const p256dh = subscription.getKey('p256dh');
     const auth = subscription.getKey('auth');
 
@@ -70,7 +66,10 @@ export class NotificationPushService {
 
     return {
       endpoint: subscription.endpoint,
-      label: notificationDeviceLabel(navigator.userAgent, navigator.maxTouchPoints),
+      label: notificationDeviceLabel(
+        navigator.userAgent,
+        navigator.maxTouchPoints,
+      ),
       keys: {
         p256dh: encodeBase64Url(p256dh),
         auth: encodeBase64Url(auth),
@@ -125,5 +124,8 @@ function encodeBase64Url(value: ArrayBuffer): string {
     binary += String.fromCharCode(byte);
   }
 
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/u, '');
+  return btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/u, '');
 }

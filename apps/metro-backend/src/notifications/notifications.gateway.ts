@@ -58,8 +58,8 @@ export class NotificationsGateway
     private readonly settings: NotificationSettingsService,
     private readonly realtime: NotificationRealtimeService,
   ) {
-    this.removeRealtimeListener = this.realtime.onEvent(
-      (userId, event) => this.broadcastDelta(userId, event),
+    this.removeRealtimeListener = this.realtime.onEvent((userId, event) =>
+      this.broadcastDelta(userId, event),
     );
     this.removeTransportResetListener = this.realtime.onTransportReset(() => {
       void this.resyncConnectedClients();
@@ -187,7 +187,10 @@ export class NotificationsGateway
     client.disconnect();
   }
 
-  private scheduleTokenExpiry(client: AuthenticatedSocket, token: string): void {
+  private scheduleTokenExpiry(
+    client: AuthenticatedSocket,
+    token: string,
+  ): void {
     const expiresAt = tokenExpiry(token);
     if (expiresAt === null) {
       return;

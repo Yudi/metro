@@ -43,14 +43,8 @@
       <!-- Always show lines immediately using static info, status loads in background -->
       <div class="subway-lines-grid">
         @for (card of stationStatusCards(); track card.code) {
-          <div
-            class="subway-line-card"
-            [class.has-issue]="card.hasIssue"
-          >
-            <div
-              class="line-badge"
-              [style.background-color]="card.colorHex"
-            >
+          <div class="subway-line-card" [class.has-issue]="card.hasIssue">
+            <div class="line-badge" [style.background-color]="card.colorHex">
               {{ card.code }}
             </div>
             <div class="line-details">

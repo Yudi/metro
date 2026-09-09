@@ -88,25 +88,59 @@ describe('NotificationSnapshotService', () => {
   it('expires a current-minute platform observation without renewing cached data', async () => {
     const setup = service();
     setup.nextTrains.getNextTrains.mockResolvedValue({
-      lineCode: 'L10', stationCode: 'LUZ', fetchedAt: NOW,
-      trains: [{ destinationCode: 'RGS', destinationName: 'Rio Grande', arrivalTime: '09:00', isAtPlatform: true }],
+      lineCode: 'L10',
+      stationCode: 'LUZ',
+      fetchedAt: NOW,
+      trains: [
+        {
+          destinationCode: 'RGS',
+          destinationName: 'Rio Grande',
+          arrivalTime: '09:00',
+          isAtPlatform: true,
+        },
+      ],
     });
-    const selection = target('rail_station', { lineCode: 'L10', stationCode: 'LUZ' });
+    const selection = target('rail_station', {
+      lineCode: 'L10',
+      stationCode: 'LUZ',
+    });
     const config: NotificationTriggerInput = {
-      name: 'Arrival', enabled: true, days: [2], windows: [{ start: '09:00', end: '10:00' }],
-      timezone: 'America/Sao_Paulo', smart: false, leadMinutes: 0, intervalMinutes: 5,
-      kind: 'rail_arrivals', targetIds: [selection.id], statusMode: 'all',
+      name: 'Arrival',
+      enabled: true,
+      days: [2],
+      windows: [{ start: '09:00', end: '10:00' }],
+      timezone: 'America/Sao_Paulo',
+      smart: false,
+      leadMinutes: 0,
+      intervalMinutes: 5,
+      kind: 'rail_arrivals',
+      targetIds: [selection.id],
+      statusMode: 'all',
     };
     const snapshot = await setup.service.read('rail_arrivals', selection, NOW);
     expect(snapshot).not.toBeNull();
     if (!snapshot) throw new Error('Missing platform observation');
-    const message = buildNotificationMessage(config, 'trigger', selection.id, snapshot, new Date(NOW.getTime() + 10_000));
+    const message = buildNotificationMessage(
+      config,
+      'trigger',
+      selection.id,
+      snapshot,
+      new Date(NOW.getTime() + 10_000),
+    );
     expect(message?.payload.notification.body).toContain('na plataforma');
     expect(message?.expiresAt.getTime()).toBe(NOW.getTime() + 30_000);
     const later = new Date(NOW.getTime() + 31_000);
     const cached = await setup.service.read('rail_arrivals', selection, later);
     expect(cached).toBe(snapshot);
-    expect(buildNotificationMessage(config, 'trigger', selection.id, snapshot, later)).toBeNull();
+    expect(
+      buildNotificationMessage(
+        config,
+        'trigger',
+        selection.id,
+        snapshot,
+        later,
+      ),
+    ).toBeNull();
   });
   it('parses Sao Paulo clock predictions and bounds late-night rollover', () => {
     const lateEvening = new Date('2026-09-09T01:55:00.000Z');
@@ -152,27 +186,38 @@ describe('NotificationSnapshotService', () => {
   it.each([
     { success: false, errorMessage: undefined },
     { success: true, errorMessage: 'Status antigo' },
-    { success: true, errorMessage: undefined, lastUpdated: new Date(NOW.getTime() - 11 * 60_000) },
-  ])('does not turn unavailable or stale rail state into a notification: %o', async (patch) => {
-    const setup = service();
-    setup.rail.getLinesStatus.mockResolvedValue({
-      lines: [
-        {
-          code: 1,
-          line: 'Linha 1 - Azul',
-          statusCode: 'OperacaoNormal',
-          statusLabel: 'Operação Normal',
-        },
-      ],
-      lastUpdated: patch.lastUpdated ?? NOW,
-      success: patch.success,
-      errorMessage: patch.errorMessage,
-    });
+    {
+      success: true,
+      errorMessage: undefined,
+      lastUpdated: new Date(NOW.getTime() - 11 * 60_000),
+    },
+  ])(
+    'does not turn unavailable or stale rail state into a notification: %o',
+    async (patch) => {
+      const setup = service();
+      setup.rail.getLinesStatus.mockResolvedValue({
+        lines: [
+          {
+            code: 1,
+            line: 'Linha 1 - Azul',
+            statusCode: 'OperacaoNormal',
+            statusLabel: 'Operação Normal',
+          },
+        ],
+        lastUpdated: patch.lastUpdated ?? NOW,
+        success: patch.success,
+        errorMessage: patch.errorMessage,
+      });
 
-    await expect(
-      setup.service.read('rail_status', target('rail_line', { lineCode: 'L1' }), NOW),
-    ).resolves.toBeNull();
-  });
+      await expect(
+        setup.service.read(
+          'rail_status',
+          target('rail_line', { lineCode: 'L1' }),
+          NOW,
+        ),
+      ).resolves.toBeNull();
+    },
+  );
 
   it('reads headway for actual CPTM lines through the shared headway reader', async () => {
     const setup = service();
@@ -249,31 +294,48 @@ describe('NotificationSnapshotService', () => {
     { trains: [] },
     {
       fetchedAt: new Date(NOW.getTime() - 3 * 60_000),
-      trains: [{ destinationCode: 'RGS', destinationName: 'Rio Grande', arrivalTime: '09:05', isAtPlatform: false }],
+      trains: [
+        {
+          destinationCode: 'RGS',
+          destinationName: 'Rio Grande',
+          arrivalTime: '09:05',
+          isAtPlatform: false,
+        },
+      ],
     },
     {
       outOfSchedule: true,
-      trains: [{ destinationCode: 'RGS', destinationName: 'Rio Grande', arrivalTime: '09:05', isAtPlatform: false }],
+      trains: [
+        {
+          destinationCode: 'RGS',
+          destinationName: 'Rio Grande',
+          arrivalTime: '09:05',
+          isAtPlatform: false,
+        },
+      ],
     },
-  ])('skips missing, stale, or out-of-schedule rail arrivals: %o', async (patch) => {
-    const setup = service();
-    setup.nextTrains.getNextTrains.mockResolvedValue({
-      lineCode: 'L10',
-      stationCode: 'LUZ',
-      fetchedAt: patch.fetchedAt ?? NOW,
-      operationClosed: false,
-      outOfSchedule: patch.outOfSchedule ?? false,
-      trains: patch.trains,
-    });
+  ])(
+    'skips missing, stale, or out-of-schedule rail arrivals: %o',
+    async (patch) => {
+      const setup = service();
+      setup.nextTrains.getNextTrains.mockResolvedValue({
+        lineCode: 'L10',
+        stationCode: 'LUZ',
+        fetchedAt: patch.fetchedAt ?? NOW,
+        operationClosed: false,
+        outOfSchedule: patch.outOfSchedule ?? false,
+        trains: patch.trains,
+      });
 
-    await expect(
-      setup.service.read(
-        'rail_arrivals',
-        target('rail_station', { lineCode: 'L10', stationCode: 'LUZ' }),
-        NOW,
-      ),
-    ).resolves.toBeNull();
-  });
+      await expect(
+        setup.service.read(
+          'rail_arrivals',
+          target('rail_station', { lineCode: 'L10', stationCode: 'LUZ' }),
+          NOW,
+        ),
+      ).resolves.toBeNull();
+    },
+  );
 
   it('requires one exact semantic bus-stop match before calling realtime', async () => {
     const setup = service();
@@ -315,7 +377,9 @@ describe('NotificationSnapshotService', () => {
     );
 
     expect(snapshot?.body).toContain('8000-10 · Terminal A às 09:10');
-    expect(setup.routeStopMapping.getApiStopCode).toHaveBeenCalledWith('current-stop');
+    expect(setup.routeStopMapping.getApiStopCode).toHaveBeenCalledWith(
+      'current-stop',
+    );
     expect(setup.busRealtime.getStopArrivals).toHaveBeenCalledWith(123);
   });
 
@@ -346,7 +410,9 @@ describe('NotificationSnapshotService', () => {
 
   it('does not mark a target unavailable when the catalog query fails', async () => {
     const setup = service();
-    setup.geography.searchBusStops.mockRejectedValue(new Error('database offline'));
+    setup.geography.searchBusStops.mockRejectedValue(
+      new Error('database offline'),
+    );
 
     await expect(
       setup.service.read(
@@ -419,18 +485,31 @@ describe('NotificationSnapshotService', () => {
     const setup = service();
     setup.geography.searchBusStops.mockResolvedValue([
       {
-        id: 'a', stopId: 'a', sourceAgency: 'sptrans', name: 'Parada', description: '',
-        latitude: -23.5505, longitude: -46.6333,
+        id: 'a',
+        stopId: 'a',
+        sourceAgency: 'sptrans',
+        name: 'Parada',
+        description: '',
+        latitude: -23.5505,
+        longitude: -46.6333,
       },
       {
-        id: 'b', stopId: 'b', sourceAgency: 'sptrans', name: 'Parada', description: '',
-        latitude: -23.55055, longitude: -46.63335,
+        id: 'b',
+        stopId: 'b',
+        sourceAgency: 'sptrans',
+        name: 'Parada',
+        description: '',
+        latitude: -23.55055,
+        longitude: -46.63335,
       },
     ]);
     const ambiguous = await setup.service.read(
       'bus_arrivals',
       target('bus_stop', {
-        name: 'Parada', description: '', latitude: -23.5505, longitude: -46.6333,
+        name: 'Parada',
+        description: '',
+        latitude: -23.5505,
+        longitude: -46.6333,
       }),
       NOW,
     );
@@ -440,16 +519,34 @@ describe('NotificationSnapshotService', () => {
     setup.service.clear();
     setup.geography.searchBusStops.mockResolvedValue([
       {
-        id: 'one', stopId: 'one', sourceAgency: 'sptrans', name: 'Parada', description: '',
-        latitude: -23.5505, longitude: -46.6333,
+        id: 'one',
+        stopId: 'one',
+        sourceAgency: 'sptrans',
+        name: 'Parada',
+        description: '',
+        latitude: -23.5505,
+        longitude: -46.6333,
       },
     ]);
     setup.routeStopMapping.getApiStopCode.mockResolvedValue(1);
     setup.busRealtime.getStopArrivals.mockResolvedValue({
-      p: { l: [{ c: '8000-10', sl: 1, lt0: 'Destino', lt1: 'Volta', vs: [{ t: '09:10' }] }] },
+      p: {
+        l: [
+          {
+            c: '8000-10',
+            sl: 1,
+            lt0: 'Destino',
+            lt1: 'Volta',
+            vs: [{ t: '09:10' }],
+          },
+        ],
+      },
     });
     const descriptor = {
-      name: 'Parada', description: '', latitude: -23.5505, longitude: -46.6333,
+      name: 'Parada',
+      description: '',
+      latitude: -23.5505,
+      longitude: -46.6333,
     };
     await Promise.all([
       setup.service.read('bus_arrivals', target('bus_stop', descriptor), NOW),
@@ -467,8 +564,14 @@ describe('NotificationSnapshotService', () => {
         lastUpdated: NOW.toISOString(),
         notices: [
           {
-            sourceId: 'first-id', sourceUrl: 'https://example.test/first', listedDate: '08/09',
-            title: 'Desvio', description: 'Rua fechada', periodText: 'Hoje', routes: ['8000-10'], listing: 'UPCOMING',
+            sourceId: 'first-id',
+            sourceUrl: 'https://example.test/first',
+            listedDate: '08/09',
+            title: 'Desvio',
+            description: 'Rua fechada',
+            periodText: 'Hoje',
+            routes: ['8000-10'],
+            listing: 'UPCOMING',
           },
         ],
       })
@@ -477,8 +580,14 @@ describe('NotificationSnapshotService', () => {
         lastUpdated: new Date(NOW.getTime() + 60_000).toISOString(),
         notices: [
           {
-            sourceId: 'second-id', sourceUrl: 'https://example.test/second', listedDate: '09/09',
-            title: 'Desvio', description: 'Rua fechada', periodText: 'Hoje', routes: ['8000-10'], listing: 'UPCOMING',
+            sourceId: 'second-id',
+            sourceUrl: 'https://example.test/second',
+            listedDate: '09/09',
+            title: 'Desvio',
+            description: 'Rua fechada',
+            periodText: 'Hoje',
+            routes: ['8000-10'],
+            listing: 'UPCOMING',
           },
         ],
       });
@@ -505,16 +614,34 @@ describe('NotificationSnapshotService', () => {
       lastUpdated: NOW.toISOString(),
       notices: [
         {
-          sourceId: 'first-id', sourceUrl: 'https://example.test/first', listedDate: '08/09',
-          title: 'Desvio', description: 'Rua fechada', periodText: 'Hoje', routes: ['8000-10'], listing: 'UPCOMING',
+          sourceId: 'first-id',
+          sourceUrl: 'https://example.test/first',
+          listedDate: '08/09',
+          title: 'Desvio',
+          description: 'Rua fechada',
+          periodText: 'Hoje',
+          routes: ['8000-10'],
+          listing: 'UPCOMING',
         },
         {
-          sourceId: 'second-id', sourceUrl: 'https://example.test/second', listedDate: '09/09',
-          title: 'Desvio', description: 'Rua fechada', periodText: 'Hoje', routes: ['8000-10'], listing: 'RECENT',
+          sourceId: 'second-id',
+          sourceUrl: 'https://example.test/second',
+          listedDate: '09/09',
+          title: 'Desvio',
+          description: 'Rua fechada',
+          periodText: 'Hoje',
+          routes: ['8000-10'],
+          listing: 'RECENT',
         },
         {
-          sourceId: 'third-id', sourceUrl: 'https://example.test/third', listedDate: '09/09',
-          title: 'Obra', description: 'Outra rua', periodText: 'Amanhã', routes: ['8000-10'], listing: 'UPCOMING',
+          sourceId: 'third-id',
+          sourceUrl: 'https://example.test/third',
+          listedDate: '09/09',
+          title: 'Obra',
+          description: 'Outra rua',
+          periodText: 'Amanhã',
+          routes: ['8000-10'],
+          listing: 'UPCOMING',
         },
       ],
     });
@@ -526,27 +653,44 @@ describe('NotificationSnapshotService', () => {
     );
 
     expect(snapshots).toHaveLength(2);
-    expect(snapshots.map((snapshot) => snapshot.title)).toEqual(['Desvio', 'Obra']);
+    expect(snapshots.map((snapshot) => snapshot.title)).toEqual([
+      'Desvio',
+      'Obra',
+    ]);
   });
 
   it('reads fixed special-line departures and ignores a special line with no departure', async () => {
     const setup = service();
     setup.specialRail.getSpecialLinesStatus.mockResolvedValue([
       {
-        code: 'EA', line: 'Expresso Aeroporto', statusCode: 'OperacaoNormal',
-        nextDepartures: [{ label: 'Próxima partida', time: '13:00' }], issues: [],
+        code: 'EA',
+        line: 'Expresso Aeroporto',
+        statusCode: 'OperacaoNormal',
+        nextDepartures: [{ label: 'Próxima partida', time: '13:00' }],
+        issues: [],
       },
       {
-        code: 'GRU', line: 'Aeromóvel GRU', statusCode: 'OperacaoNormal',
-        nextDepartures: [], issues: [],
+        code: 'GRU',
+        line: 'Aeromóvel GRU',
+        statusCode: 'OperacaoNormal',
+        nextDepartures: [],
+        issues: [],
       },
     ]);
 
     await expect(
-      setup.service.read('special_departures', target('special_line', { code: 'EA' }), NOW),
+      setup.service.read(
+        'special_departures',
+        target('special_line', { code: 'EA' }),
+        NOW,
+      ),
     ).resolves.toMatchObject({ title: 'Expresso Aeroporto', normal: true });
     await expect(
-      setup.service.read('special_departures', target('special_line', { code: 'GRU' }), NOW),
+      setup.service.read(
+        'special_departures',
+        target('special_line', { code: 'GRU' }),
+        NOW,
+      ),
     ).resolves.toBeNull();
   });
 

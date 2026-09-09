@@ -144,7 +144,9 @@ export class NotificationSettingsService {
       };
     }
 
-    throw new Error('Não foi possível carregar as configurações de notificações.');
+    throw new Error(
+      'Não foi possível carregar as configurações de notificações.',
+    );
   }
 
   async getTargets(
@@ -155,7 +157,10 @@ export class NotificationSettingsService {
     if (!normalizedKind) {
       throw new BadRequestException('Tipo de destino inválido.');
     }
-    if (typeof search !== 'string' || search.length > MAX_NOTIFICATION_SEARCH_LENGTH) {
+    if (
+      typeof search !== 'string' ||
+      search.length > MAX_NOTIFICATION_SEARCH_LENGTH
+    ) {
       throw new BadRequestException('A busca deve ter até 100 caracteres.');
     }
 
@@ -514,7 +519,13 @@ export class NotificationSettingsService {
         id: { in: input.targetIds },
         kind: expectedKind,
       },
-      select: { id: true, kind: true, label: true, available: true, descriptor: true },
+      select: {
+        id: true,
+        kind: true,
+        label: true,
+        available: true,
+        descriptor: true,
+      },
     });
 
     const byRequestedId = new Map<string, TargetRecord>();
@@ -531,9 +542,7 @@ export class NotificationSettingsService {
       );
     }
     if (input.enabled && resolved.some((target) => !target?.available)) {
-      throw new BadRequestException(
-        'Um ou mais destinos estão indisponíveis.',
-      );
+      throw new BadRequestException('Um ou mais destinos estão indisponíveis.');
     }
 
     const unique = new Map<string, TargetRecord>();
@@ -547,7 +556,9 @@ export class NotificationSettingsService {
         'Selecione destinos diferentes e compatíveis com o tipo de aviso.',
       );
     }
-    return input.targetIds.map((targetId) => byRequestedId.get(targetId) as TargetRecord);
+    return input.targetIds.map(
+      (targetId) => byRequestedId.get(targetId) as TargetRecord,
+    );
   }
 
   private async ensureUser(
@@ -681,7 +692,11 @@ export class NotificationSettingsService {
     if ('railLineCode' in target && typeof target.railLineCode === 'number') {
       return { railLineCode: target.railLineCode };
     }
-    if (!('descriptor' in target) || !target.descriptor || typeof target.descriptor !== 'object') {
+    if (
+      !('descriptor' in target) ||
+      !target.descriptor ||
+      typeof target.descriptor !== 'object'
+    ) {
       return {};
     }
 
@@ -714,7 +729,10 @@ export class NotificationSettingsService {
       try {
         return await operation();
       } catch (error) {
-        if (!isRetryableTransactionError(error) || attempt === maximumAttempts) {
+        if (
+          !isRetryableTransactionError(error) ||
+          attempt === maximumAttempts
+        ) {
           throw error;
         }
         await new Promise((resolve) =>
@@ -741,7 +759,9 @@ function parseTriggerInput(value: unknown): NotificationTriggerInput {
       end: window.end,
     })),
     timezone: input.timezone,
-    smart: (input.kind === 'rail_status' || input.kind === 'bus_notices') && input.smart,
+    smart:
+      (input.kind === 'rail_status' || input.kind === 'bus_notices') &&
+      input.smart,
     leadMinutes: input.leadMinutes,
     intervalMinutes: input.intervalMinutes,
     arrivalLeadMinutes: input.arrivalLeadMinutes ?? 5,
@@ -771,13 +791,18 @@ function parsePushRegistration(value: unknown): PushRegistration {
   const endpoint = parsePushEndpoint(value.endpoint);
   const keys = value.keys;
   if (!isRecord(keys)) {
-    throw new BadRequestException('A assinatura do navegador está incompleta. Ative novamente as notificações.');
+    throw new BadRequestException(
+      'A assinatura do navegador está incompleta. Ative novamente as notificações.',
+    );
   }
   const p256dh = parsePushKey(keys.p256dh, 65, 'p256dh');
   const auth = parsePushKey(keys.auth, 16, 'auth');
   let label = DEFAULT_DEVICE_LABEL;
   if (value.label !== undefined) {
-    if (typeof value.label !== 'string' || value.label.length > MAX_PUSH_LABEL_LENGTH) {
+    if (
+      typeof value.label !== 'string' ||
+      value.label.length > MAX_PUSH_LABEL_LENGTH
+    ) {
       throw new BadRequestException(
         `O nome do dispositivo deve ter até ${MAX_PUSH_LABEL_LENGTH} caracteres.`,
       );
@@ -812,7 +837,9 @@ export function parsePushEndpoint(value: unknown): string {
     (!PUSH_SERVICE_HOSTS.has(hostname) &&
       !hostname.endsWith('.notify.windows.com'))
   ) {
-    throw new BadRequestException('O navegador deve usar um serviço de notificações HTTPS reconhecido.');
+    throw new BadRequestException(
+      'O navegador deve usar um serviço de notificações HTTPS reconhecido.',
+    );
   }
   return url.href;
 }
@@ -828,7 +855,9 @@ function parsePushKey(
     !BASE64_URL_PATTERN.test(value) ||
     value.length % 4 === 1
   ) {
-    throw new BadRequestException(`A chave ${name} da assinatura do navegador é inválida.`);
+    throw new BadRequestException(
+      `A chave ${name} da assinatura do navegador é inválida.`,
+    );
   }
   const decoded = Buffer.from(value, 'base64url');
   if (decoded.length !== expectedBytes) {
@@ -839,7 +868,9 @@ function parsePushKey(
   return value;
 }
 
-function normalizeOptionalId(id: string | null | undefined): string | undefined {
+function normalizeOptionalId(
+  id: string | null | undefined,
+): string | undefined {
   if (id === null || id === undefined) {
     return undefined;
   }
@@ -904,8 +935,5 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isRetryableTransactionError(error: unknown): boolean {
-  return (
-    isRecord(error) &&
-    (error.code === 'P2034' || error.code === 'P2002')
-  );
+  return isRecord(error) && (error.code === 'P2034' || error.code === 'P2002');
 }

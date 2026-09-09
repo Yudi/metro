@@ -1,14 +1,25 @@
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of, Subject, throwError } from 'rxjs';
-import { AuthService, authReady, firebaseIdToken, firebaseUser } from '@metro/shared/firebase';
-import { NotificationApiError, NotificationApiService } from '@metro/shared/api';
+import {
+  AuthService,
+  authReady,
+  firebaseIdToken,
+  firebaseUser,
+} from '@metro/shared/firebase';
+import {
+  NotificationApiError,
+  NotificationApiService,
+} from '@metro/shared/api';
 import type {
   NotificationConfiguration,
   NotificationTrigger,
   NotificationTriggerInput,
 } from '@metro/shared/notification-contracts';
-import { NotificationPermissionState, NotificationPushService } from './notification-push.service';
+import {
+  NotificationPermissionState,
+  NotificationPushService,
+} from './notification-push.service';
 import { NotificationWebsocketService } from './notification-websocket.service';
 import { NotificationsComponent } from './notifications.component';
 
@@ -139,10 +150,22 @@ describe('NotificationsComponent', () => {
     expect(component.triggers()).toEqual([]);
   });
   it('releases an old-account browser subscription without silently transferring it', async () => {
-    requestSubscription.mockResolvedValue({ endpoint: 'https://push.example/test', keys: { p256dh: 'key', auth: 'auth' } });
-    api.registerDevice.mockReturnValue(throwError(() => new NotificationApiError('Este navegador já está vinculado a outra conta.')));
+    requestSubscription.mockResolvedValue({
+      endpoint: 'https://push.example/test',
+      keys: { p256dh: 'key', auth: 'auth' },
+    });
+    api.registerDevice.mockReturnValue(
+      throwError(
+        () =>
+          new NotificationApiError(
+            'Este navegador já está vinculado a outra conta.',
+          ),
+      ),
+    );
     await component.enableNotifications();
-    expect(TestBed.inject(NotificationPushService).unsubscribe).toHaveBeenCalledTimes(1);
+    expect(
+      TestBed.inject(NotificationPushService).unsubscribe,
+    ).toHaveBeenCalledTimes(1);
     expect(component.pushError()).toContain('Ativar notificações novamente');
     expect(api.registerDevice).toHaveBeenCalledTimes(1);
   });
@@ -188,7 +211,9 @@ describe('NotificationsComponent', () => {
     });
     await fixture.whenStable();
 
-    expect(component.operationError()).toContain('alterado em outro dispositivo');
+    expect(component.operationError()).toContain(
+      'alterado em outro dispositivo',
+    );
     expect(api.getConfiguration).toHaveBeenCalledTimes(2);
   });
 });

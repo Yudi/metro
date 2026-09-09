@@ -133,9 +133,7 @@ export class BikeGateway
       this.logger.debug(
         `Bike broadcast: ${deltaCount} delta${
           deltaCount === 1 ? '' : 's'
-        }, ${fullCount} full payload${
-          fullCount === 1 ? '' : 's'
-        }${deltaInfo}`,
+        }, ${fullCount} full payload${fullCount === 1 ? '' : 's'}${deltaInfo}`,
       );
     }
   }

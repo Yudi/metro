@@ -70,8 +70,8 @@ export class MapService {
 
       this.logger.warn(
         targetMatches
-          ? 'initializeMap called for the same target while a map instance already exists — destroying previous instance to avoid duplicate rendering'
-          : 'initializeMap called but an existing map instance was present — destroying previous instance',
+          ? 'initializeMap called for the same target while a map instance already exists - destroying previous instance to avoid duplicate rendering'
+          : 'initializeMap called but an existing map instance was present - destroying previous instance',
       );
 
       // Clean up the previous map to ensure only one map is attached to the DOM

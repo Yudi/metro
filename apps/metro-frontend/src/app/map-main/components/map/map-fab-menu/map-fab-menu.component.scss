@@ -122,7 +122,7 @@ $surface: var(--mat-sys-surface, #fffbfe);
   }
 }
 
-// Safe area for notched devices — rely on the dynamic toolbar height (which
+// Safe area for notched devices - rely on the dynamic toolbar height (which
 // already includes safe-area padding). If the CSS variable isn't available,
 // fall back to the previous fixed spacing.
 @supports (padding-bottom: env(safe-area-inset-bottom)) {

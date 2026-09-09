@@ -21,7 +21,10 @@ export interface PublishedRouteDirection {
   /** Service-day times. Hours >=24 explicitly represent the following day. */
   departures: string[];
   streets: { name: string; number: string; notices?: string[] }[];
-  travelTimes: { period: 'morning' | 'interpeak' | 'afternoon'; minutes: number }[];
+  travelTimes: {
+    period: 'morning' | 'interpeak' | 'afternoon';
+    minutes: number;
+  }[];
   startTime: string | null;
   endTime: string | null;
 }

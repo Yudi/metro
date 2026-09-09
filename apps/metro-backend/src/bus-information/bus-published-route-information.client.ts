@@ -21,19 +21,13 @@ const MAX_NOTICE_LENGTH = 2_000;
 const MAX_TRAVEL_TIMES_PER_DIRECTION = 10;
 const MAX_TEXT_LENGTH = 1_000;
 
-const DAY_KINDS = new Set<PublishedDayKind>([
-  'weekday',
-  'saturday',
-  'sunday',
-]);
+const DAY_KINDS = new Set<PublishedDayKind>(['weekday', 'saturday', 'sunday']);
 const PERIODS = new Set(['morning', 'interpeak', 'afternoon']);
 const STATUS = new Set(['AVAILABLE', 'UNAVAILABLE', 'NOT_FOUND']);
 
 @Injectable()
 export class BusPublishedRouteInformationClient implements OnModuleDestroy {
-  private readonly logger = new Logger(
-    BusPublishedRouteInformationClient.name,
-  );
+  private readonly logger = new Logger(BusPublishedRouteInformationClient.name);
   private readonly client: BusItineraryGrpcClient;
 
   constructor(private readonly config: ConfigService) {
@@ -94,10 +88,7 @@ interface BusItineraryGrpcClient extends Client {
   getPublishedRouteInformation(
     request: { routeCode: string },
     options: { deadline: Date },
-    callback: (
-      error: ServiceError | null,
-      response?: unknown,
-    ) => void,
+    callback: (error: ServiceError | null, response?: unknown) => void,
   ): unknown;
 }
 
@@ -109,10 +100,7 @@ function parsePublishedRouteInformation(
   const status = readEnum(value.status, STATUS);
   const routeCode = readText(value.routeCode, MAX_ROUTE_CODE_LENGTH);
   const lastUpdated = readNullableText(value.lastUpdated, MAX_TEXT_LENGTH);
-  if (
-    lastUpdated !== null &&
-    !Number.isFinite(Date.parse(lastUpdated))
-  ) {
+  if (lastUpdated !== null && !Number.isFinite(Date.parse(lastUpdated))) {
     throw new Error('Invalid published route lastUpdated');
   }
 
@@ -165,7 +153,8 @@ function readPublishedDirection(value: unknown): PublishedRouteDirection {
     const period = readEnum(travelTime.period, PERIODS);
     const minutes = readInteger(travelTime.minutes, 0, 24 * 60);
     return {
-      period: period as PublishedRouteDirection['travelTimes'][number]['period'],
+      period:
+        period as PublishedRouteDirection['travelTimes'][number]['period'],
       minutes,
     };
   });
@@ -243,10 +232,7 @@ function readNoticeText(value: unknown): string {
   return value.trim();
 }
 
-function readServiceTime(
-  value: unknown,
-  nullable: true,
-): string | null;
+function readServiceTime(value: unknown, nullable: true): string | null;
 function readServiceTime(value: unknown, nullable: false): string;
 function readServiceTime(value: unknown, nullable: boolean): string | null {
   if (nullable && (value === null || value === undefined || value === '')) {

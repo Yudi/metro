@@ -27,7 +27,9 @@ describe('Firebase HTTP authentication', () => {
     'http://localhost:3000/api',
     '/api',
   ])('authenticates notification GraphQL requests at %s', (baseUrl) => {
-    expect(authorization(`${baseUrl}/`, `${baseUrl}/graphql`)).toBe('Bearer account-token');
+    expect(authorization(`${baseUrl}/`, `${baseUrl}/graphql`)).toBe(
+      'Bearer account-token',
+    );
   });
 
   it.each([
@@ -41,14 +43,18 @@ describe('Firebase HTTP authentication', () => {
   });
 
   it('preserves authentication for same-origin relative API requests', () => {
-    expect(authorization('https://metro.yudi.com.br/api', '/api/graphql')).toBe('Bearer account-token');
+    expect(authorization('https://metro.yudi.com.br/api', '/api/graphql')).toBe(
+      'Bearer account-token',
+    );
   });
 
   it('reads the current token for every request and omits it after logout', () => {
     const url = 'https://metro.yudi.com.br/api/graphql';
     for (const token of ['refreshed-token', null]) {
       firebaseIdToken.set(token);
-      expect(authorization('https://metro.yudi.com.br/api', url)).toBe(token ? `Bearer ${token}` : null);
+      expect(authorization('https://metro.yudi.com.br/api', url)).toBe(
+        token ? `Bearer ${token}` : null,
+      );
     }
   });
 });

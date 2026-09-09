@@ -1,4 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  input,
+} from '@angular/core';
 import {
   getContrastColor,
   getRailLineByCode,
@@ -20,11 +25,7 @@ import {
   selector: 'app-notification-target-identity',
   imports: [HistoryLineIdentityComponent, HistoryRouteIdentityComponent],
   template: `
-    <span
-      class="target-identity"
-      role="img"
-      [attr.aria-label]="target().label"
-    >
+    <span class="target-identity" role="img" [attr.aria-label]="target().label">
       @if (target().kind === 'bus_route') {
         <app-history-route-identity
           [name]="routeCode()"
@@ -39,7 +40,9 @@ import {
           [name]="line.colorName"
           [badge]="line.code"
           [badgeOnly]="true"
-          [badgeShape]="target().kind === 'rail_station' ? 'round' : 'rectangle'"
+          [badgeShape]="
+            target().kind === 'rail_station' ? 'round' : 'rectangle'
+          "
           [badgeBackgroundColor]="line.colorHex"
           [badgeTextColor]="line.textColor"
         />
@@ -114,7 +117,9 @@ export class NotificationTargetIdentityComponent {
 
     const label = target.label.trim();
     const separatorIndex = label.indexOf('·');
-    return (separatorIndex === -1 ? label : label.slice(0, separatorIndex)).trim();
+    return (
+      separatorIndex === -1 ? label : label.slice(0, separatorIndex)
+    ).trim();
   });
 
   readonly routeColors = computed(() => {

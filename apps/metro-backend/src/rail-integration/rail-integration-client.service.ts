@@ -257,8 +257,7 @@ export class RailIntegrationClientService
         vehicle.estimated !== true ||
         (Number.isFinite(vehicle.validUntil) &&
           (vehicle.validUntil as number) > now &&
-          (vehicle.validUntil as number) <=
-            now + MAX_VEHICLE_ESTIMATE_TTL_MS),
+          (vehicle.validUntil as number) <= now + MAX_VEHICLE_ESTIMATE_TTL_MS),
     );
   }
 

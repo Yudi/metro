@@ -103,9 +103,9 @@ describe('LiteBusStopDetail', () => {
     expect(
       station.querySelector('.station-line-badge')?.getAttribute('aria-label'),
     ).toBe('Linha 2');
-    expect(station.querySelector('.rail-station-name')?.textContent?.trim()).toBe(
-      'Vila Madalena',
-    );
+    expect(
+      station.querySelector('.rail-station-name')?.textContent?.trim(),
+    ).toBe('Vila Madalena');
     expect(
       station.querySelector('.rail-station-distance')?.textContent?.trim(),
     ).toBe('Parada da linha a 131 m da estação');

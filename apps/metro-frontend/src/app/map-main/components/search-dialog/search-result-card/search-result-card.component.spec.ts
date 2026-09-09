@@ -1,5 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { SearchResultCardComponent, SearchResult } from './search-result-card.component';
+import {
+  SearchResultCardComponent,
+  SearchResult,
+} from './search-result-card.component';
 
 describe('SearchResultCardComponent keyboard activation', () => {
   let fixture: ComponentFixture<SearchResultCardComponent>;

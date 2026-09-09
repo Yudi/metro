@@ -135,14 +135,9 @@ function targetSearchTerms(target: NotificationTarget): string[] {
   const terms = [label, label.split('·', 1)[0] ?? label];
 
   if (target.kind === 'rail_line') {
-    const lineCode =
-      target.railLineCode ?? /^linha\s*(\d+)/iu.exec(label)?.[1];
+    const lineCode = target.railLineCode ?? /^linha\s*(\d+)/iu.exec(label)?.[1];
     if (lineCode) {
-      terms.push(
-        String(lineCode),
-        `L${lineCode}`,
-        `Linha ${lineCode}`,
-      );
+      terms.push(String(lineCode), `L${lineCode}`, `Linha ${lineCode}`);
       const line = getRailLineByCode(Number(lineCode));
       if (line) {
         terms.push(line.colorName, line.fullName);
@@ -158,8 +153,11 @@ function isExplicitTargetSearch(
   search: string,
 ): boolean {
   const query = normalizeTargetSearch(search);
-  return query.length > 0 && targetSearchTerms(target).some(
-    (term) => normalizeTargetSearch(term) === query,
+  return (
+    query.length > 0 &&
+    targetSearchTerms(target).some(
+      (term) => normalizeTargetSearch(term) === query,
+    )
   );
 }
 
@@ -220,9 +218,7 @@ export class NotificationTriggerEditorComponent implements OnChanges {
   readonly title = computed(() =>
     this.trigger() ? 'Editar aviso' : 'Novo aviso',
   );
-  readonly isRailStatus = computed(
-    () => this.selectedKind() === 'rail_status',
-  );
+  readonly isRailStatus = computed(() => this.selectedKind() === 'rail_status');
   readonly isArrivalKind = computed(
     () =>
       this.selectedKind() === 'rail_arrivals' ||
@@ -252,7 +248,11 @@ export class NotificationTriggerEditorComponent implements OnChanges {
       DEFAULT_TRIGGER.arrivalLeadMinutes ?? 5,
       {
         nonNullable: true,
-        validators: [Validators.required, Validators.min(1), Validators.max(30)],
+        validators: [
+          Validators.required,
+          Validators.min(1),
+          Validators.max(30),
+        ],
       },
     ),
     intervalMinutes: new FormControl(DEFAULT_TRIGGER.intervalMinutes, {
@@ -269,7 +269,10 @@ export class NotificationTriggerEditorComponent implements OnChanges {
 
   private readonly api = inject(NotificationApiService);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly targetSearchSubject = new Subject<{ kind: NotificationTargetKind; search: string }>();
+  private readonly targetSearchSubject = new Subject<{
+    kind: NotificationTargetKind;
+    search: string;
+  }>();
   private initializedKey: string | null = null;
   private baselineId: string | undefined;
   private baselineRevision: number | undefined;
@@ -297,7 +300,11 @@ export class NotificationTriggerEditorComponent implements OnChanges {
 
     this.targetSearchSubject
       .pipe(
-        distinctUntilChanged((previous, current) => previous.kind === current.kind && previous.search === current.search),
+        distinctUntilChanged(
+          (previous, current) =>
+            previous.kind === current.kind &&
+            previous.search === current.search,
+        ),
         switchMap(({ kind, search }) => {
           if (!search) {
             this.targetLoading.set(false);
@@ -371,7 +378,9 @@ export class NotificationTriggerEditorComponent implements OnChanges {
     this.form.controls.days.markAsDirty();
   }
 
-  addWindow(window: { start: string; end: string } = { start: '07:00', end: '09:00' }): void {
+  addWindow(
+    window: { start: string; end: string } = { start: '07:00', end: '09:00' },
+  ): void {
     if (this.windows.length >= 8) {
       return;
     }
@@ -380,11 +389,17 @@ export class NotificationTriggerEditorComponent implements OnChanges {
       new FormGroup<WindowFormControls>({
         start: new FormControl(window.start, {
           nonNullable: true,
-          validators: [Validators.required, Validators.pattern(/^([01]\d|2[0-3]):[0-5]\d$/u)],
+          validators: [
+            Validators.required,
+            Validators.pattern(/^([01]\d|2[0-3]):[0-5]\d$/u),
+          ],
         }),
         end: new FormControl(window.end, {
           nonNullable: true,
-          validators: [Validators.required, Validators.pattern(/^([01]\d|2[0-3]):[0-5]\d$/u)],
+          validators: [
+            Validators.required,
+            Validators.pattern(/^([01]\d|2[0-3]):[0-5]\d$/u),
+          ],
         }),
       }),
     );
@@ -406,11 +421,18 @@ export class NotificationTriggerEditorComponent implements OnChanges {
   private updateTargetSearch(query: string): void {
     this.targetSearch.set(query);
     this.rawTargetResults.set([]);
-    this.targetSearchSubject.next({ kind: this.targetKind(), search: query.trim() });
+    this.targetSearchSubject.next({
+      kind: this.targetKind(),
+      search: query.trim(),
+    });
   }
 
   selectTarget(target: NotificationTarget): void {
-    if (!target.available || target.kind !== this.targetKind() || this.isTargetSelected(target.id)) {
+    if (
+      !target.available ||
+      target.kind !== this.targetKind() ||
+      this.isTargetSelected(target.id)
+    ) {
       return;
     }
 

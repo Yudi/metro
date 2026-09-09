@@ -1,11 +1,5 @@
 import { isPlatformBrowser } from '@angular/common';
-import {
-  OnDestroy,
-  PLATFORM_ID,
-  Service,
-  inject,
-  signal,
-} from '@angular/core';
+import { OnDestroy, PLATFORM_ID, Service, inject, signal } from '@angular/core';
 import { LoggerService } from '@metro/shared/api';
 import type {
   NotificationConfigurationRealtimeEvent,
@@ -29,7 +23,8 @@ import { environment } from '../../environments/environment';
 export class NotificationWebsocketService implements OnDestroy {
   private readonly platformId = inject(PLATFORM_ID);
   private readonly logger = inject(LoggerService);
-  private readonly eventsSubject = new Subject<NotificationConfigurationRealtimeEvent>();
+  private readonly eventsSubject =
+    new Subject<NotificationConfigurationRealtimeEvent>();
   private readonly socketUrl = environment.apiUrl.replace(/\/api$/, '');
   private readonly namespace = '/notifications';
   private socket: Socket | null = null;
@@ -84,18 +79,18 @@ export class NotificationWebsocketService implements OnDestroy {
     socket.on('connect_error', (error: unknown) => {
       if (this.socket === socket) {
         this.connected.set(false);
-        this.logger.warn('Notification settings WebSocket connection failed.', error);
+        this.logger.warn(
+          'Notification settings WebSocket connection failed.',
+          error,
+        );
       }
     });
-    socket.on(
-      NOTIFICATION_CONFIGURATION_SNAPSHOT_EVENT,
-      (payload: unknown) => {
-        const event = parseSnapshot(payload);
-        if (event && this.socket === socket) {
-          this.eventsSubject.next(event);
-        }
-      },
-    );
+    socket.on(NOTIFICATION_CONFIGURATION_SNAPSHOT_EVENT, (payload: unknown) => {
+      const event = parseSnapshot(payload);
+      if (event && this.socket === socket) {
+        this.eventsSubject.next(event);
+      }
+    });
     socket.on(NOTIFICATION_CONFIGURATION_DELTA_EVENT, (payload: unknown) => {
       const event = parseDelta(payload);
       if (event && this.socket === socket) {
@@ -145,7 +140,9 @@ function parseSnapshot(
   return value as unknown as NotificationConfigurationSnapshotEvent;
 }
 
-function parseDelta(value: unknown): NotificationConfigurationRealtimeEvent | null {
+function parseDelta(
+  value: unknown,
+): NotificationConfigurationRealtimeEvent | null {
   if (!isRecord(value) || value['type'] !== 'delta') {
     return null;
   }

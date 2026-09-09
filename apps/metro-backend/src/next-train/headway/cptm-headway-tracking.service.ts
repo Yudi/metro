@@ -95,7 +95,7 @@ export class CptmHeadwayTrackingService {
       });
     }
 
-    // Step 1: Detect departures — trains that disappeared from predictions
+    // Step 1: Detect departures - trains that disappeared from predictions
     for (const [prefix, tracked] of trains) {
       if (currentVehicles.has(prefix)) continue;
 
@@ -141,7 +141,7 @@ export class CptmHeadwayTrackingService {
           );
         }
       } else {
-        // New train — start tracking
+        // New train - start tracking
         const alreadyAtStation =
           current.prediction <= ARRIVAL_THRESHOLD_SECONDS;
 

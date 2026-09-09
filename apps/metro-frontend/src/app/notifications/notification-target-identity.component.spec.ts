@@ -27,9 +27,9 @@ describe('NotificationTargetIdentityComponent', () => {
     expect(element.querySelector('app-history-line-identity')).not.toBeNull();
     expect(element.querySelector('.line-badge')?.textContent?.trim()).toBe('9');
     expect(element.textContent).not.toContain('Esmeralda');
-    expect(element.querySelector('.target-identity')?.getAttribute('aria-label')).toBe(
-      'Linha 9 - Esmeralda',
-    );
+    expect(
+      element.querySelector('.target-identity')?.getAttribute('aria-label'),
+    ).toBe('Linha 9 - Esmeralda');
   });
 
   it('keeps station text while showing only its rail line number', () => {
@@ -63,8 +63,8 @@ describe('NotificationTargetIdentityComponent', () => {
       '702P-10',
     );
     expect(element.textContent).not.toContain('Vila Industrial');
-    expect(element.querySelector('.target-identity')?.getAttribute('aria-label')).toBe(
-      '702P-10 · Metrô Belém - Vila Industrial',
-    );
+    expect(
+      element.querySelector('.target-identity')?.getAttribute('aria-label'),
+    ).toBe('702P-10 · Metrô Belém - Vila Industrial');
   });
 });

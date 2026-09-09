@@ -18,4 +18,3 @@ export class BusPublishedRouteInformationResolver {
     return this.published.getInformation(routeId);
   }
 }
-

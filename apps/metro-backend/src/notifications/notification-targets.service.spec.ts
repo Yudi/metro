@@ -4,11 +4,13 @@ function setup() {
   const prisma = {
     $queryRaw: jest.fn(),
     notificationTarget: {
-      upsert: jest.fn(async ({ create }: { create: Record<string, unknown> }) => ({
-        id: '11111111-1111-7111-8111-111111111111',
-        ...create,
-        available: true,
-      })),
+      upsert: jest.fn(
+        async ({ create }: { create: Record<string, unknown> }) => ({
+          id: '11111111-1111-7111-8111-111111111111',
+          ...create,
+          available: true,
+        }),
+      ),
     },
   };
   return {
@@ -60,10 +62,7 @@ describe('NotificationTargetsService', () => {
     const descriptors = prisma.notificationTarget.upsert.mock.calls.map(
       ([call]) => call.create.descriptor,
     );
-    expect(descriptors).toEqual([
-      { code: 'EA' },
-      { code: '10X' },
-    ]);
+    expect(descriptors).toEqual([{ code: 'EA' }, { code: '10X' }]);
   });
 
   it('stores catalog platform metadata as part of bus stop identity', async () => {

@@ -33,7 +33,10 @@ interface ItinerariesStoryArgs {
 
 const paramsByState: Record<StoryState, Record<string, string>> = {
   sptrans: { agency: 'sptrans', line: SPTRANS_ROUTE.route_id },
-  artesp: { agency: 'artesp', line: ARTESP_ROUTE.route_id.slice('artesp:'.length) },
+  artesp: {
+    agency: 'artesp',
+    line: ARTESP_ROUTE.route_id.slice('artesp:'.length),
+  },
   empty: {},
   unavailable: { agency: 'sptrans', line: 'unavailable' },
 };
@@ -84,7 +87,8 @@ function createMockItinerariesService(
         return of({ ...UNAVAILABLE_ITINERARY, serviceDate });
       }
 
-      const itinerary = state === 'artesp' ? ARTESP_ITINERARY : SPTRANS_ITINERARY;
+      const itinerary =
+        state === 'artesp' ? ARTESP_ITINERARY : SPTRANS_ITINERARY;
       return of({
         ...itinerary,
         serviceDate,
@@ -161,7 +165,8 @@ const meta: Meta<ItinerariesStoryArgs> = {
     applicationConfig: {
       providers: createProviders(args.state),
     },
-    template: '<p role="note">Prévia com dados ilustrativos, sem informações em tempo real.</p><app-itineraries />',
+    template:
+      '<p role="note">Prévia com dados ilustrativos, sem informações em tempo real.</p><app-itineraries />',
   }),
 };
 

@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('configuração de notificações', () => {
-  test('mantém a configuração protegida para quem não entrou', async ({ page }) => {
+  test('mantém a configuração protegida para quem não entrou', async ({
+    page,
+  }) => {
     await page.addInitScript(() => {
       const browserWindow = window as unknown as {
         Notification?: {
@@ -18,7 +20,10 @@ test.describe('configuração de notificações', () => {
           permission: nativeNotification?.permission ?? 'default',
           requestPermission: () => {
             browserWindow.permissionRequested = true;
-            return nativeNotification?.requestPermission?.() ?? Promise.resolve('granted');
+            return (
+              nativeNotification?.requestPermission?.() ??
+              Promise.resolve('granted')
+            );
           },
         },
       });
@@ -34,7 +39,9 @@ test.describe('configuração de notificações', () => {
     ).toBeVisible();
     expect(
       await page.evaluate(
-        () => (window as unknown as { permissionRequested?: boolean }).permissionRequested,
+        () =>
+          (window as unknown as { permissionRequested?: boolean })
+            .permissionRequested,
       ),
     ).toBe(false);
   });

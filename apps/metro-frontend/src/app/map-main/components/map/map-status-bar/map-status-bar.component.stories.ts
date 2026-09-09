@@ -21,7 +21,7 @@ const meta: Meta<MapStatusBarComponent> = {
     displayMode: {
       control: { type: 'inline-radio' },
       options: ['selected', 'nearby'],
-      description: "Display mode — 'selected' or 'nearby'",
+      description: "Display mode - 'selected' or 'nearby'",
       table: { type: { summary: "'selected' | 'nearby'" } },
     },
     routeCount: {

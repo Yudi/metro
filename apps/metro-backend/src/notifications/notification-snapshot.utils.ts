@@ -121,9 +121,9 @@ export function parseArrivalPrediction(
   if (!match || !Number.isFinite(nowMs)) return null;
 
   try {
-    const current = Temporal.Instant.fromEpochMilliseconds(nowMs).toZonedDateTimeISO(
-      NOTIFICATION_TIME_ZONE,
-    );
+    const current = Temporal.Instant.fromEpochMilliseconds(
+      nowMs,
+    ).toZonedDateTimeISO(NOTIFICATION_TIME_ZONE);
     let candidate = Temporal.ZonedDateTime.from({
       timeZone: NOTIFICATION_TIME_ZONE,
       year: current.year,

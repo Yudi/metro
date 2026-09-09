@@ -250,7 +250,6 @@ export interface LineDescriptionDialogData {
       .schedule-section {
         padding: 0.8rem;
       }
-
     }
   `,
 })

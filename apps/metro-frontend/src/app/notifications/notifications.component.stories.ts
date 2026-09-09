@@ -1,7 +1,12 @@
 import { signal } from '@angular/core';
 import { applicationConfig, Meta, StoryObj } from '@storybook/angular';
 import { of, throwError } from 'rxjs';
-import { AuthService, authReady, firebaseIdToken, firebaseUser } from '@metro/shared/firebase';
+import {
+  AuthService,
+  authReady,
+  firebaseIdToken,
+  firebaseUser,
+} from '@metro/shared/firebase';
 import { NotificationApiService } from '@metro/shared/api';
 import type {
   NotificationConfiguration,
@@ -114,10 +119,7 @@ function storyProviders(
       options.error
         ? throwError(() => new Error('Serviço indisponível'))
         : of(state),
-    saveTrigger: (
-      input: NotificationTriggerInput,
-      id?: string,
-    ) => {
+    saveTrigger: (input: NotificationTriggerInput, id?: string) => {
       if (!state) {
         return of(input);
       }
@@ -130,8 +132,13 @@ function storyProviders(
         id: id ?? `story-trigger-${state.triggers.length + 1}`,
         revision: (current?.revision ?? 0) + 1,
         targets: input.targetIds
-          .map((targetId) => storyTargets.find((target) => target.id === targetId))
-          .filter((target): target is NotificationTrigger['targets'][number] => !!target),
+          .map((targetId) =>
+            storyTargets.find((target) => target.id === targetId),
+          )
+          .filter(
+            (target): target is NotificationTrigger['targets'][number] =>
+              !!target,
+          ),
       } as unknown as NotificationTrigger;
       state = {
         ...state,
@@ -227,9 +234,7 @@ function storyRender(authenticated = true, deviceId?: string) {
         deviceId,
       );
     } else {
-      window.localStorage.removeItem(
-        'metro.notifications.device.story-user',
-      );
+      window.localStorage.removeItem('metro.notifications.device.story-user');
     }
     return { props: {} };
   };
@@ -241,16 +246,19 @@ export const AvisoConfigurado: Story = {
 };
 
 export const PushAtivo: Story = {
-  decorators: storyProviders({
-    ...baseConfiguration,
-    devices: [
-      {
-        id: 'story-device',
-        label: 'Chrome · Windows',
-        createdAt: '2026-09-08T10:00:00.000Z',
-      },
-    ],
-  }, { permission: 'granted' }),
+  decorators: storyProviders(
+    {
+      ...baseConfiguration,
+      devices: [
+        {
+          id: 'story-device',
+          label: 'Chrome · Windows',
+          createdAt: '2026-09-08T10:00:00.000Z',
+        },
+      ],
+    },
+    { permission: 'granted' },
+  ),
   render: storyRender(true, 'story-device'),
 };
 

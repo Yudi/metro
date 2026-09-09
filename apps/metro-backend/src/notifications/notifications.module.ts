@@ -21,8 +21,29 @@ import { NotificationRetentionService } from './notification-retention.service';
 import { WsThrottlerGuard } from '../common/guards/ws-throttler.guard';
 
 @Module({
-  imports: [PrismaModule, RailModule, NextTrainModule, RealtimeModule, RailIntegrationClientModule, GeographyModule, BusInformationModule],
-  providers: [NotificationRetentionService, AuthService, WsThrottlerGuard, NotificationTargetsService, NotificationRealtimeService, NotificationSettingsService, NotificationsResolver, NotificationsGateway, NotificationSnapshotService, NotificationEngineService, NotificationPushService, NotificationQueueService],
+  imports: [
+    PrismaModule,
+    RailModule,
+    NextTrainModule,
+    RealtimeModule,
+    RailIntegrationClientModule,
+    GeographyModule,
+    BusInformationModule,
+  ],
+  providers: [
+    NotificationRetentionService,
+    AuthService,
+    WsThrottlerGuard,
+    NotificationTargetsService,
+    NotificationRealtimeService,
+    NotificationSettingsService,
+    NotificationsResolver,
+    NotificationsGateway,
+    NotificationSnapshotService,
+    NotificationEngineService,
+    NotificationPushService,
+    NotificationQueueService,
+  ],
   exports: [NotificationRealtimeService],
 })
 export class NotificationsModule {}

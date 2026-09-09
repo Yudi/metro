@@ -37,7 +37,9 @@
       "@metro/shared/train-composition": [
         "./libs/shared/train-composition/src/index.ts"
       ],
-      "@metro/shared/notification-contracts": ["./libs/shared/notification-contracts/src/index.ts"],
+      "@metro/shared/notification-contracts": [
+        "./libs/shared/notification-contracts/src/index.ts"
+      ],
       "@metro/storybook-mocks": ["./libs/shared/storybook-mocks/src/index.ts"]
     },
     "strict": true

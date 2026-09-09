@@ -35,6 +35,7 @@ describe('NotificationApiService', () => {
 
   it('loads the account configuration through the JSON scalar field', () => {
     const configuration: NotificationConfiguration = {
+      revision: 1,
       available: true,
       publicKey: 'public-key',
       triggers: [],

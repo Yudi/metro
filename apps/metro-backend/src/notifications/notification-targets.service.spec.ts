@@ -94,4 +94,41 @@ describe('NotificationTargetsService', () => {
       }),
     );
   });
+
+  it('projects bus route identity and colors without persisting presentation data', async () => {
+    const { service, prisma } = setup();
+    prisma.$queryRaw.mockResolvedValue([
+      {
+        name: '702P-10',
+        label: 'Metrô Belém - Vila Industrial',
+        color: '0066CC',
+        textColor: 'FFFFFF',
+      },
+    ]);
+
+    await expect(service.search('bus_route', '702P')).resolves.toEqual([
+      expect.objectContaining({
+        kind: 'bus_route',
+        label: '702P-10 · Metrô Belém - Vila Industrial',
+        busRouteShortName: '702P-10',
+        busRouteColor: '0066CC',
+        busRouteTextColor: 'FFFFFF',
+      }),
+    ]);
+    expect(prisma.notificationTarget.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          descriptor: {
+            routeName: '702P-10',
+            agency: 'sptrans',
+            presentation: {
+              busRouteShortName: '702P-10',
+              busRouteColor: '0066CC',
+              busRouteTextColor: 'FFFFFF',
+            },
+          },
+        }),
+      }),
+    );
+  });
 });

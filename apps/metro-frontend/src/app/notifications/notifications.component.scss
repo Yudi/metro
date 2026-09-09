@@ -287,6 +287,15 @@ h1 {
   line-height: 1.45;
 }
 
+.trigger-targets {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .trigger-actions {
   flex: 0 0 auto;
   gap: 2px;

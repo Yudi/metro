@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Prisma } from '../../generated/prisma/client';
@@ -18,6 +19,7 @@ import {
   validateNotificationTrigger,
 } from '@metro/shared/notification-contracts';
 import { NotificationTargetsService } from './notification-targets.service';
+import { NotificationRealtimeService } from './notification-realtime.service';
 
 export const MAX_NOTIFICATION_TRIGGERS_PER_USER = 500;
 export const MAX_NOTIFICATION_SEARCH_LENGTH = 100;
@@ -86,35 +88,63 @@ export class NotificationSettingsService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly notificationTargets: NotificationTargetsService,
+    @Optional() private readonly realtime?: NotificationRealtimeService,
   ) {}
 
   async getConfiguration(userId: string): Promise<NotificationConfiguration> {
     await this.ensureUser(this.prisma, userId);
 
-    const [triggerRows, deviceRows] = await Promise.all([
-      this.prisma.notificationTrigger.findMany({
-        where: { userId },
-        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-        include: {
-          targets: {
-            include: { target: true },
+    // A mutation allocates the account version only after its database
+    // transaction commits. Read the version on both sides of the database
+    // snapshot so an in-flight delta cannot be mislabeled as part of an older
+    // or newer HTTP response.
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const revisionBefore = await this.currentRevision(userId);
+      const [triggerRows, deviceRows] = await Promise.all([
+        this.prisma.notificationTrigger.findMany({
+          where: { userId },
+          orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+          include: {
+            targets: {
+              include: { target: true },
+            },
           },
-        },
-      }),
-      this.prisma.pushSubscription.findMany({
-        where: { user_id: userId },
-        orderBy: [{ created_at: 'asc' }, { id: 'asc' }],
-        select: { id: true, label: true, created_at: true },
-      }),
-    ]);
+        }),
+        this.prisma.pushSubscription.findMany({
+          where: { user_id: userId },
+          orderBy: [{ created_at: 'asc' }, { id: 'asc' }],
+          select: { id: true, label: true, created_at: true },
+        }),
+      ]);
+      const revisionAfter = await this.currentRevision(userId);
+      const vapid = this.getVapidConfiguration();
+      if (revisionBefore !== revisionAfter) {
+        if (attempt < 2) {
+          continue;
+        }
 
-    const vapid = this.getVapidConfiguration();
-    return {
-      available: vapid.available,
-      publicKey: vapid.available ? vapid.publicKey : null,
-      triggers: triggerRows.map((row) => this.toNotificationTrigger(row)),
-      devices: deviceRows.map((row) => this.toNotificationDevice(row)),
-    };
+        // Do not label a potentially mixed database read with the newer
+        // version. The client will keep its current state for this stale
+        // snapshot and the socket resync path will retry it.
+        return {
+          revision: revisionBefore,
+          available: vapid.available,
+          publicKey: vapid.available ? vapid.publicKey : null,
+          triggers: triggerRows.map((row) => this.toNotificationTrigger(row)),
+          devices: deviceRows.map((row) => this.toNotificationDevice(row)),
+        };
+      }
+
+      return {
+        revision: revisionAfter,
+        available: vapid.available,
+        publicKey: vapid.available ? vapid.publicKey : null,
+        triggers: triggerRows.map((row) => this.toNotificationTrigger(row)),
+        devices: deviceRows.map((row) => this.toNotificationDevice(row)),
+      };
+    }
+
+    throw new Error('Não foi possível carregar as configurações de notificações.');
   }
 
   async getTargets(
@@ -160,7 +190,7 @@ export class NotificationSettingsService {
       );
     }
 
-    return this.withTransactionRetry(() =>
+    const saved = await this.withTransactionRetry(() =>
       this.prisma.$transaction(
         async (tx) => {
           await this.ensureAndLockUser(tx, userId);
@@ -252,6 +282,8 @@ export class NotificationSettingsService {
         { isolationLevel: 'Serializable' },
       ),
     );
+    await this.publishTriggerUpsert(userId, saved);
+    return saved;
   }
 
   async deleteTrigger(
@@ -262,7 +294,7 @@ export class NotificationSettingsService {
     const triggerId = normalizeRequiredId(id, 'Identificador do aviso');
     const revision = normalizeRequiredRevision(expectedRevision);
 
-    return this.withTransactionRetry(() =>
+    const deleted = await this.withTransactionRetry(() =>
       this.prisma.$transaction(
         async (tx) => {
           await this.ensureAndLockUser(tx, userId);
@@ -288,11 +320,15 @@ export class NotificationSettingsService {
         { isolationLevel: 'Serializable' },
       ),
     );
+    if (deleted) {
+      await this.publishTriggerRemove(userId, triggerId, revision);
+    }
+    return deleted;
   }
 
   async registerDevice(userId: string, value: unknown): Promise<string> {
     const input = parsePushRegistration(value);
-    return this.withTransactionRetry(() =>
+    const id = await this.withTransactionRetry(() =>
       this.prisma.$transaction(
         async (tx) => {
           await this.ensureAndLockUser(tx, userId);
@@ -357,6 +393,13 @@ export class NotificationSettingsService {
         { isolationLevel: 'Serializable' },
       ),
     );
+    if (this.realtime) {
+      const device = await this.getDeviceProjection(userId, id);
+      if (device) {
+        await this.publishDeviceUpsert(userId, device);
+      }
+    }
+    return id;
   }
 
   async removeDevice(userId: string, id: string): Promise<boolean> {
@@ -364,7 +407,96 @@ export class NotificationSettingsService {
     const deleted = await this.prisma.pushSubscription.deleteMany({
       where: { id: deviceId, user_id: userId },
     });
-    return deleted.count > 0;
+    const removed = deleted.count > 0;
+    if (removed) {
+      await this.publishDeviceRemoved(userId, deviceId);
+    }
+    return removed;
+  }
+
+  private async currentRevision(userId: string): Promise<number> {
+    return this.realtime?.getCurrentRevision(userId) ?? 0;
+  }
+
+  private async publishTriggerUpsert(
+    userId: string,
+    trigger: NotificationTrigger,
+  ): Promise<void> {
+    if (!this.realtime) {
+      return;
+    }
+    try {
+      await this.realtime.publishTriggerUpsert(userId, trigger);
+    } catch {
+      // The committed mutation remains authoritative if realtime delivery is
+      // temporarily unavailable; a reconnect requests a fresh snapshot.
+    }
+  }
+
+  private async publishTriggerRemove(
+    userId: string,
+    triggerId: string,
+    triggerRevision: number,
+  ): Promise<void> {
+    if (!this.realtime) {
+      return;
+    }
+    try {
+      await this.realtime.publishTriggerRemove(
+        userId,
+        triggerId,
+        triggerRevision,
+      );
+    } catch {
+      // See publishTriggerUpsert: database success must not depend on socket
+      // transport availability.
+    }
+  }
+
+  private async publishDeviceUpsert(
+    userId: string,
+    device: NotificationDevice,
+  ): Promise<void> {
+    if (!this.realtime) {
+      return;
+    }
+    try {
+      await this.realtime.publishDeviceUpsert(userId, device);
+    } catch {
+      // Reconnect/resync recovers a missed device event.
+    }
+  }
+
+  private async publishDeviceRemoved(
+    userId: string,
+    deviceId: string,
+  ): Promise<void> {
+    if (!this.realtime) {
+      return;
+    }
+    try {
+      await this.realtime.publishDeviceRemoved(userId, deviceId);
+    } catch {
+      // Reconnect/resync recovers a missed device event.
+    }
+  }
+
+  private async getDeviceProjection(
+    userId: string,
+    deviceId: string,
+  ): Promise<NotificationDevice | null> {
+    try {
+      const rows = await this.prisma.pushSubscription.findMany({
+        where: { id: deviceId, user_id: userId },
+        orderBy: { id: 'asc' },
+        take: 1,
+        select: { id: true, label: true, created_at: true },
+      });
+      const row = rows[0] as DeviceRecord | undefined;
+      return row ? this.toNotificationDevice(row) : null;
+    } catch {
+      return null;
+    }
   }
 
   private async findAvailableTargets(
@@ -500,7 +632,43 @@ export class NotificationSettingsService {
       kind,
       label: target.label,
       available: target.available,
+      ...this.busRoutePresentation(target),
       ...this.railLinePresentation(target),
+    };
+  }
+
+  private busRoutePresentation(
+    target: NotificationTarget | TargetRecord,
+  ): Pick<
+    NotificationTarget,
+    'busRouteShortName' | 'busRouteColor' | 'busRouteTextColor'
+  > {
+    if (target.kind !== 'bus_route') {
+      return {};
+    }
+
+    const candidate = target as TargetRecord & {
+      busRouteShortName?: unknown;
+      busRouteColor?: unknown;
+      busRouteTextColor?: unknown;
+    };
+    const descriptor = readObject(candidate.descriptor);
+    const descriptorPresentation = readObject(descriptor?.['presentation']);
+    const shortName =
+      readNonEmptyString(candidate.busRouteShortName) ??
+      readNonEmptyString(descriptorPresentation?.['busRouteShortName']) ??
+      target.label.split('·', 1)[0]?.trim();
+    const color =
+      publicHexColor(candidate.busRouteColor) ??
+      publicHexColor(descriptorPresentation?.['busRouteColor']);
+    const textColor =
+      publicHexColor(candidate.busRouteTextColor) ??
+      publicHexColor(descriptorPresentation?.['busRouteTextColor']);
+
+    return {
+      ...(shortName ? { busRouteShortName: shortName } : {}),
+      ...(color ? { busRouteColor: color } : {}),
+      ...(textColor ? { busRouteTextColor: textColor } : {}),
     };
   }
 
@@ -710,6 +878,25 @@ function normalizeRequiredRevision(revision: number): number {
 
 function toPrismaJson(value: NotificationTriggerInput): Prisma.InputJsonValue {
   return value as unknown as Prisma.InputJsonValue;
+}
+
+function readObject(value: unknown): Record<string, unknown> | null {
+  return isRecord(value) ? value : null;
+}
+
+function readNonEmptyString(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const result = value.trim();
+  return result || undefined;
+}
+
+function publicHexColor(value: unknown): string | undefined {
+  const normalized = readNonEmptyString(value)?.replace(/^#/u, '');
+  return normalized && /^[0-9a-f]{6}$/iu.test(normalized)
+    ? `#${normalized}`
+    : undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -27,7 +27,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { NotificationApiService } from '@metro/shared/api';
-import { getContrastColor, getRailLineByCode } from '@metro/shared/utils';
+import { getRailLineByCode } from '@metro/shared/utils';
 import {
   NOTIFICATION_KINDS,
   NOTIFICATION_TIMEZONE,
@@ -49,7 +49,7 @@ import {
   switchMap,
   timer,
 } from 'rxjs';
-import { HistoryLineIdentityComponent } from '../shared/history/history-transit-identity.component';
+import { NotificationTargetIdentityComponent } from './notification-target-identity.component';
 
 export type NotificationTriggerFormInput = NotificationTriggerInput & {
   arrivalLeadMinutes?: number;
@@ -104,16 +104,6 @@ const DAY_OPTIONS = [
   { value: 6, shortLabel: 'Sáb', label: 'sábado' },
 ] as const;
 
-interface TargetPresentation {
-  label: string;
-  railLine: {
-    code: number;
-    name: string;
-    colorHex: string;
-    textColor: string;
-  } | null;
-}
-
 const KIND_LABELS: Record<NotificationKind, string> = {
   rail_status: 'Status do metrô e trem',
   rail_headway: 'Intervalo entre trens',
@@ -131,6 +121,48 @@ const TARGET_KIND_LABELS: Record<NotificationTargetKind, string> = {
   special_line: 'serviços',
 };
 
+function normalizeTargetSearch(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('pt-BR')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
+function targetSearchTerms(target: NotificationTarget): string[] {
+  const label = target.label.trim();
+  const terms = [label, label.split('·', 1)[0] ?? label];
+
+  if (target.kind === 'rail_line') {
+    const lineCode =
+      target.railLineCode ?? /^linha\s*(\d+)/iu.exec(label)?.[1];
+    if (lineCode) {
+      terms.push(
+        String(lineCode),
+        `L${lineCode}`,
+        `Linha ${lineCode}`,
+      );
+      const line = getRailLineByCode(Number(lineCode));
+      if (line) {
+        terms.push(line.colorName, line.fullName);
+      }
+    }
+  }
+
+  return terms;
+}
+
+function isExplicitTargetSearch(
+  target: NotificationTarget,
+  search: string,
+): boolean {
+  const query = normalizeTargetSearch(search);
+  return query.length > 0 && targetSearchTerms(target).some(
+    (term) => normalizeTargetSearch(term) === query,
+  );
+}
+
 @Component({
   selector: 'app-notification-trigger-editor',
   imports: [
@@ -143,7 +175,7 @@ const TARGET_KIND_LABELS: Record<NotificationTargetKind, string> = {
     MatProgressSpinnerModule,
     MatSelectModule,
     MatSlideToggleModule,
-    HistoryLineIdentityComponent,
+    NotificationTargetIdentityComponent,
   ],
   templateUrl: './notification-trigger-editor.component.html',
   styleUrl: './notification-trigger-editor.component.scss',
@@ -162,7 +194,18 @@ export class NotificationTriggerEditorComponent implements OnChanges {
   readonly kindLabels = KIND_LABELS;
   readonly selectedKind = signal<NotificationKind>(DEFAULT_TRIGGER.kind);
   readonly targetSearch = signal('');
-  readonly targetResults = signal<NotificationTarget[]>([]);
+  private readonly rawTargetResults = signal<NotificationTarget[]>([]);
+  readonly targetResults = computed(() => {
+    const search = this.targetSearch();
+    const selectedIds = new Set(
+      this.selectedTargets().map((target) => target.id),
+    );
+
+    return this.rawTargetResults().filter(
+      (target) =>
+        !selectedIds.has(target.id) || isExplicitTargetSearch(target, search),
+    );
+  });
   readonly selectedTargets = signal<NotificationTarget[]>([]);
   readonly targetLoading = signal(false);
   readonly targetError = signal(false);
@@ -247,7 +290,7 @@ export class NotificationTriggerEditorComponent implements OnChanges {
           this.form.controls.smart.setValue(true, { emitEvent: false });
         }
         this.selectedTargets.set([]);
-        this.targetResults.set([]);
+        this.rawTargetResults.set([]);
         this.form.controls.targetIds.setValue([]);
         this.updateTargetSearch('');
       });
@@ -278,17 +321,19 @@ export class NotificationTriggerEditorComponent implements OnChanges {
       .subscribe((targets) => {
         this.targetLoading.set(false);
         if (targets === null) {
-          this.targetResults.set([]);
+          this.rawTargetResults.set([]);
           return;
         }
 
-        const byId = new Map(
-          [...this.selectedTargets(), ...targets].map((target) => [
-            target.id,
-            target,
-          ]),
-        );
-        this.targetResults.set([...byId.values()]);
+        const selectedTargets = this.selectedTargets();
+        const byId = new Map(targets.map((target) => [target.id, target]));
+        for (const target of selectedTargets) {
+          if (!byId.has(target.id)) {
+            byId.set(target.id, target);
+          }
+        }
+
+        this.rawTargetResults.set([...byId.values()]);
       });
   }
 
@@ -360,6 +405,7 @@ export class NotificationTriggerEditorComponent implements OnChanges {
 
   private updateTargetSearch(query: string): void {
     this.targetSearch.set(query);
+    this.rawTargetResults.set([]);
     this.targetSearchSubject.next({ kind: this.targetKind(), search: query.trim() });
   }
 
@@ -373,7 +419,7 @@ export class NotificationTriggerEditorComponent implements OnChanges {
     this.form.controls.targetIds.setValue(selected.map((item) => item.id));
     this.form.controls.targetIds.markAsDirty();
     this.updateTargetSearch('');
-    this.targetResults.set([]);
+    this.rawTargetResults.set([]);
   }
 
   removeTarget(target: NotificationTarget): void {
@@ -387,30 +433,6 @@ export class NotificationTriggerEditorComponent implements OnChanges {
 
   isTargetSelected(targetId: string): boolean {
     return this.selectedTargets().some((target) => target.id === targetId);
-  }
-
-  targetPresentation(target: NotificationTarget): TargetPresentation {
-    const line =
-      target.railLineCode === undefined
-        ? undefined
-        : getRailLineByCode(target.railLineCode);
-    if (!line) {
-      return { label: target.label, railLine: null };
-    }
-
-    const label =
-      target.kind === 'rail_station'
-        ? target.label.replace(` · ${line.fullName}`, '')
-        : '';
-    return {
-      label,
-      railLine: {
-        code: line.code,
-        name: line.colorName,
-        colorHex: line.colorHex,
-        textColor: getContrastColor(line.colorHex),
-      },
-    };
   }
 
   submit(): void {
@@ -485,7 +507,7 @@ export class NotificationTriggerEditorComponent implements OnChanges {
     this.selectedKind.set(value.kind);
     this.updateIntervalValidators(value.kind, value.kind);
     this.selectedTargets.set(targets);
-    this.targetResults.set(targets);
+    this.rawTargetResults.set([]);
     this.updateTargetSearch('');
     this.targetError.set(false);
     this.targetLoading.set(false);

@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { SwPush } from '@angular/service-worker';
 import { of } from 'rxjs';
 import { NotificationPushService } from './notification-push.service';
+import { notificationDeviceLabel } from './notification-device-label';
 
 describe('NotificationPushService', () => {
   const requestSubscription = jest.fn();
@@ -62,6 +63,7 @@ describe('NotificationPushService', () => {
 
     await expect(service.requestSubscription('public-key')).resolves.toEqual({
       endpoint: 'https://push.example/subscription',
+      label: notificationDeviceLabel(navigator.userAgent, navigator.maxTouchPoints),
       keys: { p256dh: 'AQID', auth: 'BAUG' },
     });
     expect(requestSubscription).toHaveBeenCalledWith({
@@ -74,5 +76,24 @@ describe('NotificationPushService', () => {
 
     await service.unsubscribe();
     expect(unsubscribe).not.toHaveBeenCalled();
+  });
+
+  it('does not create an authorization when reading an absent subscription', async () => {
+    const service = TestBed.inject(NotificationPushService);
+    await expect(service.existingSubscription()).resolves.toBeNull();
+    expect(requestSubscription).not.toHaveBeenCalled();
+  });
+
+  it('summarizes an existing subscription without requesting permission', async () => {
+    TestBed.overrideProvider(SwPush, {
+      useValue: { isEnabled: true, requestSubscription, subscription: of(subscription) },
+    });
+    const service = TestBed.inject(NotificationPushService);
+    await expect(service.existingSubscription()).resolves.toEqual({
+      endpoint: subscription.endpoint,
+      label: notificationDeviceLabel(navigator.userAgent, navigator.maxTouchPoints),
+      keys: { p256dh: 'AQID', auth: 'BAUG' },
+    });
+    expect(requestSubscription).not.toHaveBeenCalled();
   });
 });

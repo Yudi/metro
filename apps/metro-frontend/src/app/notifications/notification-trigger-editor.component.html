@@ -156,7 +156,6 @@
       @if (targetResults().length > 0) {
         <div class="target-results" role="listbox" aria-label="Resultados da busca">
           @for (target of targetResults(); track target.id) {
-            @let presentation = targetPresentation(target);
             <button
               type="button"
               class="target-result"
@@ -165,19 +164,7 @@
               (click)="selectTarget(target)"
             >
               <span class="target-copy">
-                @if (presentation.label) {
-                  <span>{{ presentation.label }}</span>
-                }
-                @if (presentation.railLine; as line) {
-                  <app-history-line-identity
-                    [badge]="line.code"
-                    [name]="line.name"
-                    [badgeOnly]="target.kind === 'rail_station'"
-                    [badgeShape]="target.kind === 'rail_station' ? 'round' : 'rectangle'"
-                    [badgeBackgroundColor]="line.colorHex"
-                    [badgeTextColor]="line.textColor"
-                  />
-                }
+                <app-notification-target-identity [target]="target" />
               </span>
               @if (isTargetSelected(target.id)) {
                 <mat-icon aria-hidden="true">check</mat-icon>
@@ -194,22 +181,9 @@
           <span class="target-message">Selecione ao menos um destino.</span>
         } @else {
           @for (target of selectedTargets(); track target.id) {
-            @let presentation = targetPresentation(target);
             <span class="target-chip">
               <span class="target-chip-copy">
-                @if (presentation.label) {
-                  <span>{{ presentation.label }}</span>
-                }
-                @if (presentation.railLine; as line) {
-                  <app-history-line-identity
-                    [badge]="line.code"
-                    [name]="line.name"
-                    [badgeOnly]="target.kind === 'rail_station'"
-                    [badgeShape]="target.kind === 'rail_station' ? 'round' : 'rectangle'"
-                    [badgeBackgroundColor]="line.colorHex"
-                    [badgeTextColor]="line.textColor"
-                  />
-                }
+                <app-notification-target-identity [target]="target" />
               </span>
               <button
                 type="button"

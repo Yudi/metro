@@ -250,7 +250,15 @@
                       <p class="trigger-meta">
                         <span>{{ scheduleSummary(trigger) }}</span>
                         <span aria-hidden="true">•</span>
-                        <span>{{ targetSummary(trigger) }}</span>
+                        <span class="trigger-targets" aria-label="Destinos do aviso">
+                          @if (trigger.targets.length === 0) {
+                            Destino indisponível
+                          } @else {
+                            @for (target of trigger.targets; track target.id) {
+                              <app-notification-target-identity [target]="target" />
+                            }
+                          }
+                        </span>
                       </p>
                     </div>
                     <div class="trigger-actions">

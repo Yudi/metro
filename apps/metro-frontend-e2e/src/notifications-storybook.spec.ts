@@ -28,6 +28,11 @@ test('shows cloud triggers on desktop and mobile', async ({ page }) => {
   await page.goto('/iframe.html?id=pages-notifications--aviso-configurado&viewMode=story');
   await expect(page.getByRole('heading', { name: 'Notificações', exact: true })).toBeVisible();
   await expect(page.getByText('Minha ida para a faculdade', { exact: true })).toBeVisible();
+  const targetIdentity = page.locator('app-notification-target-identity').first();
+  await expect(targetIdentity).toHaveText('9');
+  const busIdentity = page.locator('app-notification-target-identity').nth(1);
+  await expect(busIdentity).toHaveText('702P-10');
+  await expect(busIdentity.locator('.route-badge')).toHaveCSS('background-color', 'rgb(0, 102, 204)');
   await page.screenshot({ animations: 'disabled', path: resolve(captures, 'desktop.png'), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole('heading', { name: 'Notificações', exact: true })).toBeVisible();
@@ -35,6 +40,17 @@ test('shows cloud triggers on desktop and mobile', async ({ page }) => {
   await page.screenshot({ animations: 'disabled', path: resolve(captures, 'mobile.png'), fullPage: true });
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.screenshot({ animations: 'disabled', path: resolve(captures, 'mobile-dark.png'), fullPage: true });
+});
+
+test('hides selected lines from general results and reveals an exact search', async ({ page }) => {
+  await page.goto('/iframe.html?id=pages-notifications--aviso-configurado&viewMode=story');
+  await page.getByRole('button', { name: 'Editar Minha ida para a faculdade' }).click();
+  const results = page.getByRole('listbox', { name: 'Resultados da busca' });
+  await expect(results.getByRole('button', { name: 'Linha 9 - Esmeralda', exact: true })).toHaveCount(0);
+  await page.getByLabel('Buscar linhas', { exact: true }).fill('9');
+  await expect(results.getByRole('button', { name: 'Linha 9 - Esmeralda', exact: true })).toBeDisabled();
+  await page.getByLabel('Buscar linhas', { exact: true }).fill('linha');
+  await expect(results.getByRole('button', { name: 'Linha 9 - Esmeralda', exact: true })).toHaveCount(0);
 });
 
 test('edits multiple days and time ranges without losing existing selections', async ({ page }) => {
@@ -89,4 +105,9 @@ test('explains sign-in and permission-denied states', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Entre para configurar avisos' })).toBeVisible();
   await page.goto('/iframe.html?id=pages-notifications--permissao-bloqueada&viewMode=story');
   await expect(page.getByText(/bloquead/i).first()).toBeVisible();
+});
+
+test('identifies an authorized device by browser and operating system', async ({ page }) => {
+  await page.goto('/iframe.html?id=pages-notifications--push-ativo&viewMode=story');
+  await expect(page.getByText('Chrome · Windows', { exact: true })).toBeVisible();
 });

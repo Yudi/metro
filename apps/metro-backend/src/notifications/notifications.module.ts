@@ -14,11 +14,15 @@ import { NotificationSnapshotService } from './notification-snapshot.service';
 import { NotificationEngineService } from './notification-engine.service';
 import { NotificationPushService } from './notification-push.service';
 import { NotificationQueueService } from './notification-queue.service';
+import { NotificationRealtimeService } from './notification-realtime.service';
+import { NotificationsGateway } from './notifications.gateway';
 
 import { NotificationRetentionService } from './notification-retention.service';
+import { WsThrottlerGuard } from '../common/guards/ws-throttler.guard';
 
 @Module({
   imports: [PrismaModule, RailModule, NextTrainModule, RealtimeModule, RailIntegrationClientModule, GeographyModule, BusInformationModule],
-  providers: [NotificationRetentionService, AuthService, NotificationTargetsService, NotificationSettingsService, NotificationsResolver, NotificationSnapshotService, NotificationEngineService, NotificationPushService, NotificationQueueService],
+  providers: [NotificationRetentionService, AuthService, WsThrottlerGuard, NotificationTargetsService, NotificationRealtimeService, NotificationSettingsService, NotificationsResolver, NotificationsGateway, NotificationSnapshotService, NotificationEngineService, NotificationPushService, NotificationQueueService],
+  exports: [NotificationRealtimeService],
 })
 export class NotificationsModule {}

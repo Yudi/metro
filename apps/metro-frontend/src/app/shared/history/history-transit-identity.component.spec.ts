@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import {
   HistoryAgencyIdentityComponent,
   HistoryLineIdentityComponent,
+  HistoryRouteIdentityComponent,
 } from './history-transit-identity.component';
 
 describe('history transit identity components', () => {
@@ -68,6 +69,23 @@ describe('history transit identity components', () => {
         '/app/shared/agencies/viamobilidade.svg',
       );
       expect(icon?.getAttribute('alt')).toBe('');
+    });
+  });
+
+  describe('HistoryRouteIdentityComponent', () => {
+    it('renders the shared route badge', async () => {
+      await TestBed.configureTestingModule({
+        imports: [HistoryRouteIdentityComponent],
+      }).compileComponents();
+
+      const fixture = TestBed.createComponent(HistoryRouteIdentityComponent);
+      fixture.componentRef.setInput('name', '702P-10');
+      fixture.detectChanges();
+
+      expect(
+        (fixture.nativeElement as HTMLElement).querySelector('.route-badge')
+          ?.textContent,
+      ).toContain('702P-10');
     });
   });
 });

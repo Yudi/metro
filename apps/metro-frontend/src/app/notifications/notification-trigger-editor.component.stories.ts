@@ -12,6 +12,16 @@ const destination = {
   railLineCode: 9,
 };
 
+const busDestination = {
+  id: 'route-702p-10',
+  kind: 'bus_route' as const,
+  label: '702P-10 · Metrô Belém - Vila Industrial',
+  available: true,
+  busRouteShortName: '702P-10',
+  busRouteColor: '#0066cc',
+  busRouteTextColor: '#ffffff',
+};
+
 const trigger: NotificationTrigger & { arrivalLeadMinutes: number } = {
   id: 'editor-story-trigger',
   revision: 8,
@@ -41,7 +51,8 @@ const meta: Meta<NotificationTriggerEditorComponent> = {
         {
           provide: NotificationApiService,
           useValue: {
-            getTargets: () => of([destination]),
+            getTargets: (kind: 'rail_line' | 'rail_station' | 'bus_route' | 'bus_stop' | 'special_line') =>
+              of(kind === 'bus_route' ? [busDestination] : [destination]),
           },
         },
       ],
@@ -79,6 +90,18 @@ export const ProximosTrens: Story = {
       days: [1, 2, 3, 4, 5, 6, 0],
       windows: [{ start: '06:00', end: '22:00' }],
       intervalMinutes: 10,
+    },
+  },
+};
+
+export const AvisosDeOnibus: Story = {
+  args: {
+    trigger: {
+      ...trigger,
+      name: 'Avisos do ônibus',
+      kind: 'bus_notices',
+      targetIds: [busDestination.id],
+      targets: [busDestination],
     },
   },
 };

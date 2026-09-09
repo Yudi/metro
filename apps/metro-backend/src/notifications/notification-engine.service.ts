@@ -3,7 +3,12 @@ import { randomUUID } from 'node:crypto';
 import { NotificationTriggerInput, notificationEligibility, validateNotificationTrigger } from '@metro/shared/notification-contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationSnapshotService } from './notification-snapshot.service';
-import { buildNotificationMessage, notificationHash } from './notification-message';
+import {
+  buildAggregatedRailStatusMessage,
+  buildNotificationMessage,
+  notificationHash,
+  type NotificationRailStatusEntry,
+} from './notification-message';
 import { nextNotificationEvaluation } from './notification-next-evaluation';
 import { notificationIssueIdentity } from './notification-issue-identity';
 import { notificationRetentionExpiry } from './notification-retention';
@@ -39,9 +44,15 @@ export class NotificationEngineService {
         if (!notificationEligibility(config, now, true)) return;
         const subscriptions = await this.prisma.pushSubscription.findMany({ where: { user_id: trigger.userId }, select: { id: true } });
         if (!subscriptions.length) { nextEvaluationAt = new Date(now.getTime() + 300_000); return; }
+        const aggregateRailStatuses = config.kind === 'rail_status' && trigger.targets.length > 1;
+        const railStatusEntries: NotificationRailStatusEntry[] = [];
         for (const { target } of trigger.targets) {
           try {
             const snapshots = await this.snapshots.readMany(config.kind, target, now);
+            if (aggregateRailStatuses) {
+              railStatusEntries.push(...snapshots.map(snapshot => ({ targetId: target.id, label: target.label, snapshot })));
+              continue;
+            }
             for (const snapshot of snapshots) {
             await this.prisma.$transaction(async tx => {
               // Revalidate the claim/revision after provider I/O and before writing the outbox.
@@ -82,6 +93,22 @@ export class NotificationEngineService {
             this.logger.warn(`Notification target evaluation failed: ${error instanceof Error ? error.name : 'unknown'}`);
           }
         }
+        if (aggregateRailStatuses && railStatusEntries.length) {
+          try {
+            await this.persistAggregatedRailStatuses(
+              trigger.id,
+              trigger.userId,
+              trigger.revision,
+              claimToken,
+              config,
+              subscriptions,
+              railStatusEntries,
+              now,
+            );
+          } catch (error) {
+            this.logger.warn(`Notification target evaluation failed: ${error instanceof Error ? error.name : 'unknown'}`);
+          }
+        }
       } finally {
         await this.prisma.notificationTrigger.updateMany({
           where: { id: trigger.id, claimToken },
@@ -90,6 +117,82 @@ export class NotificationEngineService {
       }
       }));
     }
+  }
+
+  private async persistAggregatedRailStatuses(
+    triggerId: string,
+    userId: string,
+    revision: number,
+    claimToken: string,
+    config: NotificationTriggerInput,
+    subscriptions: readonly { id: string }[],
+    entries: readonly NotificationRailStatusEntry[],
+    now: Date,
+  ): Promise<void> {
+    await this.prisma.$transaction(async tx => {
+      // Revalidate the claim once after all provider reads and keep episode,
+      // receipt, and aggregate outbox writes in the same transaction.
+      const stillCurrent = await tx.notificationTrigger.updateMany({
+        where: { id: triggerId, revision, claimToken, enabled: true },
+        data: { claimUntil: new Date(Date.now() + 120_000) },
+      });
+      if (!stillCurrent.count) return;
+
+      let freshIssue = false;
+      const currentEntries: Array<{ entry: NotificationRailStatusEntry; index: number }> = [];
+      const orderedEntries = entries
+        .map((entry, index) => ({ entry, index }))
+        .sort((left, right) => left.entry.targetId.localeCompare(right.entry.targetId));
+      for (const { entry, index } of orderedEntries) {
+        const issueKey = await notificationIssueIdentity(
+          tx,
+          config.kind,
+          entry.targetId,
+          entry.snapshot,
+        );
+        if (issueKey === undefined) continue;
+        if (
+          !notificationEligibility(config, now, entry.snapshot.important) ||
+          (config.statusMode === 'abnormal' && entry.snapshot.normal)
+        ) {
+          continue;
+        }
+        if (issueKey && !entry.snapshot.normal) {
+          const receipt = await tx.notificationIssueReceipt.createMany({
+            data: [{ userId, issueKey }],
+            skipDuplicates: true,
+          });
+          freshIssue ||= receipt.count > 0;
+        }
+        currentEntries.push({ entry: { ...entry, issueKey }, index });
+      }
+
+      const deliverable = currentEntries
+        .sort((left, right) => left.index - right.index)
+        .map(({ entry }) => entry);
+      const message = buildAggregatedRailStatusMessage(
+        config,
+        triggerId,
+        deliverable,
+        now,
+      );
+      if (!message) return;
+      // Keep the complete current state in a mixed update. If every issue was
+      // already receipted, suppress the update instead of emitting a normal
+      // only summary while another line is still broken.
+      if (deliverable.some(entry => !entry.snapshot.normal) && !freshIssue) return;
+
+      await tx.notificationDelivery.createMany({
+        data: subscriptions.map(subscription => ({
+          triggerId,
+          subscriptionId: subscription.id,
+          revision,
+          ...message,
+          fingerprint: notificationHash(`${revision}-${message.fingerprint}`),
+        })),
+        skipDuplicates: true,
+      });
+    });
   }
 
   async cleanup(now = new Date()): Promise<void> {

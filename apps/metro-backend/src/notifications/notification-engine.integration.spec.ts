@@ -23,10 +23,11 @@ describe('notification evaluation to durable outbox integration', () => {
   let engine: NotificationEngineService;
   beforeEach(async () => {
     jest.clearAllMocks();
+    prisma.$transaction.mockImplementation(async callback => callback(prisma));
     jest.useFakeTimers().setSystemTime(now);
     findMany.mockResolvedValue([{ id: 'trigger', userId: 'user', user: { last_login: now }, revision: 1, config, targets: [{ target: { id: 'target', available: true } }] }]);
     updateMany.mockResolvedValue({ count: 1 });
-    prisma.$transaction.mockImplementation(async callback => callback(prisma));
+    prisma.notificationTarget.findUniqueOrThrow.mockResolvedValue({ observationClass: 'incident', observationEpisode: 'episode' });
     read.mockResolvedValue([{ title: 'Linha 1', body: 'Velocidade reduzida', fingerprint: 'incident', important: true, normal: false, observedAt: new Date('2026-09-07T10:00:00Z'), url: '/' }]);
     const module = await Test.createTestingModule({ providers: [NotificationEngineService, { provide: PrismaService, useValue: prisma }, { provide: NotificationSnapshotService, useValue: { readMany: read } }] }).compile();
     engine = module.get(NotificationEngineService);
@@ -104,5 +105,63 @@ describe('notification evaluation to durable outbox integration', () => {
     prisma.$transaction.mockRejectedValue(new Error('database unavailable'));
     await engine.evaluateDue(now);
     expect(updateMany).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ claimToken: null, claimUntil: null }) }));
+  });
+
+  it('creates one delivery containing every normal rail line', async () => {
+    const targets = [
+      { id: 'line-one', label: 'Linha 1 - Azul', available: true },
+      { id: 'line-two', label: 'Linha 2 - Verde', available: true },
+    ];
+    findMany.mockResolvedValue([{ id: 'trigger', userId: 'user', user: { last_login: now }, revision: 1, config: { ...config, statusMode: 'all', targetIds: targets.map(target => target.id) }, targets: targets.map(target => ({ target })) }]);
+    read.mockImplementation(async (_kind: string, target: { id: string; label: string }) => [{
+      title: target.label,
+      body: 'Operação normal',
+      fingerprint: `normal-${target.id}`,
+      important: false,
+      normal: true,
+      statusLabel: 'Operação Normal',
+      lineCode: target.id === 'line-one' ? 'L1' : 'L2',
+      observedAt: now,
+      url: '/',
+    }]);
+
+    await engine.evaluateDue(now);
+
+    expect(createMany).toHaveBeenCalledTimes(1);
+    expect(createMany.mock.calls[0][0].data).toHaveLength(1);
+    expect(createMany.mock.calls[0][0].data[0].payload.notification.body).toBe('L1, L2: Operação Normal');
+  });
+
+  it('groups a mixed rail status update and suppresses a receipted repeat', async () => {
+    const targets = [
+      { id: 'line-one', label: 'Linha 1 - Azul', statusLabel: 'Operação Parcial', normal: false, important: true },
+      { id: 'line-two', label: 'Linha 2 - Verde', statusLabel: 'Operação Parcial', normal: false, important: true },
+      { id: 'line-three', label: 'Linha 3 - Vermelha', statusLabel: 'Operação Encerrada', normal: false, important: true },
+      { id: 'line-four', label: 'Linha 4 - Amarela', statusLabel: 'Operação Normal', normal: true, important: false },
+    ];
+    const trigger = { id: 'trigger', userId: 'user', user: { last_login: now }, revision: 1, config: { ...config, statusMode: 'all', targetIds: targets.map(target => target.id) }, targets: targets.map(target => ({ target: { id: target.id, label: target.label, available: true } })) };
+    findMany.mockResolvedValue([trigger]);
+    read.mockImplementation(async (_kind: string, target: { id: string; label: string }) => {
+      const state = targets.find(candidate => candidate.id === target.id);
+      if (!state) return [];
+      return [{
+        title: state.label,
+        body: `${state.statusLabel}: details for ${state.id}`,
+        fingerprint: `status-${state.id}`,
+        important: state.important,
+        normal: state.normal,
+        statusLabel: state.statusLabel,
+        lineCode: `L${state.id.slice(-1)}`,
+        observedAt: now,
+        url: '/',
+      }];
+    });
+    prisma.notificationIssueReceipt.createMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValue({ count: 0 });
+
+    await engine.evaluateDue(now);
+    await engine.evaluateDue(now);
+
+    expect(createMany).toHaveBeenCalledTimes(1);
+    expect(createMany.mock.calls[0][0].data[0].payload.notification.body).toBe("1 linha com 'Operação Encerrada'\n2 linhas com 'Operação Parcial'");
   });
 });

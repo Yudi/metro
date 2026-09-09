@@ -11,6 +11,10 @@ export interface NotificationTarget {
   available: boolean;
   /** Public presentation aid for rail lines and rail stations; descriptors stay server-owned. */
   railLineCode?: number;
+  /** Public bus-route presentation data; feed descriptors stay server-owned. */
+  busRouteShortName?: string;
+  busRouteColor?: string;
+  busRouteTextColor?: string;
 }
 export interface NotificationWindow { start: string; end: string }
 export interface NotificationTriggerInput {
@@ -35,15 +39,59 @@ export interface NotificationTrigger extends NotificationTriggerInput {
 }
 export interface NotificationPushInput {
   endpoint: string;
+  /** Browser-inferred display label; never used as an authentication value. */
+  label?: string;
   keys: { p256dh: string; auth: string };
 }
 export interface NotificationDevice { id: string; label: string; createdAt: string }
 export interface NotificationConfiguration {
+  /** Monotonic account version used to order HTTP snapshots and socket deltas. */
+  revision: number;
   available: boolean;
   publicKey: string | null;
   triggers: NotificationTrigger[];
   devices: NotificationDevice[];
 }
+
+/**
+ * A committed change to the authenticated account's notification settings.
+ * The entity revision is deliberately kept in addition to the account
+ * revision: account events can arrive out of order across replicas, while an
+ * editor still needs the trigger's optimistic-concurrency revision.
+ */
+export type NotificationConfigurationDeltaInput =
+  | { type: 'trigger_upsert'; trigger: NotificationTrigger }
+  | {
+      type: 'trigger_remove';
+      triggerId: string;
+      triggerRevision: number;
+    }
+  | { type: 'device_upsert'; device: NotificationDevice }
+  | { type: 'device_remove'; deviceId: string };
+
+export type NotificationConfigurationDelta =
+  NotificationConfigurationDeltaInput & { revision: number };
+
+export interface NotificationConfigurationSnapshotEvent {
+  type: 'snapshot';
+  configuration: NotificationConfiguration;
+}
+
+export interface NotificationConfigurationDeltaEvent {
+  type: 'delta';
+  delta: NotificationConfigurationDelta;
+}
+
+export type NotificationConfigurationRealtimeEvent =
+  | NotificationConfigurationSnapshotEvent
+  | NotificationConfigurationDeltaEvent;
+
+export const NOTIFICATION_CONFIGURATION_SNAPSHOT_EVENT =
+  'notification_configuration_snapshot' as const;
+export const NOTIFICATION_CONFIGURATION_DELTA_EVENT =
+  'notification_configuration_delta' as const;
+export const NOTIFICATION_CONFIGURATION_RESYNC_EVENT =
+  'notification_configuration_resync' as const;
 export const TARGET_KIND_FOR_NOTIFICATION: Record<NotificationKind, NotificationTargetKind> = {
   rail_status: 'rail_line', rail_headway: 'rail_station', rail_arrivals: 'rail_station', bus_arrivals: 'bus_stop',
   bus_notices: 'bus_route', special_departures: 'special_line',

@@ -1,6 +1,27 @@
 import { HistoricalService } from './historical.service';
 
 describe('HistoricalService public projection', () => {
+  it('records backend lifecycle events with the stable system source', async () => {
+    const prisma = {
+      historicalIncidentEvent: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({ id: 'incident-1' }),
+      },
+    };
+    const service = new HistoricalService(
+      prisma as never,
+      { getStationName: jest.fn() } as never,
+    );
+
+    await service.onModuleInit();
+
+    expect(prisma.historicalIncidentEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ source: 'backend_lifecycle' }),
+      }),
+    );
+  });
+
   it('does not expose raw diagnostic objects or exception stacks', async () => {
     const prisma = {
       historicalIncidentEvent: {

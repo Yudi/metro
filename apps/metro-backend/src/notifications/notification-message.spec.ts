@@ -1,5 +1,9 @@
 import { NotificationTriggerInput } from '@metro/shared/notification-contracts';
-import { buildNotificationMessage, NotificationSnapshot } from './notification-message';
+import {
+  buildAggregatedRailStatusMessage,
+  buildNotificationMessage,
+  NotificationSnapshot,
+} from './notification-message';
 
 const trigger: NotificationTriggerInput = { name: 'Ida', enabled: true, days: [1], windows: [{ start: '08:00', end: '09:00' }], timezone: 'America/Sao_Paulo', smart: false, leadMinutes: 30, intervalMinutes: 15, kind: 'rail_status', targetIds: ['one'], statusMode: 'abnormal' };
 const incident: NotificationSnapshot = { title: 'Linha 1', body: 'Velocidade reduzida', fingerprint: 'slow', important: true, normal: false, observedAt: new Date('2026-09-07T10:00:00Z'), url: '/' };
@@ -38,5 +42,70 @@ describe('notification messages', () => {
   it('stays quiet without a known approaching arrival, even in smart mode', () => {
     const arrivalTrigger = { ...trigger, kind: 'bus_arrivals' as const, smart: true };
     expect(buildNotificationMessage(arrivalTrigger, 't', 'one', { ...incident, arrivals: [] }, new Date('2026-09-07T11:00:00Z'))).toBeNull();
+  });
+
+  it('lists every normal rail line in one notification', () => {
+    const normal = (lineCode: string): NotificationSnapshot => ({
+      title: lineCode,
+      body: 'Operação normal',
+      fingerprint: `normal-${lineCode}`,
+      important: false,
+      normal: true,
+      statusLabel: 'Operação Normal',
+      lineCode,
+      observedAt: new Date('2026-09-07T10:00:00Z'),
+      url: '/',
+    });
+    const message = buildAggregatedRailStatusMessage(
+      { ...trigger, statusMode: 'all' },
+      't',
+      [
+        { targetId: 'one', label: 'Linha 1 - Azul', snapshot: normal('L1') },
+        { targetId: 'two', label: 'Linha 2 - Verde', snapshot: normal('L2') },
+      ],
+      new Date('2026-09-07T11:00:00Z'),
+    );
+
+    expect(message?.payload.notification.body).toBe('L1, L2: Operação Normal');
+    expect(message?.payload.notification.data.targetIds).toEqual(['one', 'two']);
+  });
+
+  it('summarizes issue lines by canonical status and keeps the aggregate stable', () => {
+    const issue = (targetId: string, lineCode: string, statusLabel: string, fingerprint: string): NotificationSnapshot => ({
+      title: lineCode,
+      body: `${statusLabel}: detalhes diferentes para ${lineCode}`,
+      fingerprint,
+      important: true,
+      normal: false,
+      statusLabel,
+      lineCode,
+      observedAt: new Date('2026-09-07T10:00:00Z'),
+      url: '/',
+    });
+    const entries = [
+      { targetId: 'one', snapshot: issue('one', 'L1', 'Operação Parcial', 'one-details') },
+      { targetId: 'two', snapshot: issue('two', 'L2', 'Operação Parcial', 'two-details') },
+      { targetId: 'three', snapshot: issue('three', 'L3', 'Operação Encerrada', 'three-details') },
+      { targetId: 'four', snapshot: { ...issue('four', 'L4', 'Operação Normal', 'four-normal'), normal: true, important: false } },
+    ];
+    const now = new Date('2026-09-07T11:00:00Z');
+    const message = buildAggregatedRailStatusMessage({ ...trigger, statusMode: 'all' }, 't', entries, now);
+    const reversed = buildAggregatedRailStatusMessage({ ...trigger, statusMode: 'all' }, 't', [...entries].reverse(), now);
+
+    expect(message?.payload.notification.body).toBe("1 linha com 'Operação Encerrada'\n2 linhas com 'Operação Parcial'");
+    expect(message?.payload.notification.body).not.toContain('Operação Normal');
+    expect(message?.payload.notification.data.important).toBe(true);
+    expect(message?.fingerprint).toBe(reversed?.fingerprint);
+  });
+
+  it('does not invent a normal status when a normal snapshot has no status label', () => {
+    const message = buildAggregatedRailStatusMessage(
+      { ...trigger, statusMode: 'all' },
+      't',
+      [{ targetId: 'one', snapshot: { ...incident, normal: true, important: false, lineCode: 'L1' } }],
+      new Date('2026-09-07T11:00:00Z'),
+    );
+
+    expect(message?.payload.notification.body).toBe('L1');
   });
 });

@@ -17,7 +17,6 @@ import {
   HistoricalIncidentEventType,
 } from './entities/historical-data.entity';
 import { PrismaService } from '../prisma/prisma.service';
-import { randomUUID } from 'node:crypto';
 import type {
   HeadwayCalculationSamples,
   RecordHeadwayErrorParams,
@@ -56,12 +55,7 @@ export type {
 @Injectable()
 export class HistoricalService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(HistoricalService.name);
-  private readonly backendInstanceSource = `${BACKEND_LIFECYCLE_SOURCE}:${
-    process.env.INSTANCE_ID?.trim() ||
-    (process.env.HOSTNAME?.trim()
-      ? `${process.env.HOSTNAME.trim()}:${process.env.PORT ?? '3000'}`
-      : randomUUID())
-  }`;
+  private readonly backendInstanceSource = BACKEND_LIFECYCLE_SOURCE;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -258,7 +252,7 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
           observedAt: new Date(),
           source: this.backendInstanceSource,
           severity: 'normal',
-          title: 'Instância do backend online',
+          title: 'Instância do backend on-line',
           metadata: compactJsonObject({
             pid: process.pid,
             nodeEnv: process.env.NODE_ENV,
@@ -324,7 +318,7 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
         durationSeconds,
         source: this.backendInstanceSource,
         severity: 'warning',
-        title: 'Instância do backend possivelmente ficou offline',
+        title: 'Instância do backend possivelmente ficou off-line',
         description:
           'O processo anterior não registrou um desligamento limpo antes desta inicialização.',
         metadata: compactJsonObject({
@@ -343,7 +337,7 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
           observedAt: new Date(),
           source: this.backendInstanceSource,
           severity: 'warning',
-          title: 'Instância do backend offline',
+          title: 'Instância do backend off-line',
           description: reason,
           metadata: compactJsonObject({
             pid: process.pid,
@@ -405,7 +399,7 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
           ),
           eventType,
           title: recoveredFromIncident
-            ? `${line.line}: operação recuperada`
+            ? `${line.line}: operação normalizada`
             : `${line.line}: ${line.statusLabel}`,
           startedAt: recoveredFromIncident ? latestEvent.observedAt : undefined,
           endedAt: recoveredFromIncident ? new Date() : undefined,

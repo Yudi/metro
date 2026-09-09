@@ -247,6 +247,8 @@ export class NotificationSnapshotService {
       fingerprint: notificationHash(stableJson(semantic)),
       important: !BENIGN_RAIL_STATUSES.has(line.statusCode),
       normal,
+      statusLabel: line.statusLabel,
+      lineCode,
       observedAt: new Date(observedAt),
       url: '/',
     };

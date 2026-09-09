@@ -9,6 +9,7 @@ import {
 import { SwPush } from '@angular/service-worker';
 import { firstValueFrom, take } from 'rxjs';
 import type { NotificationPushInput } from '@metro/shared/notification-contracts';
+import { notificationDeviceLabel } from './notification-device-label';
 
 export type NotificationPermissionState =
   | 'unsupported'
@@ -46,6 +47,20 @@ export class NotificationPushService {
     const subscription = await this.swPush.requestSubscription({
       serverPublicKey: publicKey,
     });
+    this.refreshPermission();
+    return this.subscriptionInput(subscription);
+  }
+
+  /** Read an existing authorization without prompting or creating a subscription. */
+  async existingSubscription(): Promise<NotificationPushInput | null> {
+    if (!isPlatformBrowser(this.platformId) || !this.swPush?.isEnabled) {
+      return null;
+    }
+    const subscription = await firstValueFrom(this.swPush.subscription.pipe(take(1)));
+    return subscription ? this.subscriptionInput(subscription) : null;
+  }
+
+  private subscriptionInput(subscription: PushSubscription): NotificationPushInput {
     const p256dh = subscription.getKey('p256dh');
     const auth = subscription.getKey('auth');
 
@@ -53,10 +68,9 @@ export class NotificationPushService {
       throw new Error('O navegador não forneceu as chaves da assinatura.');
     }
 
-    this.refreshPermission();
-
     return {
       endpoint: subscription.endpoint,
+      label: notificationDeviceLabel(navigator.userAgent, navigator.maxTouchPoints),
       keys: {
         p256dh: encodeBase64Url(p256dh),
         auth: encodeBase64Url(auth),

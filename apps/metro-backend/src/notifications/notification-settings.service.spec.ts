@@ -340,4 +340,120 @@ describe('NotificationSettingsService', () => {
     ]);
     expect(targets.search).toHaveBeenCalledWith('rail_line', 'linha');
   });
+
+  it('projects safe bus route presentation fields from target search', async () => {
+    targets.search.mockResolvedValueOnce([
+      {
+        id: targetId,
+        kind: 'bus_route',
+        label: '702P-10 · Metrô Belém - Vila Industrial',
+        available: true,
+        busRouteShortName: '702P-10',
+        busRouteColor: '0066CC',
+        busRouteTextColor: 'FFFFFF',
+      },
+    ]);
+
+    await expect(service.getTargets('bus_route', '702P')).resolves.toEqual([
+      {
+        id: targetId,
+        kind: 'bus_route',
+        label: '702P-10 · Metrô Belém - Vila Industrial',
+        available: true,
+        busRouteShortName: '702P-10',
+        busRouteColor: '#0066CC',
+        busRouteTextColor: '#FFFFFF',
+      },
+    ]);
+  });
+
+  it('recovers bus route presentation from a persisted target descriptor', async () => {
+    const busInput = {
+      ...triggerInput,
+      kind: 'bus_notices' as const,
+    };
+    prisma.notificationTrigger.findMany.mockResolvedValueOnce([
+      {
+        id: triggerId,
+        revision: 0,
+        config: { ...busInput, targetIds: [targetId] },
+        targets: [
+          {
+            target: {
+              id: targetId,
+              kind: 'bus_route',
+              label: '702P-10 · Metrô Belém - Vila Industrial',
+              available: true,
+              descriptor: {
+                routeName: '702P-10',
+                agency: 'sptrans',
+                presentation: {
+                  busRouteShortName: '702P-10',
+                  busRouteColor: '0066CC',
+                  busRouteTextColor: 'FFFFFF',
+                },
+              },
+            },
+          },
+        ],
+      },
+    ]);
+    prisma.pushSubscription.findMany.mockResolvedValueOnce([]);
+
+    const configuration = await service.getConfiguration('user-id');
+
+    expect(configuration.triggers[0].targets[0]).toMatchObject({
+      kind: 'bus_route',
+      busRouteShortName: '702P-10',
+      busRouteColor: '#0066CC',
+      busRouteTextColor: '#FFFFFF',
+    });
+  });
+
+  it('publishes trigger and device changes only after their mutations resolve', async () => {
+    const realtime = {
+      getCurrentRevision: jest.fn().mockResolvedValue(0),
+      publishTriggerUpsert: jest.fn().mockResolvedValue(1),
+      publishTriggerRemove: jest.fn().mockResolvedValue(2),
+      publishDeviceUpsert: jest.fn().mockResolvedValue(3),
+      publishDeviceRemoved: jest.fn().mockResolvedValue(4),
+    };
+    const withRealtime = new NotificationSettingsService(
+      prisma as unknown as PrismaService,
+      new ConfigService({
+        VAPID_PUBLIC_KEY: validP256dh,
+        VAPID_PRIVATE_KEY: 'b'.repeat(43),
+        VAPID_SUBJECT: 'mailto:operations@example.com',
+      }),
+      targets as unknown as NotificationTargetsService,
+      realtime as never,
+    );
+    prisma.notificationTrigger.create.mockResolvedValueOnce({
+      id: triggerId,
+      revision: 0,
+      config: triggerInput,
+      targets: [{ target: { id: targetId, kind: 'rail_line', label: 'Linha 1-Azul', available: true } }],
+    });
+
+    await withRealtime.saveTrigger('user-id', triggerInput);
+    expect(realtime.publishTriggerUpsert).toHaveBeenCalledWith(
+      'user-id',
+      expect.objectContaining({ id: triggerId }),
+    );
+
+    prisma.notificationTrigger.findFirst.mockResolvedValueOnce({ revision: 0 });
+    await withRealtime.deleteTrigger('user-id', triggerId, 0);
+    expect(realtime.publishTriggerRemove).toHaveBeenCalledWith(
+      'user-id',
+      triggerId,
+      0,
+    );
+
+    prisma.pushSubscription.deleteMany.mockResolvedValueOnce({ count: 1 });
+    await withRealtime.removeDevice('user-id', deviceId);
+    expect(realtime.publishDeviceRemoved).toHaveBeenCalledWith(
+      'user-id',
+      deviceId,
+    );
+  });
 });

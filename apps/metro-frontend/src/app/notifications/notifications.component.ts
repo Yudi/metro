@@ -19,6 +19,8 @@ import { AuthService, authReady, firebaseIdToken, firebaseUser } from '@metro/sh
 import { NotificationApiError, NotificationApiService } from '@metro/shared/api';
 import type {
   NotificationConfiguration,
+  NotificationConfigurationDelta,
+  NotificationConfigurationRealtimeEvent,
   NotificationDevice,
   NotificationKind,
   NotificationTrigger,
@@ -30,6 +32,8 @@ import {
   NotificationTriggerEditorComponent,
   NotificationTriggerEditorSave,
 } from './notification-trigger-editor.component';
+import { NotificationTargetIdentityComponent } from './notification-target-identity.component';
+import { NotificationWebsocketService } from './notification-websocket.service';
 
 type NotificationPageState =
   | 'authenticating'
@@ -75,6 +79,7 @@ const DEVICE_STORAGE_PREFIX = 'metro.notifications.device.';
     MatProgressSpinnerModule,
     MatSlideToggleModule,
     NotificationTriggerEditorComponent,
+    NotificationTargetIdentityComponent,
   ],
   templateUrl: './notifications.component.html',
   styleUrl: './notifications.component.scss',
@@ -114,13 +119,22 @@ export class NotificationsComponent {
   private readonly api = inject(NotificationApiService);
   private readonly authService = inject(AuthService);
   private readonly pushService = inject(NotificationPushService);
+  private readonly realtime = inject(NotificationWebsocketService);
   private readonly platformId = inject(PLATFORM_ID);
   private readonly destroyRef = inject(DestroyRef);
   private sessionUid: string | null = null;
+  private sessionToken: string | null = null;
   private sessionGeneration = 0;
   private requestGeneration = 0;
   private configurationSubscription?: { unsubscribe(): void };
   private mutationSubscription?: { unsubscribe(): void };
+  private realtimeResyncPending = false;
+  private realtimeRevisionWatermark = 0;
+  private deviceLabelAttempted = false;
+  private readonly triggerTombstones = new Map<string, number>();
+  private readonly deviceTombstones = new Set<string>();
+  private readonly localTriggerUpserts = new Map<string, number>();
+  private readonly localDeviceUpserts = new Set<string>();
 
   readonly permission = this.pushService.permission;
   readonly pushSupported = this.pushService.supported;
@@ -146,19 +160,44 @@ export class NotificationsComponent {
       }
 
       // Firebase clears the token while changing accounts or refreshing it.
-      // Clear cloud data until the new token is available so another account's
-      // triggers never remain visible during that transition.
+      // A same-account refresh keeps the draft in memory while all cloud
+      // operations and the old authenticated socket are stopped.
       if (!token) {
-        this.resetSession();
+        if (user && this.sessionUid === user.uid) {
+          // A token refresh keeps the same account. Tear down the old socket
+          // and cancel in-flight writes, but retain the draft and cloud state
+          // until the replacement token reconnects the account.
+          this.realtime.disconnect();
+          this.configurationSubscription?.unsubscribe();
+          this.mutationSubscription?.unsubscribe();
+          this.configurationSubscription = undefined;
+          this.mutationSubscription = undefined;
+          this.sessionToken = null;
+          this.pendingTriggerId.set(null);
+          this.deletingTriggerId.set(null);
+          this.pushBusy.set(false);
+          this.refreshing.set(false);
+        } else {
+          this.resetSession();
+        }
         this.pageState.set('authenticating');
         return;
       }
 
-      if (this.sessionUid === user.uid) {
+      if (this.sessionUid === user.uid && this.sessionToken === token) {
         return;
       }
 
-      this.startSession(user.uid);
+      if (this.sessionUid === user.uid) {
+        this.sessionToken = token;
+        this.realtime.connect(user.uid, token);
+        if (this.configuration()) {
+          this.pageState.set('ready');
+        }
+        return;
+      }
+
+      this.startSession(user.uid, token);
     });
 
     if (isPlatformBrowser(this.platformId)) {
@@ -169,8 +208,13 @@ export class NotificationsComponent {
         ),
       )
         .pipe(auditTime(400), takeUntilDestroyed(this.destroyRef))
-        .subscribe(() => this.refreshConfiguration());
+        .subscribe(() => this.pushService.refreshPermission());
     }
+
+    this.realtime.events$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((event) => this.handleRealtimeEvent(event));
+    this.destroyRef.onDestroy(() => this.realtime.disconnect());
   }
 
   login(): void {
@@ -282,6 +326,8 @@ export class NotificationsComponent {
           if (!deleted) {
             this.operationError.set('O aviso não pôde ser removido.');
           } else {
+            this.triggerTombstones.set(trigger.id, trigger.revision);
+            this.localTriggerUpserts.delete(trigger.id);
             this.configuration.update((configuration) =>
               configuration
                 ? {
@@ -344,13 +390,21 @@ export class NotificationsComponent {
 
       this.deviceId.set(id);
       this.writeStoredDeviceId(uid, id);
+      const deviceLabel = input.label?.trim() || 'Dispositivo';
+      this.deviceTombstones.delete(id);
+      this.localDeviceUpserts.add(id);
       this.configuration.update((configuration) => {
         if (!configuration) {
           return configuration;
         }
 
         if (configuration.devices.some((device) => device.id === id)) {
-          return configuration;
+          return {
+            ...configuration,
+            devices: configuration.devices.map((device) =>
+              device.id === id ? { ...device, label: deviceLabel } : device,
+            ),
+          };
         }
 
         return {
@@ -359,7 +413,7 @@ export class NotificationsComponent {
             ...configuration.devices,
             {
               id,
-              label: 'Este dispositivo',
+              label: deviceLabel,
               createdAt: new Date().toISOString(),
             },
           ],
@@ -423,6 +477,8 @@ export class NotificationsComponent {
         this.removeStoredDeviceId(uid);
       }
 
+      this.deviceTombstones.add(device.id);
+      this.localDeviceUpserts.delete(device.id);
       this.configuration.update((configuration) =>
         configuration
           ? {
@@ -464,13 +520,6 @@ export class NotificationsComponent {
     return `${days} · ${windows}`;
   }
 
-  targetSummary(trigger: NotificationTrigger): string {
-    const labels = trigger.targets
-      .map((target) => target.label.trim())
-      .filter((label) => label.length > 0);
-    return labels.length > 0 ? labels.join(' · ') : 'Destino indisponível';
-  }
-
   deviceDate(device: NotificationDevice): string {
     const date = new Date(device.createdAt);
     if (Number.isNaN(date.valueOf())) {
@@ -482,12 +531,14 @@ export class NotificationsComponent {
     }).format(date);
   }
 
-  private startSession(uid: string): void {
+  private startSession(uid: string, token: string): void {
     this.resetSession();
     this.sessionUid = uid;
+    this.sessionToken = token;
     this.sessionGeneration += 1;
     this.deviceId.set(this.readStoredDeviceId(uid));
     this.pageState.set('loading');
+    this.realtime.connect(uid, token);
     this.loadConfiguration(uid, true);
   }
 
@@ -518,11 +569,12 @@ export class NotificationsComponent {
             return;
           }
 
-          this.configuration.set(configuration);
+          const applied = this.applyConfigurationSnapshot(configuration, uid);
           this.pageState.set('ready');
           this.refreshing.set(false);
-          this.resolveStoredDeviceId(uid, configuration);
-          this.closeEditorWhenRemoved(configuration);
+          if (!applied) {
+            return;
+          }
         },
         error: (error: unknown) => {
           if (
@@ -533,10 +585,261 @@ export class NotificationsComponent {
           }
 
           this.refreshing.set(false);
+          if (this.configuration()) {
+            // A socket snapshot may already be authoritative. Keep showing
+            // it if this older HTTP read fails after the realtime path wins.
+            this.pageState.set('ready');
+            return;
+          }
           this.pageState.set('error');
           this.errorMessage.set(this.getErrorMessage(error));
         },
       });
+  }
+
+  private handleRealtimeEvent(event: NotificationConfigurationRealtimeEvent): void {
+    const uid = this.sessionUid;
+    const generation = this.sessionGeneration;
+    if (!uid || !this.isCurrentSession(uid, generation)) {
+      return;
+    }
+
+    if (event.type === 'snapshot') {
+      if (this.applyConfigurationSnapshot(event.configuration, uid)) {
+        this.pageState.set('ready');
+        this.refreshing.set(false);
+        this.errorMessage.set(null);
+      }
+      return;
+    }
+
+    this.realtimeRevisionWatermark = Math.max(
+      this.realtimeRevisionWatermark,
+      event.delta.revision,
+    );
+    const configuration = this.configuration();
+    if (!configuration) {
+      this.requestRealtimeResync();
+      return;
+    }
+
+    const currentRevision = configuration.revision;
+    if (event.delta.revision <= currentRevision) {
+      return;
+    }
+    if (event.delta.revision > currentRevision + 1) {
+      this.requestRealtimeResync();
+      return;
+    }
+
+    this.applyRealtimeDelta(event.delta);
+  }
+
+  private applyConfigurationSnapshot(
+    incoming: NotificationConfiguration,
+    uid: string,
+  ): boolean {
+    const current = this.configuration();
+    if (incoming.revision < this.realtimeRevisionWatermark) {
+      // A mixed snapshot may carry the version observed before a missing
+      // delta. Keep the watermark and ask for another snapshot.
+      this.realtimeResyncPending = false;
+      this.requestRealtimeResync();
+      return false;
+    }
+    if (current && incoming.revision < current.revision) {
+      this.closeEditorWhenRemoved(current);
+      return false;
+    }
+
+    const currentTriggers = current?.triggers ?? [];
+    const currentDevices = current?.devices ?? [];
+    const incomingTriggerIds = new Set(incoming.triggers.map((trigger) => trigger.id));
+    const triggers = incoming.triggers
+      .filter((trigger) => !this.triggerTombstones.has(trigger.id))
+      .map((trigger) => {
+        const local = currentTriggers.find((item) => item.id === trigger.id);
+        return local && local.revision > trigger.revision ? local : trigger;
+      });
+    const snapshotIsNewer =
+      current !== null && incoming.revision > current.revision;
+    for (const local of currentTriggers) {
+      if (
+        !incomingTriggerIds.has(local.id) &&
+        this.localTriggerUpserts.has(local.id) &&
+        !this.triggerTombstones.has(local.id) &&
+        !snapshotIsNewer
+      ) {
+        triggers.push(local);
+      } else if (!incomingTriggerIds.has(local.id)) {
+        this.localTriggerUpserts.delete(local.id);
+      }
+    }
+
+    const incomingDeviceIds = new Set(incoming.devices.map((device) => device.id));
+    const devices = incoming.devices.filter(
+      (device) => !this.deviceTombstones.has(device.id),
+    );
+    for (const local of currentDevices) {
+      if (
+        !incomingDeviceIds.has(local.id) &&
+        this.localDeviceUpserts.has(local.id) &&
+        !this.deviceTombstones.has(local.id) &&
+        !snapshotIsNewer
+      ) {
+        devices.push(local);
+      } else if (!incomingDeviceIds.has(local.id)) {
+        this.localDeviceUpserts.delete(local.id);
+      }
+    }
+
+    this.configuration.set({ ...incoming, triggers, devices });
+    this.realtimeRevisionWatermark = Math.max(
+      this.realtimeRevisionWatermark,
+      incoming.revision,
+    );
+    for (const [id, revision] of this.localTriggerUpserts) {
+      const incomingTrigger = incoming.triggers.find((trigger) => trigger.id === id);
+      if (incomingTrigger && incomingTrigger.revision >= revision) {
+        this.localTriggerUpserts.delete(id);
+      }
+    }
+    for (const id of this.localDeviceUpserts) {
+      if (incomingDeviceIds.has(id)) {
+        this.localDeviceUpserts.delete(id);
+      }
+    }
+    this.realtimeResyncPending = false;
+    const accepted = this.configuration();
+    if (!accepted) {
+      return false;
+    }
+    this.resolveStoredDeviceId(uid, accepted);
+    this.closeEditorWhenRemoved(accepted);
+    void this.backfillDeviceLabel(uid);
+    return true;
+  }
+
+  private async backfillDeviceLabel(uid: string): Promise<void> {
+    const device = this.currentDevice();
+    if (this.deviceLabelAttempted || !device || !/^(Dispositivo|Este dispositivo)$/iu.test(device.label.trim())) {
+      return;
+    }
+    this.deviceLabelAttempted = true;
+    const generation = this.sessionGeneration;
+    try {
+      const input = await this.pushService.existingSubscription();
+      const label = input?.label;
+      if (!input || !label || label === 'Dispositivo' || !this.isCurrentSession(uid, generation) || this.deviceId() !== device.id) {
+        return;
+      }
+      const id = await firstValueFrom(this.api.registerDevice(input).pipe(takeUntilDestroyed(this.destroyRef)));
+      if (!this.isCurrentSession(uid, generation) || id !== device.id || this.deviceId() !== device.id || this.deviceTombstones.has(id)) {
+        return;
+      }
+      this.configuration.update((configuration) => configuration ? {
+        ...configuration,
+        devices: configuration.devices.map((item) => item.id === id ? { ...item, label } : item),
+      } : configuration);
+    } catch {
+      // Label enrichment is optional; keep the existing authorization usable
+      // when its subscription cannot be read or refreshed.
+    }
+  }
+
+  private applyRealtimeDelta(delta: NotificationConfigurationDelta): void {
+    this.configuration.update((configuration) => {
+      if (!configuration) {
+        return configuration;
+      }
+
+      if (delta.type === 'trigger_upsert') {
+        if (this.triggerTombstones.has(delta.trigger.id)) {
+          return { ...configuration, revision: delta.revision };
+        }
+        const current = configuration.triggers.find(
+          (trigger) => trigger.id === delta.trigger.id,
+        );
+        if (current && current.revision > delta.trigger.revision) {
+          return { ...configuration, revision: delta.revision };
+        }
+        this.localTriggerUpserts.delete(delta.trigger.id);
+        const exists = !!current;
+        return {
+          ...configuration,
+          revision: delta.revision,
+          triggers: exists
+            ? configuration.triggers.map((trigger) =>
+                trigger.id === delta.trigger.id ? delta.trigger : trigger,
+              )
+            : [...configuration.triggers, delta.trigger],
+        };
+      }
+
+      if (delta.type === 'trigger_remove') {
+        const current = configuration.triggers.find(
+          (trigger) => trigger.id === delta.triggerId,
+        );
+        if (current && current.revision > delta.triggerRevision) {
+          return { ...configuration, revision: delta.revision };
+        }
+        this.triggerTombstones.set(delta.triggerId, delta.triggerRevision);
+        this.localTriggerUpserts.delete(delta.triggerId);
+        return {
+          ...configuration,
+          revision: delta.revision,
+          triggers: configuration.triggers.filter(
+            (trigger) => trigger.id !== delta.triggerId,
+          ),
+        };
+      }
+
+      if (delta.type === 'device_upsert') {
+        if (this.deviceTombstones.has(delta.device.id)) {
+          return { ...configuration, revision: delta.revision };
+        }
+        this.localDeviceUpserts.delete(delta.device.id);
+        const exists = configuration.devices.some(
+          (device) => device.id === delta.device.id,
+        );
+        return {
+          ...configuration,
+          revision: delta.revision,
+          devices: exists
+            ? configuration.devices.map((device) =>
+                device.id === delta.device.id ? delta.device : device,
+              )
+            : [...configuration.devices, delta.device],
+        };
+      }
+
+      this.deviceTombstones.add(delta.deviceId);
+      this.localDeviceUpserts.delete(delta.deviceId);
+      return {
+        ...configuration,
+        revision: delta.revision,
+        devices: configuration.devices.filter(
+          (device) => device.id !== delta.deviceId,
+        ),
+      };
+    });
+
+    const configuration = this.configuration();
+    if (configuration) {
+      const uid = this.sessionUid;
+      if (uid && delta.type === 'device_remove') {
+        this.resolveStoredDeviceId(uid, configuration);
+      }
+      this.closeEditorWhenRemoved(configuration);
+    }
+  }
+
+  private requestRealtimeResync(): void {
+    if (this.realtimeResyncPending) {
+      return;
+    }
+    this.realtimeResyncPending = true;
+    this.realtime.requestResync();
   }
 
   private persistTrigger(
@@ -564,8 +867,20 @@ export class NotificationsComponent {
             return;
           }
 
+          if (this.triggerTombstones.has(trigger.id)) {
+            this.pendingTriggerId.set(null);
+            return;
+          }
+          this.localTriggerUpserts.set(trigger.id, trigger.revision);
           this.configuration.update((configuration) => {
             if (!configuration) {
+              return configuration;
+            }
+
+            const current = configuration.triggers.find(
+              (item) => item.id === trigger.id,
+            );
+            if (current && current.revision > trigger.revision) {
               return configuration;
             }
 
@@ -656,13 +971,22 @@ export class NotificationsComponent {
   }
 
   private resetSession(): void {
+    this.deviceLabelAttempted = false;
     this.configurationSubscription?.unsubscribe();
     this.mutationSubscription?.unsubscribe();
+    this.realtime.disconnect();
     this.configurationSubscription = undefined;
     this.mutationSubscription = undefined;
     this.sessionUid = null;
+    this.sessionToken = null;
     this.sessionGeneration += 1;
     this.requestGeneration += 1;
+    this.realtimeResyncPending = false;
+    this.realtimeRevisionWatermark = 0;
+    this.triggerTombstones.clear();
+    this.deviceTombstones.clear();
+    this.localTriggerUpserts.clear();
+    this.localDeviceUpserts.clear();
     this.configuration.set(null);
     this.deviceId.set(null);
     this.editingTriggerId.set(null);

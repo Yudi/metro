@@ -9,6 +9,7 @@ import type {
   NotificationTriggerInput,
 } from '@metro/shared/notification-contracts';
 import { NotificationPermissionState, NotificationPushService } from './notification-push.service';
+import { NotificationWebsocketService } from './notification-websocket.service';
 import { NotificationsComponent } from './notifications.component';
 
 describe('NotificationsComponent', () => {
@@ -22,6 +23,7 @@ describe('NotificationsComponent', () => {
     removeDevice: jest.Mock;
   };
   let requestSubscription: jest.Mock;
+  let realtimeEvents: Subject<never>;
 
   const triggerInput: NotificationTriggerInput = {
     name: 'Ida para a faculdade',
@@ -52,6 +54,7 @@ describe('NotificationsComponent', () => {
   };
 
   const configuration: NotificationConfiguration = {
+    revision: 1,
     available: true,
     publicKey: 'public-key',
     triggers: [trigger],
@@ -71,6 +74,7 @@ describe('NotificationsComponent', () => {
       removeDevice: jest.fn(),
     };
     requestSubscription = jest.fn();
+    realtimeEvents = new Subject<never>();
     const permission = signal<NotificationPermissionState>('default');
     const supported = signal(true);
 
@@ -91,6 +95,15 @@ describe('NotificationsComponent', () => {
         {
           provide: AuthService,
           useValue: { loginGoogle: jest.fn() },
+        },
+        {
+          provide: NotificationWebsocketService,
+          useValue: {
+            events$: realtimeEvents.asObservable(),
+            connect: jest.fn(),
+            disconnect: jest.fn(),
+            requestResync: jest.fn(),
+          },
         },
       ],
     }).compileComponents();

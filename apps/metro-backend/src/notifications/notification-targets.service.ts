@@ -1,10 +1,20 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { NotificationTarget, NotificationTargetKind } from '@metro/shared/notification-contracts';
 import { HEADWAY_DEFAULT_ENABLED_LINES, RAIL_LINES, SPECIAL_RAIL_LINE_CODES } from '@metro/shared/utils';
+import type { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { notificationHash } from './notification-message';
 
-interface Candidate { kind: NotificationTargetKind; label: string; descriptor: Record<string, string | number>; }
+interface Candidate {
+  kind: NotificationTargetKind;
+  label: string;
+  descriptor: Record<string, string | number>;
+  storedDescriptor?: Record<string, unknown>;
+  presentation?: Pick<
+    NotificationTarget,
+    'busRouteShortName' | 'busRouteColor' | 'busRouteTextColor'
+  >;
+}
 const HEADWAY_LINE_CODES = new Set<string>(HEADWAY_DEFAULT_ENABLED_LINES);
 export function normalizeNotificationName(value: string): string {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -29,13 +39,37 @@ export class NotificationTargetsService {
       ];
     } else if (kind === 'bus_route') {
       if (search.trim().length < 2) return [];
-      const rows = await this.prisma.$queryRaw<Array<{ name: string; label: string }>>`
-        SELECT route_short_name AS name, min(route_long_name) AS label
+      const rows = await this.prisma.$queryRaw<Array<{
+        name: string;
+        label: string;
+        color: string | null;
+        textColor: string | null;
+      }>>`
+        SELECT route_short_name AS name, min(route_long_name) AS label,
+          min(route_color) AS color, min(route_text_color) AS "textColor"
         FROM public."Gtfs_Route" WHERE route_type = 3 AND source_agency = 'sptrans'
           AND (route_short_name ILIKE ${`%${search.trim()}%`} OR route_long_name ILIKE ${`%${search.trim()}%`})
         GROUP BY route_short_name ORDER BY route_short_name LIMIT 30
       `;
-      candidates = rows.map(row => ({ kind, label: `${row.name} · ${row.label}`, descriptor: { routeName: row.name, agency: 'sptrans' } }));
+      candidates = rows.map(row => ({
+        kind,
+        label: `${row.name} · ${row.label}`,
+        descriptor: { routeName: row.name, agency: 'sptrans' },
+        storedDescriptor: {
+          routeName: row.name,
+          agency: 'sptrans',
+          presentation: {
+            busRouteShortName: row.name,
+            ...(row.color ? { busRouteColor: row.color } : {}),
+            ...(row.textColor ? { busRouteTextColor: row.textColor } : {}),
+          },
+        },
+        presentation: {
+          busRouteShortName: row.name,
+          ...(row.color ? { busRouteColor: row.color } : {}),
+          ...(row.textColor ? { busRouteTextColor: row.textColor } : {}),
+        },
+      }));
     } else {
       if (search.trim().length < 3) return [];
       const rows = await this.prisma.$queryRaw<Array<{ name: string; description: string | null; latitude: number; longitude: number; platformCode: string | null }>>`
@@ -54,15 +88,29 @@ export class NotificationTargetsService {
   private async persist(candidate: Candidate): Promise<NotificationTarget> {
     // IDs identify the user's semantic selection, not a replaceable feed row.
     const identityKey = notificationHash(JSON.stringify([candidate.kind, candidate.descriptor]));
+    const descriptor = candidate.storedDescriptor ?? candidate.descriptor;
+    const descriptorJson = descriptor as unknown as Prisma.InputJsonValue;
     const target = await this.prisma.notificationTarget.upsert({
-      where: { identityKey }, update: { label: candidate.label, available: true },
-      create: { identityKey, ...candidate },
+      where: { identityKey },
+      update: {
+        label: candidate.label,
+        available: true,
+        descriptor: descriptorJson,
+      },
+      create: {
+        identityKey,
+        kind: candidate.kind,
+        label: candidate.label,
+        available: true,
+        descriptor: descriptorJson,
+      },
     });
     return {
       id: target.id,
       kind: candidate.kind,
       label: target.label,
       available: target.available,
+      ...candidate.presentation,
       ...this.railLinePresentation(candidate),
     };
   }

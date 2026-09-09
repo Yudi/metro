@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import * as webPush from 'web-push';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationPushService } from './notification-push.service';
+import { NotificationRealtimeService } from './notification-realtime.service';
 
 jest.mock('web-push', () => ({ sendNotification: jest.fn() }));
 describe('notification delivery', () => {
@@ -15,7 +16,8 @@ describe('notification delivery', () => {
     $transaction: jest.fn(async (callback: (tx: typeof transaction) => unknown) => callback(transaction)),
   } as unknown as PrismaService;
   const config = { get: () => 'configured' } as unknown as ConfigService;
-  const service = new NotificationPushService(prisma, config);
+  const publishDeviceRemoved = jest.fn().mockResolvedValue(1);
+  const service = new NotificationPushService(prisma, config, { publishDeviceRemoved } as unknown as NotificationRealtimeService);
   const delivery = () => ({
     id: 'd', triggerId: 't', subscriptionId: 's', revision: 1, attempts: 1,
     expiresAt: new Date('2026-09-07T11:35:00Z'), payload: { notification: { data: { important: true } } },
@@ -26,6 +28,7 @@ describe('notification delivery', () => {
     jest.useFakeTimers().setSystemTime(now);
     jest.clearAllMocks();
     findFirst.mockResolvedValue(null);
+    deleteMany.mockResolvedValue({ count: 1 });
     updateMany.mockResolvedValue({ count: 1 });
     findUnique.mockImplementation(async () => ({ ...delivery(), claimToken: updateMany.mock.calls[0][0].data.claimToken }));
     jest.mocked(webPush.sendNotification).mockResolvedValue({ statusCode: 201, body: '', headers: {} });
@@ -94,6 +97,13 @@ describe('notification delivery', () => {
     jest.mocked(webPush.sendNotification).mockRejectedValue({ statusCode: 410 });
     await service.deliver('d', now);
     expect(deleteMany).toHaveBeenCalledWith({ where: { id: 's', user_id: 'u' } });
+    expect(publishDeviceRemoved).toHaveBeenCalledWith('u', 's');
+  });
+  it('does not publish a removal for a subscription already deleted elsewhere', async () => {
+    jest.mocked(webPush.sendNotification).mockRejectedValue({ statusCode: 404 });
+    deleteMany.mockResolvedValue({ count: 0 });
+    await service.deliver('d', now);
+    expect(publishDeviceRemoved).not.toHaveBeenCalled();
   });
   it('persists transient retry times and releases the claim', async () => {
     jest.mocked(webPush.sendNotification).mockRejectedValue({ statusCode: 429 });

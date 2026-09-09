@@ -148,7 +148,7 @@ export class RailIncidentHistoryService {
       eventType === historical_incident_event_type.BACKEND_OFFLINE ||
       eventType === historical_incident_event_type.BACKEND_OFFLINE_DETECTED
     ) {
-      return 'Backend';
+      return 'Sistema';
     }
 
     return 'Sistema';
@@ -179,7 +179,7 @@ export class RailIncidentHistoryService {
       case 'rail_status':
         return 'Monitoramento das linhas';
       case 'backend_lifecycle':
-        return 'Backend';
+        return 'Sistema';
       case 'headway_tracking':
         return 'Monitoramento de intervalos';
       default:
@@ -215,9 +215,9 @@ export class RailIncidentHistoryService {
           ? 'Normalização'
           : 'Status operacional';
       case historical_incident_event_type.BACKEND_ONLINE:
-        return 'Backend online';
+        return 'Backend on-line';
       case historical_incident_event_type.BACKEND_OFFLINE:
-        return 'Backend offline';
+        return 'Backend off-line';
       case historical_incident_event_type.BACKEND_OFFLINE_DETECTED:
         return 'Indisponibilidade detectada';
       case historical_incident_event_type.RETRIEVAL_ISSUE:

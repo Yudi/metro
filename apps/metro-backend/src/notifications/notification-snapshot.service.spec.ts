@@ -143,6 +143,8 @@ describe('NotificationSnapshotService', () => {
       title: 'Linha 1 - Azul',
       normal: false,
       important: false,
+      statusLabel: 'Operação Transitória',
+      lineCode: 'L1',
     });
     expect(setup.rail.getLinesStatus).toHaveBeenCalledTimes(1);
   });

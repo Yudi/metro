@@ -72,7 +72,7 @@ const MOCK_ROWS: IncidentHistoryItem[] = [
       nome: 'Backend',
       badge: 'SISTEMA',
     },
-    situacao: 'Backend possivelmente ficou offline',
+    situacao: 'Backend possivelmente ficou off-line',
     descricao:
       'O processo anterior não registrou um desligamento limpo antes desta inicialização.',
     classificacao: {

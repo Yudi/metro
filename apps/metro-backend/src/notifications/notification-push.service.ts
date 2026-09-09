@@ -1,14 +1,19 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'node:crypto';
 import * as webPush from 'web-push';
 import { NotificationTriggerInput, notificationEligibility, validateNotificationTrigger } from '@metro/shared/notification-contracts';
 import { notificationRetentionExpiry, notificationRetentionStage } from './notification-retention';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationRealtimeService } from './notification-realtime.service';
 
 @Injectable()
 export class NotificationPushService {
-  constructor(private readonly prisma: PrismaService, private readonly config: ConfigService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+    @Optional() private readonly realtime?: NotificationRealtimeService,
+  ) {}
 
   async deliver(id: string, now = new Date()): Promise<void> {
     const publicKey = this.config.get<string>('VAPID_PUBLIC_KEY');
@@ -74,7 +79,15 @@ export class NotificationPushService {
     } catch (error: unknown) {
       const status = error && typeof error === 'object' && 'statusCode' in error ? Number(error.statusCode) : 0;
       if (status === 404 || status === 410) {
-        await this.prisma.pushSubscription.deleteMany({ where: { id: delivery.subscriptionId, user_id: delivery.subscription.user_id } });
+        const removed = await this.prisma.pushSubscription.deleteMany({ where: { id: delivery.subscriptionId, user_id: delivery.subscription.user_id } });
+        if (removed.count && delivery.subscription.user_id) {
+          try {
+            await this.realtime?.publishDeviceRemoved(delivery.subscription.user_id, delivery.subscriptionId);
+          } catch {
+            // The expired subscription is already gone; reconnect snapshots
+            // reconcile the device list if realtime delivery is unavailable.
+          }
+        }
         return;
       }
       if (status >= 400 && status < 500 && status !== 429) {

@@ -12,6 +12,7 @@ import {
   NotificationPermissionState,
   NotificationPushService,
 } from './notification-push.service';
+import { NotificationWebsocketService } from './notification-websocket.service';
 import { NotificationsComponent } from './notifications.component';
 
 const storyTrigger: NotificationTrigger & { arrivalLeadMinutes: number } = {
@@ -35,14 +36,46 @@ const storyTrigger: NotificationTrigger & { arrivalLeadMinutes: number } = {
       kind: 'rail_line',
       label: 'Linha 9 - Esmeralda',
       available: true,
+      railLineCode: 9,
     },
   ],
 };
 
+const busStoryTrigger: NotificationTrigger & { arrivalLeadMinutes: number } = {
+  id: 'story-bus-trigger',
+  revision: 2,
+  name: 'Avisos do ônibus',
+  enabled: true,
+  days: [1, 2, 3, 4, 5],
+  windows: [{ start: '06:30', end: '09:00' }],
+  timezone: 'America/Sao_Paulo',
+  smart: true,
+  leadMinutes: 15,
+  arrivalLeadMinutes: 5,
+  intervalMinutes: 15,
+  kind: 'bus_notices',
+  targetIds: ['route-702p-10'],
+  statusMode: 'abnormal',
+  targets: [
+    {
+      id: 'route-702p-10',
+      kind: 'bus_route',
+      label: '702P-10 · Metrô Belém - Vila Industrial',
+      available: true,
+      busRouteShortName: '702P-10',
+      busRouteColor: '#0066cc',
+      busRouteTextColor: '#ffffff',
+    },
+  ],
+};
+
+const storyTargets = [...storyTrigger.targets, ...busStoryTrigger.targets];
+
 const baseConfiguration: NotificationConfiguration = {
+  revision: 1,
   available: true,
   publicKey: 'story-public-key',
-  triggers: [storyTrigger],
+  triggers: [storyTrigger, busStoryTrigger],
   devices: [],
 };
 
@@ -97,9 +130,7 @@ function storyProviders(
         id: id ?? `story-trigger-${state.triggers.length + 1}`,
         revision: (current?.revision ?? 0) + 1,
         targets: input.targetIds
-          .map((targetId) =>
-            storyTrigger.targets.find((target) => target.id === targetId),
-          )
+          .map((targetId) => storyTargets.find((target) => target.id === targetId))
           .filter((target): target is NotificationTrigger['targets'][number] => !!target),
       } as unknown as NotificationTrigger;
       state = {
@@ -112,7 +143,8 @@ function storyProviders(
       };
       return of(saved);
     },
-    getTargets: () => of(storyTrigger.targets),
+    getTargets: (kind: NotificationTrigger['targets'][number]['kind']) =>
+      of(storyTargets.filter((target) => target.kind === kind)),
     deleteTrigger: (id: string) => {
       if (state) {
         state = {
@@ -131,7 +163,7 @@ function storyProviders(
             ...state.devices,
             {
               id,
-              label: 'Este dispositivo',
+              label: 'Chrome · Windows',
               createdAt: '2026-09-08T10:00:00.000Z',
             },
           ],
@@ -169,6 +201,15 @@ function storyProviders(
           },
         },
         { provide: AuthService, useValue: { loginGoogle: () => undefined } },
+        {
+          provide: NotificationWebsocketService,
+          useValue: {
+            events$: of(),
+            connect: () => undefined,
+            disconnect: () => undefined,
+            requestResync: () => undefined,
+          },
+        },
       ],
     }),
   ];
@@ -205,7 +246,7 @@ export const PushAtivo: Story = {
     devices: [
       {
         id: 'story-device',
-        label: 'Chrome neste computador',
+        label: 'Chrome · Windows',
         createdAt: '2026-09-08T10:00:00.000Z',
       },
     ],

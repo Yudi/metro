@@ -61,6 +61,43 @@ export class HistoryLineIdentityComponent {
 }
 
 @Component({
+  selector: 'app-history-route-identity',
+  template: `
+    <span
+      class="route-badge"
+      aria-hidden="true"
+      [style.backgroundColor]="backgroundColor()"
+      [style.color]="textColor()"
+    >
+      {{ name() }}
+    </span>
+  `,
+  styles: `
+    .route-badge {
+      align-items: center;
+      border-radius: 6px;
+      display: inline-flex;
+      flex: 0 0 auto;
+      font-size: 0.78rem;
+      font-weight: 800;
+      justify-content: center;
+      line-height: 1;
+      min-height: 24px;
+      min-width: 32px;
+      padding: 0 6px;
+      text-align: center;
+      white-space: nowrap;
+    }
+  `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class HistoryRouteIdentityComponent {
+  readonly name = input.required<string>();
+  readonly backgroundColor = input<string>();
+  readonly textColor = input<string>();
+}
+
+@Component({
   selector: 'app-history-agency-identity',
   imports: [NgOptimizedImage],
   template: `

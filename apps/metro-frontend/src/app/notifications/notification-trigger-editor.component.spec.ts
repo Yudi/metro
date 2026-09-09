@@ -74,21 +74,7 @@ describe('NotificationTriggerEditorComponent', () => {
     ]);
   });
 
-  it('presents rail targets with their stylized line identity', () => {
-    const presentation = component.targetPresentation({
-      ...station,
-      kind: 'rail_station',
-      label: 'Pinheiros · Linha 9 - Esmeralda',
-      railLineCode: 9,
-    });
-
-    expect(presentation).toMatchObject({
-      label: 'Pinheiros',
-      railLine: { code: 9, name: 'Esmeralda' },
-    });
-  });
-
-  it('uses a round number-only badge for station targets and a rectangular line badge', () => {
+  it('uses shared identity components for selected rail targets', () => {
     component.selectedTargets.set([
       {
         ...station,
@@ -105,15 +91,42 @@ describe('NotificationTriggerEditorComponent', () => {
     ]);
     fixture.detectChanges();
 
+    const identities = fixture.nativeElement.querySelectorAll<HTMLElement>(
+      '.target-chip app-notification-target-identity',
+    );
     const badges = fixture.nativeElement.querySelectorAll<HTMLElement>(
-      '.target-chip app-history-line-identity .line-badge',
+      '.target-chip app-notification-target-identity .line-badge',
     );
 
+    expect(identities).toHaveLength(2);
     expect(badges[0]).toHaveClass('round');
     expect(badges[0]).toHaveTextContent('9');
     expect(badges[1]).not.toHaveClass('round');
-    expect(fixture.nativeElement.textContent).toContain('Amarela');
+    expect(fixture.nativeElement.textContent).toContain('Pinheiros');
     expect(fixture.nativeElement.textContent).not.toContain('Esmeralda');
+    expect(fixture.nativeElement.textContent).not.toContain('Amarela');
+  });
+
+  it('hides selected targets for broad searches but allows an exact search', () => {
+    jest.useFakeTimers();
+    const selectedLine: NotificationTarget = {
+      id: 'line-opaque',
+      kind: 'rail_line',
+      label: 'Linha 9 - Esmeralda',
+      available: true,
+      railLineCode: 9,
+    };
+    getTargets.mockReturnValue(of([selectedLine]));
+    component.selectedTargets.set([selectedLine]);
+    component.form.controls.targetIds.setValue([selectedLine.id]);
+
+    component.onTargetSearch({ target: { value: 'linha' } } as unknown as Event);
+    jest.advanceTimersByTime(250);
+    expect(component.targetResults()).toEqual([]);
+
+    component.onTargetSearch({ target: { value: '9' } } as unknown as Event);
+    jest.advanceTimersByTime(250);
+    expect(component.targetResults()).toEqual([selectedLine]);
   });
 
   it('resets selected destinations when the notification kind changes', () => {

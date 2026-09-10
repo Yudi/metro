@@ -13,7 +13,7 @@ describe('NotificationTargetIdentityComponent', () => {
     fixture = TestBed.createComponent(NotificationTargetIdentityComponent);
   });
 
-  it('renders rail lines as a number-only shared line badge', () => {
+  it('renders rail lines with their number and color name', () => {
     fixture.componentRef.setInput('target', {
       id: 'line-9',
       kind: 'rail_line',
@@ -26,13 +26,13 @@ describe('NotificationTargetIdentityComponent', () => {
     const element = fixture.nativeElement as HTMLElement;
     expect(element.querySelector('app-history-line-identity')).not.toBeNull();
     expect(element.querySelector('.line-badge')?.textContent?.trim()).toBe('9');
-    expect(element.textContent).not.toContain('Esmeralda');
+    expect(element.textContent).toContain('Esmeralda');
     expect(
       element.querySelector('.target-identity')?.getAttribute('aria-label'),
     ).toBe('Linha 9 - Esmeralda');
   });
 
-  it('keeps station text while showing only its rail line number', () => {
+  it('keeps station text while showing its rail line number and name', () => {
     fixture.componentRef.setInput('target', {
       id: 'station-9',
       kind: 'rail_station',
@@ -45,7 +45,7 @@ describe('NotificationTargetIdentityComponent', () => {
     const element = fixture.nativeElement as HTMLElement;
     expect(element.textContent).toContain('Pinheiros');
     expect(element.querySelector('.line-badge')?.textContent?.trim()).toBe('9');
-    expect(element.textContent).not.toContain('Esmeralda');
+    expect(element.textContent).toContain('Esmeralda');
   });
 
   it('renders only the short code for bus routes', () => {

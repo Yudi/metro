@@ -193,7 +193,7 @@
         @if (selectedTargets().length === 0) {
           <span class="target-message">Selecione ao menos um destino.</span>
         } @else {
-          @for (target of selectedTargets(); track target.id) {
+          @for (target of sortedSelectedTargets(); track target.id) {
             <span class="target-chip">
               <span class="target-chip-copy">
                 <app-notification-target-identity [target]="target" />

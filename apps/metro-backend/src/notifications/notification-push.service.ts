@@ -14,6 +14,68 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationRealtimeService } from './notification-realtime.service';
 
+interface NotificationPayloadData {
+  important?: unknown;
+  stateScope?: unknown;
+  stateFingerprint?: unknown;
+  windowKey?: unknown;
+}
+
+interface NotificationPayload {
+  notification?: {
+    title?: unknown;
+    body?: unknown;
+    data?: NotificationPayloadData;
+  };
+}
+
+interface NotificationStatusDedupeContext {
+  stateScope: string;
+  stateFingerprint: string;
+  windowKey: string;
+}
+
+/**
+ * Return the durable identity used to suppress a repeated rail-status state.
+ *
+ * The engine writes these fields into the payload because delivery rows can
+ * legitimately differ by trigger revision while still describing the same
+ * state. Expiry, tags, and other delivery metadata are deliberately ignored.
+ * Requiring all fields keeps periodic arrival/headway notifications outside
+ * this history check, so their configured cadence remains meaningful.
+ */
+function railStatusDedupeContext(
+  trigger: NotificationTriggerInput,
+  payload: unknown,
+  now: Date,
+): NotificationStatusDedupeContext | null {
+  if (trigger.kind !== 'rail_status' || !payload || typeof payload !== 'object')
+    return null;
+  const notification = (payload as NotificationPayload).notification;
+  if (!notification || typeof notification !== 'object') return null;
+  const data = notification.data;
+  if (!data || typeof data !== 'object') return null;
+  const stateScope =
+    typeof data.stateScope === 'string' ? data.stateScope.trim() : '';
+  const stateFingerprint =
+    typeof data.stateFingerprint === 'string'
+      ? data.stateFingerprint.trim()
+      : '';
+  const windowKey =
+    typeof data.windowKey === 'string' ? data.windowKey.trim() : '';
+  if (!stateScope || !stateFingerprint || !windowKey) return null;
+  // Ensure malformed metadata cannot make a non-current window suppress a
+  // valid delivery after a schedule edit or a delayed queue job.
+  const currentWindow = notificationEligibility(
+    trigger,
+    now,
+    data.important === true,
+  )?.windowKey;
+  return currentWindow === windowKey
+    ? { stateScope, stateFingerprint, windowKey }
+    : null;
+}
+
 @Injectable()
 export class NotificationPushService {
   constructor(
@@ -60,9 +122,7 @@ export class NotificationPushService {
         where: { id, claimToken },
         data: { ...data, claimToken: null, claimUntil: null },
       });
-    const payload = delivery.payload as {
-      notification?: { data?: { important?: boolean } };
-    };
+    const payload = delivery.payload as NotificationPayload;
     const trigger = delivery.trigger;
     const currentTime = new Date();
     const user = delivery.subscription.user;
@@ -99,12 +159,72 @@ export class NotificationPushService {
       await finish({ expiresAt: currentTime });
       return;
     }
+    const statusDedupe = trigger
+      ? railStatusDedupeContext(
+          trigger.config as unknown as NotificationTriggerInput,
+          delivery.payload,
+          currentTime,
+        )
+      : null;
     const dispatch = await this.prisma.$transaction(async (tx) => {
       // Serialize all triggers for this device across workers and replicas.
       await tx.$queryRaw`
         SELECT "id" FROM "public"."push_subscriptions"
         WHERE "id" = ${delivery.subscriptionId}::uuid FOR UPDATE
       `;
+      if (statusDedupe) {
+        const priorWhere = {
+          id: { not: delivery.id },
+          subscriptionId: delivery.subscriptionId,
+          AND: [
+            {
+              payload: {
+                path: ['notification', 'data', 'stateScope'],
+                equals: statusDedupe.stateScope,
+              },
+            },
+            {
+              payload: {
+                path: ['notification', 'data', 'windowKey'],
+                equals: statusDedupe.windowKey,
+              },
+            },
+          ],
+        };
+        // A state can recover and then fail again in the same schedule window.
+        // Compare with the latest dispatched state instead of asking whether
+        // this state ever occurred in the past.
+        const priorDispatch = await tx.notificationDelivery.findFirst({
+          where: {
+            ...priorWhere,
+            dispatchStartedAt: { not: null },
+          },
+          orderBy: { dispatchStartedAt: 'desc' },
+          select: { payload: true },
+        });
+        const priorSent = priorDispatch
+          ? null
+          : await tx.notificationDelivery.findFirst({
+              where: { ...priorWhere, sentAt: { not: null } },
+              orderBy: { sentAt: 'desc' },
+              select: { payload: true },
+            });
+        const priorPayload = priorDispatch?.payload ?? priorSent?.payload;
+        const priorStateFingerprint =
+          priorPayload && typeof priorPayload === 'object'
+            ? (priorPayload as NotificationPayload).notification?.data
+                ?.stateFingerprint
+            : undefined;
+        if (priorStateFingerprint === statusDedupe.stateFingerprint) {
+          // A matching row has already been delivered or started. Expire the
+          // new row under the claim so queue reconciliation cannot replay it.
+          await tx.notificationDelivery.updateMany({
+            where: { id: delivery.id, claimToken },
+            data: { expiresAt: currentTime, claimToken: null, claimUntil: null },
+          });
+          return { count: 0 };
+        }
+      }
       const recent = await tx.notificationDelivery.findFirst({
         where: {
           subscriptionId: delivery.subscriptionId,

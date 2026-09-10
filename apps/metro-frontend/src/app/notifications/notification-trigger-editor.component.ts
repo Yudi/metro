@@ -49,7 +49,10 @@ import {
   switchMap,
   timer,
 } from 'rxjs';
-import { NotificationTargetIdentityComponent } from './notification-target-identity.component';
+import {
+  NotificationTargetIdentityComponent,
+  sortNotificationTargets,
+} from './notification-target-identity.component';
 
 export type NotificationTriggerFormInput = NotificationTriggerInput & {
   arrivalLeadMinutes?: number;
@@ -199,12 +202,17 @@ export class NotificationTriggerEditorComponent implements OnChanges {
       this.selectedTargets().map((target) => target.id),
     );
 
-    return this.rawTargetResults().filter(
-      (target) =>
-        !selectedIds.has(target.id) || isExplicitTargetSearch(target, search),
+    return sortNotificationTargets(
+      this.rawTargetResults().filter(
+        (target) =>
+          !selectedIds.has(target.id) || isExplicitTargetSearch(target, search),
+      ),
     );
   });
   readonly selectedTargets = signal<NotificationTarget[]>([]);
+  readonly sortedSelectedTargets = computed(() =>
+    sortNotificationTargets(this.selectedTargets()),
+  );
   readonly targetLoading = signal(false);
   readonly targetError = signal(false);
   readonly submitted = signal(false);

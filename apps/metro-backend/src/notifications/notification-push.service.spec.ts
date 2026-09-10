@@ -62,6 +62,31 @@ describe('notification delivery', () => {
       user: { last_login: now },
     },
   });
+  const statusDelivery = (
+    id: string,
+    stateFingerprint: string,
+    revision = 1,
+  ) => {
+    const row = delivery();
+    return {
+      ...row,
+      id,
+      revision,
+      fingerprint: `delivery-${id}`,
+      payload: {
+        notification: {
+          ...row.payload.notification,
+          data: {
+            ...row.payload.notification.data,
+            stateScope: 'scope-lines-1-2',
+            stateFingerprint,
+            windowKey: '2026-09-07-08:00-09:00',
+          },
+        },
+      },
+      trigger: { ...row.trigger, revision },
+    };
+  };
   beforeEach(() => {
     jest.useFakeTimers().setSystemTime(now);
     jest.clearAllMocks();
@@ -133,6 +158,184 @@ describe('notification delivery', () => {
     expect(updateMany).toHaveBeenLastCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ expiresAt: now }),
+      }),
+    );
+  });
+  it('suppresses a previously dispatched status state after a restart', async () => {
+    const rows = new Map([
+      ['first', statusDelivery('first', 'state-a')],
+      ['second', statusDelivery('second', 'state-a', 2)],
+    ]);
+    findUnique.mockImplementation(async ({ where }: { where: { id: string } }) => ({
+      ...rows.get(where.id),
+      claimToken:
+        updateMany.mock.calls[updateMany.mock.calls.length - 1]?.[0].data
+          .claimToken,
+    }));
+    findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ payload: rows.get('first')?.payload });
+
+    await service.deliver('first', now);
+    const restartedService = new NotificationPushService(
+      prisma,
+      config,
+      { publishDeviceRemoved } as unknown as NotificationRealtimeService,
+    );
+    await restartedService.deliver('second', now);
+
+    expect(webPush.sendNotification).toHaveBeenCalledTimes(1);
+    expect(updateMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: { id: 'second', claimToken: expect.any(String) },
+        data: expect.objectContaining({ expiresAt: now }),
+      }),
+    );
+    const historyQuery = findFirst.mock.calls.find(
+      ([call]) => call?.orderBy?.dispatchStartedAt === 'desc',
+    )?.[0];
+    expect(historyQuery).toEqual(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          subscriptionId: 's',
+          AND: expect.arrayContaining([
+            {
+              payload: {
+                path: ['notification', 'data', 'stateScope'],
+                equals: 'scope-lines-1-2',
+              },
+            },
+            {
+              payload: {
+                path: ['notification', 'data', 'windowKey'],
+                equals: '2026-09-07-08:00-09:00',
+              },
+            },
+          ]),
+          dispatchStartedAt: { not: null },
+        }),
+        orderBy: { dispatchStartedAt: 'desc' },
+        select: { payload: true },
+      }),
+    );
+  });
+  it('allows a status state to be dispatched again after recovery', async () => {
+    const rows = new Map([
+      ['first', statusDelivery('first', 'state-a')],
+      ['second', statusDelivery('second', 'state-b', 2)],
+      ['third', statusDelivery('third', 'state-a', 3)],
+    ]);
+    findUnique.mockImplementation(async ({ where }: { where: { id: string } }) => ({
+      ...rows.get(where.id),
+      claimToken:
+        updateMany.mock.calls[updateMany.mock.calls.length - 1]?.[0].data
+          .claimToken,
+    }));
+    findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ payload: rows.get('first')?.payload })
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ payload: rows.get('second')?.payload })
+      .mockResolvedValueOnce(null);
+
+    await service.deliver('first', now);
+    await service.deliver('second', now);
+    await service.deliver('third', now);
+
+    expect(webPush.sendNotification).toHaveBeenCalledTimes(3);
+  });
+  it('does not replay an ambiguous status dispatch after a process restart', async () => {
+    const rows = new Map([
+      ['first', statusDelivery('first', 'state-a')],
+      ['second', statusDelivery('second', 'state-a', 2)],
+    ]);
+    findUnique.mockImplementation(async ({ where }: { where: { id: string } }) => ({
+      ...rows.get(where.id),
+      claimToken:
+        updateMany.mock.calls[updateMany.mock.calls.length - 1]?.[0].data
+          .claimToken,
+    }));
+    jest
+      .mocked(webPush.sendNotification)
+      .mockRejectedValueOnce(new Error('connection reset'));
+    findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ payload: rows.get('first')?.payload });
+
+    await service.deliver('first', now);
+    await new NotificationPushService(
+      prisma,
+      config,
+      { publishDeviceRemoved } as unknown as NotificationRealtimeService,
+    ).deliver('second', now);
+
+    expect(webPush.sendNotification).toHaveBeenCalledTimes(1);
+    expect(updateMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: { id: 'second', claimToken: expect.any(String) },
+        data: expect.objectContaining({ expiresAt: now }),
+      }),
+    );
+  });
+  it('allows a status retry after an explicit rate-limit response', async () => {
+    const rows = new Map([
+      ['first', statusDelivery('first', 'state-a')],
+      ['second', statusDelivery('second', 'state-a', 2)],
+    ]);
+    findUnique.mockImplementation(async ({ where }: { where: { id: string } }) => ({
+      ...rows.get(where.id),
+      claimToken:
+        updateMany.mock.calls[updateMany.mock.calls.length - 1]?.[0].data
+          .claimToken,
+    }));
+    jest
+      .mocked(webPush.sendNotification)
+      .mockRejectedValueOnce({ statusCode: 429 })
+      .mockResolvedValueOnce({ statusCode: 201, body: '', headers: {} });
+    findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+
+    await service.deliver('first', now);
+    await new NotificationPushService(
+      prisma,
+      config,
+      { publishDeviceRemoved } as unknown as NotificationRealtimeService,
+    ).deliver('second', now);
+
+    expect(webPush.sendNotification).toHaveBeenCalledTimes(2);
+    expect(updateMany.mock.calls.some(([call]) =>
+      call.data.dispatchStartedAt === null,
+    )).toBe(true);
+  });
+  it('keeps periodic notification kinds outside status history deduplication', async () => {
+    const row = statusDelivery('periodic', 'state-a');
+    row.trigger.config = { ...row.trigger.config, kind: 'rail_arrivals' };
+    findUnique.mockImplementation(async () => ({
+      ...row,
+      claimToken: updateMany.mock.calls[0][0].data.claimToken,
+    }));
+
+    await service.deliver('periodic', now);
+
+    expect(webPush.sendNotification).toHaveBeenCalledTimes(1);
+    expect(findFirst).toHaveBeenCalledTimes(1);
+    expect(findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          subscriptionId: 's',
+          dispatchStartedAt: { gt: new Date(now.getTime() - 60_000) },
+        }),
       }),
     );
   });

@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { parseRailLineCode } from '@metro/shared/utils';
 import {
   NotificationTriggerInput,
   notificationEligibility,
@@ -115,6 +116,9 @@ export function buildNotificationMessage(
           expiresAt: expiresAt.getTime(),
           targetId,
           important: snapshot.important,
+          ...(trigger.kind === 'rail_status'
+            ? railStatusState(trigger.targetIds, [{ targetId, snapshot }], eligibility.windowKey)
+            : {}),
           onActionClick: {
             default: {
               operation: 'navigateLastFocusedOrOpen',
@@ -165,7 +169,8 @@ export function buildAggregatedRailStatusMessage(
       } =>
         item.eligibility !== null &&
         !(trigger.statusMode === 'abnormal' && item.entry.snapshot.normal),
-    );
+    )
+    .sort((left, right) => compareRailStatusEntries(left.entry, right.entry));
   if (!eligible.length) return null;
 
   const hasIssue = eligible.some(({ entry }) => !entry.snapshot.normal);
@@ -240,6 +245,7 @@ export function buildAggregatedRailStatusMessage(
           targetId: targetIds[0],
           targetIds,
           important,
+          ...railStatusState(trigger.targetIds, eligible.map(({ entry }) => entry), first.eligibility.windowKey),
           onActionClick: {
             default: {
               operation: 'navigateLastFocusedOrOpen',
@@ -262,8 +268,37 @@ function railStatusLabel(entry: NotificationRailStatusEntry): string {
   return status || 'Status desconhecido';
 }
 
+/** Persist semantic state separately from outbox IDs, episodes and revisions. */
+function railStatusState(targetIds: readonly string[], entries: readonly NotificationRailStatusEntry[], windowKey: string) {
+  const normalize = (value: string) => value.trim().replace(/\s+/gu, ' ');
+  const state = entries.map(({ targetId, snapshot }) => [
+    targetId,
+    snapshot.normal,
+    normalize(snapshot.statusLabel ?? ''),
+    normalize(snapshot.body),
+  ] as const).sort(([left], [right]) => left.localeCompare(right));
+  return {
+    stateScope: notificationHash(JSON.stringify([...new Set(targetIds)].sort())),
+    stateFingerprint: notificationHash(JSON.stringify(state)),
+    windowKey,
+  };
+}
+
 function railLineLabel(entry: NotificationRailStatusEntry): string {
   const lineCode = entry.snapshot.lineCode?.trim();
   if (lineCode && /^L\d{1,2}$/u.test(lineCode)) return lineCode;
   return entry.label?.trim() || entry.snapshot.title.trim() || entry.targetId;
+}
+
+const naturalLineOrder = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' });
+
+function compareRailStatusEntries(left: NotificationRailStatusEntry, right: NotificationRailStatusEntry): number {
+  const leftLabel = railLineLabel(left);
+  const rightLabel = railLineLabel(right);
+  const leftNumber = parseRailLineCode(leftLabel.replace(/^linha\s+/iu, 'L'));
+  const rightNumber = parseRailLineCode(rightLabel.replace(/^linha\s+/iu, 'L'));
+  if (leftNumber !== undefined && rightNumber !== undefined && leftNumber !== rightNumber) {
+    return leftNumber - rightNumber;
+  }
+  return naturalLineOrder.compare(leftLabel, rightLabel) || left.targetId.localeCompare(right.targetId);
 }

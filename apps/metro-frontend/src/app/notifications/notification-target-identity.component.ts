@@ -16,6 +16,52 @@ import {
   HistoryRouteIdentityComponent,
 } from '../shared/history/history-transit-identity.component';
 
+const NATURAL_TARGET_LABEL_ORDER = new Intl.Collator('pt-BR', {
+  numeric: true,
+  sensitivity: 'base',
+});
+
+export function getNotificationTargetLineCode(
+  target: NotificationTarget,
+): number | undefined {
+  if (target.kind !== 'rail_line' && target.kind !== 'rail_station') {
+    return undefined;
+  }
+
+  if (target.railLineCode !== undefined) {
+    return target.railLineCode;
+  }
+
+  const lineCode = /\blinha\s*0?(\d{1,2})\b/iu.exec(target.label)?.[1];
+  return lineCode ? Number(lineCode) : parseRailLineCode(target.label);
+}
+
+export function sortNotificationTargets<T extends NotificationTarget>(
+  targets: readonly T[],
+): T[] {
+  return [...targets].sort((left, right) => {
+    const leftLineCode = getNotificationTargetLineCode(left);
+    const rightLineCode = getNotificationTargetLineCode(right);
+
+    if (leftLineCode !== undefined && rightLineCode !== undefined) {
+      return (
+        leftLineCode - rightLineCode ||
+        NATURAL_TARGET_LABEL_ORDER.compare(left.label, right.label) ||
+        left.id.localeCompare(right.id)
+      );
+    }
+
+    if (leftLineCode !== undefined) {
+      return -1;
+    }
+    if (rightLineCode !== undefined) {
+      return 1;
+    }
+
+    return 0;
+  });
+}
+
 /**
  * Presents a notification target using the same identities as the transit
  * history surfaces. Long rail and bus names stay available to assistive
@@ -39,7 +85,6 @@ import {
         <app-history-line-identity
           [name]="line.colorName"
           [badge]="line.code"
-          [badgeOnly]="true"
           [badgeShape]="
             target().kind === 'rail_station' ? 'round' : 'rectangle'
           "
@@ -78,10 +123,7 @@ export class NotificationTargetIdentityComponent {
       return null;
     }
 
-    const code =
-      target.railLineCode === undefined
-        ? parseRailLineCode(target.label)
-        : target.railLineCode;
+    const code = getNotificationTargetLineCode(target);
     const line = code === undefined ? undefined : getRailLineByCode(code);
     if (!line) {
       return null;

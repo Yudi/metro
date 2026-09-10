@@ -28,6 +28,57 @@ const incident: NotificationSnapshot = {
   url: '/',
 };
 describe('notification messages', () => {
+  it('persists restart-stable status content separately from outbox episode keys and windows', () => {
+    const first = buildNotificationMessage(trigger, 't', 'one', incident, new Date('2026-09-07T11:00:00Z'));
+    const restarted = buildNotificationMessage(trigger, 't', 'one', {
+      ...incident, fingerprint: 'new-episode', observedAt: new Date('2026-09-07T11:01:00Z'),
+    }, new Date('2026-09-07T11:01:00Z'));
+    expect(first?.fingerprint).not.toBe(restarted?.fingerprint);
+    expect(first?.payload.notification.data.stateFingerprint).toBe(restarted?.payload.notification.data.stateFingerprint);
+    expect(first?.payload.notification.data.stateScope).toBe(restarted?.payload.notification.data.stateScope);
+    const changed = buildNotificationMessage(trigger, 't', 'one', { ...incident, body: 'Operação Parcial' }, new Date('2026-09-07T11:02:00Z'));
+    expect(changed?.payload.notification.data.stateFingerprint).not.toBe(first?.payload.notification.data.stateFingerprint);
+    const nextWeek = buildNotificationMessage(trigger, 't', 'one', incident, new Date('2026-09-14T11:00:00Z'));
+    expect(nextWeek?.payload.notification.data.windowKey).not.toBe(first?.payload.notification.data.windowKey);
+  });
+
+  it('distinguishes changed line statuses even when merged counts look identical', () => {
+    const now = new Date('2026-09-07T11:00:00Z');
+    const first = buildAggregatedRailStatusMessage(trigger, 't', [
+      { targetId: 'one', snapshot: { ...incident, statusLabel: 'Operação Parcial', body: 'Operação Parcial' } },
+      { targetId: 'two', snapshot: { ...incident, statusLabel: 'Velocidade Reduzida', body: 'Velocidade Reduzida' } },
+    ], now);
+    const changed = buildAggregatedRailStatusMessage(trigger, 't', [
+      { targetId: 'two', snapshot: { ...incident, statusLabel: 'Operação Parcial', body: 'Operação Parcial' } },
+      { targetId: 'one', snapshot: { ...incident, statusLabel: 'Velocidade Reduzida', body: 'Velocidade Reduzida' } },
+    ], now);
+    expect(first?.payload.notification.body).toBe(changed?.payload.notification.body);
+    expect(first?.payload.notification.data.stateFingerprint).not.toBe(changed?.payload.notification.data.stateFingerprint);
+  });
+
+  it('naturally sorts merged line numbers and keeps the payload stable across query order', () => {
+    const entries = [11, 2, 10, 9, 1].map((number) => ({
+      targetId: `line-${number}`,
+      snapshot: { ...incident, normal: true, important: false, lineCode: `L${number}`, statusLabel: 'Operação Normal' },
+    }));
+    const now = new Date('2026-09-07T11:00:00Z');
+    const first = buildAggregatedRailStatusMessage({ ...trigger, statusMode: 'all' }, 't', entries, now);
+    const restarted = buildAggregatedRailStatusMessage({ ...trigger, statusMode: 'all' }, 't', [...entries].reverse(), now);
+    expect(first?.payload.notification.body).toBe('L1, L2, L9, L10, L11: Operação Normal');
+    expect(first?.payload.notification.data.targetIds).toEqual(['line-1', 'line-2', 'line-9', 'line-10', 'line-11']);
+    expect(restarted).toEqual(first);
+    expect(entries.map((entry) => entry.snapshot.lineCode)).toEqual(['L11', 'L2', 'L10', 'L9', 'L1']);
+  });
+
+  it('uses the public line number when a fallback label has no lineCode', () => {
+    const normal = { ...incident, normal: true, important: false, statusLabel: 'Operação Normal' };
+    const message = buildAggregatedRailStatusMessage({ ...trigger, statusMode: 'all' }, 't', [
+      { targetId: 'ten', snapshot: { ...normal, lineCode: 'L10' } },
+      { targetId: 'two', label: 'Linha 2 - Verde', snapshot: normal },
+    ], new Date('2026-09-07T11:00:00Z'));
+    expect(message?.payload.notification.body).toBe('Linha 2 - Verde, L10: Operação Normal');
+  });
+
   it('delivers an ongoing incident when the window opens even when it started earlier', () => {
     expect(
       buildNotificationMessage(

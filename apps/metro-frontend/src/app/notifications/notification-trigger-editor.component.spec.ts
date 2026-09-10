@@ -99,12 +99,34 @@ describe('NotificationTriggerEditorComponent', () => {
     );
 
     expect(identities).toHaveLength(2);
-    expect(badges[0]).toHaveClass('round');
-    expect(badges[0]).toHaveTextContent('9');
-    expect(badges[1]).not.toHaveClass('round');
+    expect(badges[0]).not.toHaveClass('round');
+    expect(badges[0]).toHaveTextContent('4');
+    expect(badges[1]).toHaveClass('round');
+    expect(badges[1]).toHaveTextContent('9');
     expect(fixture.nativeElement.textContent).toContain('Pinheiros');
-    expect(fixture.nativeElement.textContent).not.toContain('Esmeralda');
-    expect(fixture.nativeElement.textContent).not.toContain('Amarela');
+    expect(fixture.nativeElement.textContent).toContain('Esmeralda');
+    expect(fixture.nativeElement.textContent).toContain('Amarela');
+  });
+
+  it('sorts rail target results naturally by line number', () => {
+    jest.useFakeTimers();
+    const lines: NotificationTarget[] = [10, 2, 1].map((code) => ({
+      id: `line-${code}`,
+      kind: 'rail_line',
+      label: `Linha ${code}`,
+      available: true,
+      railLineCode: code,
+    }));
+    getTargets.mockReturnValue(of(lines));
+
+    component.onTargetSearch({
+      target: { value: 'linha' },
+    } as unknown as Event);
+    jest.advanceTimersByTime(250);
+
+    expect(
+      component.targetResults().map((target) => target.railLineCode),
+    ).toEqual([1, 2, 10]);
   });
 
   it('hides selected targets for broad searches but allows an exact search', () => {

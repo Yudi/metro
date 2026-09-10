@@ -40,7 +40,10 @@ import {
   NotificationTriggerEditorComponent,
   NotificationTriggerEditorSave,
 } from './notification-trigger-editor.component';
-import { NotificationTargetIdentityComponent } from './notification-target-identity.component';
+import {
+  NotificationTargetIdentityComponent,
+  sortNotificationTargets,
+} from './notification-target-identity.component';
 import { NotificationWebsocketService } from './notification-websocket.service';
 
 type NotificationPageState =
@@ -108,7 +111,13 @@ export class NotificationsComponent {
   readonly editingTriggerId = signal<string | null>(null);
   readonly deviceId = signal<string | null>(null);
 
-  readonly triggers = computed(() => this.configuration()?.triggers ?? []);
+  readonly triggers = computed(
+    () =>
+      this.configuration()?.triggers.map((trigger) => ({
+        ...trigger,
+        targets: sortNotificationTargets(trigger.targets),
+      })) ?? [],
+  );
   readonly devices = computed(() => this.configuration()?.devices ?? []);
   readonly currentDevice = computed(() => {
     const id = this.deviceId();

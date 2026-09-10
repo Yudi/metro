@@ -264,6 +264,13 @@ export class NotificationEngineService {
       const deliverable = currentEntries
         .sort((left, right) => left.index - right.index)
         .map(({ entry }) => entry);
+      // Missing or stale lines during provider warm-up are not a recovery.
+      // Wait for the complete selection before announcing normal operation.
+      const observedTargetIds = new Set(deliverable.map((entry) => entry.targetId));
+      if (deliverable.every((entry) => entry.snapshot.normal) &&
+        config.targetIds.some((targetId) => !observedTargetIds.has(targetId))) {
+        return;
+      }
       const message = buildAggregatedRailStatusMessage(
         config,
         triggerId,

@@ -137,6 +137,42 @@ describe('NotificationsComponent', () => {
     expect(component.triggers()).toEqual([trigger]);
     expect(requestSubscription).not.toHaveBeenCalled();
   });
+
+  it('sorts line targets naturally in a trigger summary', () => {
+    const targets: NotificationTrigger['targets'] = [10, 2, 1].map(
+      (code) => ({
+        id: `line-${code}`,
+        kind: 'rail_line',
+        label: `Linha ${code}`,
+        available: true,
+        railLineCode: code,
+      }),
+    );
+    component.configuration.set({
+      ...configuration,
+      triggers: [
+        {
+          ...trigger,
+          targetIds: targets.map((target) => target.id),
+          targets,
+        },
+      ],
+    });
+    fixture.detectChanges();
+
+    expect(
+      component.triggers()[0].targets.map((target) => target.railLineCode),
+    ).toEqual([1, 2, 10]);
+    const badges = fixture.nativeElement.querySelectorAll<HTMLElement>(
+      '.trigger-targets .line-badge',
+    );
+    expect([...badges].map((badge) => badge.textContent?.trim())).toEqual([
+      '1',
+      '2',
+      '10',
+    ]);
+  });
+
   it('keeps a pending deletion subscribed when another trigger is toggled or saved', () => {
     const deletion = new Subject<boolean>();
     api.deleteTrigger.mockReturnValue(deletion);

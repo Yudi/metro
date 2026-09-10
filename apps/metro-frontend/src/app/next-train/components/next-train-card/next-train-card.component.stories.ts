@@ -27,6 +27,8 @@ import {
   TRAIN_AT_STATION_WITH_LAST_PASSED,
   TRAIN_WITHOUT_POSITION_METADATA,
   TRAIN_LONG_LAST_PASSED_NAME,
+  SCHEDULED_SERVICE_FALLBACK,
+  SCHEDULED_SERVICE_ORIGIN,
   createNextTrainCardProviders,
 } from './next-train-card.stories.fixtures';
 
@@ -311,6 +313,73 @@ export const NoTrains: Story = {
         connected: true,
         lastUpdate: Date.now(),
         trains: [],
+        lineCode: 'L9',
+        stationCode: 'HBR',
+      }),
+    }),
+  ],
+};
+
+export const ScheduledFallback: Story = {
+  args: {
+    lineCode: 'L9',
+    stationCode: 'HBR',
+  },
+  decorators: [
+    applicationConfig({
+      providers: createNextTrainCardProviders({
+        connected: true,
+        lastUpdate: Date.now(),
+        trains: [],
+        scheduledServices: [SCHEDULED_SERVICE_FALLBACK],
+        lineCode: 'L9',
+        stationCode: 'HBR',
+      }),
+    }),
+  ],
+};
+
+export const ScheduledOriginDeparture: Story = {
+  args: {
+    lineCode: 'L4',
+    stationCode: 'LUZ',
+  },
+  decorators: [
+    applicationConfig({
+      providers: createNextTrainCardProviders({
+        connected: false,
+        lastUpdate: Date.now(),
+        trains: [],
+        scheduledServices: [SCHEDULED_SERVICE_ORIGIN],
+        lineCode: 'L4',
+        stationCode: 'LUZ',
+      }),
+    }),
+  ],
+};
+
+/** A later date remains explicit when a weekend schedule skips a day. */
+export const ScheduledAfterWeekend: Story = {
+  args: {
+    lineCode: 'L9',
+    stationCode: 'HBR',
+  },
+  decorators: [
+    applicationConfig({
+      providers: createNextTrainCardProviders({
+        connected: true,
+        lastUpdate: Date.now(),
+        trains: [],
+        scheduledServices: [
+          {
+            ...SCHEDULED_SERVICE_FALLBACK,
+            nextDepartureAt: new Date(
+              Date.now() + 3 * 24 * 60 * 60_000,
+            ).toISOString(),
+            nextArrivalAt: undefined,
+            followingDepartures: [],
+          },
+        ],
         lineCode: 'L9',
         stationCode: 'HBR',
       }),

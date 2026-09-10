@@ -463,6 +463,29 @@ small {
   font-variant-numeric: tabular-nums;
 }
 
+.rail-schedule-note {
+  display: block;
+  margin-top: 0.35rem;
+  font-weight: 700;
+}
+
+.scheduled-train-row {
+  background: #fffdf2;
+}
+
+.rail-schedule-location {
+  display: block;
+  color: #64748b;
+  font-size: 0.7rem;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.following-scheduled-row {
+  padding-left: 0.75rem;
+}
+
 .empty-state {
   display: grid;
   justify-items: center;

@@ -15,7 +15,16 @@
       <span class="header-title"> Próximos trens </span>
     }
 
-    @if (connected() && !state.operationClosed) {
+    @if (state.showSchedule) {
+      <span
+        class="schedule-indicator"
+        aria-label="Programação, sem dados em tempo real"
+        matTooltip="Horários previstos pela programação, sem dados em tempo real"
+      >
+        <mat-icon>event</mat-icon>
+        Programação
+      </span>
+    } @else if (state.hasLiveTrains && connected() && !state.operationClosed) {
       <span
         class="live-indicator"
         [matTooltip]="'Última mudança às ' + getLastUpdateDisplay(lastUpdate())"
@@ -57,14 +66,26 @@
                 <mat-icon>schedule</mat-icon>
                 a cada {{ formatHeadway(hw.averageSeconds) }}
               </span>
+            } @else if (
+              state.showSchedule && direction.scheduledIntervalLabel;
+              as intervalLabel
+            ) {
+              <span
+                class="headway-badge schedule-headway-badge"
+                [matTooltip]="getScheduledHeadwayTooltip(intervalLabel)"
+              >
+                <mat-icon>schedule</mat-icon>
+                a cada {{ intervalLabel }}
+              </span>
             }
           </div>
 
-          @if (direction.nextTrain; as nextTrain) {
+          @if (direction.nextDisplay; as next) {
             <div
               class="next-train-prominent"
-              [class.at-platform]="nextTrain.isAtPlatform"
-              [class]="getPositionStatusClass(nextTrain)"
+              [class.at-platform]="next.isAtPlatform"
+              [class.scheduled-train]="next.scheduled"
+              [class]="next.statusClass"
             >
               @if (lineInfo(); as info) {
                 <div class="train-icon-large">
@@ -79,34 +100,34 @@
               <div class="train-details">
                 <span
                   class="arrival-time-large"
-                  [class.platform]="nextTrain.isAtPlatform"
+                  [class.platform]="next.isAtPlatform"
                 >
-                  {{ getArrivalDisplay(nextTrain) }}
+                  {{ next.time }}
                 </span>
                 <span class="train-location-status">
-                  {{ getTrainLocation(nextTrain) }}
+                  {{ next.location }}
                 </span>
               </div>
             </div>
 
-            @if (direction.followingTrains.length > 0) {
-              <div class="following-trains">
-                <span class="following-label">Próximos:</span>
-                <div class="train-chips">
-                  @for (
-                    train of direction.followingTrains;
-                    track train.arrivalTime
-                  ) {
-                    <span
-                      class="train-chip"
-                      [class.at-platform]="train.isAtPlatform"
-                      [matTooltip]="getTrainLocation(train)"
-                    >
-                      {{ getChipArrivalText(train) }}
-                    </span>
-                  }
+            @if (direction.followingDisplays; as following) {
+              @if (following.length > 0) {
+                <div class="following-trains">
+                  <span class="following-label">Próximos:</span>
+                  <div class="train-chips">
+                    @for (train of following; track train.key) {
+                      <span
+                        class="train-chip"
+                        [class.at-platform]="train.isAtPlatform"
+                        [class.scheduled-chip]="train.scheduled"
+                        [matTooltip]="train.tooltip"
+                      >
+                        {{ train.label }}
+                      </span>
+                    }
+                  </div>
                 </div>
-              </div>
+              }
             }
           }
 
@@ -131,7 +152,8 @@
   }
 
   @if (
-    state.directions.length === 0 &&
+    !state.hasLiveTrains &&
+    !state.showSchedule &&
     !state.processing &&
     !state.loading &&
     !state.outOfSchedule &&

@@ -40,6 +40,53 @@
         </div>
         }
       </div>
+      } @else if ( !group.operationClosed && !group.outOfSchedule &&
+      group.scheduledServices?.length ) {
+      <div class="schedule-note">
+        <span aria-hidden="true">◷</span>
+        Programação · sem dados em tempo real
+      </div>
+      <div class="trains-list">
+        @for (service of group.scheduledServices; track service.destinationCode)
+        {
+        <div class="train-item scheduled-item">
+          <div class="train-destination">
+            <span aria-hidden="true">→</span>
+            {{ service.destinationName }}
+          </div>
+          <div class="train-time scheduled-time">
+            <span [title]="getScheduledLocation(service)">
+              {{ getScheduledArrivalDisplay(service) }}
+            </span>
+            <small class="scheduled-location">
+              {{ getScheduledLocation(service) }}
+            </small>
+            @if (getIntervalLabel(group, service); as intervalLabel) {
+            <small
+              class="interval-label"
+              [title]="getIntervalTooltip(group, service)"
+            >
+              a cada {{ intervalLabel }}
+            </small>
+            }
+          </div>
+        </div>
+        @for (departure of service.followingDepartures ?? []; track
+        departure.departureAt) {
+        <div class="train-item scheduled-item following-scheduled-item">
+          <div class="train-destination">
+            <span aria-hidden="true">↳</span>
+            {{ service.destinationName }}
+          </div>
+          <div
+            class="train-time scheduled-time"
+            [title]="getScheduledDepartureTooltip(departure)"
+          >
+            {{ getScheduledDepartureDisplay(departure) }}
+          </div>
+        </div>
+        } }
+      </div>
       } @else {
       <p class="no-trains">Nenhum trem previsto nesta linha agora</p>
       }

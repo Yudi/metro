@@ -6,6 +6,8 @@ import {
   NextTrainArrival,
   StationTrainData,
 } from '../../next-train-websocket.service';
+import type { RailScheduledService } from '@metro/shared/utils';
+import { formatScheduledRailTime } from '@metro/shared/utils';
 import { NextTrainCardComponent } from './next-train-card.component';
 
 type StationKey = `${string}:${string}`;
@@ -63,9 +65,10 @@ describe('NextTrainCardComponent', () => {
   });
 
   function setStationData(
-    lineCode: 'L4' | 'L10',
+    lineCode: 'L4' | 'L9' | 'L10',
     stationCode: string,
     train: NextTrainArrival,
+    scheduledServices?: RailScheduledService[],
   ): void {
     const key = `${lineCode}:${stationCode}` as StationKey;
     stationData.set(
@@ -79,6 +82,7 @@ describe('NextTrainCardComponent', () => {
             processing: false,
             operationClosed: false,
             outOfSchedule: false,
+            scheduledServices,
           },
         ],
       ]),
@@ -86,6 +90,49 @@ describe('NextTrainCardComponent', () => {
     fixture.componentRef.setInput('lineCode', lineCode);
     fixture.componentRef.setInput('stationCode', stationCode);
     fixture.detectChanges();
+  }
+
+  function setSnapshot(
+    lineCode: 'L4' | 'L9' | 'L10',
+    stationCode: string,
+    data: Partial<StationTrainData> & Pick<StationTrainData, 'trains'>,
+  ): void {
+    const key = `${lineCode}:${stationCode}` as StationKey;
+    stationData.set(
+      new Map([
+        [
+          key,
+          {
+            hasError: false,
+            dataReceived: true,
+            processing: false,
+            operationClosed: false,
+            outOfSchedule: false,
+            ...data,
+          },
+        ],
+      ]),
+    );
+    fixture.componentRef.setInput('lineCode', lineCode);
+    fixture.componentRef.setInput('stationCode', stationCode);
+    fixture.detectChanges();
+  }
+
+  function createScheduledService(
+    overrides: Partial<RailScheduledService> = {},
+  ): RailScheduledService {
+    return {
+      destinationCode: 'VAG',
+      destinationName: 'Varginha',
+      originStationCode: 'OSA',
+      originStationName: 'Osasco',
+      nextDepartureAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+      nextArrivalAt: new Date(Date.now() + 12 * 60_000).toISOString(),
+      arrivalEstimated: true,
+      intervalLabel: '5 min',
+      followingDepartures: [],
+      ...overrides,
+    };
   }
 
   function renderedLocation(): string {
@@ -326,5 +373,105 @@ describe('NextTrainCardComponent', () => {
     expect(
       fixture.nativeElement.querySelectorAll('.train-composition__feature'),
     ).not.toHaveLength(0);
+  });
+
+  it('shows a scheduled next train and interval when the completed snapshot has no live trains', () => {
+    const service = createScheduledService({
+      followingDepartures: [
+        {
+          departureAt: new Date(Date.now() + 17 * 60_000).toISOString(),
+          arrivalAt: new Date(Date.now() + 24 * 60_000).toISOString(),
+        },
+        {
+          departureAt: new Date(Date.now() + 29 * 60_000).toISOString(),
+          arrivalAt: new Date(Date.now() + 36 * 60_000).toISOString(),
+        },
+        {
+          departureAt: new Date(Date.now() + 41 * 60_000).toISOString(),
+          arrivalAt: new Date(Date.now() + 48 * 60_000).toISOString(),
+        },
+      ],
+    });
+
+    setSnapshot('L9', 'HBR', {
+      trains: [],
+      scheduledServices: [service],
+    });
+
+    expect(
+      fixture.nativeElement.querySelector('.schedule-indicator'),
+    ).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.live-indicator')).toBeNull();
+    expect(fixture.nativeElement.textContent).toContain('Programação');
+    expect(fixture.nativeElement.textContent).toContain(
+      'Estimativa pela programação',
+    );
+    expect(fixture.nativeElement.textContent).toContain('a cada 5 min');
+    expect(fixture.nativeElement.querySelectorAll('.train-chip')).toHaveLength(
+      3,
+    );
+  });
+
+  it('keeps live arrivals as the source of the prominent row when schedule data is also present', () => {
+    setSnapshot('L9', 'HBR', {
+      trains: [createArrival({ arrivalTime: '12:04' })],
+      scheduledServices: [createScheduledService()],
+    });
+
+    expect(
+      fixture.nativeElement.querySelector('.live-indicator'),
+    ).not.toBeNull();
+    expect(
+      fixture.nativeElement.querySelector('.schedule-indicator'),
+    ).toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain(
+      'Estimativa pela programação',
+    );
+  });
+
+  it('prefers a measured direction headway over the scheduled interval', () => {
+    setSnapshot('L9', 'HBR', {
+      trains: [],
+      scheduledServices: [createScheduledService()],
+      headway: [
+        {
+          direction: 'Varginha',
+          averageSeconds: 7 * 60,
+          sampleCount: 8,
+        },
+      ],
+    });
+
+    expect(fixture.nativeElement.textContent).toContain('a cada 7 min');
+    expect(fixture.nativeElement.textContent).not.toContain('a cada 5 min');
+  });
+
+  it.each([
+    ['loading', { dataReceived: false }],
+    ['processing', { dataReceived: false, processing: true }],
+    ['operation closed', { operationClosed: true }],
+    ['out of schedule', { outOfSchedule: true }],
+  ] as const)('does not show stale schedule data while %s', (_label, flags) => {
+    setSnapshot('L9', 'HBR', {
+      trains: [],
+      scheduledServices: [createScheduledService()],
+      ...flags,
+    });
+
+    expect(
+      fixture.nativeElement.querySelector('.schedule-indicator'),
+    ).toBeNull();
+    expect(fixture.nativeElement.querySelector('.scheduled-train')).toBeNull();
+  });
+
+  it('uses the full date for a schedule gap beyond tomorrow', () => {
+    const value = formatScheduledRailTime(
+      '2026-09-14T07:00:00Z',
+      'America/Sao_Paulo',
+      new Date('2026-09-11T22:00:00Z'),
+    );
+
+    expect(value).toContain('14/09');
+    expect(value).not.toContain('Amanhã');
   });
 });

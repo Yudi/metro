@@ -5,6 +5,76 @@ import type {
   TrainCarOccupancy,
 } from '@metro/shared/utils';
 
+export class ScheduledDepartureDto {
+  @ApiProperty({
+    example: '2026-09-09T12:07:00.000Z',
+    format: 'date-time',
+    description: 'Following scheduled departure as an ISO instant',
+  })
+  departureAt!: string;
+
+  @ApiProperty({
+    example: '2026-09-09T12:17:00.000Z',
+    format: 'date-time',
+    required: false,
+    description: 'Following scheduled arrival at the requested station',
+  })
+  arrivalAt?: string;
+}
+
+export class ScheduledServiceDto {
+  @ApiProperty({ example: 'VAG', description: 'Destination station code' })
+  destinationCode!: string;
+
+  @ApiProperty({ example: 'Varginha', description: 'Destination station name' })
+  destinationName!: string;
+
+  @ApiProperty({ example: 'OSA', description: 'Service origin station code' })
+  originStationCode!: string;
+
+  @ApiProperty({
+    example: 'Osasco',
+    description: 'Service origin station name',
+  })
+  originStationName!: string;
+
+  @ApiProperty({
+    example: '2026-09-09T12:04:00.000Z',
+    format: 'date-time',
+    description: 'Next scheduled departure as an ISO instant',
+  })
+  nextDepartureAt!: string;
+
+  @ApiProperty({
+    example: '3 min',
+    required: false,
+    description: 'Scheduled interval label for consecutive services',
+  })
+  intervalLabel?: string;
+
+  @ApiProperty({
+    example: '2026-09-09T12:14:00.000Z',
+    format: 'date-time',
+    required: false,
+    description: 'Next scheduled arrival at the requested station',
+  })
+  nextArrivalAt?: string;
+
+  @ApiProperty({
+    example: true,
+    required: false,
+    description: 'Whether the station arrival is inferred from the schedule',
+  })
+  arrivalEstimated?: boolean;
+
+  @ApiProperty({
+    type: () => [ScheduledDepartureDto],
+    required: false,
+    description: 'Up to three following scheduled departures',
+  })
+  followingDepartures?: ScheduledDepartureDto[];
+}
+
 /**
  * Train position status relative to a station
  */
@@ -111,6 +181,14 @@ export class NextTrainUpdateDto {
 
   @ApiProperty({ description: 'Train arrivals data' })
   trains!: NextTrainArrivalDto[];
+
+  @ApiProperty({
+    description:
+      'Scheduled service departures shown when no live train arrivals are available',
+    type: () => [ScheduledServiceDto],
+    required: false,
+  })
+  scheduledServices?: ScheduledServiceDto[];
 
   @ApiProperty({ description: 'Server timestamp' })
   timestamp!: number;

@@ -41,12 +41,10 @@ describe('ItinerariesService', () => {
     const error = jest.fn();
     const next = jest.fn();
     service.load('477A-10', '2026-09-08').subscribe({ next, error });
-    http
-      .expectOne('/api/graphql')
-      .flush({
-        data: { busRouteItinerary: { patterns: [] } },
-        errors: [{ message: 'Unavailable' }],
-      });
+    http.expectOne('/api/graphql').flush({
+      data: { busRouteItinerary: { patterns: [] } },
+      errors: [{ message: 'Unavailable' }],
+    });
     expect(next).not.toHaveBeenCalled();
     expect(error).toHaveBeenCalled();
   });

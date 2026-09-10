@@ -38,6 +38,8 @@ import {
   getBusStopIdentityAliases,
   groupScheduledBusDepartures,
   hasArtespStopData,
+  getTerminalForDestination,
+  NextTrainLineCode,
   sortBusRoutesByAgency,
   hasFetchableNextTrain,
   sortRailLineCodes,
@@ -47,10 +49,23 @@ import {
 import { firstValueFrom, forkJoin, map, of } from 'rxjs';
 import type { LiteScheduledBusDeparture } from '../../shared/search/lite-search.service';
 import {
+  formatLiteScheduledDepartureTime,
+  formatLiteScheduledServiceTime,
+  getLiteScheduledDepartureTooltip,
+  getLiteScheduledServiceLocation,
+} from '../../shared/search/lite-rail-schedule.utils';
+import {
   LiteArrivalLine,
   LiteRealtimeService,
   LiteStopArrivalUpdate,
 } from '../../shared/realtime/lite-realtime.service';
+
+type LiteRailScheduledService = NonNullable<
+  RailNextTrainGroup['scheduledServices']
+>[number];
+type LiteRailScheduledDeparture = NonNullable<
+  LiteRailScheduledService['followingDepartures']
+>[number];
 
 @Component({
   selector: 'app-dashboard',
@@ -331,6 +346,83 @@ export class Dashboard {
 
   readonly formatTrainTime = dashboardPresentation.formatTrainTime;
 
+  getScheduledRailTime(service: LiteRailScheduledService): string {
+    return formatLiteScheduledServiceTime(service);
+  }
+
+  getScheduledRailDepartureTime(departure: LiteRailScheduledDeparture): string {
+    return formatLiteScheduledDepartureTime(departure);
+  }
+
+  getScheduledRailLocation(service: LiteRailScheduledService): string {
+    return getLiteScheduledServiceLocation(service);
+  }
+
+  getScheduledRailDepartureTooltip(
+    departure: LiteRailScheduledDeparture,
+  ): string {
+    return getLiteScheduledDepartureTooltip(departure);
+  }
+
+  getRailIntervalLabel(
+    group: RailNextTrainGroup,
+    service: LiteRailScheduledService,
+  ): string | null {
+    const direction = this.getRailScheduledDirection(group, service);
+    const headway = group.headway?.find(
+      (candidate) =>
+        candidate.direction === direction ||
+        candidate.direction === service.destinationName,
+    );
+    if (headway) {
+      const minutes = Math.round(headway.averageSeconds / 60);
+      return minutes < 1 ? '<1 min' : `${minutes} min`;
+    }
+
+    return service.intervalLabel?.trim() || null;
+  }
+
+  getRailIntervalTooltip(
+    group: RailNextTrainGroup,
+    service: LiteRailScheduledService,
+  ): string {
+    const direction = this.getRailScheduledDirection(group, service);
+    return group.headway?.some(
+      (candidate) =>
+        candidate.direction === direction ||
+        candidate.direction === service.destinationName,
+    )
+      ? 'Intervalo médio observado'
+      : 'Intervalo programado · sem dados em tempo real';
+  }
+
+  private getRailScheduledDirection(
+    group: RailNextTrainGroup,
+    service: LiteRailScheduledService,
+  ): string {
+    const lineCode = group.line.nextTrainLineCode;
+    if (
+      !lineCode ||
+      !group.line.stationCode ||
+      !service.destinationCode ||
+      !this.hasTerminalDirections(lineCode)
+    ) {
+      return service.destinationName;
+    }
+
+    return getTerminalForDestination(
+      lineCode,
+      group.line.stationCode,
+      service.destinationCode,
+    );
+  }
+
+  private hasTerminalDirections(
+    lineCode: string,
+  ): lineCode is NextTrainLineCode {
+    return lineCode === 'L4' || lineCode === 'L8' || lineCode === 'L9';
+  }
+
   getBusArrivalLines(stopId: string): LiteArrivalLine[] {
     return this.busArrivalsByStopId().get(stopId)?.p?.l ?? [];
   }
@@ -505,11 +597,11 @@ export class Dashboard {
           this.dashboardApi
             .fetchNextTrains(line.nextTrainLineCode, line.stationCode)
             .pipe(
-              map((trains) => ({
+              map((result) => ({
                 key: `${station.key}:${line.id}`,
                 stationName: station.name,
                 line,
-                trains,
+                ...result,
               })),
             ),
         ),

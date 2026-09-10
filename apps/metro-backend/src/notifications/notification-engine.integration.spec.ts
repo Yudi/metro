@@ -29,12 +29,10 @@ describe('notification evaluation to durable outbox integration', () => {
       findMany: jest.fn().mockResolvedValue([{ id: 'device' }]),
     },
     notificationTarget: {
-      findUniqueOrThrow: jest
-        .fn()
-        .mockResolvedValue({
-          observationClass: 'incident',
-          observationEpisode: 'episode',
-        }),
+      findUniqueOrThrow: jest.fn().mockResolvedValue({
+        observationClass: 'incident',
+        observationEpisode: 'episode',
+      }),
       update: jest.fn(),
     },
     notificationIssueReceipt: {

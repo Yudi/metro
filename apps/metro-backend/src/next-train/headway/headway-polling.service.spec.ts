@@ -12,6 +12,41 @@ describe('HeadwayPollingService', () => {
     jest.useRealTimers();
   });
 
+  it('does not feed schedule-only deltas into measured headway tracking', () => {
+    const headwayTracking = { processPollResult: jest.fn() };
+    const cptmHeadwayTracking = { processObservations: jest.fn() };
+    const service = new HeadwayPollingService(
+      { get: jest.fn() } as never,
+      {} as never,
+      headwayTracking as never,
+      cptmHeadwayTracking as never,
+      { onPollComplete: jest.fn(), offPollComplete: jest.fn() } as never,
+      {} as never,
+    );
+
+    const listener = (
+      service as unknown as {
+        nextTrainPollListener(deltas: unknown[]): void;
+      }
+    ).nextTrainPollListener;
+    listener([
+      {
+        lineCode: 'L1',
+        stationCode: 'LUZ',
+        trains: [],
+        scheduledServices: [],
+        timestamp: 100,
+        hasError: false,
+        operationClosed: false,
+        outOfSchedule: false,
+      },
+    ]);
+
+    expect(headwayTracking.processPollResult).not.toHaveBeenCalled();
+    expect(cptmHeadwayTracking.processObservations).not.toHaveBeenCalled();
+    service.onModuleDestroy();
+  });
+
   it('polls CPTM lines through one shared periodic round-robin', async () => {
     jest.useFakeTimers();
     const externalRailProvider = {

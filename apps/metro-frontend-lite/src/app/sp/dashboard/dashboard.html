@@ -389,9 +389,38 @@
           (group.stationName === station.name) {
           <div class="train-box">
             <strong>{{ formatLineLabel(group.line) }} · próximos trens</strong>
-            @if (group.trains.length === 0) {
+            @if (group.trains.length === 0) { @if ( !group.operationClosed &&
+            !group.outOfSchedule && group.scheduledServices?.length ) {
+            <small class="rail-schedule-note">
+              Programação · sem dados em tempo real
+            </small>
+            @for (service of group.scheduledServices; track
+            service.destinationCode) {
+            <div class="train-row scheduled-train-row">
+              <span>{{ service.destinationName }}</span>
+              <time [title]="getScheduledRailLocation(service)">
+                {{ getScheduledRailTime(service) }}
+                <small class="rail-schedule-location">
+                  {{ getScheduledRailLocation(service) }}
+                </small>
+              </time>
+              @if (getRailIntervalLabel(group, service); as intervalLabel) {
+              <small [title]="getRailIntervalTooltip(group, service)">
+                a cada {{ intervalLabel }}
+              </small>
+              }
+            </div>
+            @for (departure of service.followingDepartures ?? []; track
+            departure.departureAt) {
+            <div class="train-row scheduled-train-row following-scheduled-row">
+              <span>{{ service.destinationName }}</span>
+              <time [title]="getScheduledRailDepartureTooltip(departure)">
+                {{ getScheduledRailDepartureTime(departure) }}
+              </time>
+            </div>
+            } } } @else {
             <small>Sem previsão disponível.</small>
-            } @else { @for (train of group.trains.slice(0, 3); track
+            } } @else { @for (train of group.trains.slice(0, 3); track
             train.destinationCode + train.arrivalTime) {
             <div class="train-row">
               <span>{{ train.destinationName }}</span>

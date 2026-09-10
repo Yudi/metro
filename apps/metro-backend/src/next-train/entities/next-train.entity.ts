@@ -116,6 +116,64 @@ export class DirectionHeadwayEntity {
   isFallback?: boolean;
 }
 
+@ObjectType({ description: 'Following scheduled rail departure' })
+export class ScheduledDepartureEntity {
+  @Field(() => Date, {
+    description: 'Following scheduled departure',
+  })
+  departureAt!: Date;
+
+  @Field(() => Date, {
+    nullable: true,
+    description: 'Following scheduled arrival at the requested station',
+  })
+  arrivalAt?: Date;
+}
+
+@ObjectType({ description: 'Scheduled rail service departure' })
+export class ScheduledServiceEntity {
+  @Field(() => String, { description: 'Destination station code' })
+  destinationCode!: string;
+
+  @Field(() => String, { description: 'Destination station name' })
+  destinationName!: string;
+
+  @Field(() => String, { description: 'Service origin station code' })
+  originStationCode!: string;
+
+  @Field(() => String, { description: 'Service origin station name' })
+  originStationName!: string;
+
+  @Field(() => Date, {
+    description: 'Next scheduled departure',
+  })
+  nextDepartureAt!: Date;
+
+  @Field(() => String, {
+    nullable: true,
+    description: 'Scheduled interval label for consecutive services',
+  })
+  intervalLabel?: string;
+
+  @Field(() => Date, {
+    nullable: true,
+    description: 'Next scheduled arrival at the requested station',
+  })
+  nextArrivalAt?: Date;
+
+  @Field(() => Boolean, {
+    nullable: true,
+    description: 'Whether the station arrival is inferred from the schedule',
+  })
+  arrivalEstimated?: boolean;
+
+  @Field(() => [ScheduledDepartureEntity], {
+    nullable: true,
+    description: 'Up to three following scheduled departures',
+  })
+  followingDepartures?: ScheduledDepartureEntity[];
+}
+
 /**
  * Container for next train arrivals at a station
  */
@@ -132,6 +190,12 @@ export class StationNextTrains {
 
   @Field(() => [NextTrainArrival], { description: 'List of arriving trains' })
   trains!: NextTrainArrival[];
+
+  @Field(() => [ScheduledServiceEntity], {
+    description:
+      'Scheduled services shown when no live train arrivals are available',
+  })
+  scheduledServices!: ScheduledServiceEntity[];
 
   @Field(() => Boolean, {
     nullable: true,

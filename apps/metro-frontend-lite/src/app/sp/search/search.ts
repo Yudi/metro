@@ -276,7 +276,7 @@ export class Search {
             stations.map((station) =>
               this.searchService
                 .getNextTrains(station.lineCode, station.stationCode)
-                .pipe(map((trains) => ({ ...station, trains }))),
+                .pipe(map((result) => ({ ...station, ...result }))),
             ),
           );
         }),
@@ -288,7 +288,13 @@ export class Search {
           this.trainsLoading.set(false);
           if (groups.length === 0) {
             this.trainsError.set('Não foi possível identificar esta estação');
-          } else if (groups.every((group) => group.trains.length === 0)) {
+          } else if (
+            groups.every(
+              (group) =>
+                group.trains.length === 0 &&
+                (group.scheduledServices?.length ?? 0) === 0,
+            )
+          ) {
             this.trainsError.set('Nenhum trem previsto no momento');
           }
         },

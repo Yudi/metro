@@ -40,6 +40,11 @@
     background: rgba(0, 167, 142, 0.15);
     color: #00a78e;
   }
+
+  &.scheduled-chip {
+    background: var(--mat-sys-secondary-container, #ffecb5);
+    color: var(--mat-sys-on-secondary-container, #5d4100);
+  }
 }
 
 .more-trains {

@@ -5,6 +5,7 @@ package metro.rail.integration.v1;
 service RailIntegrationService {
   rpc Check(ReadinessRequest) returns (ReadinessResponse);
   rpc FetchNextTrains(LineStationRequest) returns (NextTrainsResponse);
+  rpc FetchScheduledService(LineStationRequest) returns (ScheduledServicesResponse);
   rpc GetStationName(LineStationRequest) returns (StationNameResponse);
   rpc GetStationCodes(LineRequest) returns (StationCodesResponse);
   rpc GetStationByName(StationByNameRequest) returns (StationLookupResponse);
@@ -61,6 +62,27 @@ message NextTrainsResponse {
   bool success = 1;
   repeated NextTrainArrival trains = 2;
   bool is_api_error = 3;
+}
+
+message ScheduledService {
+  string destination_code = 1;
+  string destination_name = 2;
+  string origin_station_code = 3;
+  string origin_station_name = 4;
+  string next_departure_at = 5;
+  optional string next_arrival_at = 6;
+  optional bool arrival_estimated = 7;
+  optional string interval_label = 8;
+  repeated ScheduledDeparture following_departures = 9;
+}
+
+message ScheduledDeparture {
+  string departure_at = 1;
+  optional string arrival_at = 2;
+}
+
+message ScheduledServicesResponse {
+  repeated ScheduledService services = 1;
 }
 
 message StationNameResponse {

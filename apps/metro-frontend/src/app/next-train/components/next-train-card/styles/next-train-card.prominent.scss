@@ -42,6 +42,26 @@
   // }
 }
 
+.next-train-prominent.scheduled-train {
+  background: var(--mat-sys-secondary-container, #ffecb5);
+
+  .train-icon-large {
+    background: color-mix(
+      in srgb,
+      var(--mat-sys-secondary, #8a6100) 14%,
+      var(--mat-sys-surface, #fff)
+    );
+
+    mat-icon {
+      color: var(--mat-sys-on-secondary-container, #5d4100);
+    }
+  }
+
+  .arrival-time-large {
+    color: var(--mat-sys-on-secondary-container, #5d4100);
+  }
+}
+
 .train-icon-large {
   display: flex;
   align-items: center;

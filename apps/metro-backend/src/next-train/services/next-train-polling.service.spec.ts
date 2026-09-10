@@ -20,6 +20,7 @@ describe('NextTrainPollingService', () => {
 
   const externalRailProvider = {
     fetchNextTrains: jest.fn(),
+    fetchScheduledService: jest.fn(),
     getStationName: jest.fn(),
   };
   const railService = {
@@ -32,6 +33,7 @@ describe('NextTrainPollingService', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     schedule.isOperating.mockResolvedValue(true);
+    externalRailProvider.fetchScheduledService.mockResolvedValue([]);
     service = new NextTrainPollingService(
       externalRailProvider as never,
       railService as never,
@@ -135,6 +137,134 @@ describe('NextTrainPollingService', () => {
           operationClosed: false,
         }),
       ]),
+    );
+  });
+
+  it('uses schedule data for a supported station without a live integration', async () => {
+    const scheduledService = {
+      destinationCode: 'TUC',
+      destinationName: 'Tucuruvi',
+      originStationCode: 'JAB',
+      originStationName: 'Jabaquara',
+      nextDepartureAt: '2026-09-09T12:04:00.000Z',
+      nextArrivalAt: '2026-09-09T12:14:00.000Z',
+      arrivalEstimated: true,
+      intervalLabel: '4 min',
+      followingDepartures: [{ departureAt: '2026-09-09T12:08:00.000Z' }],
+    };
+    externalRailProvider.fetchScheduledService.mockResolvedValue([
+      scheduledService,
+    ]);
+
+    const result = await (
+      service as unknown as {
+        fetchAndCacheKey(
+          key: string,
+          timestamp: number,
+        ): Promise<{ delta: unknown; hasError: boolean }>;
+      }
+    ).fetchAndCacheKey('L1:LUZ', 100);
+
+    expect(externalRailProvider.fetchNextTrains).not.toHaveBeenCalled();
+    expect(externalRailProvider.fetchScheduledService).toHaveBeenCalledWith(
+      'L1',
+      'LUZ',
+    );
+    expect(result).toEqual({ delta: expect.anything(), hasError: false });
+    expect(service.getCached('L1', 'LUZ')).toEqual(
+      expect.objectContaining({
+        trains: [],
+        scheduledServices: [scheduledService],
+        hasError: false,
+      }),
+    );
+  });
+
+  it('refreshes and clears schedule fallback as the dated service list changes', async () => {
+    const firstService = {
+      destinationCode: 'VAG',
+      destinationName: 'Varginha',
+      originStationCode: 'OSA',
+      originStationName: 'Osasco',
+      nextDepartureAt: '2026-09-09T12:04:00.000Z',
+      intervalLabel: '3 min',
+    };
+    externalRailProvider.fetchNextTrains.mockResolvedValue({
+      success: true,
+      trains: [],
+      isApiError: false,
+    });
+    externalRailProvider.fetchScheduledService
+      .mockResolvedValueOnce([firstService])
+      .mockResolvedValueOnce([]);
+
+    const poll = (
+      service as unknown as {
+        fetchAndCacheKey(key: string, timestamp: number): Promise<unknown>;
+      }
+    ).fetchAndCacheKey.bind(service);
+    const first = await poll('L9:HBR', 100);
+    const second = await poll('L9:HBR', 200);
+
+    expect(first).toEqual({ delta: expect.anything(), hasError: false });
+    expect(second).toEqual({ delta: expect.anything(), hasError: false });
+    expect(service.getCached('L9', 'HBR')).toEqual(
+      expect.objectContaining({ trains: [], scheduledServices: [] }),
+    );
+  });
+
+  it('keeps a live transport error in the cache while using schedule fallback', async () => {
+    const scheduledService = {
+      destinationCode: 'VAG',
+      destinationName: 'Varginha',
+      originStationCode: 'OSA',
+      originStationName: 'Osasco',
+      nextDepartureAt: '2026-09-09T12:04:00.000Z',
+    };
+    externalRailProvider.fetchNextTrains.mockRejectedValue(
+      new Error('live source unavailable'),
+    );
+    externalRailProvider.fetchScheduledService.mockResolvedValue([
+      scheduledService,
+    ]);
+
+    await (
+      service as unknown as {
+        fetchAndCacheKey(key: string, timestamp: number): Promise<unknown>;
+      }
+    ).fetchAndCacheKey('L9:HBR', 100);
+
+    expect(externalRailProvider.fetchScheduledService).toHaveBeenCalledWith(
+      'L9',
+      'HBR',
+    );
+    expect(service.getCached('L9', 'HBR')).toEqual(
+      expect.objectContaining({
+        trains: [],
+        scheduledServices: [scheduledService],
+        hasError: true,
+      }),
+    );
+  });
+
+  it('marks a schedule transport failure as an errored empty snapshot', async () => {
+    externalRailProvider.fetchScheduledService.mockRejectedValue(
+      new Error('schedule source unavailable'),
+    );
+
+    await (
+      service as unknown as {
+        fetchAndCacheKey(key: string, timestamp: number): Promise<unknown>;
+      }
+    ).fetchAndCacheKey('L1:LUZ', 100);
+
+    expect(externalRailProvider.fetchNextTrains).not.toHaveBeenCalled();
+    expect(service.getCached('L1', 'LUZ')).toEqual(
+      expect.objectContaining({
+        trains: [],
+        scheduledServices: [],
+        hasError: true,
+      }),
     );
   });
 
@@ -484,7 +614,7 @@ describe('NextTrainPollingService', () => {
       ).fetchAndCacheKey.bind(service);
 
       await poll('L11:LUZ', 100);
-      expect(service.getCached('L11', 'LUZ')?.stationName).toBe('LUZ');
+      expect(service.getCached('L11', 'LUZ')?.stationName).toBe('Luz');
       await poll('L11:LUZ', 200);
       await poll('L11:LUZ', 300);
 

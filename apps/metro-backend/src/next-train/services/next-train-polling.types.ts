@@ -1,5 +1,6 @@
 import type {
   ExtendedNextTrainLineCode,
+  RailScheduledService,
   RailStatusCode,
 } from '@metro/shared/utils';
 import type { NextTrainArrivalDto } from '../dto/next-train.dto';
@@ -13,6 +14,7 @@ export interface StationCacheEntry {
   stationCode: string;
   stationName: string;
   trains: NextTrainArrivalDto[];
+  scheduledServices?: RailScheduledService[];
   hash: string;
   fetchedAt: number;
   hasError: boolean;
@@ -24,6 +26,7 @@ export interface StationDelta {
   lineCode: LineCode;
   stationCode: string;
   trains: NextTrainArrivalDto[];
+  scheduledServices?: RailScheduledService[];
   timestamp: number;
   hasError: boolean;
   operationClosed: boolean;

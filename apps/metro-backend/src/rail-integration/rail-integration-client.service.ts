@@ -19,6 +19,7 @@ import {
   ExtendedNextTrainLineCode,
   SpecialRailService,
 } from '@metro/shared/utils';
+import type { RailScheduledService } from '@metro/shared/utils';
 import {
   loadRailIntegrationGrpcDefinition,
   RailHeadwayObservation,
@@ -60,6 +61,10 @@ interface NextTrainsTransportResponse
   trains?: NextTrainTransportArrival[];
 }
 
+interface ScheduledServicesTransportResponse {
+  services?: RailScheduledService[];
+}
+
 interface StationCodesResponse {
   stationCodes?: string[];
 }
@@ -90,6 +95,7 @@ interface SpecialRailStatusLinesResponse {
 
 type RailIntegrationMethod =
   | 'fetchNextTrains'
+  | 'fetchScheduledService'
   | 'getStationName'
   | 'getStationCodes'
   | 'getStationByName'
@@ -197,6 +203,71 @@ export class RailIntegrationClientService
         cars: train.cars,
       })),
     }));
+  }
+
+  async fetchScheduledService(
+    lineCode: string,
+    stationCode: string,
+  ): Promise<RailScheduledService[]> {
+    const response = await this.call<ScheduledServicesTransportResponse>(
+      'fetchScheduledService',
+      {
+        lineCode,
+        stationCode,
+      },
+    );
+
+    return (response.services ?? []).map((service) => {
+      const mapped: RailScheduledService = {
+        destinationCode: service.destinationCode,
+        destinationName: service.destinationName,
+        originStationCode: service.originStationCode,
+        originStationName: service.originStationName,
+        nextDepartureAt: service.nextDepartureAt,
+      };
+
+      // Omitted proto3 scalars arrive as empty defaults; expose only non-empty values.
+      if (
+        typeof service.intervalLabel === 'string' &&
+        service.intervalLabel.length > 0
+      ) {
+        mapped.intervalLabel = service.intervalLabel;
+      }
+
+      if (
+        typeof service.nextArrivalAt === 'string' &&
+        service.nextArrivalAt.length > 0
+      ) {
+        mapped.nextArrivalAt = service.nextArrivalAt;
+      }
+
+      if (
+        service.nextArrivalAt &&
+        typeof service.arrivalEstimated === 'boolean'
+      ) {
+        mapped.arrivalEstimated = service.arrivalEstimated;
+      }
+
+      const followingDepartures = (service.followingDepartures ?? [])
+        .filter(
+          (departure) =>
+            typeof departure.departureAt === 'string' &&
+            departure.departureAt.length > 0,
+        )
+        .slice(0, 3)
+        .map((departure) => ({
+          departureAt: departure.departureAt,
+          ...(typeof departure.arrivalAt === 'string' &&
+          departure.arrivalAt.length > 0
+            ? { arrivalAt: departure.arrivalAt }
+            : {}),
+        }));
+      if (followingDepartures.length > 0) {
+        mapped.followingDepartures = followingDepartures;
+      }
+
+      return mapped;
+    });
   }
 
   async getStationName(

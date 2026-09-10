@@ -1,6 +1,8 @@
 import type {
   FavoriteRailLineOption,
+  DirectionHeadway,
   RailLinesStatusResponse,
+  RailScheduledService,
 } from '@metro/shared/utils';
 import type { LiteNextTrainArrival } from '../../shared/search/lite-search.service';
 
@@ -89,6 +91,11 @@ export interface RailNextTrainGroup {
   stationName: string;
   line: FavoriteRailLineOption;
   trains: LiteNextTrainArrival[];
+  scheduledServices?: RailScheduledService[];
+  headway?: DirectionHeadway[];
+  operationClosed?: boolean;
+  outOfSchedule?: boolean;
+  hasError?: boolean;
 }
 
 export interface RoutesForStopResponse {
@@ -106,6 +113,13 @@ export interface RailStatusResponse {
 
 export interface NextTrainsResponse {
   data?: {
-    nextTrains: { trains: LiteNextTrainArrival[] } | null;
+    nextTrains: {
+      trains: LiteNextTrainArrival[];
+      scheduledServices?: RailScheduledService[];
+      headway?: DirectionHeadway[];
+      operationClosed?: boolean;
+      outOfSchedule?: boolean;
+      hasError?: boolean;
+    } | null;
   };
 }

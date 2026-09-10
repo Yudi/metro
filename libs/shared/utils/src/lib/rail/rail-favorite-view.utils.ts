@@ -6,8 +6,10 @@ import {
   RAIL_LINES,
   RailLineInfo,
 } from './rail-line.utils';
-import { TRIVIATRENS_LIVE_DATA_ENABLED } from '../transit/transit-agency.utils';
-import { ExtendedNextTrainLineCode } from './viamobilidade-stations';
+import {
+  ExtendedNextTrainLineCode,
+  hasNextTrainInformation,
+} from './viamobilidade-stations';
 
 export interface FavoriteRailLineOption {
   id: string;
@@ -19,14 +21,6 @@ export interface FavoriteRailLineOption {
   colorHex: string;
   nextTrainLineCode: ExtendedNextTrainLineCode | null;
 }
-
-const NEXT_TRAIN_LINE_IDS = new Set<string>([
-  'L4',
-  'L8',
-  'L9',
-  'L10',
-  ...(TRIVIATRENS_LIVE_DATA_ENABLED ? ['L11', 'L12', 'L13'] : []),
-]);
 
 export function uniqueIds(ids: string[]): string[] {
   return [...new Set(ids)];
@@ -52,9 +46,7 @@ export function sortRailLineCodes(codes: number[]): number[] {
 export function getNextTrainLineCode(
   lineId: string,
 ): ExtendedNextTrainLineCode | null {
-  return NEXT_TRAIN_LINE_IDS.has(lineId)
-    ? (lineId as ExtendedNextTrainLineCode)
-    : null;
+  return hasNextTrainInformation(lineId) ? lineId : null;
 }
 
 export function getRailLineCodeFromFavorite(id: string): number | undefined {

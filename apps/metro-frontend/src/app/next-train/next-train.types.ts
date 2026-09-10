@@ -1,5 +1,6 @@
 import type {
   DirectionHeadway,
+  RailScheduledService,
   TrackedRailLineCode,
   TrackedRailVehicle,
   TrainCarOccupancy,
@@ -51,6 +52,7 @@ export interface NextTrainUpdate {
   operationClosed?: boolean;
   outOfSchedule?: boolean;
   headway?: DirectionHeadway[];
+  scheduledServices?: RailScheduledService[];
 }
 
 /**
@@ -67,6 +69,7 @@ export interface StationTrainData {
   operationClosed: boolean;
   outOfSchedule: boolean;
   headway?: DirectionHeadway[];
+  scheduledServices?: RailScheduledService[];
 }
 
 /**

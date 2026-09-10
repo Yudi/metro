@@ -35,6 +35,7 @@ export interface GrpcUnaryCall<TRequest, TResponse> {
 export type RailIntegrationGrpcClient = Client & {
   check: GrpcUnaryCall<unknown, { ready: boolean }>;
   fetchNextTrains: GrpcUnaryCall<unknown, unknown>;
+  fetchScheduledService: GrpcUnaryCall<unknown, unknown>;
   getStationName: GrpcUnaryCall<unknown, unknown>;
   getStationCodes: GrpcUnaryCall<unknown, unknown>;
   getStationByName: GrpcUnaryCall<unknown, unknown>;

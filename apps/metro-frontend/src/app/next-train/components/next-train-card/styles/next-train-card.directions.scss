@@ -68,4 +68,9 @@
     opacity: 0.7;
     font-style: italic;
   }
+
+  &.schedule-headway-badge {
+    background: var(--mat-sys-secondary-container, #ffecb5);
+    color: var(--mat-sys-on-secondary-container, #5d4100);
+  }
 }

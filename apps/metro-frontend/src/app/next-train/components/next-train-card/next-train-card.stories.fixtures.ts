@@ -4,6 +4,7 @@ import type {
   StationTrainData,
 } from '../../next-train.types';
 import { NextTrainWebsocketService } from '../../next-train-websocket.service';
+import type { RailScheduledService } from '@metro/shared/utils';
 
 export const TRAIN_ARRIVING: NextTrainArrival = {
   destinationCode: 'VAG',
@@ -112,6 +113,40 @@ export const TRAIN_LONG_LAST_PASSED_NAME: NextTrainArrival = {
   trainLastPassedStationName: 'São Caetano do Sul-Prefeito Walter Braido',
 };
 
+export const SCHEDULED_SERVICE_FALLBACK: RailScheduledService = {
+  destinationCode: 'VAG',
+  destinationName: 'Varginha',
+  originStationCode: 'OSA',
+  originStationName: 'Osasco',
+  nextDepartureAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+  nextArrivalAt: new Date(Date.now() + 12 * 60_000).toISOString(),
+  arrivalEstimated: true,
+  intervalLabel: '5 min',
+  followingDepartures: [
+    {
+      departureAt: new Date(Date.now() + 17 * 60_000).toISOString(),
+      arrivalAt: new Date(Date.now() + 24 * 60_000).toISOString(),
+    },
+    {
+      departureAt: new Date(Date.now() + 29 * 60_000).toISOString(),
+      arrivalAt: new Date(Date.now() + 36 * 60_000).toISOString(),
+    },
+    {
+      departureAt: new Date(Date.now() + 41 * 60_000).toISOString(),
+      arrivalAt: new Date(Date.now() + 48 * 60_000).toISOString(),
+    },
+  ],
+};
+
+export const SCHEDULED_SERVICE_ORIGIN: RailScheduledService = {
+  destinationCode: 'VLS',
+  destinationName: 'Vila Sônia',
+  originStationCode: 'LUZ',
+  originStationName: 'Luz',
+  nextDepartureAt: new Date(Date.now() + 8 * 60_000).toISOString(),
+  intervalLabel: '7 min',
+};
+
 type SubscriptionKey = `${string}:${string}`;
 
 export interface MockNextTrainServiceOptions {
@@ -122,6 +157,7 @@ export interface MockNextTrainServiceOptions {
   stationCode: string;
   operationClosed?: boolean;
   outOfSchedule?: boolean;
+  scheduledServices?: RailScheduledService[];
 }
 
 export function createMockNextTrainService(
@@ -129,7 +165,11 @@ export function createMockNextTrainService(
 ): Partial<NextTrainWebsocketService> {
   const dataMap = new Map<SubscriptionKey, StationTrainData>();
   const key: SubscriptionKey = `${opts.lineCode}:${opts.stationCode}`;
-  if (opts.trains.length > 0 || opts.lastUpdate !== null) {
+  if (
+    opts.trains.length > 0 ||
+    opts.lastUpdate !== null ||
+    (opts.scheduledServices?.length ?? 0) > 0
+  ) {
     dataMap.set(key, {
       trains: opts.trains,
       hasError: false,
@@ -137,6 +177,7 @@ export function createMockNextTrainService(
       processing: false,
       operationClosed: opts.operationClosed ?? false,
       outOfSchedule: opts.outOfSchedule ?? false,
+      scheduledServices: opts.scheduledServices,
     });
   }
 

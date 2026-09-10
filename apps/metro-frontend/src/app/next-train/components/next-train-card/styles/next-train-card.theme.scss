@@ -21,6 +21,17 @@
     background: rgba(108, 99, 255, 0.15);
     color: #b4aeff;
   }
+
+  .schedule-indicator,
+  .schedule-headway-badge,
+  .next-train-prominent.scheduled-train {
+    background: color-mix(
+      in srgb,
+      var(--mat-sys-secondary-container, #6b5100) 35%,
+      var(--mat-sys-surface-container, #3a3a3a)
+    );
+    color: var(--mat-sys-on-secondary-container, #ffe9a8);
+  }
 }
 
 /* dark theme for new elements */

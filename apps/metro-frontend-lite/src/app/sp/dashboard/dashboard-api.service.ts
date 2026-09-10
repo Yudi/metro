@@ -202,14 +202,46 @@ export class DashboardApiService {
                 arrivalTime
                 isAtPlatform
               }
+              scheduledServices {
+                destinationCode
+                destinationName
+                originStationCode
+                originStationName
+                nextDepartureAt
+                nextArrivalAt
+                arrivalEstimated
+                intervalLabel
+                followingDepartures {
+                  departureAt
+                  arrivalAt
+                }
+              }
+              headway {
+                direction
+                averageSeconds
+                sampleCount
+                bucket
+                bucketLabel
+                isFallback
+              }
+              operationClosed
+              outOfSchedule
             }
           }
         `,
         variables: { lineCode, stationCode },
       })
       .pipe(
-        map((response) => response.data?.nextTrains?.trains ?? []),
-        catchError(() => of([])),
+        map(
+          (response) =>
+            response.data?.nextTrains ?? {
+              trains: [],
+              scheduledServices: [],
+            },
+        ),
+        catchError(() =>
+          of({ trains: [], scheduledServices: [], hasError: true }),
+        ),
       );
   }
 

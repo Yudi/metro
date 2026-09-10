@@ -88,6 +88,90 @@ describe('RailIntegrationClientService', () => {
     service.onModuleDestroy();
   });
 
+  it('maps only generic scheduled service fields and omits protobuf defaults', async () => {
+    const fetchScheduledService = jest.fn(
+      unarySuccess({
+        services: [
+          {
+            destinationCode: 'VAG',
+            destinationName: 'Varginha',
+            originStationCode: 'OSA',
+            originStationName: 'Osasco',
+            nextDepartureAt: '2026-09-09T12:04:00.000Z',
+            nextArrivalAt: '2026-09-09T12:14:00.000Z',
+            arrivalEstimated: true,
+            intervalLabel: '3 min',
+            followingDepartures: [
+              {
+                departureAt: '2026-09-09T12:07:00.000Z',
+                arrivalAt: '2026-09-09T12:17:00.000Z',
+              },
+              {
+                departureAt: '2026-09-09T12:10:00.000Z',
+              },
+              {
+                departureAt: '2026-09-09T12:13:00.000Z',
+              },
+              {
+                departureAt: '2026-09-09T12:16:00.000Z',
+              },
+            ],
+            internalDetails: 'must not cross the boundary',
+          },
+          {
+            destinationCode: 'OSA',
+            destinationName: 'Osasco',
+            originStationCode: 'VAG',
+            originStationName: 'Varginha',
+            nextDepartureAt: '2026-09-09T12:05:00.000Z',
+            nextArrivalAt: '',
+            arrivalEstimated: false,
+            intervalLabel: '',
+            followingDepartures: [],
+          },
+        ],
+      }),
+    );
+    const service = createServiceWithClient({
+      fetchScheduledService,
+    });
+
+    await expect(service.fetchScheduledService('L1', 'LUZ')).resolves.toEqual([
+      {
+        destinationCode: 'VAG',
+        destinationName: 'Varginha',
+        originStationCode: 'OSA',
+        originStationName: 'Osasco',
+        nextDepartureAt: '2026-09-09T12:04:00.000Z',
+        nextArrivalAt: '2026-09-09T12:14:00.000Z',
+        arrivalEstimated: true,
+        intervalLabel: '3 min',
+        followingDepartures: [
+          {
+            departureAt: '2026-09-09T12:07:00.000Z',
+            arrivalAt: '2026-09-09T12:17:00.000Z',
+          },
+          { departureAt: '2026-09-09T12:10:00.000Z' },
+          { departureAt: '2026-09-09T12:13:00.000Z' },
+        ],
+      },
+      {
+        destinationCode: 'OSA',
+        destinationName: 'Osasco',
+        originStationCode: 'VAG',
+        originStationName: 'Varginha',
+        nextDepartureAt: '2026-09-09T12:05:00.000Z',
+      },
+    ]);
+
+    expect(fetchScheduledService).toHaveBeenCalledWith(
+      { lineCode: 'L1', stationCode: 'LUZ' },
+      expect.any(Date),
+      expect.any(Function),
+    );
+    service.onModuleDestroy();
+  });
+
   it('propagates the current request correlation ID through gRPC metadata', async () => {
     const getStationCodes = jest.fn(
       (

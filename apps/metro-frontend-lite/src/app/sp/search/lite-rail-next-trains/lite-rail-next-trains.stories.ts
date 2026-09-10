@@ -3,6 +3,26 @@ import {
   LiteNextTrainGroup,
   LiteRailNextTrains,
 } from './lite-rail-next-trains';
+import type { RailScheduledService } from '@metro/shared/utils';
+
+const scheduledAt = (minutes: number): string =>
+  new Date(Date.now() + minutes * 60_000).toISOString();
+
+const scheduledService: RailScheduledService = {
+  destinationCode: 'VAG',
+  destinationName: 'Varginha',
+  originStationCode: 'OSA',
+  originStationName: 'Osasco',
+  nextDepartureAt: scheduledAt(4),
+  nextArrivalAt: scheduledAt(11),
+  arrivalEstimated: true,
+  intervalLabel: '5 min',
+  followingDepartures: [
+    { departureAt: scheduledAt(16), arrivalAt: scheduledAt(23) },
+    { departureAt: scheduledAt(28), arrivalAt: scheduledAt(35) },
+    { departureAt: scheduledAt(40), arrivalAt: scheduledAt(47) },
+  ],
+};
 
 const groups: LiteNextTrainGroup[] = [
   {
@@ -48,6 +68,10 @@ const meta: Meta<LiteRailNextTrains> = {
   component: LiteRailNextTrains,
   tags: ['autodocs'],
   argTypes: {
+    groups: {
+      control: 'object',
+      description: 'Live trains or published schedule fallback per line',
+    },
     loading: { control: 'boolean' },
     error: { control: 'text' },
   },
@@ -73,5 +97,44 @@ export const Loading: Story = {
 export const NoPredictions: Story = {
   args: {
     groups: groups.map((group) => ({ ...group, trains: [] })),
+  },
+};
+
+export const ScheduledFallback: Story = {
+  args: {
+    groups: [
+      {
+        lineCode: 'L9',
+        stationCode: 'HBR',
+        trains: [],
+        scheduledServices: [scheduledService],
+      },
+    ],
+    error: null,
+    loading: false,
+  },
+};
+
+export const ScheduledWeekendGap: Story = {
+  args: {
+    groups: [
+      {
+        lineCode: 'L9',
+        stationCode: 'HBR',
+        trains: [],
+        scheduledServices: [
+          {
+            ...scheduledService,
+            nextDepartureAt: new Date(
+              Date.now() + 3 * 24 * 60 * 60_000,
+            ).toISOString(),
+            nextArrivalAt: undefined,
+            followingDepartures: [],
+          },
+        ],
+      },
+    ],
+    error: null,
+    loading: false,
   },
 };

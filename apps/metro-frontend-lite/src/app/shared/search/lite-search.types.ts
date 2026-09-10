@@ -1,4 +1,9 @@
-import type { ExtendedNextTrainLineCode, BusFare } from '@metro/shared/utils';
+import type {
+  BusFare,
+  DirectionHeadway,
+  ExtendedNextTrainLineCode,
+  RailScheduledService,
+} from '@metro/shared/utils';
 
 /**
  * Minimal search result for lite version
@@ -58,6 +63,15 @@ export interface LiteNextTrainArrival {
   destinationName: string;
   arrivalTime: string;
   isAtPlatform: boolean;
+}
+
+export interface LiteNextTrainsResult {
+  trains: LiteNextTrainArrival[];
+  scheduledServices: RailScheduledService[];
+  headway?: DirectionHeadway[];
+  operationClosed?: boolean;
+  outOfSchedule?: boolean;
+  hasError?: boolean;
 }
 
 /**

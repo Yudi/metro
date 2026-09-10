@@ -10,13 +10,28 @@ import {
   isApi1RailLine,
   CPTM_LINE_CONFIG,
 } from '@metro/shared/utils';
-import { LiteNextTrainArrival } from '../../../shared/search/lite-search.service';
+import type { LiteNextTrainArrival } from '../../../shared/search/lite-search.service';
+import type {
+  DirectionHeadway,
+  RailScheduledService,
+} from '@metro/shared/utils';
 import { LiteSpinner } from '@metro/shared/lite-ui';
+import {
+  formatLiteScheduledDepartureTime,
+  formatLiteScheduledServiceTime,
+  getLiteScheduledDepartureTooltip,
+  getLiteScheduledServiceLocation,
+} from '../../../shared/search/lite-rail-schedule.utils';
 
 export interface LiteNextTrainGroup {
   lineCode: ExtendedNextTrainLineCode;
   stationCode: string;
   trains: LiteNextTrainArrival[];
+  scheduledServices?: RailScheduledService[];
+  headway?: DirectionHeadway[];
+  operationClosed?: boolean;
+  outOfSchedule?: boolean;
+  hasError?: boolean;
 }
 
 @Component({
@@ -55,14 +70,38 @@ export class LiteRailNextTrains {
 
   getTrainTerminal(train: LiteNextTrainArrival): string {
     const lineCode = train.lineCode as ExtendedNextTrainLineCode;
-    if (!train.destinationCode || isApi1RailLine(lineCode)) {
+    if (
+      !train.destinationCode ||
+      isApi1RailLine(lineCode) ||
+      !this.hasTerminalDirections(lineCode)
+    ) {
       return train.destinationName || '';
     }
 
     return getTerminalForDestination(
-      lineCode as NextTrainLineCode,
+      lineCode,
       train.stationCode,
       train.destinationCode,
+    );
+  }
+
+  getScheduledDirection(service: RailScheduledService): string {
+    const group = this.groups().find((group) =>
+      group.scheduledServices?.includes(service),
+    );
+    const lineCode = group?.lineCode;
+    if (
+      !lineCode ||
+      !service.destinationCode ||
+      !this.hasTerminalDirections(lineCode)
+    ) {
+      return service.destinationName;
+    }
+
+    return getTerminalForDestination(
+      lineCode,
+      group.stationCode,
+      service.destinationCode,
     );
   }
 
@@ -74,5 +113,67 @@ export class LiteRailNextTrains {
     return formatTransitTime(train.arrivalTime, {
       timeZone: this.transitTimeZone,
     });
+  }
+
+  getScheduledArrivalDisplay(service: RailScheduledService): string {
+    return formatLiteScheduledServiceTime(service);
+  }
+
+  getScheduledDepartureDisplay(
+    departure: NonNullable<RailScheduledService['followingDepartures']>[number],
+  ): string {
+    return formatLiteScheduledDepartureTime(departure);
+  }
+
+  getScheduledLocation(service: RailScheduledService): string {
+    return getLiteScheduledServiceLocation(service);
+  }
+
+  getScheduledDepartureTooltip(
+    departure: NonNullable<RailScheduledService['followingDepartures']>[number],
+  ): string {
+    return getLiteScheduledDepartureTooltip(departure);
+  }
+
+  getIntervalLabel(
+    group: LiteNextTrainGroup,
+    service: RailScheduledService,
+  ): string | null {
+    const direction = this.getScheduledDirection(service);
+    const headway = group.headway?.find(
+      (candidate) =>
+        candidate.direction === direction ||
+        candidate.direction === service.destinationName,
+    );
+    if (headway) {
+      return this.formatHeadway(headway.averageSeconds);
+    }
+
+    return service.intervalLabel?.trim() || null;
+  }
+
+  getIntervalTooltip(
+    group: LiteNextTrainGroup,
+    service: RailScheduledService,
+  ): string {
+    const direction = this.getScheduledDirection(service);
+    return group.headway?.some(
+      (candidate) =>
+        candidate.direction === direction ||
+        candidate.direction === service.destinationName,
+    )
+      ? 'Intervalo médio observado'
+      : 'Intervalo programado · sem dados em tempo real';
+  }
+
+  private hasTerminalDirections(
+    lineCode: ExtendedNextTrainLineCode,
+  ): lineCode is NextTrainLineCode {
+    return lineCode === 'L4' || lineCode === 'L8' || lineCode === 'L9';
+  }
+
+  private formatHeadway(seconds: number): string {
+    const minutes = Math.round(seconds / 60);
+    return minutes < 1 ? '<1 min' : `${minutes} min`;
   }
 }

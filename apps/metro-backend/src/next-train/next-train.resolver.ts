@@ -3,23 +3,24 @@ import {
   StationNextTrains,
   NextTrainArrival,
   CptmStationInfo,
+  ScheduledServiceEntity,
 } from './entities/next-train.entity';
 import {
   NextTrainPollingService,
   LineCode,
 } from './services/next-train-polling.service';
+import type { NextTrainFetchResult } from './dto/next-train.dto';
 import { HeadwayTrackingService } from './headway/headway-tracking.service';
 import { NextTrainScheduleService } from './services/next-train-schedule.service';
 import { RailRealtimeSourcePort } from '@metro/rail-integration-contracts';
 import {
-  getStationName,
-  isValidStation,
-  NextTrainLineCode,
-  isApi1RailLine,
+  getNextTrainStationName,
+  hasNextTrainInformation,
   hasNextTrainIntegration,
   findApi1RailStationByName,
-  isValidApi1RailStationCode,
+  isValidNextTrainStation,
 } from '@metro/shared/utils';
+import type { RailScheduledService } from '@metro/shared/utils';
 
 @Resolver(() => NextTrainArrival)
 export class NextTrainResolver {
@@ -30,16 +31,119 @@ export class NextTrainResolver {
     private readonly schedule: NextTrainScheduleService,
   ) {}
 
+  private async fetchLiveTrains(
+    lineCode: LineCode,
+    stationCode: string,
+  ): Promise<NextTrainFetchResult> {
+    if (!hasNextTrainIntegration(lineCode)) {
+      return { success: true, trains: [], isApiError: false };
+    }
+
+    try {
+      return await this.externalRailProvider.fetchNextTrains(
+        lineCode,
+        stationCode,
+      );
+    } catch {
+      // Keep live-source failures non-fatal so schedule fallback remains available.
+      return { success: false, trains: [], isApiError: true };
+    }
+  }
+
+  private async fetchScheduledServices(
+    lineCode: LineCode,
+    stationCode: string,
+  ): Promise<RailScheduledService[]> {
+    try {
+      return (
+        (await this.externalRailProvider.fetchScheduledService(
+          lineCode,
+          stationCode,
+        )) ?? []
+      );
+    } catch {
+      // Schedule failures are non-fatal; the live result remains usable.
+      return [];
+    }
+  }
+
+  private async resolveStationName(
+    lineCode: LineCode,
+    stationCode: string,
+  ): Promise<string> {
+    const localName = getNextTrainStationName(lineCode, stationCode);
+    if (!hasNextTrainIntegration(lineCode)) {
+      return localName ?? stationCode;
+    }
+
+    try {
+      const stationName = await this.externalRailProvider.getStationName(
+        lineCode,
+        stationCode,
+      );
+      if (stationName) return stationName;
+    } catch {
+      // Fall back to the local station catalog.
+    }
+
+    return localName ?? stationCode;
+  }
+
+  private async getHeadway(
+    lineCode: LineCode,
+    stationCode: string,
+  ): Promise<Awaited<ReturnType<HeadwayTrackingService['getHeadway']>>> {
+    try {
+      return await this.headwayTracking.getHeadway(lineCode, stationCode);
+    } catch {
+      // Headway failures must not block the station response.
+      return null;
+    }
+  }
+
+  private toScheduledServiceEntities(
+    services: RailScheduledService[],
+  ): ScheduledServiceEntity[] {
+    return services.map((service) => ({
+      destinationCode: service.destinationCode,
+      destinationName: service.destinationName,
+      originStationCode: service.originStationCode,
+      originStationName: service.originStationName,
+      nextDepartureAt: new Date(service.nextDepartureAt),
+      ...(service.intervalLabel
+        ? { intervalLabel: service.intervalLabel }
+        : {}),
+      ...(service.nextArrivalAt
+        ? { nextArrivalAt: new Date(service.nextArrivalAt) }
+        : {}),
+      ...(service.nextArrivalAt && service.arrivalEstimated !== undefined
+        ? { arrivalEstimated: service.arrivalEstimated }
+        : {}),
+      ...(service.followingDepartures?.length
+        ? {
+            followingDepartures: service.followingDepartures.map(
+              (departure) => ({
+                departureAt: new Date(departure.departureAt),
+                ...(departure.arrivalAt
+                  ? { arrivalAt: new Date(departure.arrivalAt) }
+                  : {}),
+              }),
+            ),
+          }
+        : {}),
+    }));
+  }
+
   @Query(() => StationNextTrains, {
     name: 'nextTrains',
     nullable: true,
     description:
-      'Get next train arrivals for a station (L4/L8/L9/L10/L11/L12/L13/EA/10X). Prefer WebSocket for real-time updates.',
+      'Get next train arrivals or scheduled services for a station. Prefer WebSocket for real-time updates.',
   })
   async getNextTrains(
     @Args('lineCode', {
       type: () => String,
-      description: 'Line code: L4, L8, L9, L10, L11, L12, L13, EA, or 10X',
+      description: 'Supported rail line code',
     })
     lineCode: string,
     @Args('stationCode', {
@@ -49,23 +153,13 @@ export class NextTrainResolver {
     stationCode: string,
   ): Promise<StationNextTrains | null> {
     // Validate line code
-    if (!hasNextTrainIntegration(lineCode)) {
+    if (!hasNextTrainInformation(lineCode)) {
       return null;
     }
 
     const typedLineCode = lineCode as LineCode;
 
-    if (
-      isApi1RailLine(typedLineCode) &&
-      !isValidApi1RailStationCode(typedLineCode, stationCode)
-    ) {
-      return null;
-    }
-
-    if (
-      !isApi1RailLine(typedLineCode) &&
-      !isValidStation(typedLineCode as NextTrainLineCode, stationCode)
-    ) {
+    if (!isValidNextTrainStation(typedLineCode, stationCode)) {
       return null;
     }
 
@@ -75,21 +169,17 @@ export class NextTrainResolver {
     ));
 
     if (outOfSchedule) {
-      const stationName =
-        (await this.externalRailProvider.getStationName(
-          typedLineCode,
-          stationCode,
-        )) ??
-        (!isApi1RailLine(typedLineCode)
-          ? getStationName(typedLineCode as NextTrainLineCode, stationCode)
-          : undefined) ??
-        stationCode;
+      const stationName = await this.resolveStationName(
+        typedLineCode,
+        stationCode,
+      );
 
       return {
         stationCode,
         stationName,
         lineCode: typedLineCode,
         trains: [],
+        scheduledServices: [],
         operationClosed: false,
         outOfSchedule: true,
         fetchedAt: new Date(),
@@ -99,10 +189,7 @@ export class NextTrainResolver {
     // Check cache first
     const cached = this.polling.getCached(typedLineCode, stationCode);
     if (cached) {
-      const headway = await this.headwayTracking.getHeadway(
-        typedLineCode,
-        stationCode,
-      );
+      const headway = await this.getHeadway(typedLineCode, stationCode);
 
       return {
         stationCode: cached.stationCode,
@@ -119,6 +206,9 @@ export class NextTrainResolver {
           isAtPlatform: t.isAtPlatform,
           updatedAt: new Date().toISOString(),
         })),
+        scheduledServices: this.toScheduledServiceEntities(
+          cached.scheduledServices ?? [],
+        ),
         operationClosed: cached.operationClosed,
         outOfSchedule: cached.outOfSchedule,
         fetchedAt: new Date(cached.fetchedAt),
@@ -126,24 +216,17 @@ export class NextTrainResolver {
       };
     }
 
-    const result = await this.externalRailProvider.fetchNextTrains(
+    const result = await this.fetchLiveTrains(typedLineCode, stationCode);
+    const stationName = await this.resolveStationName(
       typedLineCode,
       stationCode,
     );
-    const stationName =
-      (await this.externalRailProvider.getStationName(
-        typedLineCode,
-        stationCode,
-      )) ??
-      (!isApi1RailLine(typedLineCode)
-        ? getStationName(typedLineCode as NextTrainLineCode, stationCode)
-        : undefined) ??
-      stationCode;
+    const scheduledServices =
+      result.trains.length === 0
+        ? await this.fetchScheduledServices(typedLineCode, stationCode)
+        : [];
 
-    const headway = await this.headwayTracking.getHeadway(
-      typedLineCode,
-      stationCode,
-    );
+    const headway = await this.getHeadway(typedLineCode, stationCode);
 
     return {
       stationCode,
@@ -160,6 +243,7 @@ export class NextTrainResolver {
         isAtPlatform: t.isAtPlatform,
         updatedAt: new Date().toISOString(),
       })),
+      scheduledServices: this.toScheduledServiceEntities(scheduledServices),
       operationClosed: false,
       outOfSchedule,
       fetchedAt: new Date(),

@@ -3,7 +3,7 @@ import { LITE_SEARCH_QUERY, LITE_NEARBY_QUERY } from './lite-search.queries';
 import type {
   LiteBikeAvailability,
   LiteSearchStop,
-  LiteNextTrainArrival,
+  LiteNextTrainsResult,
   NextTrainStationInfo,
   LiteRouteRailConnection,
   GraphQLResponse,
@@ -17,6 +17,7 @@ export type {
   LiteBikeAvailability,
   LiteSearchStop,
   LiteNextTrainArrival,
+  LiteNextTrainsResult,
   NextTrainStationInfo,
   LiteRouteRailConnectionStation,
   LiteRouteRailConnectionDirection,
@@ -281,7 +282,7 @@ export class LiteSearchService {
   getNextTrains(
     lineCode: ExtendedNextTrainLineCode,
     stationCode: string,
-  ): Observable<LiteNextTrainArrival[]> {
+  ): Observable<LiteNextTrainsResult> {
     const query = `
       query GetNextTrains($lineCode: String!, $stationCode: String!) {
         nextTrains(lineCode: $lineCode, stationCode: $stationCode) {
@@ -293,6 +294,30 @@ export class LiteSearchService {
             arrivalTime
             isAtPlatform
           }
+          scheduledServices {
+            destinationCode
+            destinationName
+            originStationCode
+            originStationName
+            nextDepartureAt
+            nextArrivalAt
+            arrivalEstimated
+            intervalLabel
+            followingDepartures {
+              departureAt
+              arrivalAt
+            }
+          }
+          headway {
+            direction
+            averageSeconds
+            sampleCount
+            bucket
+            bucketLabel
+            isFallback
+          }
+          operationClosed
+          outOfSchedule
         }
       }
     `;
@@ -300,15 +325,23 @@ export class LiteSearchService {
     return this.http
       .post<{
         data: {
-          nextTrains: { trains: LiteNextTrainArrival[] } | null;
+          nextTrains: LiteNextTrainsResult | null;
         };
       }>(`${this.baseUrl}/graphql`, {
         query,
         variables: { lineCode, stationCode },
       })
       .pipe(
-        map((response) => response.data?.nextTrains?.trains || []),
-        catchError(() => of([])),
+        map(
+          (response) =>
+            response.data?.nextTrains ?? {
+              trains: [],
+              scheduledServices: [],
+            },
+        ),
+        catchError(() =>
+          of({ trains: [], scheduledServices: [], hasError: true }),
+        ),
       );
   }
 

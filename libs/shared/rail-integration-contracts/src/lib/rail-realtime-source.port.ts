@@ -5,6 +5,7 @@ import {
   SpecialRailService,
   TrainCarOccupancy,
 } from '@metro/shared/utils';
+import type { RailScheduledService } from '@metro/shared/utils';
 
 export type TrainPositionStatus =
   | 'approaching'
@@ -32,6 +33,11 @@ export interface RailNextTrainFetchResult {
   trains: RailNextTrainArrival[];
   isApiError: boolean;
 }
+
+export type {
+  RailScheduledDeparture,
+  RailScheduledService,
+} from '@metro/shared/utils';
 
 export interface RailStationLookupResult {
   stationCode: string;
@@ -78,6 +84,17 @@ export interface RailHeadwayObservation {
 
 export abstract class RailRealtimeSourcePort {
   abstract getAvailableSpecialRailServices(): Promise<SpecialRailService[]>;
+
+  /**
+   * Returns the next published service departures for the requested station.
+   * `nextDepartureAt` is always the departure from `originStationCode`; when
+   * available, `nextArrivalAt` describes the inferred arrival at the request
+   * station and is marked with `arrivalEstimated`.
+   */
+  abstract fetchScheduledService(
+    lineCode: string,
+    stationCode: string,
+  ): Promise<RailScheduledService[]>;
 
   abstract fetchNextTrains(
     lineCode: ExtendedNextTrainLineCode,

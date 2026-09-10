@@ -1,11 +1,12 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import {
   getHeadwayBucket,
-  getStationName,
+  getNextTrainStationName,
   isHeadwayOffHoursSuppressionWindow,
+  hasNextTrainIntegration,
   isApi1RailLine,
-  NextTrainLineCode,
 } from '@metro/shared/utils';
+import type { RailScheduledService } from '@metro/shared/utils';
 import { NextTrainFetchResult } from '../dto/next-train.dto';
 import { RailRealtimeSourcePort } from '@metro/rail-integration-contracts';
 import { RailService } from '../../rail/rail.service';
@@ -261,7 +262,44 @@ export class NextTrainPollingService implements OnModuleDestroy {
     lineCode: LineCode,
     stationCode: string,
   ): Promise<NextTrainFetchResult> {
-    return this.externalRailProvider.fetchNextTrains(lineCode, stationCode);
+    if (!hasNextTrainIntegration(lineCode)) {
+      return { success: true, trains: [], isApiError: false };
+    }
+
+    try {
+      return await this.externalRailProvider.fetchNextTrains(
+        lineCode,
+        stationCode,
+      );
+    } catch (error) {
+      // Keep the live error state while allowing schedule fallback.
+      this.logger.warn(
+        `Live next-train data unavailable for ${lineCode}:${stationCode}; using schedule fallback when available: ${formatError(error)}`,
+      );
+      return { success: false, trains: [], isApiError: true };
+    }
+  }
+
+  private async fetchScheduledServices(
+    lineCode: LineCode,
+    stationCode: string,
+  ): Promise<{ services: RailScheduledService[]; hasError: boolean }> {
+    try {
+      return {
+        services:
+          (await this.externalRailProvider.fetchScheduledService(
+            lineCode,
+            stationCode,
+          )) ?? [],
+        hasError: false,
+      };
+    } catch (error) {
+      // Keep schedule failures non-fatal and clear stale fallback data.
+      this.logger.warn(
+        `Scheduled next-train data unavailable for ${lineCode}:${stationCode}: ${formatError(error)}`,
+      );
+      return { services: [], hasError: true };
+    }
   }
 
   private async pollBucket(bucket: PollBucket): Promise<void> {
@@ -376,11 +414,18 @@ export class NextTrainPollingService implements OnModuleDestroy {
       operationClosed || outOfSchedule
         ? { trains: [], isApiError: false }
         : await this.fetchTrains(lineCode, stationCode);
+    const scheduleResult =
+      trains.length === 0 && !operationClosed && !outOfSchedule
+        ? await this.fetchScheduledServices(lineCode, stationCode)
+        : { services: [], hasError: false };
+    const scheduledServices = scheduleResult.services;
+    const hasError = isApiError || scheduleResult.hasError;
     const newHash = computeStationCacheHash(
       trains,
-      isApiError,
+      hasError,
       operationClosed,
       outOfSchedule,
+      scheduledServices,
     );
 
     const stationName = await this.resolveStationName(
@@ -390,7 +435,7 @@ export class NextTrainPollingService implements OnModuleDestroy {
     );
 
     if (this.pollSequences.get(key) !== sequence) {
-      return { delta: null, hasError: isApiError };
+      return { delta: null, hasError };
     }
 
     const cached = this.cache.get(key);
@@ -400,15 +445,16 @@ export class NextTrainPollingService implements OnModuleDestroy {
       stationCode,
       stationName,
       trains,
+      scheduledServices,
       hash: newHash,
       fetchedAt: timestamp,
-      hasError: isApiError,
+      hasError,
       operationClosed,
       outOfSchedule,
     };
     this.cache.set(key, entry);
 
-    const errorStateChanged = cached?.hasError !== isApiError;
+    const errorStateChanged = cached?.hasError !== hasError;
     const operationStateChanged = cached?.operationClosed !== operationClosed;
     const scheduleStateChanged = cached?.outOfSchedule !== outOfSchedule;
     if (
@@ -423,16 +469,17 @@ export class NextTrainPollingService implements OnModuleDestroy {
           lineCode,
           stationCode,
           trains,
+          scheduledServices,
           timestamp,
-          hasError: isApiError,
+          hasError,
           operationClosed,
           outOfSchedule,
         },
-        hasError: isApiError,
+        hasError,
       };
     }
 
-    return { delta: null, hasError: isApiError };
+    return { delta: null, hasError };
   }
 
   private async resolveStationName(
@@ -446,9 +493,11 @@ export class NextTrainPollingService implements OnModuleDestroy {
       return cachedName;
     }
 
-    const localName = !isApi1RailLine(lineCode)
-      ? getStationName(lineCode as NextTrainLineCode, stationCode)
-      : undefined;
+    const localName = getNextTrainStationName(lineCode, stationCode);
+    if (!hasNextTrainIntegration(lineCode)) {
+      return localName ?? stationCode;
+    }
+
     try {
       const stationName = await this.externalRailProvider.getStationName(
         lineCode,
@@ -551,4 +600,8 @@ export class NextTrainPollingService implements OnModuleDestroy {
       return 'unknown';
     }
   }
+}
+
+function formatError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

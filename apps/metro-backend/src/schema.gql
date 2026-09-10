@@ -722,11 +722,11 @@ type Query {
   nearbyStops(input: NearbyStopsInput!): [SearchResultUnion!]!
 
   """
-  Get next train arrivals for a station (L4/L8/L9/L10/L11/L12/L13/EA/10X). Prefer WebSocket for real-time updates.
+  Get next train arrivals or scheduled services for a station. Prefer WebSocket for real-time updates.
   """
   nextTrains(
     """
-    Line code: L4, L8, L9, L10, L11, L12, L13, EA, or 10X
+    Supported rail line code
     """
     lineCode: String!
 
@@ -1296,7 +1296,12 @@ type StationNextTrains {
   headway: [DirectionHeadwayEntity!]
 
   """
-  Line code (L4, L8, or L9)
+  Scheduled services shown when no live train arrivals are available
+  """
+  scheduledServices: [ScheduledServiceEntity!]!
+
+  """
+  Supported rail line code
   """
   lineCode: String!
 
@@ -1324,6 +1329,71 @@ type StationNextTrains {
   List of arriving trains
   """
   trains: [NextTrainArrival!]!
+}
+
+"""
+Scheduled rail service departure
+"""
+type ScheduledServiceEntity {
+  """
+  Whether the station arrival is inferred from the schedule
+  """
+  arrivalEstimated: Boolean
+
+  """
+  Up to three following scheduled departures
+  """
+  followingDepartures: [ScheduledDepartureEntity!]
+
+  """
+  Destination station code
+  """
+  destinationCode: String!
+
+  """
+  Destination station name
+  """
+  destinationName: String!
+
+  """
+  Scheduled interval label for consecutive services
+  """
+  intervalLabel: String
+
+  """
+  Next scheduled arrival at the requested station
+  """
+  nextArrivalAt: DateTime
+
+  """
+  Next scheduled departure as an ISO instant
+  """
+  nextDepartureAt: DateTime!
+
+  """
+  Service origin station code
+  """
+  originStationCode: String!
+
+  """
+  Service origin station name
+  """
+  originStationName: String!
+}
+
+"""
+Following scheduled rail departure
+"""
+type ScheduledDepartureEntity {
+  """
+  Following scheduled arrival at the requested station
+  """
+  arrivalAt: DateTime
+
+  """
+  Following scheduled departure as an ISO instant
+  """
+  departureAt: DateTime!
 }
 
 type StopFullData {

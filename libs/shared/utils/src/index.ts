@@ -15,6 +15,8 @@ export * from './lib/rail/rail-status-line.utils';
 export * from './lib/rail/viamobilidade-stations';
 export * from './lib/rail/cptm-stations';
 export * from './lib/rail/special-rail-service.types';
+export * from './lib/rail/rail-schedule.types';
+export * from './lib/rail/rail-schedule-display.utils';
 export * from './lib/rail/headway.types';
 export * from './lib/rail/headway-history.types';
 export * from './lib/favorites/favorites.types';

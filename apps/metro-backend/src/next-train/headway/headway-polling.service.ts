@@ -18,6 +18,7 @@ import {
   HEADWAY_DEFAULT_ENABLED_LINES,
   getHeadwayBucket,
   isHeadwayOffHoursSuppressionWindow,
+  hasNextTrainIntegration,
   type RailStatusCode,
 } from '@metro/shared/utils';
 import { RailService } from '../../rail/rail.service';
@@ -84,6 +85,9 @@ export class HeadwayPollingService implements OnModuleInit, OnModuleDestroy {
     }
     for (const delta of deltas) {
       if (delta.hasError) continue;
+      // Timetable-only subscriptions intentionally have no live observations
+      // to feed into measured headway tracking.
+      if (!hasNextTrainIntegration(delta.lineCode)) continue;
 
       this.lastPollTimes.set(
         `${delta.lineCode}:${delta.stationCode}`,
@@ -420,6 +424,10 @@ export class HeadwayPollingService implements OnModuleInit, OnModuleDestroy {
     lineCode: ExtendedNextTrainLineCode,
     stationCode: string,
   ): Promise<void> {
+    if (!hasNextTrainIntegration(lineCode)) {
+      return;
+    }
+
     const key = `${lineCode}:${stationCode}`;
     const now = Date.now();
     const last = this.lastPollTimes.get(key);

@@ -38,13 +38,28 @@ import {
 import { BreathingAnimationService } from '../../../shared/services/breathing-animation.service';
 import type {
   NextTrainCardViewModel,
+  FollowingTrainDisplay,
+  NextTrainDisplay,
+  ScheduledDepartureForDisplay,
   TrainDirectionView,
 } from './next-train-card.types';
-import { compareArrivalTimes, sortDirections } from './next-train-card.utils';
+import {
+  compareArrivalTimes,
+  formatScheduledDepartureTime,
+  formatScheduledServiceTime,
+  getScheduledDepartureLocation,
+  getScheduledServiceLocation,
+  groupScheduledServices,
+  sortDirections,
+} from './next-train-card.utils';
+import type {
+  ScheduledDirection,
+  ScheduledServiceForDisplay,
+} from './next-train-card.utils';
 
 /**
- * Component to display real-time next train arrivals for supported rail stations
- * Uses WebSocket for delta updates to minimize bandwidth
+ * Component to display live next-train arrivals and published schedule
+ * fallbacks for supported rail stations. WebSocket updates minimize bandwidth
  */
 @Component({
   selector: 'app-next-train-card',
@@ -73,7 +88,6 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
   private readonly breathingService = inject(BreathingAnimationService);
   private readonly transitTimeZone = DEFAULT_TRANSIT_TIME_ZONE;
 
-  /** Line code (L4, L8, L9, L10, L11, L12, or L13) */
   readonly lineCode = input.required<ExtendedNextTrainLineCode>();
 
   /** Station code (e.g., HBR, PIN) */
@@ -120,6 +134,37 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
     return this.stationData()?.headway ?? [];
   });
 
+  readonly scheduledServices = computed<readonly ScheduledServiceForDisplay[]>(
+    () => this.stationData()?.scheduledServices ?? [],
+  );
+
+  /** Show schedules only after a completed snapshot has no live arrivals. */
+  readonly canShowSchedule = computed(() => {
+    const data = this.stationData();
+    return Boolean(
+      data?.dataReceived &&
+        !data.processing &&
+        !data.operationClosed &&
+        !data.outOfSchedule &&
+        this.trains().length === 0,
+    );
+  });
+
+  readonly scheduledDirections = computed<readonly ScheduledDirection[]>(() => {
+    if (!this.canShowSchedule()) {
+      return [];
+    }
+
+    return groupScheduledServices(this.scheduledServices(), (service) =>
+      this.getDirectionForDestination(
+        this.lineCode(),
+        this.stationCode(),
+        service.destinationCode,
+        service.destinationName,
+      ),
+    );
+  });
+
   readonly staticCompositions = computed(() =>
     resolveStationTrainCompositionViews(
       TRAIN_PLATFORM_CONFIGS,
@@ -149,14 +194,10 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
   /** Terminal stations for direction labels (L4/L8/L9 only) */
   readonly terminals = computed(() => {
     const lineCode = this.lineCode();
-    if (isApi1RailLine(lineCode)) {
-      // Actual CPTM lines (L10-L13) don't have terminal mapping - return empty
-      return ['', ''] as [string, string];
+    if (!this.hasTerminalDirections(lineCode)) {
+      return [] as const;
     }
-    return getTerminalStations(
-      lineCode as NextTrainLineCode,
-      this.stationCode(),
-    );
+    return getTerminalStations(lineCode, this.stationCode());
   });
 
   /** Group live trains by terminal direction, including pre-computed headway. */
@@ -171,17 +212,12 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
     const grouped = new Map<string, NextTrainArrival[]>();
 
     for (const train of trains) {
-      let terminal: string;
-      if (isApi1RailLine(lineCode)) {
-        // For actual CPTM lines (L10-L13), group by destination name since we don't have terminal mapping
-        terminal = train.destinationName;
-      } else {
-        terminal = getTerminalForDestination(
-          lineCode as NextTrainLineCode,
-          stationCode,
-          train.destinationCode,
-        );
-      }
+      const terminal = this.getDirectionForDestination(
+        lineCode,
+        stationCode,
+        train.destinationCode,
+        train.destinationName,
+      );
       const existing = grouped.get(terminal);
       if (existing) {
         existing.push(train);
@@ -228,12 +264,21 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
       ]),
     );
     const liveDirections = this.trainsByDirection();
-    const directions = liveDirections.map((direction) => ({
-      ...direction,
-      composition:
-        direction.composition ??
-        staticByDirection.get(hardNormalizeString(direction.terminal)),
-    }));
+    const scheduledDirections = this.scheduledDirections();
+    const scheduledByDirection = new Map(
+      scheduledDirections.map((direction) => [
+        hardNormalizeString(direction.terminal),
+        direction,
+      ]),
+    );
+    const directions = liveDirections
+      .map((direction) => ({
+        ...direction,
+        composition:
+          direction.composition ??
+          staticByDirection.get(hardNormalizeString(direction.terminal)),
+      }))
+      .map((direction) => this.addDisplayFields(direction));
     const liveDirectionKeys = new Set(
       liveDirections.map((direction) =>
         hardNormalizeString(direction.terminal),
@@ -246,13 +291,47 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
         continue;
       }
 
-      directions.push({
-        terminal: composition.directionName,
-        nextTrain: undefined,
-        followingTrains: [],
-        headway: undefined,
-        composition,
-      });
+      directions.push(
+        this.addDisplayFields({
+          terminal: composition.directionName,
+          nextTrain: undefined,
+          followingTrains: [],
+          headway: this.getHeadwayForScheduledDirection(
+            scheduledByDirection.get(directionKey),
+          ),
+          nextScheduledService:
+            scheduledByDirection.get(directionKey)?.nextService,
+          scheduledIntervalLabel:
+            scheduledByDirection.get(directionKey)?.intervalLabel,
+          followingScheduledDepartures:
+            scheduledByDirection.get(directionKey)?.followingDepartures,
+          composition,
+        }),
+      );
+    }
+
+    const existingDirectionKeys = new Set(
+      directions.map((direction) => hardNormalizeString(direction.terminal)),
+    );
+    for (const scheduled of scheduledDirections) {
+      const directionKey = hardNormalizeString(scheduled.terminal);
+      if (existingDirectionKeys.has(directionKey)) {
+        continue;
+      }
+
+      directions.push(
+        this.addDisplayFields({
+          terminal: scheduled.terminal,
+          nextTrain: undefined,
+          followingTrains: [],
+          headway: this.getHeadwayForScheduledDirection(scheduled),
+          nextScheduledService: scheduled.nextService,
+          scheduledIntervalLabel: scheduled.intervalLabel,
+          followingScheduledDepartures: scheduled.followingDepartures,
+          composition: undefined,
+        }),
+      );
+      existingDirectionKeys.add(directionKey);
     }
 
     return sortDirections(directions, this.terminals());
@@ -268,6 +347,9 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
       hasApiError: data?.hasError ?? false,
       operationClosed: data?.operationClosed ?? false,
       outOfSchedule: data?.outOfSchedule ?? false,
+      hasLiveTrains: this.trains().length > 0,
+      showSchedule:
+        this.canShowSchedule() && this.scheduledDirections().length > 0,
     };
   });
 
@@ -378,6 +460,121 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
     }
   }
 
+  /** Use terminal mapping where available; otherwise group by destination. */
+  private getDirectionForDestination(
+    lineCode: ExtendedNextTrainLineCode,
+    stationCode: string,
+    destinationCode: string,
+    destinationName: string,
+  ): string {
+    if (this.hasTerminalDirections(lineCode) && destinationCode) {
+      return getTerminalForDestination(lineCode, stationCode, destinationCode);
+    }
+
+    return destinationName || destinationCode;
+  }
+
+  private hasTerminalDirections(
+    lineCode: ExtendedNextTrainLineCode,
+  ): lineCode is NextTrainLineCode {
+    return lineCode === 'L4' || lineCode === 'L8' || lineCode === 'L9';
+  }
+
+  private addDisplayFields(direction: TrainDirectionView): TrainDirectionView {
+    return {
+      ...direction,
+      nextDisplay: this.getNextTrainDisplay(direction),
+      followingDisplays: this.getFollowingTrainDisplays(direction),
+    };
+  }
+
+  private getNextTrainDisplay(
+    direction: TrainDirectionView,
+  ): NextTrainDisplay | undefined {
+    if (direction.nextTrain) {
+      return {
+        time: this.getArrivalDisplay(direction.nextTrain),
+        location: this.getTrainLocation(direction.nextTrain),
+        isAtPlatform: direction.nextTrain.isAtPlatform === true,
+        statusClass: this.getPositionStatusClass(direction.nextTrain),
+        scheduled: false,
+      };
+    }
+
+    if (direction.nextScheduledService) {
+      return {
+        time: this.getScheduledArrivalDisplay(direction.nextScheduledService),
+        location: this.getScheduledLocation(direction.nextScheduledService),
+        isAtPlatform: false,
+        statusClass: 'status-transit',
+        scheduled: true,
+      };
+    }
+
+    return undefined;
+  }
+
+  private getFollowingTrainDisplays(
+    direction: TrainDirectionView,
+  ): FollowingTrainDisplay[] {
+    const liveDisplays = direction.followingTrains.map(
+      (train, index): FollowingTrainDisplay => ({
+        key: `live-${index}-${train.arrivalTime}`,
+        label: this.getChipArrivalText(train),
+        tooltip: this.getTrainLocation(train),
+        isAtPlatform: train.isAtPlatform === true,
+        scheduled: false,
+      }),
+    );
+    const scheduledDisplays = (direction.followingScheduledDepartures ?? [])
+      .slice(0, 3)
+      .map(
+        (departure, index): FollowingTrainDisplay => ({
+          key: `scheduled-${index}-${departure.departureAt}`,
+          label: this.getScheduledDepartureDisplay(departure),
+          tooltip: this.getScheduledDepartureTooltip(departure),
+          isAtPlatform: false,
+          scheduled: true,
+        }),
+      );
+
+    return [...liveDisplays, ...scheduledDisplays];
+  }
+
+  private getHeadwayForScheduledDirection(
+    direction: ScheduledDirection | undefined,
+  ): DirectionHeadway | undefined {
+    if (!direction) {
+      return undefined;
+    }
+
+    return this.headway().find(
+      (headway) =>
+        headway.direction === direction.terminal ||
+        direction.destinationNames.has(headway.direction),
+    );
+  }
+
+  getScheduledArrivalDisplay(service: ScheduledServiceForDisplay): string {
+    return formatScheduledServiceTime(service, this.transitTimeZone);
+  }
+
+  getScheduledLocation(service: ScheduledServiceForDisplay): string {
+    return getScheduledServiceLocation(service);
+  }
+
+  getScheduledDepartureDisplay(
+    departure: ScheduledDepartureForDisplay,
+  ): string {
+    return formatScheduledDepartureTime(departure, this.transitTimeZone);
+  }
+
+  getScheduledDepartureTooltip(
+    departure: ScheduledDepartureForDisplay,
+  ): string {
+    return `${getScheduledDepartureLocation(departure)} · sem dados em tempo real`;
+  }
+
   private getStationName(name: string | null | undefined): string | null {
     const trimmed = name?.trim();
     return trimmed ? trimmed : null;
@@ -472,5 +669,9 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
       return `Intervalo médio estimado · ${hw.bucketLabel} (${samples})`;
     }
     return `Intervalo médio estimado (${samples})`;
+  }
+
+  getScheduledHeadwayTooltip(intervalLabel: string): string {
+    return `Intervalo programado de ${intervalLabel} · sem dados em tempo real`;
   }
 }

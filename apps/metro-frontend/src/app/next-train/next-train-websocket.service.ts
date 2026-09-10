@@ -5,7 +5,7 @@ import { LoggerService } from '@metro/shared/api';
 import {
   ExtendedNextTrainLineCode,
   hasExternalRailVehicles,
-  hasNextTrainIntegration,
+  hasNextTrainInformation,
   TrackedRailLineCode,
   TrackedRailVehicle,
 } from '@metro/shared/utils';
@@ -101,8 +101,8 @@ export class NextTrainWebsocketService implements OnDestroy {
     lineCode: ExtendedNextTrainLineCode,
     stationCode: string,
   ): NextTrainSubscriptionRelease {
-    if (!hasNextTrainIntegration(lineCode)) {
-      this.logger.warn(`No next-train integration for line: ${lineCode}`);
+    if (!hasNextTrainInformation(lineCode)) {
+      this.logger.warn(`No next-train information for line: ${lineCode}`);
       return () => undefined;
     }
 
@@ -324,6 +324,24 @@ export class NextTrainWebsocketService implements OnDestroy {
         return newMap;
       });
       this.latestVehicleUpdateTimestamps.clear();
+      this._stationData.update((map) => {
+        const newMap = new Map<SubscriptionKey, StationTrainData>();
+        for (const [key, station] of map) {
+          newMap.set(key, {
+            ...station,
+            trains: [],
+            hasError: false,
+            dataReceived: false,
+            processing: false,
+            operationClosed: false,
+            outOfSchedule: false,
+            headway: undefined,
+            scheduledServices: undefined,
+          });
+        }
+        return newMap;
+      });
+      this.latestStationUpdateTimestamps.clear();
     });
 
     this.socket.on(NEXT_TRAIN_UPDATE_EVENT, (data: NextTrainUpdate) => {
@@ -384,6 +402,7 @@ export class NextTrainWebsocketService implements OnDestroy {
         operationClosed: update.operationClosed ?? false,
         outOfSchedule: update.outOfSchedule ?? false,
         headway: update.headway,
+        scheduledServices: update.scheduledServices,
       });
       return newMap;
     });

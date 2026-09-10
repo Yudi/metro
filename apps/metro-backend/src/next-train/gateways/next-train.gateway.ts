@@ -21,12 +21,10 @@ import {
 import { HeadwayTrackingService } from '../headway/headway-tracking.service';
 import { SubscribeStationDto, NextTrainUpdateDto } from '../dto/next-train.dto';
 import {
-  isValidStation,
   hasExternalRailVehicles,
-  hasNextTrainIntegration,
-  isApi1RailLine,
+  hasNextTrainInformation,
+  isValidNextTrainStation,
   TrackedRailLineCode,
-  isValidApi1RailStationCode,
 } from '@metro/shared/utils';
 
 const NEXT_TRAIN_SUBSCRIBE_EVENT = 'subscribe_station';
@@ -89,6 +87,13 @@ export class NextTrainGateway
     this.vehiclePolling.offPollComplete(this.vehicleDeltaListener);
   }
 
+  private async getHeadway(
+    lineCode: StationDelta['lineCode'],
+    stationCode: string,
+  ): Promise<Awaited<ReturnType<HeadwayTrackingService['getHeadway']>>> {
+    return this.headwayTracking.getHeadway(lineCode, stationCode);
+  }
+
   handleConnection(@ConnectedSocket() client: Socket): void {
     this.logger.debug(`Next train client connected: ${client.id}`);
     this.clientSubscriptions.set(client.id, new Set());
@@ -118,27 +123,15 @@ export class NextTrainGateway
     const { lineCode, stationCode } = subscription;
 
     // Validate line code
-    if (!hasNextTrainIntegration(lineCode)) {
+    if (!hasNextTrainInformation(lineCode)) {
       this.logger.warn(`Invalid line code: ${lineCode}`);
       client.emit('error', {
-        message:
-          'Invalid line code. Must be L4, L8, L9, L10, L11, L12, L13, EA, or 10X.',
+        message: 'Invalid line code. Must be a supported rail line.',
       });
       return;
     }
 
-    if (
-      isApi1RailLine(lineCode) &&
-      !isValidApi1RailStationCode(lineCode, stationCode)
-    ) {
-      this.logger.warn(`Invalid station code: ${stationCode} for ${lineCode}`);
-      client.emit('error', {
-        message: `Invalid station code ${stationCode} for line ${lineCode}`,
-      });
-      return;
-    }
-
-    if (!isApi1RailLine(lineCode) && !isValidStation(lineCode, stationCode)) {
+    if (!isValidNextTrainStation(lineCode, stationCode)) {
       this.logger.warn(`Invalid station code: ${stationCode} for ${lineCode}`);
       client.emit('error', {
         message: `Invalid station code ${stationCode} for line ${lineCode}`,
@@ -157,9 +150,8 @@ export class NextTrainGateway
 
     // If we have cached data, send it immediately
     if (cached) {
-      const headway = await this.headwayTracking.getHeadway(
-        lineCode,
-        stationCode,
+      const headway = await this.getHeadway(lineCode, stationCode).catch(
+        () => null,
       );
 
       const update: NextTrainUpdateDto = {
@@ -167,6 +159,7 @@ export class NextTrainGateway
         lineCode,
         stationCode,
         trains: cached.trains,
+        scheduledServices: cached.scheduledServices ?? [],
         timestamp: cached.fetchedAt,
         hasError: cached.hasError,
         processing: false,
@@ -181,6 +174,7 @@ export class NextTrainGateway
         lineCode,
         stationCode,
         trains: [],
+        scheduledServices: [],
         timestamp: Date.now(),
         hasError: false,
         processing: true,
@@ -198,7 +192,7 @@ export class NextTrainGateway
     if (!subscription) return;
     const { lineCode, stationCode } = subscription;
 
-    if (!hasNextTrainIntegration(lineCode)) return;
+    if (!hasNextTrainInformation(lineCode)) return;
 
     const key = `${lineCode}:${stationCode}`;
     const subs = this.clientSubscriptions.get(client.id);
@@ -288,14 +282,14 @@ export class NextTrainGateway
       if (subscribers.size === 0) continue;
 
       // Fetch headway asynchronously - don't block the delta emission
-      void this.headwayTracking
-        .getHeadway(delta.lineCode, delta.stationCode)
+      void this.getHeadway(delta.lineCode, delta.stationCode)
         .then((headway) => {
           const update: NextTrainUpdateDto = {
             type: 'delta',
             lineCode: delta.lineCode,
             stationCode: delta.stationCode,
             trains: delta.trains,
+            scheduledServices: delta.scheduledServices ?? [],
             timestamp: delta.timestamp,
             hasError: delta.hasError,
             processing: false,
@@ -316,6 +310,7 @@ export class NextTrainGateway
             lineCode: delta.lineCode,
             stationCode: delta.stationCode,
             trains: delta.trains,
+            scheduledServices: delta.scheduledServices ?? [],
             timestamp: delta.timestamp,
             hasError: delta.hasError,
             processing: false,

@@ -1,12 +1,13 @@
 import {
-  type ActualCptmLineCode,
-  findApi1RailStationByName,
-  hasExternalRailNextTrain,
+  getApi1RailStationName,
+  isValidApi1RailStationCode,
+  isSpecialCptmLine,
 } from './cptm-stations';
 import {
   L4_STATIONS as STATIC_L4_STATIONS,
   L8_STATIONS as STATIC_L8_STATIONS,
   L9_STATIONS as STATIC_L9_STATIONS,
+  getStaticRailStationsByLine,
   type StaticRailStation,
 } from './stations/rail-stations.entity';
 
@@ -55,16 +56,59 @@ export const L9_STATIONS: NextTrainStation[] = STATIC_L9_STATIONS;
 export type NextTrainLineCode = 'L4' | 'L8' | 'L9';
 
 /**
- * Extended line code type including CPTM lines (L10-L13)
+ * Lines supported by live arrivals or published service schedules.
  */
 export type ExtendedNextTrainLineCode =
   | NextTrainLineCode
+  | 'L1'
+  | 'L2'
+  | 'L3'
+  | 'L5'
+  | 'L6'
+  | 'L7'
   | 'L10'
   | 'L11'
   | 'L12'
   | 'L13'
+  | 'L15'
+  | 'L17'
   | 'EA'
   | '10X';
+
+/** Schedule availability does not enable a line's live integration. */
+export function hasNextTrainInformation(
+  lineCode: string,
+): lineCode is ExtendedNextTrainLineCode {
+  return (
+    isSpecialCptmLine(lineCode) ||
+    (/^L(?:[1-9]|1[0-3]|15|17)$/.test(lineCode) &&
+      getStaticRailStationsByLine(lineCode) !== undefined)
+  );
+}
+
+export function isValidNextTrainStation(
+  lineCode: string,
+  stationCode: string,
+): boolean {
+  if (!hasNextTrainInformation(lineCode)) return false;
+  return isSpecialCptmLine(lineCode)
+    ? isValidApi1RailStationCode(lineCode, stationCode)
+    : (getStaticRailStationsByLine(lineCode) ?? []).some(
+        (station) => station.code === stationCode,
+      );
+}
+
+export function getNextTrainStationName(
+  lineCode: string,
+  stationCode: string,
+): string | undefined {
+  if (!hasNextTrainInformation(lineCode)) return undefined;
+  return isSpecialCptmLine(lineCode)
+    ? getApi1RailStationName(lineCode, stationCode)
+    : getStaticRailStationsByLine(lineCode)?.find(
+        (station) => station.code === stationCode,
+      )?.name;
+}
 
 /**
  * Map of line code to stations for next-train enabled lines
@@ -266,12 +310,7 @@ function matchesStationName(
   );
 }
 
-/**
- * Find all next-train station codes for a stop by name and line codes
- * Checks if the line codes include L4 (4), L8 (8), L9 (9), or CPTM lines (10-13)
- * Returns array of { lineCode, stationCode } for each match
- * For CPTM lines (10-13), stationCode comes from the shared static station list
- */
+/** Resolve canonical station codes for live or scheduled rail information. */
 export function findNextTrainStations(
   stationName: string,
   lineCodes: number[],
@@ -282,52 +321,13 @@ export function findNextTrainStations(
   }[] = [];
   const normalizedName = normalizeStationName(stationName);
 
-  // Check if L4 is in the line codes
-  if (lineCodes.includes(4)) {
-    for (const station of L4_STATIONS) {
-      if (matchesStationName(station, normalizedName)) {
-        results.push({ lineCode: 'L4', stationCode: station.code });
-        break;
-      }
-    }
-  }
+  for (const numericLineCode of [...new Set(lineCodes)].sort((a, b) => a - b)) {
+    const lineCode = `L${numericLineCode}`;
+    if (!hasNextTrainInformation(lineCode)) continue;
 
-  // Check if L8 is in the line codes
-  if (lineCodes.includes(8)) {
-    for (const station of L8_STATIONS) {
-      if (matchesStationName(station, normalizedName)) {
-        results.push({ lineCode: 'L8', stationCode: station.code });
-        break;
-      }
-    }
-  }
-
-  // Check if L9 is in the line codes
-  if (lineCodes.includes(9)) {
-    for (const station of L9_STATIONS) {
-      if (matchesStationName(station, normalizedName)) {
-        results.push({ lineCode: 'L9', stationCode: station.code });
-        break;
-      }
-    }
-  }
-
-  const cptmLineCodes: Array<[number, ActualCptmLineCode]> = [
-    [10, 'L10'],
-    [11, 'L11'],
-    [12, 'L12'],
-    [13, 'L13'],
-  ];
-
-  for (const [numericLineCode, lineCode] of cptmLineCodes) {
-    if (
-      !lineCodes.includes(numericLineCode) ||
-      !hasExternalRailNextTrain(lineCode)
-    ) {
-      continue;
-    }
-
-    const station = findApi1RailStationByName(lineCode, stationName);
+    const station = getStaticRailStationsByLine(lineCode)?.find((candidate) =>
+      matchesStationName(candidate, normalizedName),
+    );
     if (station) {
       results.push({ lineCode, stationCode: station.code });
     }

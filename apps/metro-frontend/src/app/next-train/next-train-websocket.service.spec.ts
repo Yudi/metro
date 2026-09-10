@@ -77,6 +77,17 @@ describe('NextTrainWebsocketService', () => {
     });
   });
 
+  it('subscribes to schedule-only catalog lines', () => {
+    const service = TestBed.inject(NextTrainWebsocketService);
+
+    service.subscribe('L1', 'TUC');
+
+    expect(socket.emit).toHaveBeenCalledWith('subscribe_station', {
+      lineCode: 'L1',
+      stationCode: 'TUC',
+    });
+  });
+
   it('ignores an older update for the same station key', () => {
     const service = TestBed.inject(NextTrainWebsocketService);
     service.subscribe('L9', 'HBR');
@@ -135,6 +146,85 @@ describe('NextTrainWebsocketService', () => {
     expect(service.getStationData('L9', 'HBR')).toMatchObject({
       processing: false,
       dataReceived: true,
+    });
+  });
+
+  it('stores schedule departures and clears them when the next snapshot omits them', () => {
+    const service = TestBed.inject(NextTrainWebsocketService);
+    service.subscribe('L9', 'HBR');
+    const update = listeners.get('next_train_update');
+    const scheduledServices = [
+      {
+        destinationCode: 'VAG',
+        destinationName: 'Varginha',
+        originStationCode: 'OSA',
+        originStationName: 'Osasco',
+        nextDepartureAt: '2026-09-09T20:00:00Z',
+        intervalLabel: '5 min',
+      },
+    ];
+
+    update?.({
+      type: 'full',
+      lineCode: 'L9',
+      stationCode: 'HBR',
+      trains: [],
+      scheduledServices,
+      timestamp: 200,
+    });
+    expect(service.getStationData('L9', 'HBR')?.scheduledServices).toEqual(
+      scheduledServices,
+    );
+
+    update?.({
+      type: 'delta',
+      lineCode: 'L9',
+      stationCode: 'HBR',
+      trains: [
+        {
+          destinationCode: 'VAG',
+          destinationName: 'Varginha',
+          trainCurrentStationName: 'Pinheiros',
+          arrivalTime: '12:00',
+          isAtPlatform: false,
+          isTrainStopped: false,
+        },
+      ],
+      timestamp: 201,
+    });
+
+    expect(service.getStationData('L9', 'HBR')).toMatchObject({
+      trains: [{ destinationCode: 'VAG' }],
+      scheduledServices: undefined,
+    });
+  });
+
+  it('clears station schedule snapshots on disconnect until a fresh update arrives', () => {
+    const service = TestBed.inject(NextTrainWebsocketService);
+    service.subscribe('L9', 'HBR');
+    listeners.get('next_train_update')?.({
+      type: 'full',
+      lineCode: 'L9',
+      stationCode: 'HBR',
+      trains: [],
+      scheduledServices: [
+        {
+          destinationCode: 'VAG',
+          destinationName: 'Varginha',
+          originStationCode: 'OSA',
+          originStationName: 'Osasco',
+          nextDepartureAt: '2026-09-09T20:00:00Z',
+        },
+      ],
+      timestamp: 200,
+    });
+
+    listeners.get('disconnect')?.();
+
+    expect(service.getStationData('L9', 'HBR')).toMatchObject({
+      trains: [],
+      scheduledServices: undefined,
+      dataReceived: false,
     });
   });
 

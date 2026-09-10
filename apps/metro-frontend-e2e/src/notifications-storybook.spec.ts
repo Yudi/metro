@@ -55,7 +55,8 @@ test('shows cloud triggers on desktop and mobile', async ({ page }) => {
   const targetIdentity = page
     .locator('app-notification-target-identity')
     .first();
-  await expect(targetIdentity).toHaveText('9');
+  await expect(targetIdentity.locator('.line-badge')).toHaveText('9');
+  await expect(targetIdentity.getByText('Esmeralda', { exact: true })).toBeVisible();
   const busIdentity = page.locator('app-notification-target-identity').nth(1);
   await expect(busIdentity).toHaveText('702P-10');
   await expect(busIdentity.locator('.route-badge')).toHaveCSS(

@@ -15,6 +15,7 @@ const service = root.lookupService(
 const expectedMethods = [
   "Check",
   "FetchNextTrains",
+  "FetchScheduledService",
   "GetStationName",
   "GetStationCodes",
   "GetStationByName",

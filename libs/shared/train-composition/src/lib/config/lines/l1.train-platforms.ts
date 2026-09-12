@@ -102,7 +102,28 @@ export const L1_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
         direction: { destinationCodes: ['TUC'] },
         disembarkingSide: 'right',
         platformType: 'side',
-        features: [],
+        features: [
+          {
+            id: 'l1-tte-tuc-exit-door-14',
+            type: 'exit',
+            label: 'Saída da estação na porta 14',
+            anchor: {
+              type: 'door',
+              carPosition: 4,
+              doorPosition: 2,
+            },
+          },
+          {
+            id: 'l1-tte-tuc-exit-door-15',
+            type: 'exit',
+            label: 'Saída da estação na porta 15',
+            anchor: {
+              type: 'door',
+              carPosition: 4,
+              doorPosition: 3,
+            },
+          },
+        ],
       },
     ],
 

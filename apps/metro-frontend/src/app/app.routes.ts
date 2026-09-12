@@ -53,6 +53,7 @@ export const routes: Routes = [
       },
       {
         path: 'painel',
+        data: { preserveDashboard: true },
         loadComponent: () =>
           import('./insights-dashboard/insights-dashboard.component').then(
             (m) => m.InsightsDashboardComponent,

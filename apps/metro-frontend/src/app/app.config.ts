@@ -6,7 +6,8 @@ import {
   ErrorHandler,
   provideBrowserGlobalErrorListeners,
 } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { provideRouter, RouteReuseStrategy } from '@angular/router';
+import { DashboardRouteReuseStrategy } from './insights-dashboard/dashboard-route-reuse.strategy';
 
 import { routes } from './app.routes';
 import {
@@ -47,6 +48,7 @@ export const appConfig: ApplicationConfig = {
     { provide: ErrorHandler, useClass: TelemetryErrorHandler },
     provideFirebase(environment.firebase),
     provideRouter(routes),
+    { provide: RouteReuseStrategy, useClass: DashboardRouteReuseStrategy },
     provideClientHydration(withEventReplay()),
     provideHttpClient(
       withFetch(),

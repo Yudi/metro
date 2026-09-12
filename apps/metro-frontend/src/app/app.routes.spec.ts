@@ -6,6 +6,7 @@ import { DEFAULT_CITY } from '@metro/shared/cities';
 import { CityNotFoundComponent } from './cities/city-not-found.component';
 import { createCityRoute } from './cities/city.routes';
 import { spFeatureRoutes } from './cities/sp/sp.routes';
+import { HomeComponent } from './home/home.component';
 import { routes } from './app.routes';
 
 describe('application city routes', () => {
@@ -30,16 +31,18 @@ describe('application city routes', () => {
     expect(cityRoute.children?.[0].path).toBe('painel');
   });
 
-  it('renders the default home at root and features beneath /sp', () => {
+  it('renders the São Paulo rail status at root and /sp', async () => {
     const rootRoute = routes.find((route) => route.path === '');
     const cityRoute = routes.find(
       (route) => route.path === DEFAULT_CITY.id,
     );
     const rootHome = rootRoute?.children?.find((route) => route.path === '');
+    const cityHome = cityRoute?.children?.find((route) => route.path === '');
     const featurePaths = cityRoute?.children?.map((route) => route.path);
 
     expect(rootRoute?.pathMatch).toBe('full');
-    expect(rootHome?.loadComponent).toBeDefined();
+    expect(await rootHome?.loadComponent?.()).toBe(HomeComponent);
+    expect(await cityHome?.loadComponent?.()).toBe(HomeComponent);
     expect(rootHome?.redirectTo).toBeUndefined();
     expect(cityRoute?.data?.['cityId']).toBe(DEFAULT_CITY.id);
     expect(featurePaths).toEqual(

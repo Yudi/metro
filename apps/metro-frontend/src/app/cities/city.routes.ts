@@ -2,6 +2,12 @@ import type { Route, Routes } from '@angular/router';
 import { SeoGuard } from '@metro/shared/seo';
 import type { TransitCity } from '@metro/shared/cities';
 
+export function createCityRoute(
+  city: TransitCity,
+  featureRoutes: Routes,
+  path = city.id,
+): Route {
+  return {
     path,
     pathMatch: path === '' ? 'full' : undefined,
     data: { cityId: city.id },

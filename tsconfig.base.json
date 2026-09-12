@@ -15,6 +15,7 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "paths": {
+      "@metro/shared/cities": ["./libs/shared/cities/src/index.ts"],
       "@metro/shared/bus-itinerary-contracts/grpc": [
         "./libs/shared/bus-itinerary-contracts/src/grpc.ts"
       ],

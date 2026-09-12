@@ -5,7 +5,7 @@ import { RouterLink } from '@angular/router';
 import { AuthService } from '@metro/shared/firebase';
 import { authReady } from '@metro/shared/firebase';
 import { firebaseUser } from '@metro/shared/firebase';
-import { SAO_PAULO_CITY_CENTER } from '@metro/shared/utils';
+import { CityContextService } from '../cities/city-context.service';
 
 @Component({
   selector: 'app-menu.component',
@@ -15,9 +15,14 @@ import { SAO_PAULO_CITY_CENTER } from '@metro/shared/utils';
 })
 export class MenuComponent {
   public authService = inject(AuthService);
+  public readonly cityContext = inject(CityContextService);
   public readonly authReady = authReady;
 
   public firebaseUser = firebaseUser;
+
+  cityPath(path = ''): string {
+    return this.cityContext.path(path);
+  }
 
   public readonly menuList: menuList = {
     Ônibus: [
@@ -36,9 +41,9 @@ export class MenuComponent {
           subwayStations: '1',
           subwayRoutes: '1',
           bike: '0',
-          lat: String(SAO_PAULO_CITY_CENTER.latitude),
-          lon: String(SAO_PAULO_CITY_CENTER.longitude),
-          z: '11',
+          lat: String(this.cityContext.city().map.center.latitude),
+          lon: String(this.cityContext.city().map.center.longitude),
+          z: String(this.cityContext.city().map.zoom),
         },
       },
       {

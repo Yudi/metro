@@ -8,6 +8,8 @@ import express, { type Response } from 'express';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectPaths, getStaticAssetCacheControl } from '@metro/shared/utils';
+import { routes as appRoutes } from './app/app.routes';
+import xmlbuilder from 'xmlbuilder';
 
 const serverDistFolder = dirname(fileURLToPath(import.meta.url));
 const browserDistFolder = resolve(serverDistFolder, '../browser');
@@ -22,24 +24,6 @@ function setStaticCacheHeaders(response: Response, filePath: string): void {
   );
 }
 
-import { routes as appRoutes } from './app/app.routes';
-import xmlbuilder from 'xmlbuilder';
-
-/**
- * Example Express Rest API endpoints can be defined here.
- * Uncomment and define endpoints as necessary.
- *
- * Example:
- * ```ts
- * app.get('/api/**', (req, res) => {
- *   // Handle API request
- * });
- * ```
- */
-
-/**
- * Serve static files from /browser
- */
 app.use(
   '/lite',
   express.static(browserDistFolder, {
@@ -51,7 +35,7 @@ app.use(
 );
 
 app.get('/lite/sitemap.xml', (req, res) => {
-  const routes = Array.from(new Set(collectPaths(appRoutes)));
+  const routes = collectPaths(appRoutes);
   const root = xmlbuilder.create('urlset', {
     version: '1.0',
     encoding: 'UTF-8',
@@ -68,9 +52,6 @@ app.get('/lite/sitemap.xml', (req, res) => {
   res.send(root.end({ pretty: true }));
 });
 
-/**
- * Handle all other requests by rendering the Angular application.
- */
 app.use('/{*splat}', (req, res, next) => {
   angularApp
     .handle(req)
@@ -80,10 +61,6 @@ app.use('/{*splat}', (req, res, next) => {
     .catch(next);
 });
 
-/**
- * Start the server if this module is the main entry point.
- * The server listens on the port defined by the `PORT` environment variable, or defaults to 4000.
- */
 if (isMainModule(import.meta.url)) {
   const port = process.env['PORT'] || 4000;
   app.listen(port, () => {
@@ -91,7 +68,4 @@ if (isMainModule(import.meta.url)) {
   });
 }
 
-/**
- * Request handler used by the Angular CLI (for dev-server and during build) or Firebase Cloud Functions.
- */
 export const reqHandler = createNodeRequestHandler(app);

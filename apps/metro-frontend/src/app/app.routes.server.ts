@@ -6,15 +6,19 @@ export const serverRoutes: ServerRoute[] = [
     renderMode: RenderMode.Server,
   },
   {
-    path: 'sobre',
+    path: 'sp',
     renderMode: RenderMode.Server,
   },
   {
-    path: 'telefones',
+    path: 'sp/sobre',
     renderMode: RenderMode.Server,
   },
   {
-    path: 'notifications',
+    path: 'sp/telefones',
+    renderMode: RenderMode.Server,
+  },
+  {
+    path: 'sp/notifications',
     renderMode: RenderMode.Client,
   },
   {

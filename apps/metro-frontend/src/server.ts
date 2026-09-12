@@ -7,7 +7,7 @@ import {
 import express, { type Response } from 'express';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { routes as appRoutes } from './app/app.routes';
+import { routes } from './app/app.routes';
 import { collectPaths, getStaticAssetCacheControl } from '@metro/shared/utils';
 
 import xmlbuilder from 'xmlbuilder';
@@ -25,21 +25,6 @@ function setStaticCacheHeaders(response: Response, filePath: string): void {
   );
 }
 
-/**
- * Example Express Rest API endpoints can be defined here.
- * Uncomment and define endpoints as necessary.
- *
- * Example:
- * ```ts
- * app.get('/api/**', (req, res) => {
- *   // Handle API request
- * });
- * ```
- */
-
-/**
- * Serve static files from /browser
- */
 app.use(
   '/app',
   express.static(browserDistFolder, {
@@ -72,7 +57,7 @@ app.get('/app/sitemap.xml', (req, res) => {
 });
 
 app.get('/app/sitemap-main.xml', (req, res) => {
-  const routes = Array.from(new Set(collectPaths(appRoutes)));
+  const paths = Array.from(new Set(collectPaths(routes)));
 
   const root = xmlbuilder.create('urlset', {
     version: '1.0',
@@ -80,7 +65,7 @@ app.get('/app/sitemap-main.xml', (req, res) => {
   });
   root.att('xmlns', 'http://www.sitemaps.org/schemas/sitemap/0.9');
 
-  routes.forEach((route) => {
+  paths.forEach((route) => {
     const path = route.startsWith('/') ? route : `/${route}`;
     const url = root.ele('url');
     url.ele('loc', `https://metro.yudi.com.br/app${path}`);
@@ -90,9 +75,6 @@ app.get('/app/sitemap-main.xml', (req, res) => {
   res.send(root.end({ pretty: true }));
 });
 
-/**
- * Handle all other requests by rendering the Angular application.
- */
 app.use('/{*splat}', (req, res, next) => {
   angularApp
     .handle(req)
@@ -102,10 +84,6 @@ app.use('/{*splat}', (req, res, next) => {
     .catch(next);
 });
 
-/**
- * Start the server if this module is the main entry point.
- * The server listens on the port defined by the `PORT` environment variable, or defaults to 4000.
- */
 if (isMainModule(import.meta.url)) {
   const port = process.env['PORT'] || 4000;
   app.listen(port, () => {
@@ -113,7 +91,4 @@ if (isMainModule(import.meta.url)) {
   });
 }
 
-/**
- * The request handler used by the Angular CLI (dev-server and during build).
- */
 export const reqHandler = createNodeRequestHandler(app);

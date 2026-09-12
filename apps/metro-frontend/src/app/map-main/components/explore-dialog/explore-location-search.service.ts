@@ -1,7 +1,7 @@
+import { CityContextService } from '../../../cities/city-context.service';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Service, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
-import { SAO_PAULO_CITY_CENTER } from '@metro/shared/utils';
 
 export type PhotonLocationType =
   | 'house'
@@ -60,59 +60,16 @@ interface RankedExploreLocationResult extends ExploreLocationResult {
   index: number;
 }
 
-const PRIORITY_CITY_NAMES = new Set([
-  'sao paulo',
-  'guarulhos',
-  'aruja',
-  'santa isabel',
-  'itaquaquecetuba',
-  'poa',
-  'ferraz de vasconcelos',
-  'suzano',
-  'mogi das cruzes',
-  'biritiba mirim',
-  'salesopolis',
-  'sao cateano do sul',
-  'sao caetano do sul',
-  'santo andre',
-  'manua',
-  'maua',
-  'ribeirao pires',
-  'rio grande da serra',
-  'sao bernardo do campo',
-  'diadema',
-  'taboao da serra',
-  'embu das artes',
-  'itapecerica da serra',
-  'embu-guacu',
-  'sao lourenco da serra',
-  'juquitiba',
-  'cotia',
-  'vargem grande paulista',
-  'osasco',
-  'carapicuiba',
-  'barueri',
-  'jandira',
-  'itapevi',
-  'santana de parnaiba',
-  'pirapora do bom jesus',
-  'cajamar',
-  'caieiras',
-  'franco da rocha',
-  'francisco morato',
-  'mairipora',
-  'jundiai',
-]);
-
 @Service()
 export class ExploreLocationSearchService {
+  readonly cityContext = inject(CityContextService);
   private readonly http = inject(HttpClient);
   private readonly photonUrl = 'https://photon.komoot.io/api/';
 
   search(
     query: string,
-    prioritizeLat: number = SAO_PAULO_CITY_CENTER.latitude,
-    prioritizeLon: number = SAO_PAULO_CITY_CENTER.longitude,
+    prioritizeLat: number = this.cityContext.city().map.center.latitude,
+    prioritizeLon: number = this.cityContext.city().map.center.longitude,
   ): Observable<ExploreLocationResult[]> {
     const params = new HttpParams()
       .set('q', query)
@@ -195,7 +152,7 @@ export class ExploreLocationSearchService {
       return 0;
     }
 
-    if (normalizedCity && PRIORITY_CITY_NAMES.has(normalizedCity)) {
+    if (normalizedCity && this.cityContext.city().searchPriorityCities.includes(normalizedCity)) {
       return 1;
     }
 

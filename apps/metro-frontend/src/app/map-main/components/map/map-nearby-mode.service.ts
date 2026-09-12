@@ -1,11 +1,8 @@
+import { CityContextService } from '../../../cities/city-context.service';
 import { Service, inject } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { GeolocationService } from '@metro/shared/geolocation';
-import {
-  SAO_PAULO_CITY_CENTER,
-  SAO_PAULO_CITY_CENTER_COORDINATES,
-} from '@metro/shared/utils';
 import { LoggerService } from '@metro/shared/api';
 import {
   ExploreDialogComponent,
@@ -19,6 +16,7 @@ import { MapStateService } from './map-state.service';
 
 @Service()
 export class MapNearbyModeService {
+  readonly cityContext = inject(CityContextService);
   private readonly snackBar = inject(MatSnackBar);
   private readonly dialog = inject(MatDialog);
   private readonly mapState = inject(MapStateService);
@@ -128,12 +126,12 @@ export class MapNearbyModeService {
   }
 
   private fallbackToDefaultLocation(): void {
-    this.logger.info('Using default location: São Paulo center');
+    this.logger.info('Using default city location', { city: this.cityContext.id() });
     this.dataLoader.loadNearbyStops(
-      SAO_PAULO_CITY_CENTER.latitude,
-      SAO_PAULO_CITY_CENTER.longitude,
+      this.cityContext.city().map.center.latitude,
+      this.cityContext.city().map.center.longitude,
     );
-    this.displayService.centerOn(SAO_PAULO_CITY_CENTER_COORDINATES, 14);
+    this.displayService.centerOn(this.cityContext.center(), 14);
   }
 
   private startExploreLocationSelection(): void {

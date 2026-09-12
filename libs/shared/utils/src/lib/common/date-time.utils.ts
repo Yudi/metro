@@ -1,4 +1,6 @@
-export const DEFAULT_TRANSIT_TIME_ZONE = 'America/Sao_Paulo';
+import { DEFAULT_CITY } from '@metro/shared/cities';
+
+export const DEFAULT_TRANSIT_TIME_ZONE = DEFAULT_CITY.timeZone;
 
 export interface TransitTimeFormatOptions {
   locale?: string;
@@ -20,7 +22,7 @@ export function formatTransitTime(
   options: TransitTimeFormatOptions = {},
 ): string {
   if (value instanceof Date || typeof value === 'number') {
-    return new Intl.DateTimeFormat(options.locale ?? 'pt-BR', {
+    return new Intl.DateTimeFormat(options.locale ?? DEFAULT_CITY.locale, {
       hour: '2-digit',
       minute: '2-digit',
       timeZone: options.timeZone ?? DEFAULT_TRANSIT_TIME_ZONE,
@@ -42,7 +44,7 @@ export function formatTransitTime(
     return trimmedValue;
   }
 
-  return new Intl.DateTimeFormat(options.locale ?? 'pt-BR', {
+  return new Intl.DateTimeFormat(options.locale ?? DEFAULT_CITY.locale, {
     hour: '2-digit',
     minute: '2-digit',
     timeZone: options.timeZone ?? DEFAULT_TRANSIT_TIME_ZONE,

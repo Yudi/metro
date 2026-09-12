@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test('renders the project information route and navigation shell', async ({
   page,
 }) => {
-  await page.goto('/sobre');
+  await page.goto('/sp/sobre');
 
   await expect(page).toHaveTitle(/Sobre \| Transporte Metropolitano/);
   await expect(
@@ -103,7 +103,7 @@ test('searches for a bus stop and opens its details', async ({ page }) => {
     await route.fulfill({ json: { data: {} } });
   });
 
-  await page.goto('/proxima-chegada');
+  await page.goto('/sp/proxima-chegada');
   await page.getByLabel('Estação ou ponto de ônibus').fill('Terminal');
   await expect(
     page.locator('.result-title').filter({ hasText: 'Terminal Central' }),

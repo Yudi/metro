@@ -137,7 +137,7 @@ describe('notification messages', () => {
     );
     expect(message?.expiresAt.toISOString()).toBe('2026-09-07T12:00:00.000Z');
     expect(message?.payload.notification.data.onActionClick.settings.url).toBe(
-      'notifications',
+      'sp/notifications',
     );
   });
   it('groups only upcoming arrivals in the configured lead horizon', () => {

@@ -1,3 +1,4 @@
+import { CityContextService } from '../../../../cities/city-context.service';
 import {
   Component,
   input,
@@ -31,6 +32,7 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MapHeaderComponent {
+  readonly cityContext = inject(CityContextService);
   readonly displayMode = input.required<DisplayMode>();
   readonly hasSelections = input<boolean>(false);
   readonly hasFeatures = input<boolean>(false);

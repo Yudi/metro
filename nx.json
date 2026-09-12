@@ -87,6 +87,7 @@
         "apps/metro-frontend/**/*",
         "apps/metro-frontend-lite/**/*",
         "libs/shared/api/**/*",
+        "libs/shared/cities/**/*",
         "libs/shared/environment/**/*",
         "libs/shared/firebase/**/*",
         "libs/shared/geolocation/**/*",

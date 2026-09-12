@@ -59,7 +59,7 @@
         mat-mini-fab
         class="fab-item"
         (click)="handleCenter()"
-        matTooltip="Centralizar em São Paulo"
+        [matTooltip]="'Centralizar em ' + cityContext.city().name"
         matTooltipPosition="left"
       >
         <mat-icon>location_city</mat-icon>

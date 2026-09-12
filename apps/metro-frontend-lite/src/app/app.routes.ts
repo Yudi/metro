@@ -1,10 +1,12 @@
 import { Route } from '@angular/router';
+import { SAO_PAULO_CITY } from '@metro/shared/cities';
 import { SeoGuard } from '@metro/shared/seo';
+import { routes as spRoutes } from './cities/sp/sp.routes';
 
 export const routes: Route[] = [
   {
     path: '',
-    canActivate: [SeoGuard],
+    canActivateChild: [SeoGuard],
     loadComponent: () =>
       import('./shared/layout/main-layout/main-layout').then(
         (m) => m.MainLayout,
@@ -13,11 +15,13 @@ export const routes: Route[] = [
     children: [
       {
         path: '',
-        loadComponent: () => import('./home/home').then((m) => m.Home),
+        pathMatch: 'full',
+        loadComponent: () =>
+          import('./sp/dashboard/dashboard').then((m) => m.Dashboard),
       },
       {
-        path: 'sp',
-        loadChildren: () => import('./sp/sp.routes').then((m) => m.routes),
+        path: SAO_PAULO_CITY.id,
+        children: spRoutes,
       },
     ],
   },

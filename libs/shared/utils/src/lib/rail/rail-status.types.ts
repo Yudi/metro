@@ -2,7 +2,7 @@
  * Shared rail status types between frontend and backend
  */
 
-import type { SpecialRailLineCode } from './rail-special-lines.config';
+import type { SpecialRailLineCode } from '../cities/sp/rail/rail-special-lines.config';
 
 /**
  * Normalized rail status codes (without accents/spaces)

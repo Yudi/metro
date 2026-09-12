@@ -11,6 +11,7 @@ import { FavoritesService } from '@metro/shared/api';
 import { Router } from '@angular/router';
 import { SpecialRailIssue } from '@metro/shared/utils';
 import { ScheduledDeparturesComponent } from '../../../shared/components/scheduled-departures/scheduled-departures.component';
+import { CityContextService } from '../../../cities/city-context.service';
 
 export interface LineScheduleSection {
   title: string;
@@ -258,6 +259,7 @@ export class LineDescriptionDialogComponent {
   readonly data = inject<LineDescriptionDialogData>(MAT_DIALOG_DATA);
   private readonly favoritesService = inject(FavoritesService);
   private readonly router = inject(Router);
+  private readonly cityContext = inject(CityContextService);
   readonly isFavorite = computed(() =>
     this.data.specialLineCode
       ? this.favoritesService.isFavorite(this.data.specialLineCode, 'railLine')
@@ -300,6 +302,8 @@ export class LineDescriptionDialogComponent {
     }
 
     this.dialogRef.close();
-    void this.router.navigate(['/mapa'], { queryParams: { railLine: code } });
+    void this.router.navigate([this.cityContext.path('/mapa')], {
+      queryParams: { railLine: code },
+    });
   }
 }

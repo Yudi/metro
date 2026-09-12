@@ -72,7 +72,7 @@
       <button
         mat-icon-button
         (click)="centerClick.emit()"
-        matTooltip="Centralizar em São Paulo"
+        [matTooltip]="'Centralizar em ' + cityContext.city().name"
         aria-label="Centralizar mapa"
       >
         <mat-icon>location_city</mat-icon>

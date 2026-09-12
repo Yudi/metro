@@ -1,3 +1,4 @@
+import { CityContextService } from '../../../cities/city-context.service';
 import { Service, inject } from '@angular/core';
 import { Feature } from 'ol';
 import { Point } from 'ol/geom';
@@ -10,13 +11,13 @@ import { FeatureFactoryService } from './feature-factory.service';
 import { LoggerService } from '@metro/shared/api';
 import { isSubwayShape } from '../../geography/transit-utils';
 import { fromLonLat } from 'ol/proj';
-import { SAO_PAULO_CITY_CENTER_COORDINATES } from '@metro/shared/utils';
 import { createBikeStationFeatureProperties } from './layers/bike-feature-properties.utils';
 import { MapSelectionDisplayService } from './map-selection-display.service';
 import { updatePreservedFeaturesCreationSource } from './map-feature-source.utils';
 
 @Service()
 export class MapDisplayService {
+  readonly cityContext = inject(CityContextService);
   private mapService = inject(MapService);
   private geographyService = inject(GeographyGraphQLService);
   private mapState = inject(MapStateService);
@@ -438,8 +439,8 @@ export class MapDisplayService {
     this.mapService.fitToFeatures();
   }
 
-  centerOnSaoPaulo(): void {
-    this.mapService.centerOn(SAO_PAULO_CITY_CENTER_COORDINATES, 11);
+  centerOnCity(): void {
+    this.mapService.centerOn(this.cityContext.center(), this.cityContext.city().map.zoom);
   }
 
   centerOn(coordinates: [number, number], zoom: number): void {

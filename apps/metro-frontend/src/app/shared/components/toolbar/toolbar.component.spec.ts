@@ -44,9 +44,9 @@ describe('ToolbarComponent', () => {
   });
 
   it('shows a back route for whitelisted app paths', () => {
-    queryParamMap.next(convertToParamMap({ back: '/mapa' }));
+    queryParamMap.next(convertToParamMap({ back: '/sp/mapa' }));
 
-    expect(component.backRoute()).toBe('/mapa');
+    expect(component.backRoute()).toBe('/sp/mapa');
   });
 
   it('ignores external back routes', () => {
@@ -66,9 +66,32 @@ describe('ToolbarComponent', () => {
       .spyOn(router, 'navigateByUrl')
       .mockResolvedValue(true);
 
-    queryParamMap.next(convertToParamMap({ back: '/favoritos' }));
+    queryParamMap.next(convertToParamMap({ back: '/sp/favoritos' }));
     component.navigateBack();
 
-    expect(navigateByUrl).toHaveBeenCalledWith('/favoritos');
+    expect(navigateByUrl).toHaveBeenCalledWith('/sp/favoritos');
+  });
+
+  it('preserves query and fragment on a city itinerary back route', () => {
+    queryParamMap.next(
+      convertToParamMap({
+        back: '/sp/itinerarios/sptrans/477A-10?dia=2026-09-12#horarios',
+      }),
+    );
+
+    expect(component.backRoute()).toBe(
+      '/sp/itinerarios/sptrans/477A-10?dia=2026-09-12#horarios',
+    );
+  });
+
+  it('rejects unprefixed feature paths', () => {
+    queryParamMap.next(convertToParamMap({ back: '/mapa' }));
+    expect(component.backRoute()).toBeNull();
+  });
+
+  it('keeps an unsupported city out of the back-route allowlist', () => {
+    queryParamMap.next(convertToParamMap({ back: '/rio-de-janeiro/painel' }));
+
+    expect(component.backRoute()).toBeNull();
   });
 });

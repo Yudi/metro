@@ -1,4 +1,4 @@
-import type { SpecialCptmLineCode } from './cptm-stations';
+import type { SpecialCptmLineCode } from '../cities/sp/rail/cptm-stations';
 
 export interface SpecialRailServiceStation {
   stationCode: string;

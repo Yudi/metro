@@ -3,9 +3,9 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { haversineDistanceKm } from '../../common/utils/geo-distance.util';
 import { BusStop } from '../entities/geography.entity';
 import { BusStopService } from './bus-stop.service';
+import { SAO_PAULO_CITY } from '@metro/shared/cities';
 import {
   normalizeStationName,
-  SAO_PAULO_CITY_CENTER,
   shouldMergeStations,
 } from '@metro/shared/utils';
 
@@ -91,8 +91,8 @@ export class SubwayStationService {
     // Merge stations with identical names (intermodal stations)
     const mergedStations = this.mergeIdenticalStations(
       rawStations,
-      SAO_PAULO_CITY_CENTER.latitude,
-      SAO_PAULO_CITY_CENTER.longitude,
+      SAO_PAULO_CITY.map.center.latitude,
+      SAO_PAULO_CITY.map.center.longitude,
     );
 
     return mergedStations;

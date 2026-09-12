@@ -1,5 +1,7 @@
+import { CityContextService } from '../../../../cities/city-context.service';
 import {
   Component,
+  inject,
   input,
   output,
   signal,
@@ -17,6 +19,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MapFabMenuComponent {
+  readonly cityContext = inject(CityContextService);
   readonly hasSelections = input<boolean>(false);
   readonly hasFeatures = input<boolean>(false);
   readonly isRequestingLocation = input<boolean>(false);

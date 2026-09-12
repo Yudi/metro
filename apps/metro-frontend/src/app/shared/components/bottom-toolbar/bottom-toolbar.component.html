@@ -22,7 +22,7 @@
       <button
         mat-button
         class="nav-btn"
-        [routerLink]="item.route"
+        [routerLink]="cityPath(item.route)"
         routerLinkActive="active"
         [routerLinkActiveOptions]="{ exact: true }"
         [attr.aria-label]="item.label"

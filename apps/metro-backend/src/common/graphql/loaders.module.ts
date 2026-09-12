@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { LoadersService } from './loaders.service';
-import { GeographyModule } from '../../geography/geography.module';
+import { SaoPauloTransitModule } from '../../cities/sp/sp-transit.module';
 
 @Module({
   providers: [LoadersService],
-  imports: [GeographyModule],
+  imports: [SaoPauloTransitModule],
   exports: [LoadersService],
 })
 export class LoadersModule {}

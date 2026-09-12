@@ -1,14 +1,17 @@
-import { Component } from '@angular/core';
+import { CityContextService } from '../../../cities/city-context.service';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { RouterLink } from '@angular/router';
 
 @Component({
   selector: 'app-footer',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [MatToolbarModule, RouterLink],
   templateUrl: './footer.component.html',
   styleUrl: './footer.component.scss',
 })
 export class FooterComponent {
+  readonly cityContext = inject(CityContextService);
   footerLinks = footerLinks;
 }
 

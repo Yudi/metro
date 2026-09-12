@@ -19,7 +19,8 @@
     "../../libs/shared/bike-contracts/src/**/*.ts",
     "../../libs/shared/notification-contracts/src/**/*.ts",
     "../../libs/shared/rail-integration-contracts/src/**/*.ts",
-    "../../libs/shared/bus-itinerary-contracts/src/**/*.ts"
+    "../../libs/shared/bus-itinerary-contracts/src/**/*.ts",
+    "../../libs/shared/cities/src/**/*.ts"
   ],
   "exclude": [
     "jest.config.ts",

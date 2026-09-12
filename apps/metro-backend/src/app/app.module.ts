@@ -1,4 +1,3 @@
-import { BusInformationModule } from '../bus-information/bus-information.module';
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
@@ -12,17 +11,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { GqlThrottlerGuard } from '../common/guards/gql-throttler.guard';
 import { PrismaModule } from '../prisma/prisma.module';
-import { DataImportModule } from '../data-import/data-import.module';
-import { RailImportModule } from '../rail-import/rail-import.module';
-import { RailModule } from '../rail/rail.module';
-import { GeographyModule } from '../geography/geography.module';
-import { SearchModule } from '../search/search.module';
-import { RealtimeModule } from '../realtime/realtime.module';
-import { BikeModule } from '../bike/bike.module';
-import { VectorTilesModule } from '../vector-tiles/vector-tiles.module';
-import { NextTrainModule } from '../next-train/next-train.module';
 import { UserModule } from '../user/user.module';
-import { HistoricalModule } from '../historical/historical.module';
 import { LoadersService } from '../common/graphql/loaders.service';
 import { LoadersModule } from '../common/graphql/loaders.module';
 import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
@@ -33,6 +22,7 @@ import { validatePublicEnvironment } from './public-environment.validation';
 import { RequestContextModule } from '../common/request-context/request-context.module';
 import { createGraphQLTimingPlugin } from '../observability/graphql-timing.plugin';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { SaoPauloTransitModule } from '../cities/sp/sp-transit.module';
 
 const isProduction = process.env.NODE_ENV === 'production';
 @Module({
@@ -88,19 +78,9 @@ const isProduction = process.env.NODE_ENV === 'production';
     }),
     HttpModule,
     PrismaModule,
-    DataImportModule,
-    RailImportModule,
-    RailModule,
-    GeographyModule,
-    BusInformationModule,
-    SearchModule,
-    RealtimeModule,
-    BikeModule,
-    VectorTilesModule,
-    NextTrainModule,
+    SaoPauloTransitModule,
     UserModule,
     NotificationsModule,
-    HistoricalModule,
     ObservabilityModule,
     LoadersModule,
   ],

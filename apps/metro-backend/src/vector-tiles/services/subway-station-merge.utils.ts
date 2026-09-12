@@ -1,6 +1,6 @@
 import { haversineDistanceKm } from '../../common/utils/geo-distance.util';
+import { SAO_PAULO_CITY } from '@metro/shared/cities';
 import {
-  SAO_PAULO_CITY_CENTER,
   extractLineCodeFromAgency,
   getRailLineByCode,
   getStationDisplayName,
@@ -153,8 +153,8 @@ function stationDistanceFromCenter(station: RawStation): number {
   return haversineDistanceKm(
     station.stop_lat,
     station.stop_lon,
-    SAO_PAULO_CITY_CENTER.latitude,
-    SAO_PAULO_CITY_CENTER.longitude,
+    SAO_PAULO_CITY.map.center.latitude,
+    SAO_PAULO_CITY.map.center.longitude,
   );
 }
 

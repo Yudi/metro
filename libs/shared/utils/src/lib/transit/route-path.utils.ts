@@ -3,24 +3,24 @@ export interface RoutePathTreeNode {
   children?: readonly RoutePathTreeNode[];
 }
 
-export function collectPaths(routes: readonly RoutePathTreeNode[]): string[] {
-  const paths: string[] = [];
+export function collectPaths(
+  routes: readonly RoutePathTreeNode[],
+  parentPath = '',
+): string[] {
+  const paths = new Set<string>();
 
   for (const route of routes) {
-    if (route.path !== undefined && route.path !== '**') {
-      paths.push(
-        route.path === ''
-          ? '/'
-          : route.path.startsWith('/')
-            ? route.path
-            : `/${route.path}`,
-      );
-    }
+    if (route.path?.includes('*') || route.path?.includes(':')) continue;
 
-    if (Array.isArray(route.children)) {
-      paths.push(...collectPaths(route.children));
+    const path = [parentPath, route.path ?? '']
+      .join('/').replace(/\/+/g, '/').replace(/\/$/, '') || '/';
+    if (route.path !== undefined) paths.add(path);
+    if (route.children) {
+      for (const childPath of collectPaths(route.children, path)) {
+        paths.add(childPath);
+      }
     }
   }
 
-  return paths;
+  return [...paths];
 }

@@ -1,21 +1,12 @@
+import { CityContextService } from '../../../cities/city-context.service';
 import { isPlatformBrowser } from '@angular/common';
 import { Service, PLATFORM_ID, inject, signal } from '@angular/core';
 import Dexie, { Table } from 'dexie';
 import { LayerType } from './layers/map-layer.service';
 import { VectorTileLayerType } from './vector-tiles/vector-tile-layer.service';
 import { DisplayMode, NearbyCenter } from './map.types';
-import { SAO_PAULO_CITY_CENTER } from '@metro/shared/utils';
 
 export const MAP_VIEW_STATE_RESTORE_PARAM = 'restoreMapState';
-
-export const DEFAULT_MAP_QUERY_PARAMS: Record<string, string> = {
-  subwayStations: '1',
-  subwayRoutes: '0',
-  bike: '0',
-  lat: String(SAO_PAULO_CITY_CENTER.latitude),
-  lon: String(SAO_PAULO_CITY_CENTER.longitude),
-  z: '11',
-};
 
 export interface SavedMapViewState {
   center: [number, number];
@@ -33,7 +24,7 @@ export interface SavedMapViewState {
 }
 
 interface MapViewStateRecord extends SavedMapViewState {
-  key: 'last';
+  key: string;
   updatedAt: number;
 }
 
@@ -50,6 +41,7 @@ class MapViewStateDatabase extends Dexie {
 
 @Service()
 export class MapViewStateStorageService {
+  readonly cityContext = inject(CityContextService);
   private readonly platformId = inject(PLATFORM_ID);
   private readonly db = isPlatformBrowser(this.platformId)
     ? new MapViewStateDatabase()
@@ -58,12 +50,24 @@ export class MapViewStateStorageService {
   private readonly _defaultStateRequests = signal(0);
   readonly defaultStateRequests = this._defaultStateRequests.asReadonly();
 
+  private get storageKey(): string {
+    return `last:${this.cityContext.id()}`;
+  }
+
   requestDefaultState(): void {
     this._defaultStateRequests.update((value) => value + 1);
   }
 
   getDefaultQueryParams(): Record<string, string> {
-    return { ...DEFAULT_MAP_QUERY_PARAMS };
+    const city = this.cityContext.city();
+    return {
+      subwayStations: '1',
+      subwayRoutes: '0',
+      bike: '0',
+      lat: String(city.map.center.latitude),
+      lon: String(city.map.center.longitude),
+      z: String(city.map.zoom),
+    };
   }
 
   getRestoreQueryParams(): Record<string, string> {
@@ -75,7 +79,7 @@ export class MapViewStateStorageService {
       return false;
     }
 
-    return (await this.db.mapViewStates.get('last')) !== undefined;
+    return (await this.db.mapViewStates.get(this.storageKey)) !== undefined;
   }
 
   async readLastState(): Promise<SavedMapViewState | null> {
@@ -83,7 +87,7 @@ export class MapViewStateStorageService {
       return null;
     }
 
-    const record = await this.db.mapViewStates.get('last');
+    const record = await this.db.mapViewStates.get(this.storageKey);
     if (!record) {
       return null;
     }
@@ -106,7 +110,7 @@ export class MapViewStateStorageService {
     }
 
     void this.db.mapViewStates.put({
-      key: 'last',
+      key: this.storageKey,
       updatedAt: Date.now(),
       ...state,
     });

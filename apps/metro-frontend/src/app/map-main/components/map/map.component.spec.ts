@@ -1,3 +1,4 @@
+import { DEFAULT_CITY } from '@metro/shared/cities';
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MapComponent } from './map.component';
@@ -157,15 +158,15 @@ describe('MapComponent', () => {
     const mapService = TestBed.inject(MapService);
     expect(mapService.centerOn).toHaveBeenCalledWith(
       [-46.6333, -23.5505],
-      MapComponent.DEFAULT_ZOOM,
+      DEFAULT_CITY.map.zoom,
     );
   });
 
   it('does not create duplicate maps when initializeMap is called multiple times', () => {
     const mapService = TestBed.inject(MapService);
     const options = {
-      center: MapComponent.DEFAULT_CENTER,
-      zoom: MapComponent.DEFAULT_ZOOM,
+      center: [DEFAULT_CITY.map.center.longitude, DEFAULT_CITY.map.center.latitude],
+      zoom: DEFAULT_CITY.map.zoom,
       showControls: true,
       additionalLayers: [],
     } satisfies MapOptions;
@@ -279,7 +280,7 @@ describe('MapComponent', () => {
     it('applies zoom and uses the default center', () => {
       const mapService = TestBed.inject(MapService);
       expect(mapService.centerOn).toHaveBeenCalledWith(
-        MapComponent.DEFAULT_CENTER,
+        [DEFAULT_CITY.map.center.longitude, DEFAULT_CITY.map.center.latitude],
         12,
       );
     });

@@ -57,6 +57,7 @@ import { BusInformationComponent } from '../map-main/components/bus-information/
 import { routeNoticeView } from '../map-main/components/bus-information/bus-notice-view';
 import { TransitSearchFieldComponent } from '../shared/components/transit-search-field/transit-search-field.component';
 import { ScheduledDeparturesComponent } from '../shared/components/scheduled-departures/scheduled-departures.component';
+import { CityContextService } from '../cities/city-context.service';
 import {
   ItinerariesService,
   ItineraryPattern,
@@ -113,6 +114,7 @@ export function serviceDayKind(date: string): PublishedDayKind {
 export class ItinerariesComponent {
   private readonly router = inject(Router);
   private readonly activatedRoute = inject(ActivatedRoute);
+  readonly cityContext = inject(CityContextService);
   private readonly searchService = inject(TypesenseSearchService);
   private readonly itineraries = inject(ItinerariesService);
   private readonly information = inject(BusInformationService);
@@ -471,6 +473,10 @@ export class ItinerariesComponent {
     bike: '0',
   }));
 
+  cityPath(path = ''): string {
+    return this.cityContext.path(path);
+  }
+
   constructor() {
     merge(this.activatedRoute.paramMap, this.activatedRoute.queryParamMap)
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -489,9 +495,12 @@ export class ItinerariesComponent {
       separator >= 0 ? route.route_id.slice(separator + 1) : route.route_id;
     this.query.set('');
     this.selectedPatternId.set('');
-    void this.router.navigate(['/itinerarios', agency, line], {
-      queryParams: { dia: this.params().get('dia') },
-    });
+    void this.router.navigate(
+      [this.cityContext.path('/itinerarios'), agency, line],
+      {
+        queryParams: { dia: this.params().get('dia') },
+      },
+    );
   }
 
   selectDate(date: string): void {

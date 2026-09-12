@@ -29,7 +29,7 @@ test.describe('configuração de notificações', () => {
       });
     });
 
-    await page.goto('/notifications');
+    await page.goto('/sp/notifications');
 
     await expect(
       page.getByRole('heading', { name: 'Entre para configurar avisos' }),
@@ -47,7 +47,7 @@ test.describe('configuração de notificações', () => {
   });
 
   test('liga o menu à página de notificações', async ({ page }) => {
-    await page.goto('/menu');
+    await page.goto('/sp/menu');
 
     const notificationsLink = page.getByRole('link', { name: 'Notificações' });
     await expect(notificationsLink).toHaveAttribute('href', /notifications/);

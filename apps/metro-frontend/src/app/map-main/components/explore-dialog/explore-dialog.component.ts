@@ -1,3 +1,4 @@
+import { CityContextService } from '../../../cities/city-context.service';
 import {
   AfterViewInit,
   ChangeDetectionStrategy,
@@ -32,7 +33,6 @@ import {
   ExploreLocationSearchService,
   PhotonLocationType,
 } from './explore-location-search.service';
-import { SAO_PAULO_CITY_CENTER } from '@metro/shared/utils';
 
 export type ExploreDialogResult =
   | { action: 'manual' }
@@ -59,6 +59,7 @@ export type ExploreDialogResult =
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ExploreDialogComponent implements AfterViewInit {
+  readonly cityContext = inject(CityContextService);
   @ViewChild('searchInput')
   private readonly searchInputRef!: ElementRef<HTMLInputElement>;
 
@@ -97,9 +98,9 @@ export class ExploreDialogComponent implements AfterViewInit {
           this.isSearching.set(true);
           const location = this.geolocationService.location();
           const prioritizeLat =
-            location?.latitude ?? SAO_PAULO_CITY_CENTER.latitude;
+            location?.latitude ?? this.cityContext.city().map.center.latitude;
           const prioritizeLon =
-            location?.longitude ?? SAO_PAULO_CITY_CENTER.longitude;
+            location?.longitude ?? this.cityContext.city().map.center.longitude;
 
           return this.searchService
             .search(trimmedQuery, prioritizeLat, prioritizeLon)

@@ -11,7 +11,11 @@
     </button>
   }
 
-  <a class="brand" routerLink="/" aria-label="Ir para página inicial">
+  <a
+    class="brand"
+    [routerLink]="cityPath()"
+    aria-label="Ir para página inicial"
+  >
     <img
       src="/app/icons/logo.avif"
       alt="Logotipo do site"
@@ -33,7 +37,7 @@
       } @else {
         <a
           mat-button
-          [routerLink]="item.route"
+          [routerLink]="cityPath(item.route)"
           [queryParams]="item.queryParams"
         >
           {{ item.label }}

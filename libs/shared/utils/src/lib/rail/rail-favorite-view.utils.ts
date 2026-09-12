@@ -9,7 +9,7 @@ import {
 import {
   ExtendedNextTrainLineCode,
   hasNextTrainInformation,
-} from './viamobilidade-stations';
+} from '../cities/sp/rail/viamobilidade-stations';
 
 export interface FavoriteRailLineOption {
   id: string;

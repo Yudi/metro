@@ -6,8 +6,9 @@
  * through the Trivia Trens live-data switch or HEADWAY_ENABLED_LINES config.
  */
 
-import { ExtendedNextTrainLineCode } from './viamobilidade-stations';
-import { TRIVIATRENS_LIVE_DATA_ENABLED } from '../transit/transit-agency.utils';
+import { DEFAULT_CITY } from '@metro/shared/cities';
+import { ExtendedNextTrainLineCode } from '../cities/sp/rail/viamobilidade-stations';
+import { TRIVIATRENS_LIVE_DATA_ENABLED } from '../cities/sp/transit/transit-agency.utils';
 
 const TRIVIATRENS_NEXT_TRAIN_LINES: ExtendedNextTrainLineCode[] = [
   'L11',
@@ -89,7 +90,7 @@ export const HEADWAY_BUCKETS: HeadwayBucketDefinition[] = [
   { id: 'night', startMinutes: 1320, endMinutes: 1440, label: 'Noturno' },
 ];
 
-const SAO_PAULO_TZ = 'America/Sao_Paulo';
+const SAO_PAULO_TZ = DEFAULT_CITY.timeZone;
 const OFF_HOURS_START_MINUTES = 0;
 const OFF_HOURS_END_MINUTES = 4 * 60;
 const OFF_HOURS_REMAINING_TRAINS_TOLERANCE_MINUTES = 60;

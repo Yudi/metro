@@ -27,6 +27,7 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { ToolbarItem } from '../toolbar/toolbar.component';
+import { CityContextService } from '../../../cities/city-context.service';
 
 @Component({
   selector: 'app-bottom-toolbar',
@@ -56,6 +57,7 @@ export class BottomToolbarComponent implements AfterViewInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly platformId = inject(PLATFORM_ID);
   private readonly router = inject(Router);
+  private readonly cityContext = inject(CityContextService);
 
   private readonly height = signal(0);
   private readonly currentUrl = toSignal(
@@ -73,6 +75,10 @@ export class BottomToolbarComponent implements AfterViewInit {
       `${h}px`,
     );
   });
+
+  cityPath(path = ''): string {
+    return this.cityContext.path(path);
+  }
 
   ngAfterViewInit(): void {
     if (!isPlatformBrowser(this.platformId)) return;
@@ -118,11 +124,14 @@ export class BottomToolbarComponent implements AfterViewInit {
     }
 
     this.currentUrl();
-    return this.router.isActive(this.router.createUrlTree(['/mapa']), {
-      paths: 'exact',
-      queryParams: 'ignored',
-      fragment: 'ignored',
-      matrixParams: 'ignored',
-    });
+    return this.router.isActive(
+      this.router.parseUrl(this.cityContext.path('/mapa')),
+      {
+        paths: 'exact',
+        queryParams: 'ignored',
+        fragment: 'ignored',
+        matrixParams: 'ignored',
+      },
+    );
   }
 }

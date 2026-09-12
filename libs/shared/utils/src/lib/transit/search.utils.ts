@@ -2,8 +2,11 @@ import {
   getCanonicalRailStationName,
   getLineCodesFromColorNames,
 } from '../rail/rail-line.utils';
+import {
+  LIVE_TRAIN_TRACKING_API_ORDER,
+  LIVE_TRAIN_TRACKING_APIS_BY_LINE_CODE,
+} from '../cities/sp/transit/live-train-tracking.config';
 import { toTitleCase } from '../rail/stations/station-name.utils';
-import { TRIVIATRENS_LIVE_DATA_ENABLED } from './transit-agency.utils';
 
 export enum SearchTypesEnum {
   BusRoute = 'busRoute',
@@ -114,24 +117,6 @@ export function extractLineCodesFromRouteNames(routes: string[]): number[] {
 
   return [...lineCodes].sort((a, b) => a - b);
 }
-
-const LIVE_TRAIN_TRACKING_API_ORDER: LiveTrainTrackingApiId[] = [
-  'api3',
-  'api2',
-  'api1',
-];
-
-const LIVE_TRAIN_TRACKING_APIS_BY_LINE_CODE: Partial<
-  Record<number, LiveTrainTrackingApiId[]>
-> = {
-  4: ['api3', 'api1'],
-  8: ['api2'],
-  9: ['api2'],
-  10: ['api1'],
-  11: TRIVIATRENS_LIVE_DATA_ENABLED ? ['api1'] : [],
-  12: TRIVIATRENS_LIVE_DATA_ENABLED ? ['api1'] : [],
-  13: TRIVIATRENS_LIVE_DATA_ENABLED ? ['api1'] : [],
-};
 
 export function getLiveTrainTrackingApiIds(
   lineCodes: number[],

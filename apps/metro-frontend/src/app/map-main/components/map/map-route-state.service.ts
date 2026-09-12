@@ -1,3 +1,4 @@
+import { CityContextService } from '../../../cities/city-context.service';
 import { Service, effect, inject, signal, untracked } from '@angular/core';
 import { ParamMap } from '@angular/router';
 import {
@@ -9,7 +10,6 @@ import {
   FavoriteList,
   getRailLineByCode,
   getRailLineById,
-  SAO_PAULO_CITY_CENTER_COORDINATES,
 } from '@metro/shared/utils';
 import { MapService } from './map.service';
 import { MapStateService } from './map-state.service';
@@ -25,14 +25,10 @@ import {
   SavedMapViewState,
 } from './map-view-state-storage.service';
 
-export const DEFAULT_MAP_CENTER: [number, number] = [
-  ...SAO_PAULO_CITY_CENTER_COORDINATES,
-];
-export const DEFAULT_MAP_ZOOM = 11;
-
 /** Applies route parameters and persists the map view between navigations. */
 @Service()
 export class MapRouteStateService {
+  readonly cityContext = inject(CityContextService);
   private readonly mapService = inject(MapService);
   private readonly mapState = inject(MapStateService);
   private readonly dataLoader = inject(MapDataLoaderService);
@@ -234,7 +230,7 @@ export class MapRouteStateService {
       this.mapService
         .getVectorTileLayerService()
         .setLayerVisibility(VectorTileLayerType.RAIL_ROUTES, false);
-      this.mapService.centerOn(DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM);
+      this.mapService.centerOn(this.cityContext.center(), this.cityContext.city().map.zoom);
       this.dataLoader.syncVectorTileFilters();
       this.displayService.updateMapDisplay();
     } finally {
@@ -459,7 +455,7 @@ export class MapRouteStateService {
       }
     } else if (isValidZoom(zoom) && (lat === null || lon === null)) {
       try {
-        this.mapService.centerOn(DEFAULT_MAP_CENTER, zoom as number);
+        this.mapService.centerOn(this.cityContext.center(), zoom as number);
         this.logger.debug('Applied query param zoom with default center', {
           zoom,
         });

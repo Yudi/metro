@@ -1,3 +1,4 @@
+import { cityPath } from '@metro/shared/cities';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -71,7 +72,7 @@ export class NotificationRetentionService {
                     onActionClick: {
                       default: {
                         operation: 'navigateLastFocusedOrOpen',
-                        url: 'notifications',
+                        url: cityPath('notifications').slice(1),
                       },
                     },
                   },

@@ -49,6 +49,7 @@ import {
 } from '../map-main/geography/geography-graphql.service';
 import { StopArrivalsComponent } from '../map-main/components/stop-arrivals/stop-arrivals.component';
 import { NextTrainCardComponent } from '../next-train/components/next-train-card/next-train-card.component';
+import { CityContextService } from '../cities/city-context.service';
 import type {
   AgencyIdentity,
   BusFavoritesLookupResponse,
@@ -85,6 +86,7 @@ export class InsightsDashboardComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly platformId = inject(PLATFORM_ID);
   private readonly geographyService = inject(GeographyGraphQLService);
+  readonly cityContext = inject(CityContextService);
   private lastBusLookupKey = '';
 
   readonly favorites = this.favoritesService.favorites;
@@ -94,6 +96,10 @@ export class InsightsDashboardComponent {
   readonly mergedRailStations = signal<MergedRailStationInsight[]>([]);
   readonly loadingBusDetails = signal(false);
   readonly lookupError = signal<string | null>(null);
+
+  cityPath(path = ''): string {
+    return this.cityContext.path(path);
+  }
 
   readonly busRoutes = computed(() =>
     sortBusRoutesByAgency([...this.busRoutesById().values()]),

@@ -26,6 +26,8 @@ import { footerLinks } from '../footer/footer.component';
 import { filter, map } from 'rxjs';
 import { isPlatformBrowser } from '@angular/common';
 import { MapViewStateStorageService } from '../../../map-main/components/map/map-view-state-storage.service';
+import { CityContextService } from '../../../cities/city-context.service';
+import { getCity } from '@metro/shared/cities';
 
 @Component({
   selector: 'app-material-toolbar',
@@ -98,10 +100,15 @@ export class ToolbarComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly platformId = inject(PLATFORM_ID);
   private readonly mapViewStateStorage = inject(MapViewStateStorageService);
+  readonly cityContext = inject(CityContextService);
 
   private readonly _opened = signal(false);
 
   readonly opened = this._opened.asReadonly();
+
+  cityPath(path = ''): string {
+    return this.cityContext.path(path);
+  }
 
   private readonly queryParamMap = toSignal(this.route.queryParamMap, {
     initialValue: this.route.snapshot.queryParamMap,
@@ -154,7 +161,8 @@ export class ToolbarComponent {
     event.stopImmediatePropagation();
     this.closeSidenav();
 
-    const isOnMap = this.router.isActive(this.router.createUrlTree(['/mapa']), {
+    const mapCommands = [this.cityContext.path('/mapa')];
+    const isOnMap = this.router.isActive(this.router.createUrlTree(mapCommands), {
       paths: 'exact',
       queryParams: 'ignored',
       fragment: 'ignored',
@@ -163,13 +171,13 @@ export class ToolbarComponent {
 
     if (isOnMap) {
       this.mapViewStateStorage.requestDefaultState();
-      await this.router.navigate(['/mapa'], {
+      await this.router.navigate(mapCommands, {
         queryParams: this.mapViewStateStorage.getDefaultQueryParams(),
       });
       return;
     }
 
-    await this.router.navigate(['/mapa'], {
+    await this.router.navigate(mapCommands, {
       queryParams: (await this.mapViewStateStorage.hasLastState())
         ? this.mapViewStateStorage.getRestoreQueryParams()
         : this.mapViewStateStorage.getDefaultQueryParams(),
@@ -246,11 +254,16 @@ export class ToolbarComponent {
 
   private isWhitelistedBackPath(urlTree: UrlTree): boolean {
     const primaryRoute = urlTree.root.children['primary'];
-    const path = primaryRoute
-      ? `/${primaryRoute.segments.map((segment) => segment.path).join('/')}`
-      : '/';
+    const segments = primaryRoute?.segments ?? [];
+    if (segments.length === 0) return true;
+    if (!getCity(segments[0].path)) return false;
+    const relativeSegments = segments.slice(1);
+    const path = `/${relativeSegments.map((segment) => segment.path).join('/')}`;
 
-    return this.safeBackPaths.has(path);
+    return (
+      this.safeBackPaths.has(path) ||
+      /^\/itinerarios\/[^/]+\/[^/]+$/.test(path)
+    );
   }
 }
 

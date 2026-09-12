@@ -14,7 +14,11 @@ export class DashboardRouteReuseStrategy
   implements OnDestroy
 {
   private readonly browser = isPlatformBrowser(inject(PLATFORM_ID));
-  private stored: { route: Route; handle: DetachedRouteHandle } | null = null;
+  private stored: {
+    route: Route;
+    cityId: string | undefined;
+    handle: DetachedRouteHandle;
+  } | null = null;
 
   override shouldDetach(route: ActivatedRouteSnapshot): boolean {
     return this.browser && route.routeConfig?.data?.['preserveDashboard'] === true;
@@ -28,11 +32,26 @@ export class DashboardRouteReuseStrategy
       return;
     }
 
-    this.stored = handle ? { route: route.routeConfig, handle } : null;
+    const cityId = this.getCityId(route);
+    if (this.stored && this.stored.cityId !== cityId) {
+      destroyDetachedRouteHandle(this.stored.handle);
+    }
+
+    this.stored = handle
+      ? {
+          route: route.routeConfig,
+          cityId,
+          handle,
+        }
+      : null;
   }
 
   override shouldAttach(route: ActivatedRouteSnapshot): boolean {
-    return this.shouldDetach(route) && this.stored?.route === route.routeConfig;
+    return (
+      this.shouldDetach(route) &&
+      this.stored?.route === route.routeConfig &&
+      this.stored?.cityId === this.getCityId(route)
+    );
   }
 
   override retrieve(route: ActivatedRouteSnapshot): DetachedRouteHandle | null {
@@ -44,5 +63,16 @@ export class DashboardRouteReuseStrategy
       destroyDetachedRouteHandle(this.stored.handle);
       this.stored = null;
     }
+  }
+
+  private getCityId(route: ActivatedRouteSnapshot): string | undefined {
+    for (const snapshot of route.pathFromRoot) {
+      const cityId = snapshot.data['cityId'];
+      if (typeof cityId === 'string') {
+        return cityId;
+      }
+    }
+
+    return undefined;
   }
 }

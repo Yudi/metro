@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { haversineDistanceKm } from '../../common/utils/geo-distance.util';
+import { SAO_PAULO_CITY } from '@metro/shared/cities';
 import {
   getStationDisplayName,
   isStationMergeException,
@@ -9,7 +10,6 @@ import {
   LINE_AGENCY_MAPPING,
   getRailLineByCode,
   parseRailLineCode,
-  SAO_PAULO_CITY_CENTER,
 } from '@metro/shared/utils';
 import { TransitDataPrecomputeService } from '../../transit-data/transit-data-precompute.service';
 import {
@@ -303,14 +303,14 @@ export class RailStationProcessorService implements OnModuleInit {
       const closestDistance = haversineDistanceKm(
         closest.latitude,
         closest.longitude,
-        SAO_PAULO_CITY_CENTER.latitude,
-        SAO_PAULO_CITY_CENTER.longitude,
+        SAO_PAULO_CITY.map.center.latitude,
+        SAO_PAULO_CITY.map.center.longitude,
       );
       const currentDistance = haversineDistanceKm(
         current.latitude,
         current.longitude,
-        SAO_PAULO_CITY_CENTER.latitude,
-        SAO_PAULO_CITY_CENTER.longitude,
+        SAO_PAULO_CITY.map.center.latitude,
+        SAO_PAULO_CITY.map.center.longitude,
       );
       return currentDistance < closestDistance ? current : closest;
     });

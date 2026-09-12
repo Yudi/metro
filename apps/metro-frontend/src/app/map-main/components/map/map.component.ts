@@ -1,3 +1,4 @@
+import { CityContextService } from '../../../cities/city-context.service';
 import {
   AfterViewInit,
   Component,
@@ -35,11 +36,7 @@ import { MapFooterComponent } from './map-footer/map-footer.component';
 import { GeolocationService } from '@metro/shared/geolocation';
 import { ActivatedRoute } from '@angular/router';
 import { UserLocationLayerService } from './user-location-layer.service';
-import {
-  DEFAULT_MAP_CENTER,
-  DEFAULT_MAP_ZOOM,
-  MapRouteStateService,
-} from './map-route-state.service';
+import { MapRouteStateService } from './map-route-state.service';
 
 @Component({
   selector: 'app-map',
@@ -56,6 +53,7 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MapComponent implements AfterViewInit, OnDestroy {
+  readonly cityContext = inject(CityContextService);
   @ViewChild('popupContainer', { static: true }) popupContainer!: ElementRef;
 
   private mapService = inject(MapService);
@@ -105,10 +103,6 @@ export class MapComponent implements AfterViewInit, OnDestroy {
   readonly zoomLevel = this.mapService.zoomLevel;
 
   readonly isDevMode = isDevMode();
-
-  /** Default view used when no explicit center is provided via query params */
-  static readonly DEFAULT_CENTER: [number, number] = [...DEFAULT_MAP_CENTER];
-  static readonly DEFAULT_ZOOM = DEFAULT_MAP_ZOOM;
 
   constructor() {
     this.railService
@@ -229,8 +223,8 @@ export class MapComponent implements AfterViewInit, OnDestroy {
     if (cptmVehicleLayer) additionalLayers.push(cptmVehicleLayer);
 
     const options: MapOptions = {
-      center: MapComponent.DEFAULT_CENTER, // São Paulo coordinates
-      zoom: MapComponent.DEFAULT_ZOOM,
+      center: this.cityContext.center(),
+      zoom: this.cityContext.city().map.zoom,
       showControls: true,
       additionalLayers,
     };
@@ -298,8 +292,8 @@ export class MapComponent implements AfterViewInit, OnDestroy {
     this.displayService.fitToAllFeatures();
   }
 
-  centerOnSaoPaulo(): void {
-    this.displayService.centerOnSaoPaulo();
+  centerOnCity(): void {
+    this.displayService.centerOnCity();
   }
 
   async centerOnUserLocation(): Promise<void> {

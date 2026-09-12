@@ -49,7 +49,7 @@
             @if (item.route) {
               <a
                 mat-list-item
-                [routerLink]="item.route"
+                [routerLink]="cityPath(item.route)"
                 [queryParams]="item.queryParams"
               >
                 <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>

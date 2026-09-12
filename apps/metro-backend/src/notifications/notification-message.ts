@@ -1,3 +1,4 @@
+import { cityPath } from '@metro/shared/cities';
 import { createHash } from 'node:crypto';
 import { parseRailLineCode } from '@metro/shared/utils';
 import {
@@ -126,7 +127,7 @@ export function buildNotificationMessage(
             },
             settings: {
               operation: 'navigateLastFocusedOrOpen',
-              url: 'notifications',
+              url: cityPath('notifications').slice(1),
             },
           },
         },
@@ -253,7 +254,7 @@ export function buildAggregatedRailStatusMessage(
             },
             settings: {
               operation: 'navigateLastFocusedOrOpen',
-              url: 'notifications',
+              url: cityPath('notifications').slice(1),
             },
           },
         },

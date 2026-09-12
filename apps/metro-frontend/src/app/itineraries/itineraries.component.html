@@ -76,7 +76,11 @@
               {{ agency() }}
             </p>
           </div>
-          <a mat-stroked-button routerLink="/mapa" [queryParams]="mapParams()">
+          <a
+            mat-stroked-button
+            [routerLink]="cityPath('/mapa')"
+            [queryParams]="mapParams()"
+          >
             <mat-icon>map</mat-icon>Ver no mapa
           </a>
         </header>

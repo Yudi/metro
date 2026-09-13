@@ -35,6 +35,10 @@ import {
   SpecialRailService,
 } from '@metro/shared/utils';
 
+type LiteSpecialRailService = Pick<SpecialRailService, 'code'> & {
+  stations: Pick<SpecialRailService['stations'][number], 'stationCode' | 'name'>[];
+};
+
 /**
  * Minimal search service for lite frontend
  * Uses direct HTTP calls instead of complex dependencies
@@ -50,7 +54,7 @@ export class LiteSearchService {
   readonly selectedStop = signal<LiteSearchStop | null>(null);
   readonly isLoading = signal(false);
   readonly isNearbyMode = signal(false);
-  readonly specialRailServices = signal<SpecialRailService[]>([]);
+  readonly specialRailServices = signal<LiteSpecialRailService[]>([]);
 
   // Computed states
   readonly hasResults = computed(() => this.lastResults().length > 0);
@@ -234,19 +238,14 @@ export class LiteSearchService {
     ];
   }
 
-  private fetchSpecialRailServices(): Observable<SpecialRailService[]> {
+  private fetchSpecialRailServices(): Observable<LiteSpecialRailService[]> {
     const query = `
       query LiteSpecialRailServices {
         railSpecialServices {
           code
-          name
-          colorHex
-          textColorHex
           stations {
             stationCode
             name
-            latitude
-            longitude
           }
         }
       }
@@ -254,7 +253,7 @@ export class LiteSearchService {
 
     return this.http
       .post<
-        GraphQLResponse<{ railSpecialServices: SpecialRailService[] }>
+        GraphQLResponse<{ railSpecialServices: LiteSpecialRailService[] }>
       >(`${this.baseUrl}/graphql`, { query })
       .pipe(
         map((response) => response.data?.railSpecialServices ?? []),
@@ -297,7 +296,6 @@ export class LiteSearchService {
           scheduledServices {
             destinationCode
             destinationName
-            originStationCode
             originStationName
             nextDepartureAt
             nextArrivalAt
@@ -311,10 +309,6 @@ export class LiteSearchService {
           headway {
             direction
             averageSeconds
-            sampleCount
-            bucket
-            bucketLabel
-            isFallback
           }
           operationClosed
           outOfSchedule
@@ -364,19 +358,14 @@ export class LiteSearchService {
         ) {
           routeId
           routeShortName
-          routeLongName
           directions {
             directionId
             headsign
             stations {
               id
               name
-              agencies
               lines
               distanceMeters
-              nearStopId
-              nearStopName
-              stopSequence
             }
           }
         }
@@ -415,7 +404,6 @@ export class LiteSearchService {
           headsign
           directionId
           departureTime
-          sourceAgency
           platformCode
         }
       }

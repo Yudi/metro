@@ -6,7 +6,7 @@ import type {
   TypesenseRoute,
   TypesenseSearchResult,
 } from '../search/typesense-search.service';
-import type { PublishedRouteInformation } from '@metro/shared/bus-itinerary-contracts';
+import type { PublishedItinerary } from './itineraries.service';
 import type { ItineraryPattern, RouteItinerary } from './itineraries.service';
 
 function scheduledTimes(
@@ -25,27 +25,13 @@ function scheduledTimes(
   );
 }
 
-function stops(
-  prefix: string,
-  names: readonly string[],
-  latitude: number,
-  longitude: number,
-): ItineraryPattern['stops'] {
-  return names.map((name, index) => ({
-    id: `${prefix}-${index + 1}`,
-    name,
-    sequence: index + 1,
-    latitude: latitude - index * 0.008,
-    longitude: longitude - index * 0.006,
-  }));
-}
 
 function frequency(
   startTime: string,
   endTime: string,
   headwaySeconds: number,
 ): ItineraryPattern['intervals'][number] {
-  return { startTime, endTime, headwaySeconds, exactTimes: false };
+  return { startTime, endTime, headwaySeconds };
 }
 
 function pattern(
@@ -61,7 +47,7 @@ function pattern(
     id,
     directionId,
     headsign,
-    stops: stops(id, stopNames, -23.505, -46.625),
+    stops: stopNames.map((name) => ({ name })),
     departures,
     intervals,
     durationMinutes,
@@ -71,10 +57,8 @@ function pattern(
 export const SPTRANS_ROUTE: TypesenseRoute = {
   id: 'sptrans:477A-10',
   route_id: '477A-10',
-  agency_id: 'sptrans',
   route_short_name: '477A-10',
   route_long_name: 'Sacomã – Pinheiros',
-  route_type: 3,
   route_color: '0066CC',
   route_text_color: 'FFFFFF',
   source: 'gtfs',
@@ -87,10 +71,8 @@ export const SPTRANS_ROUTE: TypesenseRoute = {
 export const ARTESP_ROUTE: TypesenseRoute = {
   id: 'artesp:001',
   route_id: 'artesp:001',
-  agency_id: 'artesp',
   route_short_name: '001',
   route_long_name: 'Terminal Regional – Centro',
-  route_type: 3,
   route_color: 'C90C0F',
   route_text_color: 'FFFFFF',
   source: 'gtfs',
@@ -102,7 +84,6 @@ export const ARTESP_ROUTE: TypesenseRoute = {
 
 export const SPTRANS_ITINERARY: RouteItinerary = {
   status: 'AVAILABLE',
-  serviceDate: '2026-09-07',
   operatorName: 'SPTrans (dados ilustrativos)',
   route: {
     routeId: SPTRANS_ROUTE.route_id,
@@ -159,7 +140,6 @@ export const SPTRANS_ITINERARY: RouteItinerary = {
 
 export const ARTESP_ITINERARY: RouteItinerary = {
   status: 'AVAILABLE',
-  serviceDate: '2026-09-07',
   operatorName: 'Operadora regional (dados ilustrativos)',
   route: {
     routeId: ARTESP_ROUTE.route_id,
@@ -194,16 +174,13 @@ export const ARTESP_ITINERARY: RouteItinerary = {
 
 export const UNAVAILABLE_ITINERARY: RouteItinerary = {
   status: 'UNAVAILABLE',
-  serviceDate: '2026-09-07',
   operatorName: null,
   route: null,
   patterns: [],
 };
 
-export const SPTRANS_PUBLISHED: PublishedRouteInformation = {
+export const SPTRANS_PUBLISHED: PublishedItinerary = {
   status: 'AVAILABLE',
-  routeCode: SPTRANS_ROUTE.route_id,
-  lastUpdated: '2026-09-07T12:00:00-03:00',
   operatorName: 'SPTrans (dados ilustrativos)',
   consortiumName: 'Consórcio Exemplo',
   days: [
@@ -299,10 +276,8 @@ export const SPTRANS_PUBLISHED: PublishedRouteInformation = {
   ],
 };
 
-export const UNAVAILABLE_PUBLISHED: PublishedRouteInformation = {
+export const UNAVAILABLE_PUBLISHED: PublishedItinerary = {
   status: 'UNAVAILABLE',
-  routeCode: SPTRANS_ROUTE.route_id,
-  lastUpdated: null,
   operatorName: null,
   consortiumName: null,
   days: [],
@@ -329,8 +304,6 @@ export const SPTRANS_NOTICES: BusNoticesResult = {
         '07/09/2026, das 9h às 20h.\nMotivo: evento ilustrativo na via.\n477A-10\nIda: embarque provisório na Av. Rebouças durante a interdição.\nVolta: embarque provisório na Rua Augusta.',
       routes: ['477A-10'],
       periodText: '07/09/2026, das 9h às 20h.',
-      listedDate: '7 de setembro de 2026',
-      listing: 'RECENT',
     } satisfies OperationalNotice,
   ],
 };

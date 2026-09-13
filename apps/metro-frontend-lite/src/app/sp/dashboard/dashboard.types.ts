@@ -1,9 +1,13 @@
 import type {
   FavoriteRailLineOption,
-  DirectionHeadway,
   RailLinesStatusResponse,
-  RailScheduledService,
+  RailLineStatus,
+  SpecialRailLineStatus,
 } from '@metro/shared/utils';
+import type {
+  LiteDirectionHeadway,
+  LiteRailScheduledService,
+} from '../../shared/search/lite-search.types';
 import type { LiteNextTrainArrival } from '../../shared/search/lite-search.service';
 
 export interface BusRouteInsight {
@@ -26,12 +30,8 @@ export interface LiteAgencyDisplay {
 }
 
 export interface BusStopInsight {
-  id: string;
   stopId: string;
   name: string;
-  latitude: number;
-  longitude: number;
-  isSubwayStation: boolean;
   agencies?: string[];
   routeShortNames: string[];
   sourceAgency?: string;
@@ -41,7 +41,6 @@ export interface BusStopInsight {
 }
 
 export interface BusRouteGraphQL {
-  id: string;
   routeId: string;
   shortName: string;
   longName: string;
@@ -57,12 +56,8 @@ export interface BusFavoritesLookupResponse {
   data?: {
     multipleBusRoutes: BusRouteInsight[];
     multipleBusStops: Array<{
-      id: string;
       stopId: string;
       name: string;
-      latitude: number;
-      longitude: number;
-      isSubwayStation: boolean;
       agencies?: string[];
       routeShortNames?: string[];
       sourceAgency?: string;
@@ -90,9 +85,9 @@ export interface RailNextTrainGroup {
   key: string;
   stationName: string;
   line: FavoriteRailLineOption;
-  trains: LiteNextTrainArrival[];
-  scheduledServices?: RailScheduledService[];
-  headway?: DirectionHeadway[];
+  trains: Omit<LiteNextTrainArrival, 'lineCode' | 'stationCode'>[];
+  scheduledServices?: LiteRailScheduledService[];
+  headway?: LiteDirectionHeadway[];
   operationClosed?: boolean;
   outOfSchedule?: boolean;
   hasError?: boolean;
@@ -104,19 +99,31 @@ export interface RoutesForStopResponse {
   };
 }
 
+export interface DashboardRailStatus {
+  lastUpdated: RailLinesStatusResponse['lastUpdated'];
+  lines: Pick<
+    RailLineStatus,
+    'code' | 'statusLabel' | 'statusColor' | 'description' | 'detail'
+  >[];
+  specialLines?: Pick<
+    SpecialRailLineStatus,
+    'code' | 'colorHex' | 'line' | 'statusLabel' | 'nextDepartures'
+  >[];
+}
+
 export interface RailStatusResponse {
   data?: {
-    railLinesStatus: RailLinesStatusResponse;
-    railSpecialLinesStatus?: RailLinesStatusResponse['specialLines'];
+    railLinesStatus: DashboardRailStatus;
+    railSpecialLinesStatus?: DashboardRailStatus['specialLines'];
   };
 }
 
 export interface NextTrainsResponse {
   data?: {
     nextTrains: {
-      trains: LiteNextTrainArrival[];
-      scheduledServices?: RailScheduledService[];
-      headway?: DirectionHeadway[];
+      trains: Omit<LiteNextTrainArrival, 'lineCode' | 'stationCode'>[];
+      scheduledServices?: LiteRailScheduledService[];
+      headway?: LiteDirectionHeadway[];
       operationClosed?: boolean;
       outOfSchedule?: boolean;
       hasError?: boolean;

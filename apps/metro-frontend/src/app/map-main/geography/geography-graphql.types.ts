@@ -25,7 +25,6 @@ export interface BusRouteGraphQL {
   routeId: string;
   shortName: string;
   longName: string;
-  routeType: number;
   color: string;
   textColor: string;
   sourceAgency?: string;
@@ -68,12 +67,8 @@ export interface RouteFullDataGraphQL {
 export interface RouteRailConnectionStationGraphQL {
   id: string;
   name: string;
-  agencies: string[];
   lines: string[];
   distanceMeters: number;
-  nearStopId: string;
-  nearStopName: string;
-  stopSequence: number;
 }
 
 export interface RouteRailConnectionDirectionGraphQL {
@@ -85,7 +80,6 @@ export interface RouteRailConnectionDirectionGraphQL {
 export interface RouteRailConnectionGraphQL {
   routeId: string;
   routeShortName: string;
-  routeLongName: string;
   directions: RouteRailConnectionDirectionGraphQL[];
 }
 
@@ -96,7 +90,6 @@ export interface ScheduledBusDepartureGraphQL {
   headsign: string;
   directionId: number;
   departureTime: string;
-  sourceAgency: string;
   platformCode?: string;
 }
 

@@ -206,7 +206,6 @@ export class RailGraphqlService {
             statusLabel
             statusColor
             description
-            incidentCategory
             detail
           }
           lastUpdated
@@ -303,7 +302,6 @@ export class RailGraphqlService {
           statusLabel
           statusColor
           description
-          incidentCategory
           detail
         }
       }

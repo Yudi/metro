@@ -9,8 +9,6 @@ export interface OperationalNotice {
   description: string;
   routes: string[];
   periodText: string;
-  listedDate: string;
-  listing: string;
 }
 export interface BusNoticesResult {
   status: string;
@@ -25,7 +23,7 @@ export class BusInformationService {
     return this.query<BusNoticesResult>(
       'busOperationalNotices',
       routeCodes,
-      'status lastUpdated notices { sourceId sourceUrl title description routes periodText listedDate listing }',
+      'status lastUpdated notices { sourceId sourceUrl title description routes periodText }',
     );
   }
 

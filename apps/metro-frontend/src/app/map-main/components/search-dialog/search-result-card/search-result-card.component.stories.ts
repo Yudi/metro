@@ -14,7 +14,6 @@ function toSearchResult(route: {
   routeId: string;
   shortName: string;
   longName: string;
-  routeType: number;
   color: string;
   textColor: string;
   sourceAgency?: string;
@@ -25,10 +24,8 @@ function toSearchResult(route: {
   const routeData: TypesenseRoute = {
     id: route.id,
     route_id: route.routeId,
-    agency_id: route.sourceAgency ?? '',
     route_short_name: route.shortName,
     route_long_name: route.longName,
-    route_type: route.routeType,
     route_color: route.color,
     route_text_color: route.textColor,
     source: 'gtfs',

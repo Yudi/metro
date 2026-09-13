@@ -132,7 +132,6 @@ export class GeographyGraphQLService {
           routeId
           shortName
           longName
-          routeType
           color
           textColor
           sourceAgency
@@ -162,7 +161,6 @@ export class GeographyGraphQLService {
           routeId
           shortName
           longName
-          routeType
           color
           textColor
           sourceAgency
@@ -286,7 +284,6 @@ export class GeographyGraphQLService {
           routeId
           shortName
           longName
-          routeType
           color
           textColor
           sourceAgency
@@ -399,19 +396,14 @@ export class GeographyGraphQLService {
         ) {
           routeId
           routeShortName
-          routeLongName
           directions {
             directionId
             headsign
             stations {
               id
               name
-              agencies
               lines
               distanceMeters
-              nearStopId
-              nearStopName
-              stopSequence
             }
           }
         }
@@ -439,7 +431,6 @@ export class GeographyGraphQLService {
           headsign
           directionId
           departureTime
-          sourceAgency
           platformCode
         }
       }

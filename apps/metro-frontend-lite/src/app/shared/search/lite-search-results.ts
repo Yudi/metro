@@ -22,7 +22,6 @@ export function processLiteSearchResults(
           routeId: route.route_id,
           shortName: route.route_short_name,
           longName: route.route_long_name,
-          routeType: route.route_type,
           color: route.route_color || '2563eb',
           textColor: route.route_text_color || 'ffffff',
           sourceAgency: route.sourceAgency || undefined,

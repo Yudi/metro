@@ -15,12 +15,8 @@ export const BUS_FAVORITES_LOOKUP_QUERY = `
       }
     }
     multipleBusStops(ids: $stopIds) {
-      id
       stopId
       name
-      latitude
-      longitude
-      isSubwayStation
       agencies
       routeShortNames
       sourceAgency

@@ -37,7 +37,6 @@ export function convertToBusRoute(graphqlRoute: BusRouteGraphQL): MapFeature {
       routeId: graphqlRoute.routeId,
       shortName: graphqlRoute.shortName,
       longName: graphqlRoute.longName,
-      routeType: graphqlRoute.routeType,
       color: graphqlRoute.color,
       textColor: graphqlRoute.textColor,
       sourceAgency: graphqlRoute.sourceAgency,

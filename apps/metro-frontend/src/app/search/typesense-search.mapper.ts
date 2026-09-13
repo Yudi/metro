@@ -1,7 +1,6 @@
 import { getLineCodeByColorName, getRailLineByCode } from '@metro/shared/utils';
 import type {
   SearchGraphQLResult,
-  SearchHighlightResult,
   TypesenseSearchResponse,
   TypesenseSearchResult,
 } from './typesense-search.types';
@@ -12,19 +11,14 @@ export function mapTypesenseSearchResponse(
 ): TypesenseSearchResponse {
   const mappedResults = results
     .map((result): TypesenseSearchResult | null => {
-      const highlights = mapHighlights(result.highlights);
-      const text_match = result.score ?? undefined;
-
       if (result.__typename === 'SearchBusRoute') {
         return {
           type: 'route',
           document: {
             id: result.route_id,
             route_id: result.route_id,
-            agency_id: '',
             route_short_name: result.route_short_name,
             route_long_name: result.route_long_name,
-            route_type: result.route_type,
             route_color: result.route_color || '',
             route_text_color: result.route_text_color || '',
             source: 'gtfs',
@@ -33,8 +27,6 @@ export function mapTypesenseSearchResponse(
             supportsRealtime: result.supportsRealtime ?? undefined,
             fares: result.fares || undefined,
           },
-          highlights,
-          text_match,
         };
       }
 
@@ -57,10 +49,8 @@ export function mapTypesenseSearchResponse(
             routes: (result.routes || []).map((route) => ({
               id: route.id,
               route_id: route.route_id,
-              agency_id: '',
               route_short_name: route.route_short_name,
               route_long_name: route.route_long_name,
-              route_type: route.route_type,
               route_color: route.route_color || '',
               route_text_color: route.route_text_color || '',
               sourceAgency: route.sourceAgency || undefined,
@@ -69,8 +59,6 @@ export function mapTypesenseSearchResponse(
               fares: route.fares || undefined,
             })),
           },
-          highlights,
-          text_match,
         };
       }
 
@@ -81,16 +69,12 @@ export function mapTypesenseSearchResponse(
           document: {
             id: lineCode,
             route_id: lineCode,
-            agency_id: result.agency,
             route_short_name: lineCode,
             route_long_name: result.line_fullname,
-            route_type: 2,
             route_color: '',
             route_text_color: '',
             source: 'rail',
           },
-          highlights,
-          text_match,
         };
       }
 
@@ -113,8 +97,6 @@ export function mapTypesenseSearchResponse(
             is_subway_station: true,
             source: 'gpkg',
           },
-          highlights,
-          text_match,
         };
       }
 
@@ -129,8 +111,6 @@ export function mapTypesenseSearchResponse(
             stop_lon: result.bikeLongitude,
             source: 'bike',
           },
-          highlights,
-          text_match,
         };
       }
 
@@ -161,14 +141,4 @@ function getRailLineNamesFromAliases(aliases: string[]): string[] {
     .sort((a, b) => a - b)
     .map((code) => getRailLineByCode(code)?.colorName)
     .filter((lineName): lineName is string => lineName !== undefined);
-}
-
-function mapHighlights(
-  highlights?: SearchHighlightResult[] | null,
-): Record<string, string[]> | undefined {
-  if (!highlights?.length) return undefined;
-  return highlights.reduce<Record<string, string[]>>((acc, highlight) => {
-    acc[highlight.field] = [...(acc[highlight.field] || []), highlight.snippet];
-    return acc;
-  }, {});
 }

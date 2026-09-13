@@ -1,5 +1,3 @@
-import type { SearchTypes } from '@metro/shared/utils';
-
 export interface NextArrivalComponentSearchResult {
   data?: {
     search: NextArrivalSearchItem[];
@@ -13,12 +11,6 @@ interface NextArrivalSearchItemBase {
     | 'SearchBusRoute'
     | 'SearchRailLine'
     | 'SearchBikeStation';
-  type: SearchTypes;
-  score?: number | null;
-  highlights?: {
-    field: string;
-    snippet: string;
-  }[];
 }
 
 export type NextArrivalSearchItem =
@@ -48,7 +40,6 @@ interface BusRouteResult extends NextArrivalSearchItemBase {
 
 interface BusStopResult extends NextArrivalSearchItemBase {
   __typename: 'SearchBusStop';
-  id: string;
   stop_id: string;
   stop_name: string;
   stop_desc: string | null;
@@ -59,7 +50,6 @@ interface BusStopResult extends NextArrivalSearchItemBase {
   platformCode?: string | null;
   mergedStopIds?: string[] | null;
   routes: {
-    route_id?: string;
     route_short_name: string;
   }[];
 }
@@ -86,9 +76,6 @@ export const STOP_SEARCH_QUERY = `
       search(input: $input) {
         __typename
         ... on SearchBusStop {
-          id
-          type
-          score
           stop_id
           stop_name
           stop_desc
@@ -99,27 +86,16 @@ export const STOP_SEARCH_QUERY = `
           platformCode
           mergedStopIds
           routes {
-            route_id
             route_short_name
-          }
-          highlights {
-            field
-            snippet
           }
         }
         ... on SearchRailStation {
           id
-          type
-          score
           station_code
           station_name
           station_aliases
           latitude
           longitude
-          highlights {
-            field
-            snippet
-          }
         }
       }
     }

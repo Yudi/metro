@@ -376,12 +376,8 @@ export class InsightsDashboardComponent {
         const stopsById = new Map<string, BusStopInsight>();
         for (const stop of response.data.multipleBusStops) {
           const mappedStop = {
-            id: stop.id,
             stopId: stop.stopId,
             name: stop.name,
-            latitude: stop.latitude,
-            longitude: stop.longitude,
-            isSubwayStation: stop.isSubwayStation,
             agencies: stop.agencies,
             routeShortNames: stop.routeShortNames ?? [],
             sourceAgency: stop.sourceAgency,
@@ -411,12 +407,8 @@ export class InsightsDashboardComponent {
             stopIds.map((id) => [
               id,
               stopsById.get(id) ?? {
-                id,
                 stopId: id,
                 name: id,
-                latitude: 0,
-                longitude: 0,
-                isSubwayStation: false,
                 routeShortNames: [],
               },
             ]),

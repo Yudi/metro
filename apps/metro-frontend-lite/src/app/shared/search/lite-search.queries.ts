@@ -1,7 +1,6 @@
 export const LITE_SEARCH_QUERY = `
     query LiteSearch($input: SearchFiltersInput!) {
       search(input: $input) {
-        __typename
         ... on SearchBusStop {
           id
           type
@@ -18,7 +17,6 @@ export const LITE_SEARCH_QUERY = `
             route_id
             route_short_name
             route_long_name
-            route_type
             route_color
             route_text_color
             sourceAgency
@@ -54,7 +52,6 @@ export const LITE_SEARCH_QUERY = `
 export const LITE_NEARBY_QUERY = `
     query LiteNearbyStops($input: NearbyStopsInput!) {
       nearbyStops(input: $input) {
-        __typename
         ... on SearchBusStop {
           id
           type
@@ -71,7 +68,6 @@ export const LITE_NEARBY_QUERY = `
             route_id
             route_short_name
             route_long_name
-            route_type
             route_color
             route_text_color
             sourceAgency

@@ -20,7 +20,6 @@ const routes: LiteBusRoute[] = [
     routeId: '477A-10',
     shortName: '477A-10',
     longName: 'Sacoma - Terminal Pinheiros',
-    routeType: 3,
     color: '2563eb',
     textColor: 'ffffff',
   },
@@ -29,7 +28,6 @@ const routes: LiteBusRoute[] = [
     routeId: '875A-10',
     shortName: '875A-10',
     longName: 'Aeroporto - Perdizes',
-    routeType: 3,
     color: '16a34a',
     textColor: 'ffffff',
   },
@@ -38,7 +36,6 @@ const routes: LiteBusRoute[] = [
     routeId: '847P-10',
     shortName: '847P-10',
     longName: 'Term. Pirituba - Vl. Olímpia',
-    routeType: 3,
     color: '006341',
     textColor: 'ffffff',
   },
@@ -118,7 +115,6 @@ const railConnections: LiteRouteRailConnection[] = [
   {
     routeId: '477A-10',
     routeShortName: '477A-10',
-    routeLongName: 'Sacoma - Terminal Pinheiros',
     directions: [
       {
         directionId: 0,
@@ -127,12 +123,8 @@ const railConnections: LiteRouteRailConnection[] = [
           {
             id: 'pinheiros-l4',
             name: 'Pinheiros',
-            agencies: ['ViaQuatro'],
             lines: ['Linha 4 - Amarela', 'Linha 9 - Esmeralda'],
             distanceMeters: 70,
-            nearStopId: '701441',
-            nearStopName: 'Parada Cardeal Arcoverde',
-            stopSequence: 4,
           },
         ],
       },
@@ -141,7 +133,6 @@ const railConnections: LiteRouteRailConnection[] = [
   {
     routeId: '847P-10',
     routeShortName: '847P-10',
-    routeLongName: 'Term. Pirituba - Vl. Olímpia',
     directions: [
       {
         directionId: 0,
@@ -155,12 +146,8 @@ const railConnections: LiteRouteRailConnection[] = [
           {
             id: 'vila-madalena-l2',
             name: 'Vila Madalena',
-            agencies: ['Metrô'],
             lines: ['Verde'],
             distanceMeters: 131,
-            nearStopId: '6311025',
-            nearStopName: 'R. Cristovão de Burgos, 54',
-            stopSequence: 26,
           },
         ],
       },

@@ -13,7 +13,7 @@ export interface BusRouteInsight {
   fares?: Array<{ price: number; currency: string }>;
 }
 
-export interface BusStopInsight extends BusStopGraphQL {
+export interface BusStopInsight extends Omit<BusStopGraphQL, 'id' | 'latitude' | 'longitude' | 'isSubwayStation'> {
   routeShortNames: string[];
 }
 
@@ -39,12 +39,8 @@ export interface BusFavoritesLookupResponse {
   data: {
     multipleBusRoutes: BusRouteInsight[];
     multipleBusStops: Array<{
-      id: string;
       stopId: string;
       name: string;
-      latitude: number;
-      longitude: number;
-      isSubwayStation: boolean;
       agencies?: string[];
       routeShortNames?: string[];
       sourceAgency?: string;

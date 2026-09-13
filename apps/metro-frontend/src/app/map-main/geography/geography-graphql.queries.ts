@@ -19,7 +19,6 @@ export const ROUTE_FIELDS = `
     routeId
     shortName
     longName
-    routeType
     color
     textColor
     sourceAgency

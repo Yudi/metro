@@ -4,30 +4,29 @@ import { map, timeout } from 'rxjs';
 import type { BusFare } from '@metro/shared/utils';
 import type { PublishedRouteInformation } from '@metro/shared/bus-itinerary-contracts';
 
+export type PublishedItinerary = Omit<
+  PublishedRouteInformation,
+  'routeCode' | 'lastUpdated'
+>;
+
 export interface ItineraryPattern {
   id: string;
   directionId: number | null;
   headsign: string;
   stops: {
-    id: string;
     name: string;
-    sequence: number;
-    latitude: number;
-    longitude: number;
   }[];
   departures: string[];
   intervals: {
     startTime: string;
     endTime: string;
     headwaySeconds: number;
-    exactTimes: boolean;
   }[];
   durationMinutes: number | null;
 }
 
 export interface RouteItinerary {
   status: string;
-  serviceDate: string;
   operatorName: string | null;
   route: {
     routeId: string;
@@ -48,12 +47,12 @@ export class ItinerariesService {
   published(routeId: string) {
     return this.http
       .post<{
-        data?: { busPublishedRouteInformation: PublishedRouteInformation };
+        data?: { busPublishedRouteInformation: PublishedItinerary };
         errors?: unknown[];
       }>('/api/graphql', {
         query: `query BusPublishedRouteInformation($routeId: String!) {
         busPublishedRouteInformation(routeId: $routeId) {
-          status routeCode lastUpdated operatorName consortiumName
+          status operatorName consortiumName
           days {
             kind directions {
               id headsign departures startTime endTime
@@ -87,12 +86,12 @@ export class ItinerariesService {
       }>('/api/graphql', {
         query: `query BusRouteItinerary($routeId: String!, $serviceDate: String!) {
         busRouteItinerary(routeId: $routeId, serviceDate: $serviceDate) {
-          status serviceDate operatorName
+          status operatorName
           route { routeId shortName longName sourceAgency color textColor fares { price currency } }
           patterns {
             id directionId headsign durationMinutes departures
-            stops { id name sequence latitude longitude }
-            intervals { startTime endTime headwaySeconds exactTimes }
+            stops { name }
+            intervals { startTime endTime headwaySeconds }
           }
         }
       }`,

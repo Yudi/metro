@@ -15,7 +15,6 @@ export interface LiteBusRoute {
   routeId: string;
   shortName: string;
   longName: string;
-  routeType: number;
   color: string;
   textColor: string;
   sourceAgency?: string;
@@ -65,10 +64,19 @@ export interface LiteNextTrainArrival {
   isAtPlatform: boolean;
 }
 
+export type LiteRailScheduledService = Omit<
+  RailScheduledService,
+  'originStationCode'
+>;
+export type LiteDirectionHeadway = Pick<
+  DirectionHeadway,
+  'direction' | 'averageSeconds'
+>;
+
 export interface LiteNextTrainsResult {
   trains: LiteNextTrainArrival[];
-  scheduledServices: RailScheduledService[];
-  headway?: DirectionHeadway[];
+  scheduledServices: LiteRailScheduledService[];
+  headway?: LiteDirectionHeadway[];
   operationClosed?: boolean;
   outOfSchedule?: boolean;
   hasError?: boolean;
@@ -85,12 +93,8 @@ export interface NextTrainStationInfo {
 export interface LiteRouteRailConnectionStation {
   id: string;
   name: string;
-  agencies: string[];
   lines: string[];
   distanceMeters: number;
-  nearStopId: string;
-  nearStopName: string;
-  stopSequence: number;
 }
 
 export interface LiteRouteRailConnectionDirection {
@@ -102,7 +106,6 @@ export interface LiteRouteRailConnectionDirection {
 export interface LiteRouteRailConnection {
   routeId: string;
   routeShortName: string;
-  routeLongName: string;
   directions: LiteRouteRailConnectionDirection[];
 }
 
@@ -111,7 +114,6 @@ export interface GraphQLResponse<T> {
 }
 
 export interface SearchGraphQLResult {
-  __typename: string;
   id: string;
   type: LiteSearchResultKind;
   score?: number | null;
@@ -140,7 +142,6 @@ export interface LiteBusRouteGraphQL {
   route_id: string;
   route_short_name: string;
   route_long_name: string;
-  route_type: number;
   route_color?: string | null;
   route_text_color?: string | null;
   sourceAgency?: string | null;
@@ -156,7 +157,6 @@ export interface LiteScheduledBusDeparture {
   headsign: string;
   directionId: number;
   departureTime: string;
-  sourceAgency: string;
   platformCode?: string;
 }
 

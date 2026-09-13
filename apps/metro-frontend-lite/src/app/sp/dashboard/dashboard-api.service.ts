@@ -1,16 +1,14 @@
 import { HttpClient } from '@angular/common/http';
 import { Service, inject } from '@angular/core';
 import { API_BASE_URL } from '@metro/shared/api';
-import type {
-  ExtendedNextTrainLineCode,
-  RailLinesStatusResponse,
-} from '@metro/shared/utils';
+import type { ExtendedNextTrainLineCode } from '@metro/shared/utils';
 import { catchError, firstValueFrom, map, of } from 'rxjs';
 import type { LiteScheduledBusDeparture } from '../../shared/search/lite-search.service';
 import type {
   BusFavoritesLookupResponse,
   MergedRailStationInsight,
   RailStatusResponse,
+  DashboardRailStatus,
   RoutesForStopResponse,
   NextTrainsResponse,
 } from './dashboard.types';
@@ -45,12 +43,8 @@ export class DashboardApiService {
               }
             }
             multipleBusStops(ids: $stopIds) {
-              id
               stopId
               name
-              latitude
-              longitude
-              isSubwayStation
               agencies
               routeShortNames
               sourceAgency
@@ -96,35 +90,21 @@ export class DashboardApiService {
             railLinesStatus {
               lines {
                 code
-                colorName
-                colorHex
-                line
-                statusCode
                 statusLabel
                 statusColor
                 description
                 detail
               }
               lastUpdated
-              success
-              errorMessage
             }
             railSpecialLinesStatus {
               code
-              colorName
               colorHex
               line
-              statusCode
               statusLabel
-              statusColor
               nextDepartures {
                 label
                 time
-              }
-              issues {
-                code
-                line
-                description
               }
             }
           }
@@ -135,10 +115,7 @@ export class DashboardApiService {
           ...(response.data?.railLinesStatus ?? {
             lines: [],
             specialLines: [],
-            specialInfoCards: [],
             lastUpdated: new Date(),
-            success: false,
-            errorMessage: null,
           }),
           specialLines: response.data?.railSpecialLinesStatus ?? [],
           lastUpdated: new Date(
@@ -149,11 +126,8 @@ export class DashboardApiService {
           of({
             lines: [],
             specialLines: [],
-            specialInfoCards: [],
             lastUpdated: new Date(),
-            success: false,
-            errorMessage: 'Erro ao carregar status das linhas.',
-          } satisfies RailLinesStatusResponse),
+          } satisfies DashboardRailStatus),
         ),
       );
   }
@@ -164,7 +138,6 @@ export class DashboardApiService {
         query: `
           query LiteDashboardRoutesForStop($stopId: String!) {
             routesForStop(stopId: $stopId) {
-              id
               routeId
               shortName
               longName
@@ -195,8 +168,6 @@ export class DashboardApiService {
           query LiteDashboardNextTrains($lineCode: String!, $stationCode: String!) {
             nextTrains(lineCode: $lineCode, stationCode: $stationCode) {
               trains {
-                lineCode
-                stationCode
                 destinationCode
                 destinationName
                 arrivalTime
@@ -205,7 +176,6 @@ export class DashboardApiService {
               scheduledServices {
                 destinationCode
                 destinationName
-                originStationCode
                 originStationName
                 nextDepartureAt
                 nextArrivalAt
@@ -219,10 +189,6 @@ export class DashboardApiService {
               headway {
                 direction
                 averageSeconds
-                sampleCount
-                bucket
-                bucketLabel
-                isFallback
               }
               operationClosed
               outOfSchedule
@@ -269,7 +235,6 @@ export class DashboardApiService {
                 headsign
                 directionId
                 departureTime
-                sourceAgency
                 platformCode
               }
             }

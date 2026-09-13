@@ -12,9 +12,9 @@ import {
 } from '@metro/shared/utils';
 import type { LiteNextTrainArrival } from '../../../shared/search/lite-search.service';
 import type {
-  DirectionHeadway,
-  RailScheduledService,
-} from '@metro/shared/utils';
+  LiteDirectionHeadway,
+  LiteRailScheduledService,
+} from '../../../shared/search/lite-search.types';
 import { LiteSpinner } from '@metro/shared/lite-ui';
 import {
   formatLiteScheduledDepartureTime,
@@ -27,8 +27,8 @@ export interface LiteNextTrainGroup {
   lineCode: ExtendedNextTrainLineCode;
   stationCode: string;
   trains: LiteNextTrainArrival[];
-  scheduledServices?: RailScheduledService[];
-  headway?: DirectionHeadway[];
+  scheduledServices?: LiteRailScheduledService[];
+  headway?: LiteDirectionHeadway[];
   operationClosed?: boolean;
   outOfSchedule?: boolean;
   hasError?: boolean;
@@ -85,7 +85,7 @@ export class LiteRailNextTrains {
     );
   }
 
-  getScheduledDirection(service: RailScheduledService): string {
+  getScheduledDirection(service: LiteRailScheduledService): string {
     const group = this.groups().find((group) =>
       group.scheduledServices?.includes(service),
     );
@@ -115,29 +115,29 @@ export class LiteRailNextTrains {
     });
   }
 
-  getScheduledArrivalDisplay(service: RailScheduledService): string {
+  getScheduledArrivalDisplay(service: LiteRailScheduledService): string {
     return formatLiteScheduledServiceTime(service);
   }
 
   getScheduledDepartureDisplay(
-    departure: NonNullable<RailScheduledService['followingDepartures']>[number],
+    departure: NonNullable<LiteRailScheduledService['followingDepartures']>[number],
   ): string {
     return formatLiteScheduledDepartureTime(departure);
   }
 
-  getScheduledLocation(service: RailScheduledService): string {
+  getScheduledLocation(service: LiteRailScheduledService): string {
     return getLiteScheduledServiceLocation(service);
   }
 
   getScheduledDepartureTooltip(
-    departure: NonNullable<RailScheduledService['followingDepartures']>[number],
+    departure: NonNullable<LiteRailScheduledService['followingDepartures']>[number],
   ): string {
     return getLiteScheduledDepartureTooltip(departure);
   }
 
   getIntervalLabel(
     group: LiteNextTrainGroup,
-    service: RailScheduledService,
+    service: LiteRailScheduledService,
   ): string | null {
     const direction = this.getScheduledDirection(service);
     const headway = group.headway?.find(
@@ -154,7 +154,7 @@ export class LiteRailNextTrains {
 
   getIntervalTooltip(
     group: LiteNextTrainGroup,
-    service: RailScheduledService,
+    service: LiteRailScheduledService,
   ): string {
     const direction = this.getScheduledDirection(service);
     return group.headway?.some(

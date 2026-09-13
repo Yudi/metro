@@ -1,12 +1,10 @@
-import type { BusFare, SearchTypes } from '@metro/shared/utils';
+import type { BusFare } from '@metro/shared/utils';
 
 export interface TypesenseRoute {
   id: string;
   route_id: string;
-  agency_id: string;
   route_short_name: string;
   route_long_name: string;
-  route_type: number;
   route_color: string;
   route_text_color: string;
   source?: 'gtfs' | 'rail';
@@ -35,8 +33,6 @@ export interface TypesenseStop {
 export interface TypesenseSearchResult {
   type: 'route' | 'stop';
   document: TypesenseRoute | TypesenseStop;
-  highlights?: Record<string, string[]>;
-  text_match?: number;
 }
 
 export interface TypesenseSearchResponse {
@@ -47,11 +43,6 @@ export interface TypesenseSearchResponse {
   message?: string;
 }
 
-export interface SearchHighlightResult {
-  field: string;
-  snippet: string;
-}
-
 export interface SearchGraphQLResultBase {
   __typename:
     | 'SearchBusRoute'
@@ -59,26 +50,22 @@ export interface SearchGraphQLResultBase {
     | 'SearchRailLine'
     | 'SearchRailStation'
     | 'SearchBikeStation';
-  type: SearchTypes;
-  score?: number | null;
-  highlights?: SearchHighlightResult[] | null;
 }
 
 export interface SearchGraphQLBusRoute
   extends SearchGraphQLResultBase,
-    TypesenseRoute {
+    Omit<TypesenseRoute, 'id'> {
   __typename: 'SearchBusRoute';
 }
 
 export interface SearchGraphQLBusStop extends SearchGraphQLResultBase {
   __typename: 'SearchBusStop';
-  id: string;
   stop_id: string;
   stop_name: string;
   stop_desc?: string | null;
   stop_lat: number;
   stop_lon: number;
-  routes?: SearchGraphQLBusRoute[] | null;
+  routes?: TypesenseRoute[] | null;
   sourceAgency?: string | null;
   sourceId?: string | null;
   platformCode?: string | null;
@@ -87,15 +74,12 @@ export interface SearchGraphQLBusStop extends SearchGraphQLResultBase {
 
 export interface SearchGraphQLRailLine extends SearchGraphQLResultBase {
   __typename: 'SearchRailLine';
-  id: string;
   line_code: string;
   line_fullname: string;
-  agency: string;
 }
 
 export interface SearchGraphQLRailStation extends SearchGraphQLResultBase {
   __typename: 'SearchRailStation';
-  id: string;
   station_code: string;
   station_name: string;
   station_aliases?: string[] | null;
@@ -105,7 +89,6 @@ export interface SearchGraphQLRailStation extends SearchGraphQLResultBase {
 
 export interface SearchGraphQLBikeStation extends SearchGraphQLResultBase {
   __typename: 'SearchBikeStation';
-  id: string;
   station_id: string;
   station_name: string;
   bikeLatitude: number;

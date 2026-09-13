@@ -1,11 +1,11 @@
 import { formatScheduledRailTime } from '@metro/shared/utils';
 import type {
   RailScheduledDeparture,
-  RailScheduledService,
 } from '@metro/shared/utils';
+import type { LiteRailScheduledService } from './lite-search.types';
 
 export function formatLiteScheduledServiceTime(
-  service: RailScheduledService,
+  service: LiteRailScheduledService,
   now = new Date(),
 ): string {
   return formatScheduledRailTime(
@@ -27,7 +27,7 @@ export function formatLiteScheduledDepartureTime(
 }
 
 export function getLiteScheduledServiceLocation(
-  service: RailScheduledService,
+  service: LiteRailScheduledService,
 ): string {
   if (service.nextArrivalAt) {
     return service.arrivalEstimated === false

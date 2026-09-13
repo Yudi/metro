@@ -132,7 +132,7 @@ export class TypesenseSearchService {
    * This can be used when you need more detailed route information like trips, schedules, etc.
    */
   getRouteDetails(routeId: string): Observable<TypesenseRoute | null> {
-    // TODO: Integrate with GraphQL SearchService.getRouteDetails() when needed
+    // Route details are loaded by GeographyGraphQLService.
     // For now, return the basic route info from Typesense search results
     this.logger.debug('Route details requested for:', routeId);
     return of(null);
@@ -143,7 +143,7 @@ export class TypesenseSearchService {
    * This can be used when you need more detailed stop information like stop times, routes, etc.
    */
   getStopDetails(stopId: string): Observable<TypesenseStop | null> {
-    // TODO: Integrate with GraphQL SearchService.getStopDetails() when needed
+    // Stop details are loaded by GeographyGraphQLService.
     // For now, return the basic stop info from Typesense search results
     this.logger.debug('Stop details requested for:', stopId);
     return of(null);

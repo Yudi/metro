@@ -38,7 +38,6 @@ import {
 import type {
   PublishedDayKind,
   PublishedRouteDirection,
-  PublishedRouteInformation,
 } from '@metro/shared/bus-itinerary-contracts';
 import { TypesenseSearchService } from '../search/typesense-search.service';
 import {
@@ -62,6 +61,7 @@ import {
   ItinerariesService,
   ItineraryPattern,
   RouteItinerary,
+  PublishedItinerary,
 } from './itineraries.service';
 import { summarizeDepartureIntervals } from './departure-intervals';
 
@@ -344,24 +344,24 @@ export class ItinerariesComponent {
               catchError(() =>
                 of({
                   loading: false,
-                  data: null as PublishedRouteInformation | null,
+                  data: null as PublishedItinerary | null,
                 }),
               ),
               startWith({
                 loading: true,
-                data: null as PublishedRouteInformation | null,
+                data: null as PublishedItinerary | null,
               }),
             )
           : of({
               loading: false,
-              data: null as PublishedRouteInformation | null,
+              data: null as PublishedItinerary | null,
             }),
       ),
     ),
     {
       initialValue: {
         loading: false,
-        data: null as PublishedRouteInformation | null,
+        data: null as PublishedItinerary | null,
       },
     },
   );

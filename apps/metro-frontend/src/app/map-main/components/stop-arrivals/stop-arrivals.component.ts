@@ -100,7 +100,9 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class StopArrivalsComponent {
-  stop = input.required<BusStopGraphQL>();
+  stop = input.required<
+    Omit<BusStopGraphQL, 'id' | 'latitude' | 'longitude' | 'isSubwayStation'>
+  >();
   routes = input<BusRouteGraphQL[]>([]);
   selectedRoutes = input<Set<string>>(new Set());
   showMapActions = input(false);

@@ -4,7 +4,6 @@ import { Feature } from 'ol';
 import { Point } from 'ol/geom';
 import { MapService } from './map.service';
 import { LayerType } from './layers/map-layer.service';
-import { GeographyGraphQLService } from '../../geography/geography-graphql.service';
 import { MapStateService } from './map-state.service';
 import { FeatureCreationSource } from './map.types';
 import { FeatureFactoryService } from './feature-factory.service';
@@ -19,7 +18,6 @@ import { updatePreservedFeaturesCreationSource } from './map-feature-source.util
 export class MapDisplayService {
   readonly cityContext = inject(CityContextService);
   private mapService = inject(MapService);
-  private geographyService = inject(GeographyGraphQLService);
   private mapState = inject(MapStateService);
   private featureFactory = inject(FeatureFactoryService);
   private logger = inject(LoggerService);

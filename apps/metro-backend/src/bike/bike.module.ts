@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
-import { BikeController } from './bike.controller';
 import { BikeApiService } from './services/bike-api.service';
 import { BikePricingService } from './services/bike-pricing.service';
 import { GbfsClientService } from './gbfs/gbfs-client.service';
@@ -11,7 +10,6 @@ import { WsThrottlerGuard } from '../common/guards/ws-throttler.guard';
 
 @Module({
   imports: [HttpModule],
-  controllers: [BikeController],
   providers: [
     WsThrottlerGuard,
     BikeApiService,

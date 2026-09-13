@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataImportService } from './data-import.service';
+import { GtfsFeedImportFacade } from './gtfs-feed-import.facade';
 import { FileOperationsService } from './services/file-operations.service';
 import { ZipProcessingService } from './services/zip-processing.service';
 import { GTFSDatabaseService } from './services/gtfs-database.service';
@@ -198,19 +199,10 @@ describe('DataImportService', () => {
   });
 
   it('reports missing required GTFS files instead of treating a partial archive as valid', async () => {
-    const result = await (
-      service as never as {
-        processGTFSFiles: (
-          datasetId: string,
-          extractDir: string,
-          files: Array<{
-            fileName: string;
-            fileHash: string;
-            fileSize: number;
-          }>,
-        ) => Promise<{ success: boolean; errors: string[] }>;
-      }
-    ).processGTFSFiles('dataset', '/tmp', [
+    const facade = (
+      service as unknown as { feedImportFacade: GtfsFeedImportFacade }
+    ).feedImportFacade;
+    const result = await facade.processGTFSFiles('dataset', '/tmp', [
       { fileName: 'agency.txt', fileHash: 'hash', fileSize: 1 },
     ]);
 

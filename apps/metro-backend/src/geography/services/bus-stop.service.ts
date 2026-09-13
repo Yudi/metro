@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
 import { PostGISService } from './postgis.service';
 import { BusStop } from '../entities/geography.entity';
 import { BoundingBoxInput, StopSearchInput } from '../dto/geography.input';
@@ -11,7 +10,6 @@ export class BusStopService {
   private readonly logger = new Logger(BusStopService.name);
 
   constructor(
-    private prisma: PrismaService,
     private postGIS: PostGISService,
     private queryOptimization: QueryOptimizationService,
   ) {}

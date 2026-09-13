@@ -368,23 +368,6 @@ export class DataImportService implements OnModuleInit {
   }
 
   /**
-   * Process GTFS files with intelligent duplicate detection
-   */
-  private async processGTFSFiles(
-    datasetId: string,
-    extractDir: string,
-    extractedFiles: { fileName: string; fileHash: string; fileSize: number }[],
-    feed: GTFSFeed = 'sptrans',
-  ): Promise<GTFSProcessingResult> {
-    return this.feedImportFacade.processGTFSFiles(
-      datasetId,
-      extractDir,
-      extractedFiles,
-      feed,
-    );
-  }
-
-  /**
    * Get latest dataset information
    */
   async getLatestDataset() {

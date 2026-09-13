@@ -1,18 +1,6 @@
 import { ObjectType, Field, Int } from '@nestjs/graphql';
 import type { RailStatusCode, RailStatusColor } from '@metro/shared/utils';
 
-export interface StaticRailLine {
-  code: number;
-  colorName: string;
-  colorHex: string;
-  fullName: string;
-  stations?: {
-    code: string;
-    name: string;
-    alternativeNames?: string[];
-  }[];
-}
-
 @ObjectType({ description: 'Individual rail line status' })
 export class RailLine {
   @Field(() => Int, { description: 'Line code number (e.g., 1 for L1)' })

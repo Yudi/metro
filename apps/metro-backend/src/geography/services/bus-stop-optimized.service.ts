@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { QueryOptimizationService } from './query-optimization.service';
 import { BusStop } from '../entities/geography.entity';
@@ -13,7 +13,6 @@ import { BusStopRow, mapBusStop } from './bus-catalog.utils';
  */
 @Injectable()
 export class BusStopServiceOptimized {
-  private readonly logger = new Logger(BusStopServiceOptimized.name);
 
   constructor(
     private prisma: PrismaService,

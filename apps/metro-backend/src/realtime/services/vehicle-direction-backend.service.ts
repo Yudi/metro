@@ -1,9 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PositionResponse } from '../dto/realtime.dto';
 
 @Injectable()
 export class VehicleDirectionBackendService {
-  private readonly logger = new Logger(VehicleDirectionBackendService.name);
   private static readonly MIN_MOVEMENT_METERS = 5;
 
   // Track last known state for each vehicle

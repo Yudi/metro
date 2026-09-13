@@ -58,7 +58,6 @@ export class CptmVehiclePollingService implements OnModuleDestroy {
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private activePoll: Promise<void> | null = null;
   private pollInterval = POLL_INTERVAL;
-  private hasError = false;
 
   private readonly pollCompleteListeners: Set<PollCompleteListener> = new Set();
 
@@ -230,7 +229,6 @@ export class CptmVehiclePollingService implements OnModuleDestroy {
         this.pollTimer = setInterval(() => void this.poll(), this.pollInterval);
       }
     }
-    this.hasError = hasErrors;
   }
 
   private async poll(): Promise<void> {

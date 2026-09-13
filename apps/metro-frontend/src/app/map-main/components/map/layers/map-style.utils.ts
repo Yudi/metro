@@ -56,31 +56,6 @@ export function createCenteredAgencyIconStyles(
   });
 }
 
-export function createInlineAgencyIconStyles(
-  agencies: TransitAgency[],
-  iconSize = 12,
-  iconSpacing = 14,
-): Style[] {
-  if (agencies.length === 0) {
-    return [createFallbackAgencyIconStyle(iconSize)];
-  }
-
-  return agencies.map(
-    (agency, index) =>
-      new Style({
-        image: new Icon({
-          src: getAgencyIconPath(agency),
-          width: iconSize,
-          height: iconSize,
-          anchor: [0, 0.5],
-          anchorXUnits: 'fraction',
-          anchorYUnits: 'fraction',
-          displacement: [index * iconSpacing, 0],
-        }),
-      }),
-  );
-}
-
 export function createFallbackAgencyIconStyle(iconSize = 14): Style {
   return new Style({
     image: new Icon({
@@ -104,26 +79,6 @@ export function createCenteredStationLabelStyle(text: string): Style {
       offsetY: 16,
       textAlign: 'center',
       textBaseline: 'top',
-    }),
-  });
-}
-
-export function createInlineStationLabelStyle(
-  text: string,
-  offsetX: number,
-): Style {
-  return new Style({
-    text: new Text({
-      text,
-      font: '12px Inter, sans-serif',
-      fill: new Fill({ color: '#202124' }),
-      stroke: new Stroke({
-        color: '#ffffff',
-        width: 3,
-      }),
-      offsetX,
-      textAlign: 'left',
-      textBaseline: 'middle',
     }),
   });
 }

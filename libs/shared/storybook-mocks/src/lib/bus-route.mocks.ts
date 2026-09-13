@@ -134,16 +134,6 @@ export const ROUTE_875I: BusRouteGraphQL = {
   textColor: 'FFFFFF',
 };
 
-export const ALL_ROUTES: BusRouteGraphQL[] = [
-  ROUTE_477A,
-  ROUTE_ARTESP_001,
-  ROUTE_ARTESP_WITHOUT_FARE,
-  ROUTE_775A,
-  ROUTE_177H,
-  ROUTE_875A,
-  ROUTE_875I,
-];
-
 export const MOCK_ROUTE_RAIL_CONNECTIONS: RouteRailConnectionGraphQL[] = [
   {
     routeId: ROUTE_477A.routeId,

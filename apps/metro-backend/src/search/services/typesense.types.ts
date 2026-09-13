@@ -69,13 +69,6 @@ export interface SearchResult {
   score?: number;
 }
 
-export interface NearbySearchResult {
-  type: SearchTypes;
-  document: StopDocument | StationDocument | BikeStationDocument;
-  highlights?: Record<string, unknown>;
-  score?: number;
-}
-
 export type NearbySearchDocument =
   | StopDocument
   | StationDocument

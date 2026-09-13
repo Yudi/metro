@@ -77,18 +77,6 @@ export function shouldMergeStations(name1: string, name2: string): boolean {
 }
 
 /**
- * Checks if a route ID indicates a subway/metro route.
- * Uses the same logic as the backend for consistency.
- *
- * @param routeId - The route ID to check
- * @returns true if this is a subway/metro route
- */
-export function isSubwayRouteId(routeId: string): boolean {
-  const upperRouteId = routeId.toUpperCase();
-  return upperRouteId.startsWith('METRÔ') || upperRouteId.startsWith('CPTM');
-}
-
-/**
  * Groups and merges items by a key derived from their names.
  * Used for deduplicating search results for stations that appear multiple times.
  *

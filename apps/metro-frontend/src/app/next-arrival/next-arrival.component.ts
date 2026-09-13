@@ -29,7 +29,6 @@ import { GeographyGraphQLService } from '../map-main/geography/geography-graphql
 import { GeolocationService } from '@metro/shared/geolocation';
 import { LoggerService } from '@metro/shared/api';
 import { getUniqueAgencies } from '@metro/shared/utils';
-import { HttpClient } from '@angular/common/http';
 import { TransitSearchFieldComponent } from '../shared/components/transit-search-field/transit-search-field.component';
 
 @Component({
@@ -56,7 +55,6 @@ export class NextArrivalComponent implements AfterViewInit {
   private readonly dialog = inject(MatDialog);
   private readonly geographyService = inject(GeographyGraphQLService);
   private readonly logger = inject(LoggerService);
-  private readonly http = inject(HttpClient);
 
   // Expose search service signals
   readonly searchQuery = this.searchService.searchQuery;

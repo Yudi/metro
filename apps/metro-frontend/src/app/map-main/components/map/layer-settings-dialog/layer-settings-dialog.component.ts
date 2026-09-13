@@ -14,7 +14,6 @@ import { MatDividerModule } from '@angular/material/divider';
 import { MapService } from '.././map.service';
 import { LayerType } from '../layers/map-layer.service';
 import { VectorTileLayerType } from '../vector-tiles/vector-tile-layer.service';
-import { MapDataLoaderService } from '../map-data-loader.service';
 import { LoggerService } from '@metro/shared/api';
 
 /**
@@ -44,7 +43,6 @@ interface LayerToggleConfig {
 })
 export class LayerSettingsDialogComponent {
   private mapService = inject(MapService);
-  private dataLoader = inject(MapDataLoaderService);
   private dialogRef = inject(MatDialogRef<LayerSettingsDialogComponent>);
   private logger = inject(LoggerService);
   private layerService = this.mapService.getLayerService();

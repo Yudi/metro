@@ -13,7 +13,6 @@ import type {
 import {
   insertRows as insertRowsSql,
   qualifyGtfsTable,
-  quoteIdent,
   truncateTable as truncateTableSql,
   updateStopGeography as updateStopGeographySql,
 } from './gtfs-sql.utils';
@@ -441,10 +440,6 @@ export class CsvProcessingService {
 
   private getQualifiedGtfsTable(tableName: string): string {
     return qualifyGtfsTable(tableName, this.rawGtfsTables);
-  }
-
-  private quoteIdent(identifier: string): string {
-    return quoteIdent(identifier);
   }
 
   /**

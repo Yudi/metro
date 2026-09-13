@@ -136,27 +136,6 @@ export const CPTM_LINE_CONFIG: Record<
 };
 
 /**
- * Get CPTM line code from route code
- */
-export function getCptmLineCode(routeCode: string): CptmLineCode | undefined {
-  const entry = Object.entries(CPTM_LINE_CONFIG).find(
-    ([, config]) => config.routeCode === routeCode,
-  );
-  return entry?.[0] as CptmLineCode | undefined;
-}
-
-/**
- * Get CPTM line code from line name
- */
-export function getCptmLineCodeByName(name: string): CptmLineCode | undefined {
-  const normalizedName = name.toLowerCase().trim();
-  const entry = Object.entries(CPTM_LINE_CONFIG).find(
-    ([, config]) => config.name.toLowerCase() === normalizedName,
-  );
-  return entry?.[0] as CptmLineCode | undefined;
-}
-
-/**
  * Check if a line code is tracked by private rail data.
  */
 export function isCptmLine(lineCode: string): lineCode is CptmLineCode {
@@ -272,16 +251,6 @@ export function hasExternalRailVehicles(
 }
 
 /**
- * Check if a line code has privately sourced next-train data.
- * Only includes L10-L13.
- */
-export function hasExternalRailNextTrain(
-  lineCode: string,
-): lineCode is ActualCptmLineCode | SpecialCptmLineCode {
-  return isApi1RailLine(lineCode);
-}
-
-/**
  * Check whether a line currently has a next-train integration.
  *
  * Trivia Trens lines are controlled by TRIVIATRENS_LIVE_DATA_ENABLED so their
@@ -296,28 +265,6 @@ export function hasNextTrainIntegration(
     lineCode === 'L9' ||
     isApi1RailLine(lineCode)
   );
-}
-
-/**
- * Extract CPTM line code from route shortName
- * Handles formats like "CPTM L10", "CPTM L10-Turquesa", "L10", etc.
- * @returns CptmLineCode if found, undefined otherwise
- */
-export function extractCptmLineCode(
-  shortName: string,
-): CptmLineCode | undefined {
-  if (!shortName) return undefined;
-
-  // Match L10, L11, L12, or L13 in the string
-  const match = shortName.match(/L1[0-3]/i);
-  if (match) {
-    const lineCode = match[0].toUpperCase() as CptmLineCode;
-    if (isCptmLine(lineCode)) {
-      return lineCode;
-    }
-  }
-
-  return undefined;
 }
 
 /**
@@ -341,11 +288,4 @@ export function extractTrackedRailVehicleLineCode(
   }
 
   return undefined;
-}
-
-/**
- * Check if a route shortName represents a CPTM line
- */
-export function isCptmRouteShortName(shortName: string): boolean {
-  return extractCptmLineCode(shortName) !== undefined;
 }

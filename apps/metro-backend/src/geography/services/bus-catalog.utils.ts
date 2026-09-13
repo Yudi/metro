@@ -183,18 +183,3 @@ export function mapBusStop(
     },
   };
 }
-
-export function agencyPriority(value: unknown): number {
-  return normalizeBusSourceAgency(value) === 'sptrans' ? 0 : 1;
-}
-
-export function sortBusRoutes<
-  T extends { sourceAgency?: string; shortName?: string; id?: string },
->(routes: T[]): T[] {
-  return routes.sort(
-    (left, right) =>
-      agencyPriority(left.sourceAgency) - agencyPriority(right.sourceAgency) ||
-      (left.shortName ?? '').localeCompare(right.shortName ?? '') ||
-      (left.id ?? '').localeCompare(right.id ?? ''),
-  );
-}

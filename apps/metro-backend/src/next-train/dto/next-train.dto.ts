@@ -235,8 +235,3 @@ export interface NextTrainFetchResult {
   /** True if the upstream source returned an error */
   isApiError: boolean;
 }
-
-/**
- * Hash of next train data for delta comparison
- */
-export type NextTrainHash = string;

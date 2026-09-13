@@ -1,6 +1,5 @@
 import { OLHOVIVO_POLL_INTERVAL_MS } from '@metro/shared/utils';
 import type {
-  BusStopGraphQL,
   MockRealtimeServiceOptions,
   StopArrivalUpdate,
   VehiclePositionUpdate,
@@ -38,35 +37,6 @@ export function createMockRealtimeService(opts: MockRealtimeServiceOptions) {
       console.debug('[mock] unsubscribeFromRoute', routeId);
     },
     POLL_INTERVAL_MS: OLHOVIVO_POLL_INTERVAL_MS,
-  };
-}
-
-/**
- * Creates a mock MapStateService for Storybook stories.
- */
-export function createMockMapStateService(
-  subwayStations: BusStopGraphQL[] = [],
-) {
-  return {
-    subwayStations: () => subwayStations,
-    selectedRoutes: () => [],
-    selectedStops: () => [],
-    displayMode: () => 'selected' as const,
-  };
-}
-
-/**
- * Creates a mock StationNameService for Storybook stories.
- */
-export function createMockStationNameService() {
-  return {
-    normalizeStationName: (name: string, isSubway: boolean) => {
-      if (isSubway) {
-        // Remove common subway suffixes for cleaner display
-        return name.replace(/\s+(Metrô|Metro|Station|Estação)$/i, '').trim();
-      }
-      return name;
-    },
   };
 }
 

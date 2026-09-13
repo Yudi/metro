@@ -62,20 +62,6 @@ export const ARTESP_ONLY_BUS_STOP: BusStopGraphQL = {
   mergedStopIds: ['artesp:42'],
 };
 
-/** Subway station that is also a bus stop */
-export const SE_SUBWAY_STATION: BusStopGraphQL = {
-  id: 'station-se-1',
-  stopId: '99001',
-  name: 'Sé',
-  description:
-    'Estação Sé do Metrô, ponto de conexão das linhas 1-Azul e 3-Vermelha',
-  latitude: -23.5503,
-  longitude: -46.6331,
-  isSubwayStation: true,
-  agencies: ['METRO'],
-  routeShortNames: ['L1', 'L3'],
-};
-
 /** Bus stop with no routes (edge case) */
 export const EMPTY_BUS_STOP: BusStopGraphQL = {
   id: 'stop-empty-1',

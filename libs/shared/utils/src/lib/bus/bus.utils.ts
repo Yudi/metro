@@ -49,13 +49,6 @@ export function getBusRouteDisplayId(
   return route.routeId.replace(/^[^:/]+[:/]/, '');
 }
 
-/**
- * Returns the globally unique application identity for a stop.
- */
-export function getBusStopIdentity(stop: BusStopIdentityLike): string {
-  return stop.stopId;
-}
-
 export function getBusStopIdentityAliases(stop: BusStopIdentityLike): string[] {
   return Array.from(
     new Set(
@@ -82,12 +75,6 @@ export function normalizeBusSourceAgency(
 ): string | null {
   const normalized = sourceAgency?.trim().toLowerCase();
   return normalized || null;
-}
-
-export function isSptransAgency(
-  sourceAgency: string | null | undefined,
-): boolean {
-  return normalizeBusSourceAgency(sourceAgency) === 'sptrans';
 }
 
 export function isArtespRoute(route: BusRouteIdentityLike): boolean {

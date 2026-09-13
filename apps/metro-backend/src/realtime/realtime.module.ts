@@ -8,7 +8,6 @@ import { RouteStopMappingService } from './services/route-stop-mapping.service';
 import { RealtimePollingService } from './services/realtime-polling.service';
 import { VehicleDirectionBackendService } from './services/vehicle-direction-backend.service';
 import { RealtimeGateway } from './gateways/realtime.gateway';
-import { RealtimeController } from './realtime.controller';
 
 @Module({
   imports: [HttpModule, ConfigModule],
@@ -21,7 +20,6 @@ import { RealtimeController } from './realtime.controller';
     RealtimePollingService,
     RealtimeGateway,
   ],
-  controllers: [RealtimeController],
   exports: [
     OlhoVivoApiService,
     RouteStopMappingService,

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { QueryOptimizationService } from './query-optimization.service';
 import { BusRoute, BusShape } from '../entities/geography.entity';
@@ -10,7 +10,6 @@ import { mapBusRoute } from './bus-catalog.utils';
  */
 @Injectable()
 export class BusRouteServiceOptimized {
-  private readonly logger = new Logger(BusRouteServiceOptimized.name);
 
   constructor(
     private prisma: PrismaService,

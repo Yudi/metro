@@ -69,13 +69,6 @@ export class RealtimeVehicleLayerService {
     });
   }
 
-  /**
-   * Create style for a vehicle marker
-   */
-  private readonly directionIconSrc = 'icons/bus-direction2.svg';
-  private readonly directionScale = 0.75;
-  private readonly directionAnchorOffsetPixels = 12;
-
   private createVehicleStyle(
     isAccessible: boolean,
     vehicleId: number,

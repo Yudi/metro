@@ -8,14 +8,12 @@ import {
 } from '../services/typesense.service';
 import {
   InternalServerErrorException,
-  Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { StopsAndStations } from '@metro/shared/utils';
 
 @Resolver()
 export class NearbyResolver {
-  private logger = new Logger(NearbyResolver.name);
   constructor(private typesenseService: TypesenseService) {}
   @Query(() => [SearchResultUnion])
   async nearbyStops(

@@ -185,14 +185,6 @@ export enum RealtimeMessageType {
 }
 
 /**
- * WebSocket message payload
- */
-export interface RealtimeMessage {
-  type: RealtimeMessageType;
-  data: unknown;
-}
-
-/**
  * Canonical WebSocket payload for vehicle positions.
  */
 export interface VehiclePositionUpdate {

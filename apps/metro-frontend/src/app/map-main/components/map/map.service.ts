@@ -408,13 +408,6 @@ export class MapService {
   }
 
   /**
-   * Update features signal from all layers
-   */
-  private updateFeaturesSignal(): void {
-    this.features.set(this.layerService.getAllFeatures());
-  }
-
-  /**
    * Destroy the map and clean up resources
    */
   destroy(): void {

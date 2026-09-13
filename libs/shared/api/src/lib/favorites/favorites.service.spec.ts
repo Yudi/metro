@@ -183,7 +183,7 @@ describe('anonymous favorites first-login import', () => {
       code: string;
       updatedAt: number;
     }> = [];
-    const anonymousRecords = [
+    let anonymousRecords = [
       {
         key: 'anonymous:railLine:L4',
         scope: ANONYMOUS_FAVORITES_SCOPE,
@@ -208,6 +208,11 @@ describe('anonymous favorites first-login import', () => {
             recordScope === ANONYMOUS_FAVORITES_SCOPE
               ? anonymousRecords
               : accountFavorites,
+          delete: async () => {
+            if (recordScope === ANONYMOUS_FAVORITES_SCOPE) {
+              anonymousRecords = [];
+            }
+          },
         }),
       }),
     };
@@ -233,6 +238,12 @@ describe('anonymous favorites first-login import', () => {
       scopeGeneration: number;
       retryAttempt: number;
       _syncError: ReturnType<typeof signal<string | null>>;
+      _anonymousFavoritesImportCount: ReturnType<typeof signal<number | null>>;
+      anonymousImportApprovedScope: string | null;
+      anonymousFavoritesImportCount: () => number | null;
+      importAnonymousFavorites(): Promise<void>;
+      discardAnonymousFavorites(): Promise<void>;
+      syncWithServer: jest.Mock;
       postGraphql: jest.Mock;
       replaceScopeFavorites: jest.Mock;
       syncScope(scope: string, generation: number): Promise<void>;
@@ -254,6 +265,11 @@ describe('anonymous favorites first-login import', () => {
     service.scopeGeneration = 0;
     service.retryAttempt = 0;
     service._syncError = signal<string | null>(null);
+    service._anonymousFavoritesImportCount = signal<number | null>(null);
+    service.anonymousFavoritesImportCount =
+      service._anonymousFavoritesImportCount;
+    service.anonymousImportApprovedScope = null;
+    service.syncWithServer = jest.fn();
     service.postGraphql = jest.fn();
     service.replaceScopeFavorites = jest.fn(
       async (_scope: string, favorites: FavoriteList) => {
@@ -274,65 +290,15 @@ describe('anonymous favorites first-login import', () => {
       },
       importedScopes,
       operations: () => operations,
+      anonymousRecords: () => anonymousRecords,
     };
   }
 
-  it('imports anonymous favorites into an empty account and syncs them', async () => {
+  it('waits for confirmation before uploading anonymous favorites', async () => {
     const { service, importedScopes, operations } = createHarness();
-    service.postGraphql
-      .mockResolvedValueOnce({
-        userFavoritesSnapshot: {
-          revision: 0,
-          favorites: createEmptyFavorites(),
-        },
-      })
-      .mockResolvedValueOnce({
-        syncFavorites: {
-          success: true,
-          revision: 1,
-          favorites: anonymousFavorites,
-        },
-      });
-
-    await service.syncScope(scope, 0);
-
-    expect(service.postGraphql).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        variables: { favorites: anonymousFavorites, expectedRevision: 0 },
-      }),
-    );
-    expect(service.replaceScopeFavorites).toHaveBeenLastCalledWith(
-      scope,
-      anonymousFavorites,
-    );
-    expect(importedScopes).toContain(scope);
-    expect(operations()).toEqual([]);
-  });
-
-  it('does not restore imported anonymous favorites after the account clears them', async () => {
-    const { service, clearAccountFavorites } = createHarness();
-    service.postGraphql
-      .mockResolvedValueOnce({
-        userFavoritesSnapshot: {
-          revision: 0,
-          favorites: createEmptyFavorites(),
-        },
-      })
-      .mockResolvedValueOnce({
-        syncFavorites: {
-          success: true,
-          revision: 1,
-          favorites: anonymousFavorites,
-        },
-      });
-    await service.syncScope(scope, 0);
-
-    clearAccountFavorites();
-    service.postGraphql.mockReset();
-    service.replaceScopeFavorites.mockClear();
     service.postGraphql.mockResolvedValueOnce({
       userFavoritesSnapshot: {
-        revision: 2,
+        revision: 0,
         favorites: createEmptyFavorites(),
       },
     });
@@ -340,10 +306,93 @@ describe('anonymous favorites first-login import', () => {
     await service.syncScope(scope, 0);
 
     expect(service.postGraphql).toHaveBeenCalledTimes(1);
-    expect(service.replaceScopeFavorites).toHaveBeenCalledWith(
-      scope,
-      createEmptyFavorites(),
+    expect(service.anonymousFavoritesImportCount()).toBe(2);
+    expect(importedScopes).not.toContain(scope);
+    expect(operations()).toEqual([]);
+  });
+
+  it('does not approve an import without a pending consent request', async () => {
+    const { service, anonymousRecords, operations } = createHarness();
+
+    await service.importAnonymousFavorites();
+    await service.discardAnonymousFavorites();
+
+    expect(service.anonymousImportApprovedScope).toBeNull();
+    expect(service.syncWithServer).not.toHaveBeenCalled();
+    expect(anonymousRecords()).toHaveLength(2);
+    expect(operations()).toEqual([]);
+  });
+
+  it('discards browser favorites without uploading them', async () => {
+    const { service, anonymousRecords, importedScopes, operations } = createHarness();
+    service._anonymousFavoritesImportCount.set(2);
+
+    await service.discardAnonymousFavorites();
+
+    expect(anonymousRecords()).toEqual([]);
+    expect(importedScopes).toContain(scope);
+    expect(service.anonymousFavoritesImportCount()).toBeNull();
+    expect(service.postGraphql).not.toHaveBeenCalled();
+    expect(operations()).toEqual([]);
+  });
+
+  it('does not reuse one account approval for another account', async () => {
+    const { service, anonymousRecords, operations } = createHarness();
+    service.anonymousImportApprovedScope = scope;
+    const otherScope = getFavoritesScope('user-b');
+    service.activeScope = otherScope;
+    service.scopeGeneration = 1;
+    service.postGraphql.mockResolvedValueOnce({
+      userFavoritesSnapshot: { revision: 0, favorites: createEmptyFavorites() },
+    });
+
+    await service.syncScope(otherScope, 1);
+
+    expect(service.anonymousFavoritesImportCount()).toBe(2);
+    expect(service.postGraphql).toHaveBeenCalledTimes(1);
+    expect(anonymousRecords()).toHaveLength(2);
+    expect(operations()).toEqual([]);
+  });
+
+  it('imports and consumes anonymous favorites after explicit confirmation', async () => {
+    const { service, importedScopes, operations, anonymousRecords } =
+      createHarness();
+    service.postGraphql.mockResolvedValueOnce({
+      userFavoritesSnapshot: {
+        revision: 0,
+        favorites: createEmptyFavorites(),
+      },
+    });
+    await service.syncScope(scope, 0);
+
+    await service.importAnonymousFavorites();
+    expect(service.syncWithServer).toHaveBeenCalledTimes(1);
+
+    service.postGraphql
+      .mockResolvedValueOnce({
+        userFavoritesSnapshot: {
+          revision: 0,
+          favorites: createEmptyFavorites(),
+        },
+      })
+      .mockResolvedValueOnce({
+        syncFavorites: {
+          success: true,
+          revision: 1,
+          favorites: anonymousFavorites,
+        },
+      });
+    await service.syncScope(scope, 0);
+
+    expect(service.postGraphql).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        variables: { favorites: anonymousFavorites, expectedRevision: 0 },
+      }),
     );
+    expect(importedScopes).toContain(scope);
+    expect(service.anonymousFavoritesImportCount()).toBeNull();
+    expect(anonymousRecords()).toEqual([]);
+    expect(operations()).toEqual([]);
   });
 });
 
@@ -366,7 +415,7 @@ describe('failed favorite synchronization recovery', () => {
       retryAttempt: number;
       _syncError: ReturnType<typeof signal<string | null>>;
       postGraphql: jest.Mock;
-      queueAnonymousFavoritesImport: jest.Mock;
+      prepareAnonymousFavoritesImport: jest.Mock;
       replaceScopeFavorites: jest.Mock;
       syncWithServer: jest.Mock;
       syncScope(scope: string, generation: number): Promise<void>;
@@ -408,7 +457,7 @@ describe('failed favorite synchronization recovery', () => {
     service.retryAttempt = 0;
     service._syncError = signal<string | null>(null);
     service.postGraphql = jest.fn();
-    service.queueAnonymousFavoritesImport = jest.fn();
+    service.prepareAnonymousFavoritesImport = jest.fn();
     service.syncWithServer = jest.fn();
     service.replaceScopeFavorites = jest.fn(
       async (_scope: string, favorites: FavoriteList) => {

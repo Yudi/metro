@@ -7,6 +7,21 @@ import { parse, validate } from 'graphql';
 import { BusRouteItineraryResolver } from './bus-route-itinerary.resolver';
 
 describe('bus route itinerary GraphQL contract', () => {
+  it('coalesces concurrent requests for the same normalized route and date', async () => {
+    let resolve!: (value: never) => void;
+    const result = new Promise<never>((done) => (resolve = done));
+    const getItinerary = jest.fn().mockReturnValue(result);
+    const resolver = new BusRouteItineraryResolver({ getItinerary } as never);
+
+    const first = resolver.busRouteItinerary(' 477A-10 ', ' 2026-09-08 ');
+    const second = resolver.busRouteItinerary('477A-10', '2026-09-08');
+
+    expect(first).toBe(second);
+    expect(getItinerary).toHaveBeenCalledTimes(1);
+    resolve({} as never);
+    await first;
+  });
+
   it('accepts the public route itinerary selection', async () => {
     const module = await Test.createTestingModule({
       imports: [GraphQLSchemaBuilderModule],

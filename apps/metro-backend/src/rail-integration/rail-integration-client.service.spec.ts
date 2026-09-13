@@ -172,6 +172,57 @@ describe('RailIntegrationClientService', () => {
     service.onModuleDestroy();
   });
 
+  it('bounds and validates scheduled services at the integration boundary', async () => {
+    const validService = (index: number) => ({
+      destinationCode: `DST${index}`,
+      destinationName: 'Destination',
+      originStationCode: 'ORG',
+      originStationName: 'Origin',
+      nextDepartureAt: '2026-09-09T12:04:00.000Z',
+    });
+    const service = createServiceWithClient({
+      fetchScheduledService: unarySuccess({
+        services: [
+          ...Array.from({ length: 64 }, (_, index) => validService(index)),
+          validService(64),
+        ],
+      }),
+    });
+
+    await expect(
+      service.fetchScheduledService('L1', 'LUZ'),
+    ).resolves.toHaveLength(64);
+    service.onModuleDestroy();
+
+    const invalidService = createServiceWithClient({
+      fetchScheduledService: unarySuccess({
+        services: [
+          { ...validService(0), destinationName: 'x'.repeat(257) },
+          { ...validService(1), nextDepartureAt: 'not-a-date' },
+          {
+            ...validService(2),
+            intervalLabel: 'x'.repeat(257),
+            nextArrivalAt: 'not-a-date',
+            followingDepartures: [
+              { departureAt: 'not-a-date' },
+              { departureAt: '2026-09-09T12:07:00.000Z' },
+            ],
+          },
+        ],
+      }),
+    });
+
+    await expect(
+      invalidService.fetchScheduledService('L1', 'LUZ'),
+    ).resolves.toEqual([
+      {
+        ...validService(2),
+        followingDepartures: [{ departureAt: '2026-09-09T12:07:00.000Z' }],
+      },
+    ]);
+    invalidService.onModuleDestroy();
+  });
+
   it('propagates the current request correlation ID through gRPC metadata', async () => {
     const getStationCodes = jest.fn(
       (

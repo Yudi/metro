@@ -81,11 +81,15 @@ export class FavoritesService implements OnDestroy {
   private syncInFlight?: Promise<void>;
   private retryTimer?: ReturnType<typeof setTimeout>;
   private retryAttempt = 0;
+  private anonymousImportApprovedScope: string | null = null;
 
   private readonly _favorites = signal<FavoriteList>(createEmptyFavorites());
   readonly favorites: Signal<FavoriteList> = this._favorites.asReadonly();
   private readonly _syncError = signal<string | null>(null);
   readonly syncError: Signal<string | null> = this._syncError.asReadonly();
+  private readonly _anonymousFavoritesImportCount = signal<number | null>(null);
+  readonly anonymousFavoritesImportCount: Signal<number | null> =
+    this._anonymousFavoritesImportCount.asReadonly();
   private readonly _dashboardSelections = signal<DashboardFavoriteSelections>(
     this.createEmptyDashboardSelections(),
   );
@@ -246,6 +250,54 @@ export class FavoritesService implements OnDestroy {
     }
   }
 
+  async importAnonymousFavorites(): Promise<void> {
+    const scope = this.activeScope;
+    if (
+      !this.db ||
+      scope === ANONYMOUS_FAVORITES_SCOPE ||
+      this._anonymousFavoritesImportCount() === null
+    ) {
+      return;
+    }
+
+    this.anonymousImportApprovedScope = scope;
+    this._anonymousFavoritesImportCount.set(null);
+    await this.syncInFlight;
+    if (scope === this.activeScope) {
+      this.syncWithServer();
+    }
+  }
+
+  async discardAnonymousFavorites(): Promise<void> {
+    const scope = this.activeScope;
+    if (
+      !this.db ||
+      scope === ANONYMOUS_FAVORITES_SCOPE ||
+      this._anonymousFavoritesImportCount() === null
+    ) {
+      return;
+    }
+
+    await this.db.transaction(
+      'rw',
+      this.db.favorites,
+      this.db.anonymousFavoritesImports,
+      async () => {
+        await this.db?.favorites
+          .where('scope')
+          .equals(ANONYMOUS_FAVORITES_SCOPE)
+          .delete();
+        await this.db?.anonymousFavoritesImports.put({
+          scope,
+          importedAt: Date.now(),
+        });
+      },
+    );
+    if (scope === this.activeScope) {
+      this._anonymousFavoritesImportCount.set(null);
+    }
+  }
+
   isFavorite(code: string, type: FavoriteTypes): boolean {
     if (!isPlatformBrowser(this.platformId)) {
       return false;
@@ -308,6 +360,8 @@ export class FavoritesService implements OnDestroy {
     this.clearRetryTimer();
     this.retryAttempt = 0;
     this._syncError.set(null);
+    this._anonymousFavoritesImportCount.set(null);
+    this.anonymousImportApprovedScope = null;
     this.stopSubscriptions();
     this.activeScope = scope;
     this._favorites.set(this.createEmptyFavorites());
@@ -612,7 +666,7 @@ export class FavoritesService implements OnDestroy {
       }
 
       let snapshot = this.requireSnapshot(result.userFavoritesSnapshot);
-      await this.queueAnonymousFavoritesImport(
+      await this.prepareAnonymousFavoritesImport(
         scope,
         generation,
         snapshot.favorites,
@@ -821,7 +875,7 @@ export class FavoritesService implements OnDestroy {
     await this.db.outbox.put(operation);
   }
 
-  private async queueAnonymousFavoritesImport(
+  private async prepareAnonymousFavoritesImport(
     scope: string,
     generation: number,
     serverFavorites: FavoriteList,
@@ -842,6 +896,10 @@ export class FavoritesService implements OnDestroy {
       this.db.anonymousFavoritesImports,
       async () => {
         if (await this.db?.anonymousFavoritesImports.get(scope)) {
+          if (scope === this.activeScope) {
+            this._anonymousFavoritesImportCount.set(null);
+          }
+          this.anonymousImportApprovedScope = null;
           return;
         }
 
@@ -855,17 +913,29 @@ export class FavoritesService implements OnDestroy {
               .toArray() ?? [],
           ]);
 
-        await this.db?.anonymousFavoritesImports.put({
-          scope,
-          importedAt: Date.now(),
-        });
-
         if (
           accountFavorites.length > 0 ||
           accountOperations.length > 0 ||
           this.hasFavorites(serverFavorites) ||
           anonymousFavorites.length === 0
         ) {
+          await this.db?.anonymousFavoritesImports.put({
+            scope,
+            importedAt: Date.now(),
+          });
+          if (scope === this.activeScope) {
+            this._anonymousFavoritesImportCount.set(null);
+          }
+          return;
+        }
+
+        if (this.anonymousImportApprovedScope !== scope) {
+          if (
+            scope === this.activeScope &&
+            generation === this.scopeGeneration
+          ) {
+            this._anonymousFavoritesImportCount.set(anonymousFavorites.length);
+          }
           return;
         }
 
@@ -877,6 +947,18 @@ export class FavoritesService implements OnDestroy {
           favorites: this.recordsToFavoriteList(anonymousFavorites),
           createdAt: Date.now(),
         });
+        await this.db?.favorites
+          .where('scope')
+          .equals(ANONYMOUS_FAVORITES_SCOPE)
+          .delete();
+        await this.db?.anonymousFavoritesImports.put({
+          scope,
+          importedAt: Date.now(),
+        });
+        this.anonymousImportApprovedScope = null;
+        if (scope === this.activeScope) {
+          this._anonymousFavoritesImportCount.set(null);
+        }
       },
     );
   }

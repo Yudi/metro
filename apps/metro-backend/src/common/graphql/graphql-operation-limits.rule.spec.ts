@@ -5,6 +5,8 @@ const schema = buildSchema(`
   type Query {
     node: Node!
     busServiceIntervals(routeCodes: [String!]!): IntervalsResult!
+    busRouteItinerary(routeId: String!, serviceDate: String!): IntervalsResult!
+    busPublishedRouteInformation(routeId: String!): IntervalsResult!
   }
   type Node { value: String, child: Node! }
   type IntervalsResult { status: String! }
@@ -77,8 +79,29 @@ describe('graphqlOperationLimitsRule', () => {
       expect.arrayContaining([
         expect.objectContaining({
           extensions: {
-            code: 'BUS_SERVICE_INTERVAL_QUERY_LIMIT_EXCEEDED',
+            code: 'EXPENSIVE_BUS_QUERY_LIMIT_EXCEEDED',
           },
+        }),
+      ]),
+    );
+  });
+
+  it('rejects aliases and combinations of expensive bus queries', () => {
+    const errors = validate(
+      schema,
+      parse(`
+        query BusInformation {
+          first: busRouteItinerary(routeId: "477A-10", serviceDate: "2026-09-08") { status }
+          second: busPublishedRouteInformation(routeId: "477A-10") { status }
+        }
+      `),
+      [graphqlOperationLimitsRule],
+    );
+
+    expect(errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          extensions: { code: 'EXPENSIVE_BUS_QUERY_LIMIT_EXCEEDED' },
         }),
       ]),
     );

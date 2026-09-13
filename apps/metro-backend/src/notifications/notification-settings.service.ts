@@ -21,7 +21,7 @@ import {
 import { NotificationTargetsService } from './notification-targets.service';
 import { NotificationRealtimeService } from './notification-realtime.service';
 
-export const MAX_NOTIFICATION_TRIGGERS_PER_USER = 500;
+export const MAX_NOTIFICATION_TRIGGERS_PER_USER = 50;
 export const MAX_NOTIFICATION_SEARCH_LENGTH = 100;
 export const MAX_NOTIFICATION_DEVICES_PER_USER = 20;
 export const MAX_PUSH_ENDPOINT_LENGTH = 2048;

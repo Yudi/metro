@@ -43,6 +43,9 @@ const DEFAULT_MAX_ATTEMPTS = 3;
 const DEFAULT_RETRY_DELAY_MS = 250;
 const MAX_RETRY_DELAY_MS = 2_000;
 const MAX_VEHICLE_ESTIMATE_TTL_MS = 5 * 60_000;
+const MAX_SCHEDULED_SERVICES = 64;
+const MAX_SCHEDULE_TEXT_LENGTH = 256;
+const MAX_SCHEDULE_DATE_LENGTH = 64;
 
 interface StationNameResponse {
   stationName?: string;
@@ -217,57 +220,49 @@ export class RailIntegrationClientService
       },
     );
 
-    return (response.services ?? []).map((service) => {
-      const mapped: RailScheduledService = {
-        destinationCode: service.destinationCode,
-        destinationName: service.destinationName,
-        originStationCode: service.originStationCode,
-        originStationName: service.originStationName,
-        nextDepartureAt: service.nextDepartureAt,
-      };
+    return (response.services ?? [])
+      .slice(0, MAX_SCHEDULED_SERVICES)
+      .filter(isValidScheduledService)
+      .map((service) => {
+        const mapped: RailScheduledService = {
+          destinationCode: service.destinationCode,
+          destinationName: service.destinationName,
+          originStationCode: service.originStationCode,
+          originStationName: service.originStationName,
+          nextDepartureAt: service.nextDepartureAt,
+        };
 
-      // Omitted proto3 scalars arrive as empty defaults; expose only non-empty values.
-      if (
-        typeof service.intervalLabel === 'string' &&
-        service.intervalLabel.length > 0
-      ) {
-        mapped.intervalLabel = service.intervalLabel;
-      }
+        // Omitted proto3 scalars arrive as empty defaults; expose only non-empty values.
+        if (isValidScheduleText(service.intervalLabel)) {
+          mapped.intervalLabel = service.intervalLabel;
+        }
 
-      if (
-        typeof service.nextArrivalAt === 'string' &&
-        service.nextArrivalAt.length > 0
-      ) {
-        mapped.nextArrivalAt = service.nextArrivalAt;
-      }
+        if (isValidScheduleDate(service.nextArrivalAt)) {
+          mapped.nextArrivalAt = service.nextArrivalAt;
+        }
 
-      if (
-        service.nextArrivalAt &&
-        typeof service.arrivalEstimated === 'boolean'
-      ) {
-        mapped.arrivalEstimated = service.arrivalEstimated;
-      }
+        if (
+          isValidScheduleDate(service.nextArrivalAt) &&
+          typeof service.arrivalEstimated === 'boolean'
+        ) {
+          mapped.arrivalEstimated = service.arrivalEstimated;
+        }
 
-      const followingDepartures = (service.followingDepartures ?? [])
-        .filter(
-          (departure) =>
-            typeof departure.departureAt === 'string' &&
-            departure.departureAt.length > 0,
-        )
-        .slice(0, 3)
-        .map((departure) => ({
-          departureAt: departure.departureAt,
-          ...(typeof departure.arrivalAt === 'string' &&
-          departure.arrivalAt.length > 0
-            ? { arrivalAt: departure.arrivalAt }
-            : {}),
-        }));
-      if (followingDepartures.length > 0) {
-        mapped.followingDepartures = followingDepartures;
-      }
+        const followingDepartures = (service.followingDepartures ?? [])
+          .slice(0, 3)
+          .filter((departure) => isValidScheduleDate(departure.departureAt))
+          .map((departure) => ({
+            departureAt: departure.departureAt,
+            ...(isValidScheduleDate(departure.arrivalAt)
+              ? { arrivalAt: departure.arrivalAt }
+              : {}),
+          }));
+        if (followingDepartures.length > 0) {
+          mapped.followingDepartures = followingDepartures;
+        }
 
-      return mapped;
-    });
+        return mapped;
+      });
   }
 
   async getStationName(
@@ -509,6 +504,33 @@ function readPositiveInteger(
 ): number {
   const value = Number(configService.get<string | number>(key));
   return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
+function isValidScheduledService(service: RailScheduledService): boolean {
+  return (
+    isValidScheduleText(service.destinationCode) &&
+    isValidScheduleText(service.destinationName) &&
+    isValidScheduleText(service.originStationCode) &&
+    isValidScheduleText(service.originStationName) &&
+    isValidScheduleDate(service.nextDepartureAt)
+  );
+}
+
+function isValidScheduleText(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= MAX_SCHEDULE_TEXT_LENGTH
+  );
+}
+
+function isValidScheduleDate(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= MAX_SCHEDULE_DATE_LENGTH &&
+    Number.isFinite(Date.parse(value))
+  );
 }
 
 function waitForReady(client: Client, deadlineMs: number): Promise<void> {

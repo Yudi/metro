@@ -1,5 +1,6 @@
 import {
   ApplicationConfig,
+  provideAppInitializer,
   provideZonelessChangeDetection,
   inject,
   isDevMode,
@@ -8,6 +9,8 @@ import {
 } from '@angular/core';
 import { provideRouter, RouteReuseStrategy } from '@angular/router';
 import { DashboardRouteReuseStrategy } from './insights-dashboard/dashboard-route-reuse.strategy';
+
+import { AnonymousFavoritesImportPromptService } from './favorites/anonymous-favorites-import-prompt.service';
 
 import { routes } from './app.routes';
 import {
@@ -43,6 +46,9 @@ import { firebaseIdToken } from '@metro/shared/firebase';
 export const appConfig: ApplicationConfig = {
   providers: [
     provideZonelessChangeDetection(),
+    provideAppInitializer(() => {
+      inject(AnonymousFavoritesImportPromptService);
+    }),
     provideBrowserGlobalErrorListeners(),
     ErrorTrackingService,
     { provide: ErrorHandler, useClass: TelemetryErrorHandler },

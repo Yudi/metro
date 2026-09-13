@@ -12,13 +12,18 @@ import {
 const MAX_OPERATION_DEPTH = 12;
 const MAX_OPERATION_FIELDS = 300;
 const MAX_OPERATION_ALIASES = 50;
-const MAX_BUS_SERVICE_INTERVAL_QUERIES = 1;
+const MAX_EXPENSIVE_BUS_QUERIES = 1;
+const EXPENSIVE_BUS_QUERY_FIELDS = new Set([
+  'busServiceIntervals',
+  'busRouteItinerary',
+  'busPublishedRouteInformation',
+]);
 
 interface OperationMetrics {
   depth: number;
   fields: number;
   aliases: number;
-  busServiceIntervalQueries: number;
+  expensiveBusQueries: number;
 }
 
 export const graphqlOperationLimitsRule: ValidationRule = (context) =>
@@ -55,7 +60,7 @@ function validateOperation(
     depth: 0,
     fields: 0,
     aliases: 0,
-    busServiceIntervalQueries: 0,
+    expensiveBusQueries: 0,
   };
   inspectSelectionSet(operation.selectionSet, 0, fragments, new Set(), metrics);
   const operationName = operation.name?.value ?? 'anonymous';
@@ -90,13 +95,13 @@ function validateOperation(
       ),
     );
   }
-  if (metrics.busServiceIntervalQueries > MAX_BUS_SERVICE_INTERVAL_QUERIES) {
+  if (metrics.expensiveBusQueries > MAX_EXPENSIVE_BUS_QUERIES) {
     reportError(
       new GraphQLError(
-        `GraphQL operation ${operationName} may request busServiceIntervals only once`,
+        `GraphQL operation ${operationName} may request only one expensive bus query`,
         {
           nodes: operation,
-          extensions: { code: 'BUS_SERVICE_INTERVAL_QUERY_LIMIT_EXCEEDED' },
+          extensions: { code: 'EXPENSIVE_BUS_QUERY_LIMIT_EXCEEDED' },
         },
       ),
     );
@@ -115,8 +120,8 @@ function inspectSelectionSet(
       const fieldDepth = depth + 1;
       metrics.depth = Math.max(metrics.depth, fieldDepth);
       metrics.fields += 1;
-      if (depth === 0 && selection.name.value === 'busServiceIntervals') {
-        metrics.busServiceIntervalQueries += 1;
+      if (depth === 0 && EXPENSIVE_BUS_QUERY_FIELDS.has(selection.name.value)) {
+        metrics.expensiveBusQueries += 1;
       }
       if (selection.alias) {
         metrics.aliases += 1;

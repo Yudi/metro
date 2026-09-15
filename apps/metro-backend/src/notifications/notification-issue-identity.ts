@@ -1,5 +1,8 @@
 import type { Prisma } from '../../generated/prisma/client';
-import { notificationRailState, type NotificationKind } from '@metro/shared/notification-contracts';
+import {
+  notificationRailState,
+  type NotificationKind,
+} from '@metro/shared/notification-contracts';
 import { randomUUID } from 'node:crypto';
 import { NotificationSnapshot, notificationHash } from './notification-message';
 
@@ -19,9 +22,14 @@ export async function notificationIssueIdentity(
   const state = notificationRailState(snapshot);
   if (state === 'unknown') return undefined;
   const status = snapshot.statusCode ?? snapshot.statusLabel?.trim();
-  const observationClass = state === 'operational' ? 'normal'
-    : state === 'closed' ? 'closed'
-    : status ? `incident:${notificationHash(status).slice(0, 20)}` : 'incident';
+  const observationClass =
+    state === 'operational'
+      ? 'normal'
+      : state === 'closed'
+        ? 'closed'
+        : status
+          ? `incident:${notificationHash(status).slice(0, 20)}`
+          : 'incident';
   await tx.$queryRaw`SELECT id FROM public.notification_targets WHERE id = ${targetId}::uuid FOR UPDATE`;
   const target = await tx.notificationTarget.findUniqueOrThrow({
     where: { id: targetId },

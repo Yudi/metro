@@ -12,8 +12,11 @@ export function collectPaths(
   for (const route of routes) {
     if (route.path?.includes('*') || route.path?.includes(':')) continue;
 
-    const path = [parentPath, route.path ?? '']
-      .join('/').replace(/\/+/g, '/').replace(/\/$/, '') || '/';
+    const path =
+      [parentPath, route.path ?? '']
+        .join('/')
+        .replace(/\/+/g, '/')
+        .replace(/\/$/, '') || '/';
     if (route.path !== undefined) paths.add(path);
     if (route.children) {
       for (const childPath of collectPaths(route.children, path)) {

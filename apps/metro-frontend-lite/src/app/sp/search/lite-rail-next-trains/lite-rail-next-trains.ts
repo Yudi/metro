@@ -120,7 +120,9 @@ export class LiteRailNextTrains {
   }
 
   getScheduledDepartureDisplay(
-    departure: NonNullable<LiteRailScheduledService['followingDepartures']>[number],
+    departure: NonNullable<
+      LiteRailScheduledService['followingDepartures']
+    >[number],
   ): string {
     return formatLiteScheduledDepartureTime(departure);
   }
@@ -130,7 +132,9 @@ export class LiteRailNextTrains {
   }
 
   getScheduledDepartureTooltip(
-    departure: NonNullable<LiteRailScheduledService['followingDepartures']>[number],
+    departure: NonNullable<
+      LiteRailScheduledService['followingDepartures']
+    >[number],
   ): string {
     return getLiteScheduledDepartureTooltip(departure);
   }

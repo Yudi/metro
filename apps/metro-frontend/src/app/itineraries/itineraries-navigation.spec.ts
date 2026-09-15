@@ -14,9 +14,9 @@ import {
 import { mapTypesenseResult } from '../map-main/components/search-dialog/search-dialog.utils';
 import { spFeatureRoutes } from '../cities/sp/sp.routes';
 
-const itineraryFeatureRoutes = (
-  spFeatureRoutes
-).filter((route) => route.path?.startsWith('itinerarios'));
+const itineraryFeatureRoutes = spFeatureRoutes.filter((route) =>
+  route.path?.startsWith('itinerarios'),
+);
 
 describe('Itinerary navigation', () => {
   const load = jest.fn();
@@ -68,9 +68,7 @@ describe('Itinerary navigation', () => {
     card?.click();
     await harness.fixture.whenStable();
     harness.detectChanges();
-    expect(TestBed.inject(Router).url).toBe(
-      '/sp/itinerarios/sptrans/477A-10',
-    );
+    expect(TestBed.inject(Router).url).toBe('/sp/itinerarios/sptrans/477A-10');
     expect(load).toHaveBeenCalledWith('477A-10', component.today);
     expect(harness.routeNativeElement?.textContent).toContain(
       SPTRANS_ROUTE.route_long_name,

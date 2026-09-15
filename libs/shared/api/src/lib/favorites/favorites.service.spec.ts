@@ -324,7 +324,8 @@ describe('anonymous favorites first-login import', () => {
   });
 
   it('discards browser favorites without uploading them', async () => {
-    const { service, anonymousRecords, importedScopes, operations } = createHarness();
+    const { service, anonymousRecords, importedScopes, operations } =
+      createHarness();
     service._anonymousFavoritesImportCount.set(2);
 
     await service.discardAnonymousFavorites();

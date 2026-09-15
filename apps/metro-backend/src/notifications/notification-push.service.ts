@@ -220,7 +220,11 @@ export class NotificationPushService {
           // new row under the claim so queue reconciliation cannot replay it.
           await tx.notificationDelivery.updateMany({
             where: { id: delivery.id, claimToken },
-            data: { expiresAt: currentTime, claimToken: null, claimUntil: null },
+            data: {
+              expiresAt: currentTime,
+              claimToken: null,
+              claimUntil: null,
+            },
           });
           return { count: 0 };
         }

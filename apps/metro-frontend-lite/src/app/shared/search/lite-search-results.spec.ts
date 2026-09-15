@@ -14,14 +14,16 @@ describe('processLiteSearchResults', () => {
         sourceId: 'stop',
         platformCode: '2',
         mergedStopIds: ['artesp:stop', 'artesp:other'],
-        routes: [{
-          id: 'route-row',
-          route_id: 'artesp:001',
-          route_short_name: '001',
-          route_long_name: 'Terminal Central',
-          supportsRealtime: false,
-          fares: [{ price: 5, currency: 'BRL' }],
-        }],
+        routes: [
+          {
+            id: 'route-row',
+            route_id: 'artesp:001',
+            route_short_name: '001',
+            route_long_name: 'Terminal Central',
+            supportsRealtime: false,
+            fares: [{ price: 5, currency: 'BRL' }],
+          },
+        ],
       },
       {
         id: 'rail-row',
@@ -42,21 +44,27 @@ describe('processLiteSearchResults', () => {
     ]);
 
     expect(results.map((result) => result.stopId)).toEqual([
-      'artesp:stop', 'rail-central', 'bike-central',
+      'artesp:stop',
+      'rail-central',
+      'bike-central',
     ]);
     expect(results[0]).toMatchObject({
       platformCode: '2',
       mergedStopIds: ['artesp:stop', 'artesp:other'],
-      routes: [{
-        id: 'route-row',
-        routeId: 'artesp:001',
-        supportsRealtime: false,
-        fares: [{ price: 5, currency: 'BRL' }],
-      }],
+      routes: [
+        {
+          id: 'route-row',
+          routeId: 'artesp:001',
+          supportsRealtime: false,
+          fares: [{ price: 5, currency: 'BRL' }],
+        },
+      ],
     });
     expect(results[1]).toMatchObject({ kind: 'railStation', isSubway: true });
     expect(results[2]).toMatchObject({
-      kind: 'bikeStation', latitude: -23.7, longitude: -46.8,
+      kind: 'bikeStation',
+      latitude: -23.7,
+      longitude: -46.8,
     });
   });
 });

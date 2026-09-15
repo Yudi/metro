@@ -10,7 +10,6 @@ import { mapBusRoute } from './bus-catalog.utils';
  */
 @Injectable()
 export class BusRouteServiceOptimized {
-
   constructor(
     private prisma: PrismaService,
     private queryOptimization: QueryOptimizationService,

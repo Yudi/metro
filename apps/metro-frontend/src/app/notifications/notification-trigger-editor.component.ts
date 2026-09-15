@@ -129,7 +129,6 @@ const TARGET_KIND_LABELS: Record<NotificationTargetKind, string> = {
   special_line: 'serviços',
 };
 
-
 function normalizeTargetSearch(value: string): string {
   return value
     .normalize('NFD')
@@ -246,13 +245,37 @@ export class NotificationTriggerEditorComponent implements OnChanges {
     const format = this.lineNameFormat();
     const target = targets[0];
     const station = target?.label.split('\u00b7', 1)[0]?.trim() || 'Sé';
-    const lineName = formatNotificationLineName(target?.railLineCode ?? 1, target?.label ?? 'Linha 1 - Azul', format);
+    const lineName = formatNotificationLineName(
+      target?.railLineCode ?? 1,
+      target?.label ?? 'Linha 1 - Azul',
+      format,
+    );
     switch (this.selectedKind()) {
-      case 'rail_headway': return { title: `Intervalo médio - ${station} - ${lineName}`, body: 'Jabaquara: 3 min - Tucuruvi: 4 min (estimativa)' };
-      case 'rail_arrivals': return { title: `Próximos trens - ${station} - ${lineName}`, body: 'Jabaquara: na plataforma\nTucuruvi: em 2 min (08:02)' };
-      case 'bus_arrivals': return { title: `Chegadas de ônibus - ${target?.label ?? 'Praça da Sé'}`, body: '8000-10 - Terminal Lapa: em 2 min (08:02)\n702P-10 - Metrô Belém: em 4 min (08:04)' };
-      case 'bus_notices': return { title: `Ônibus ${target?.busRouteShortName ?? '702P-10'} - Desvio de itinerário`, body: 'Hoje, das 08:00 às 12:00\nEmbarque transferido para o ponto seguinte durante as obras.' };
-      case 'special_departures': return { title: `Próximas partidas - ${target?.label ?? 'Expresso Aeroporto'}`, body: 'Sentido aeroporto: 08:30\nSentido centro: 09:00' };
+      case 'rail_headway':
+        return {
+          title: `Intervalo médio - ${station} - ${lineName}`,
+          body: 'Jabaquara: 3 min - Tucuruvi: 4 min (estimativa)',
+        };
+      case 'rail_arrivals':
+        return {
+          title: `Próximos trens - ${station} - ${lineName}`,
+          body: 'Jabaquara: na plataforma\nTucuruvi: em 2 min (08:02)',
+        };
+      case 'bus_arrivals':
+        return {
+          title: `Chegadas de ônibus - ${target?.label ?? 'Praça da Sé'}`,
+          body: '8000-10 - Terminal Lapa: em 2 min (08:02)\n702P-10 - Metrô Belém: em 4 min (08:04)',
+        };
+      case 'bus_notices':
+        return {
+          title: `Ônibus ${target?.busRouteShortName ?? '702P-10'} - Desvio de itinerário`,
+          body: 'Hoje, das 08:00 às 12:00\nEmbarque transferido para o ponto seguinte durante as obras.',
+        };
+      case 'special_departures':
+        return {
+          title: `Próximas partidas - ${target?.label ?? 'Expresso Aeroporto'}`,
+          body: 'Sentido aeroporto: 08:30\nSentido centro: 09:00',
+        };
     }
     const lines = [1, 2, 3].map((code) => ({
       targetId: `preview-${code}`,
@@ -309,7 +332,9 @@ export class NotificationTriggerEditorComponent implements OnChanges {
     statusMode: new FormControl(DEFAULT_TRIGGER.statusMode, {
       nonNullable: true,
     }),
-    lineNameFormat: new FormControl(DEFAULT_NOTIFICATION_LINE_NAME_FORMAT, { nonNullable: true }),
+    lineNameFormat: new FormControl(DEFAULT_NOTIFICATION_LINE_NAME_FORMAT, {
+      nonNullable: true,
+    }),
     targetIds: new FormControl([...DEFAULT_TRIGGER.targetIds], {
       nonNullable: true,
     }),
@@ -565,7 +590,8 @@ export class NotificationTriggerEditorComponent implements OnChanges {
         arrivalLeadMinutes: value.arrivalLeadMinutes ?? 5,
         intervalMinutes: value.intervalMinutes,
         statusMode: value.statusMode,
-        lineNameFormat: value.lineNameFormat ?? DEFAULT_NOTIFICATION_LINE_NAME_FORMAT,
+        lineNameFormat:
+          value.lineNameFormat ?? DEFAULT_NOTIFICATION_LINE_NAME_FORMAT,
         targetIds: [...value.targetIds],
       },
       { emitEvent: false },
@@ -580,7 +606,9 @@ export class NotificationTriggerEditorComponent implements OnChanges {
 
     const targets = trigger?.targets ?? [];
     this.selectedKind.set(value.kind);
-    this.lineNameFormat.set(value.lineNameFormat ?? DEFAULT_NOTIFICATION_LINE_NAME_FORMAT);
+    this.lineNameFormat.set(
+      value.lineNameFormat ?? DEFAULT_NOTIFICATION_LINE_NAME_FORMAT,
+    );
     this.updateIntervalValidators(value.kind, value.kind);
     this.selectedTargets.set(targets);
     this.rawTargetResults.set([]);

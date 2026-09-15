@@ -193,7 +193,10 @@ export class NotificationEngineService {
                   subscriptions,
                   railStatusEntries,
                   now,
-                  trigger.targets.map(({ target }) => ({ targetId: target.id, label: target.label })),
+                  trigger.targets.map(({ target }) => ({
+                    targetId: target.id,
+                    label: target.label,
+                  })),
                 );
               } catch (error) {
                 this.logger.warn(
@@ -282,21 +285,36 @@ export class NotificationEngineService {
           select: { payload: true },
         });
         const previousStates = readDeliveredRailStates(prior?.payload);
-        const message = buildAggregatedRailStatusMessage(config, triggerId, deliverable, now, previousStates, selectedTargets);
+        const message = buildAggregatedRailStatusMessage(
+          config,
+          triggerId,
+          deliverable,
+          now,
+          previousStates,
+          selectedTargets,
+        );
         if (!message) continue;
-        const { recoveredTargetIds, reopenedTargetIds } = message.payload.notification.data;
-        const hasRecovery = recoveredTargetIds.length > 0 || reopenedTargetIds.length > 0;
-        const hasAlert = deliverable.some((entry) => ['issue', 'closed'].includes(notificationRailState(entry.snapshot)));
+        const { recoveredTargetIds, reopenedTargetIds } =
+          message.payload.notification.data;
+        const hasRecovery =
+          recoveredTargetIds.length > 0 || reopenedTargetIds.length > 0;
+        const hasAlert = deliverable.some((entry) =>
+          ['issue', 'closed'].includes(notificationRailState(entry.snapshot)),
+        );
         if (hasAlert && !freshIssue && !hasRecovery) continue;
 
         await tx.notificationDelivery.createMany({
-          data: [{
-            triggerId,
-            subscriptionId: subscription.id,
-            revision,
-            ...message,
-            fingerprint: notificationHash(`${revision}-${message.fingerprint}`),
-          }],
+          data: [
+            {
+              triggerId,
+              subscriptionId: subscription.id,
+              revision,
+              ...message,
+              fingerprint: notificationHash(
+                `${revision}-${message.fingerprint}`,
+              ),
+            },
+          ],
           skipDuplicates: true,
         });
       }

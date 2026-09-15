@@ -58,9 +58,7 @@ describe('lite application routes', () => {
     );
 
     expect(
-      cityRoute?.children?.every(
-        (route) => route.loadComponent !== undefined,
-      ),
+      cityRoute?.children?.every((route) => route.loadComponent !== undefined),
     ).toBe(true);
   });
 

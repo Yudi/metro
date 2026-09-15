@@ -25,7 +25,6 @@ function scheduledTimes(
   );
 }
 
-
 function frequency(
   startTime: string,
   endTime: string,

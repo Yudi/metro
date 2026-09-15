@@ -20,14 +20,16 @@ describe('anonymous favorites login consent', () => {
     discardFavorites.mockReset();
     TestBed.configureTestingModule({
       imports: [TestHostComponent, AnonymousFavoritesImportDialogComponent],
-      providers: [{
-        provide: FavoritesService,
-        useValue: {
-          anonymousFavoritesImportCount: count.asReadonly(),
-          importAnonymousFavorites: importFavorites,
-          discardAnonymousFavorites: discardFavorites,
+      providers: [
+        {
+          provide: FavoritesService,
+          useValue: {
+            anonymousFavoritesImportCount: count.asReadonly(),
+            importAnonymousFavorites: importFavorites,
+            discardAnonymousFavorites: discardFavorites,
+          },
         },
-      }],
+      ],
     });
   });
 
@@ -64,7 +66,9 @@ describe('anonymous favorites login consent', () => {
 
   it('requires an explicit transfer click', async () => {
     count.set(2);
-    const fixture = TestBed.createComponent(AnonymousFavoritesImportDialogComponent);
+    const fixture = TestBed.createComponent(
+      AnonymousFavoritesImportDialogComponent,
+    );
     await fixture.whenStable();
     expect(importFavorites).not.toHaveBeenCalled();
     const buttons = fixture.nativeElement.querySelectorAll('button');
@@ -77,15 +81,18 @@ describe('anonymous favorites login consent', () => {
   it('prevents duplicate choices and allows retry after a storage failure', async () => {
     count.set(1);
     discardFavorites.mockRejectedValueOnce(new Error('storage unavailable'));
-    const fixture = TestBed.createComponent(AnonymousFavoritesImportDialogComponent);
+    const fixture = TestBed.createComponent(
+      AnonymousFavoritesImportDialogComponent,
+    );
     await fixture.whenStable();
     const first = fixture.componentInstance.resolve(false);
     await fixture.componentInstance.resolve(true);
     await first;
     await fixture.whenStable();
     expect(importFavorites).not.toHaveBeenCalled();
-    expect(fixture.nativeElement.querySelector('[role="alert"]').textContent)
-      .toContain('Não foi possível salvar sua escolha');
+    expect(
+      fixture.nativeElement.querySelector('[role="alert"]').textContent,
+    ).toContain('Não foi possível salvar sua escolha');
     expect(fixture.componentInstance.pending()).toBe(false);
     await fixture.componentInstance.resolve(false);
     expect(discardFavorites).toHaveBeenCalledTimes(2);

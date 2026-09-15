@@ -16,10 +16,7 @@ import { NotificationRetentionService } from './notification-retention.service';
 import { WsThrottlerGuard } from '../common/guards/ws-throttler.guard';
 
 @Module({
-  imports: [
-    PrismaModule,
-    SaoPauloTransitModule,
-  ],
+  imports: [PrismaModule, SaoPauloTransitModule],
   providers: [
     NotificationRetentionService,
     AuthService,

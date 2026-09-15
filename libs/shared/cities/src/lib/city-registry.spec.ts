@@ -1,4 +1,9 @@
-import { cityPath, DEFAULT_CITY, getCity, SUPPORTED_CITIES } from './city-registry';
+import {
+  cityPath,
+  DEFAULT_CITY,
+  getCity,
+  SUPPORTED_CITIES,
+} from './city-registry';
 
 describe('city registry and paths', () => {
   it('enables only implemented São Paulo and does not resolve an unknown city', () => {
@@ -10,8 +15,12 @@ describe('city registry and paths', () => {
 
   it('constructs city roots, feature paths and deep links with query and fragment', () => {
     expect(cityPath()).toBe('/sp');
-    expect(cityPath('/mapa?lat=-23&lon=-46#selection')).toBe('/sp/mapa?lat=-23&lon=-46#selection');
-    expect(cityPath('itinerarios/example/123', 'other-city')).toBe('/other-city/itinerarios/example/123');
+    expect(cityPath('/mapa?lat=-23&lon=-46#selection')).toBe(
+      '/sp/mapa?lat=-23&lon=-46#selection',
+    );
+    expect(cityPath('itinerarios/example/123', 'other-city')).toBe(
+      '/other-city/itinerarios/example/123',
+    );
     expect(cityPath('?restoreMapState=1')).toBe('/sp?restoreMapState=1');
   });
 

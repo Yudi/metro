@@ -21,7 +21,9 @@ export class DashboardRouteReuseStrategy
   } | null = null;
 
   override shouldDetach(route: ActivatedRouteSnapshot): boolean {
-    return this.browser && route.routeConfig?.data?.['preserveDashboard'] === true;
+    return (
+      this.browser && route.routeConfig?.data?.['preserveDashboard'] === true
+    );
   }
 
   override store(
@@ -55,7 +57,7 @@ export class DashboardRouteReuseStrategy
   }
 
   override retrieve(route: ActivatedRouteSnapshot): DetachedRouteHandle | null {
-    return this.shouldAttach(route) ? this.stored?.handle ?? null : null;
+    return this.shouldAttach(route) ? (this.stored?.handle ?? null) : null;
   }
 
   ngOnDestroy(): void {

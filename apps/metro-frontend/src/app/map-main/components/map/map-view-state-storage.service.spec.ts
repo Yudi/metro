@@ -2,11 +2,19 @@ import { PLATFORM_ID, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { DEFAULT_CITY, TransitCity } from '@metro/shared/cities';
 import { CityContextService } from '../../../cities/city-context.service';
-import { MapViewStateStorageService, SavedMapViewState } from './map-view-state-storage.service';
+import {
+  MapViewStateStorageService,
+  SavedMapViewState,
+} from './map-view-state-storage.service';
 
 const state: SavedMapViewState = {
-  center: [-46, -23], zoom: 13, displayMode: 'selected',
-  nearbyCenter: null, nearbyRadius: 1000, layers: {}, vectorLayers: {},
+  center: [-46, -23],
+  zoom: 13,
+  displayMode: 'selected',
+  nearbyCenter: null,
+  nearbyRadius: 1000,
+  layers: {},
+  vectorLayers: {},
   selections: { routeIds: ['route'], stopIds: [], bikeStationIds: [] },
 };
 
@@ -17,16 +25,26 @@ describe('city map view persistence', () => {
 
   beforeEach(() => {
     city.set(DEFAULT_CITY);
-    TestBed.configureTestingModule({ providers: [
-      { provide: PLATFORM_ID, useValue: 'server' },
-      { provide: CityContextService, useValue: { city, id: () => city().id } },
-    ] });
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: PLATFORM_ID, useValue: 'server' },
+        {
+          provide: CityContextService,
+          useValue: { city, id: () => city().id },
+        },
+      ],
+    });
     storage = TestBed.inject(MapViewStateStorageService);
     records = new Map([['last:sp', state]]);
-    Object.defineProperty(storage, 'db', { value: { mapViewStates: {
-      get: async (key: string) => records.get(key),
-      put: async (value: SavedMapViewState & { key: string }) => records.set(value.key, value),
-    } } });
+    Object.defineProperty(storage, 'db', {
+      value: {
+        mapViewStates: {
+          get: async (key: string) => records.get(key),
+          put: async (value: SavedMapViewState & { key: string }) =>
+            records.set(value.key, value),
+        },
+      },
+    });
   });
 
   it('isolates saved views by city', async () => {
@@ -41,9 +59,18 @@ describe('city map view persistence', () => {
   });
 
   it('uses the selected city map defaults when resetting', () => {
-    city.set({ ...DEFAULT_CITY, id: 'other-city', map: {
-      center: { latitude: 20, longitude: 10 }, zoom: 8,
-    } });
-    expect(storage.getDefaultQueryParams()).toMatchObject({ lat: '20', lon: '10', z: '8' });
+    city.set({
+      ...DEFAULT_CITY,
+      id: 'other-city',
+      map: {
+        center: { latitude: 20, longitude: 10 },
+        zoom: 8,
+      },
+    });
+    expect(storage.getDefaultQueryParams()).toMatchObject({
+      lat: '20',
+      lon: '10',
+      z: '8',
+    });
   });
 });

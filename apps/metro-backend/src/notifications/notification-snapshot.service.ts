@@ -138,7 +138,11 @@ export class NotificationSnapshotService {
         // Reinsert as the most recently used entry for bounded LRU eviction.
         this.cache.delete(key);
         this.cache.set(key, cached);
-        return cached.snapshots.filter((snapshot) => snapshot.validUntil === undefined || snapshot.validUntil > now.getTime());
+        return cached.snapshots.filter(
+          (snapshot) =>
+            snapshot.validUntil === undefined ||
+            snapshot.validUntil > now.getTime(),
+        );
       }
       this.cache.delete(key);
     }
@@ -188,9 +192,7 @@ export class NotificationSnapshotService {
       case 'rail_status':
         return this.readRailStatus(descriptor, now).then(asSnapshotArray);
       case 'rail_headway':
-        return this.readRailHeadway(descriptor, now).then(
-          asSnapshotArray,
-        );
+        return this.readRailHeadway(descriptor, now).then(asSnapshotArray);
       case 'rail_arrivals':
         return this.readRailArrivals(target, descriptor, now).then(
           asSnapshotArray,
@@ -220,7 +222,8 @@ export class NotificationSnapshotService {
     const result = (await this.rail.getLinesStatus()) as RailStatusResult;
     const observedAt = new Date(result?.lastUpdated ?? Number.NaN).getTime();
     if (
-      !result || result.success !== true ||
+      !result ||
+      result.success !== true ||
       result.errorMessage ||
       !Number.isFinite(observedAt) ||
       observedAt > now.getTime() + 60_000 ||
@@ -236,15 +239,32 @@ export class NotificationSnapshotService {
       return null;
     }
 
-    const details = [...new Set([line.description, line.detail]
-      .map((value) => value?.trim())
-      .filter((value): value is string => Boolean(value)))];
+    const details = [
+      ...new Set(
+        [line.description, line.detail]
+          .map((value) => value?.trim())
+          .filter((value): value is string => Boolean(value)),
+      ),
+    ];
     const body = [line.statusLabel, ...details].join(': ');
-    const normal = notificationRailState({ ...line, normal: false }) === 'operational';
-    const networkAllOperational = result.lines.every((candidate) => notificationRailState({ ...candidate, normal: false }) === 'operational') && RAIL_LINES.every((expected) => {
-      const observations = result.lines.filter((candidate) => candidate.code === expected.code);
-      return observations.length === 1 && notificationRailState({ ...observations[0], normal: false }) === 'operational';
-    });
+    const normal =
+      notificationRailState({ ...line, normal: false }) === 'operational';
+    const networkAllOperational =
+      result.lines.every(
+        (candidate) =>
+          notificationRailState({ ...candidate, normal: false }) ===
+          'operational',
+      ) &&
+      RAIL_LINES.every((expected) => {
+        const observations = result.lines.filter(
+          (candidate) => candidate.code === expected.code,
+        );
+        return (
+          observations.length === 1 &&
+          notificationRailState({ ...observations[0], normal: false }) ===
+            'operational'
+        );
+      });
     const semantic = {
       kind: 'rail_status',
       lineCode,
@@ -289,7 +309,11 @@ export class NotificationSnapshotService {
     if (!station) return null;
 
     const operation = await this.readRailStatus({ lineCode }, now);
-    if (operation?.statusCode === 'OperacaoEncerrada' || operation?.statusCode === 'Paralisada') return null;
+    if (
+      operation?.statusCode === 'OperacaoEncerrada' ||
+      operation?.statusCode === 'Paralisada'
+    )
+      return null;
 
     const headway = await this.headway.getHeadway(lineCode, stationCode);
     if (
@@ -654,9 +678,18 @@ export class NotificationSnapshotService {
         label: departure.label.trim(),
         time: departure.time.trim(),
       }))
-      .filter((departure) => departure.label && /^([01]\d|2[0-3]):[0-5]\d$/.test(departure.time))
-      .map((departure) => ({ ...departure, expectedAt: parseArrivalPrediction(departure.time, now) }))
-      .filter((departure) => departure.expectedAt !== null && departure.expectedAt > now.getTime())
+      .filter(
+        (departure) =>
+          departure.label && /^([01]\d|2[0-3]):[0-5]\d$/.test(departure.time),
+      )
+      .map((departure) => ({
+        ...departure,
+        expectedAt: parseArrivalPrediction(departure.time, now),
+      }))
+      .filter(
+        (departure) =>
+          departure.expectedAt !== null && departure.expectedAt > now.getTime(),
+      )
       .sort((left, right) => (left.expectedAt ?? 0) - (right.expectedAt ?? 0));
     if (!departures.length) return null;
     const issues = line.issues
@@ -675,7 +708,9 @@ export class NotificationSnapshotService {
       title: `Próximas partidas - ${line.line}`,
       body: [
         ...(!normal ? [line.statusLabel] : []),
-        ...departures.slice(0, 5).map((departure) => `${departure.label}: ${departure.time}`),
+        ...departures
+          .slice(0, 5)
+          .map((departure) => `${departure.label}: ${departure.time}`),
         ...issues.map((issue) => `${issue.line}: ${issue.description}`),
       ].join('\n'),
       fingerprint: notificationHash(

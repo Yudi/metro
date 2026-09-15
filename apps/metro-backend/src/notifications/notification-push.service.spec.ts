@@ -166,12 +166,14 @@ describe('notification delivery', () => {
       ['first', statusDelivery('first', 'state-a')],
       ['second', statusDelivery('second', 'state-a', 2)],
     ]);
-    findUnique.mockImplementation(async ({ where }: { where: { id: string } }) => ({
-      ...rows.get(where.id),
-      claimToken:
-        updateMany.mock.calls[updateMany.mock.calls.length - 1]?.[0].data
-          .claimToken,
-    }));
+    findUnique.mockImplementation(
+      async ({ where }: { where: { id: string } }) => ({
+        ...rows.get(where.id),
+        claimToken:
+          updateMany.mock.calls[updateMany.mock.calls.length - 1]?.[0].data
+            .claimToken,
+      }),
+    );
     findFirst
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null)
@@ -179,11 +181,9 @@ describe('notification delivery', () => {
       .mockResolvedValueOnce({ payload: rows.get('first')?.payload });
 
     await service.deliver('first', now);
-    const restartedService = new NotificationPushService(
-      prisma,
-      config,
-      { publishDeviceRemoved } as unknown as NotificationRealtimeService,
-    );
+    const restartedService = new NotificationPushService(prisma, config, {
+      publishDeviceRemoved,
+    } as unknown as NotificationRealtimeService);
     await restartedService.deliver('second', now);
 
     expect(webPush.sendNotification).toHaveBeenCalledTimes(1);
@@ -227,12 +227,14 @@ describe('notification delivery', () => {
       ['second', statusDelivery('second', 'state-b', 2)],
       ['third', statusDelivery('third', 'state-a', 3)],
     ]);
-    findUnique.mockImplementation(async ({ where }: { where: { id: string } }) => ({
-      ...rows.get(where.id),
-      claimToken:
-        updateMany.mock.calls[updateMany.mock.calls.length - 1]?.[0].data
-          .claimToken,
-    }));
+    findUnique.mockImplementation(
+      async ({ where }: { where: { id: string } }) => ({
+        ...rows.get(where.id),
+        claimToken:
+          updateMany.mock.calls[updateMany.mock.calls.length - 1]?.[0].data
+            .claimToken,
+      }),
+    );
     findFirst
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null)
@@ -253,12 +255,14 @@ describe('notification delivery', () => {
       ['first', statusDelivery('first', 'state-a')],
       ['second', statusDelivery('second', 'state-a', 2)],
     ]);
-    findUnique.mockImplementation(async ({ where }: { where: { id: string } }) => ({
-      ...rows.get(where.id),
-      claimToken:
-        updateMany.mock.calls[updateMany.mock.calls.length - 1]?.[0].data
-          .claimToken,
-    }));
+    findUnique.mockImplementation(
+      async ({ where }: { where: { id: string } }) => ({
+        ...rows.get(where.id),
+        claimToken:
+          updateMany.mock.calls[updateMany.mock.calls.length - 1]?.[0].data
+            .claimToken,
+      }),
+    );
     jest
       .mocked(webPush.sendNotification)
       .mockRejectedValueOnce(new Error('connection reset'));
@@ -269,11 +273,9 @@ describe('notification delivery', () => {
       .mockResolvedValueOnce({ payload: rows.get('first')?.payload });
 
     await service.deliver('first', now);
-    await new NotificationPushService(
-      prisma,
-      config,
-      { publishDeviceRemoved } as unknown as NotificationRealtimeService,
-    ).deliver('second', now);
+    await new NotificationPushService(prisma, config, {
+      publishDeviceRemoved,
+    } as unknown as NotificationRealtimeService).deliver('second', now);
 
     expect(webPush.sendNotification).toHaveBeenCalledTimes(1);
     expect(updateMany).toHaveBeenLastCalledWith(
@@ -288,12 +290,14 @@ describe('notification delivery', () => {
       ['first', statusDelivery('first', 'state-a')],
       ['second', statusDelivery('second', 'state-a', 2)],
     ]);
-    findUnique.mockImplementation(async ({ where }: { where: { id: string } }) => ({
-      ...rows.get(where.id),
-      claimToken:
-        updateMany.mock.calls[updateMany.mock.calls.length - 1]?.[0].data
-          .claimToken,
-    }));
+    findUnique.mockImplementation(
+      async ({ where }: { where: { id: string } }) => ({
+        ...rows.get(where.id),
+        claimToken:
+          updateMany.mock.calls[updateMany.mock.calls.length - 1]?.[0].data
+            .claimToken,
+      }),
+    );
     jest
       .mocked(webPush.sendNotification)
       .mockRejectedValueOnce({ statusCode: 429 })
@@ -307,16 +311,16 @@ describe('notification delivery', () => {
       .mockResolvedValueOnce(null);
 
     await service.deliver('first', now);
-    await new NotificationPushService(
-      prisma,
-      config,
-      { publishDeviceRemoved } as unknown as NotificationRealtimeService,
-    ).deliver('second', now);
+    await new NotificationPushService(prisma, config, {
+      publishDeviceRemoved,
+    } as unknown as NotificationRealtimeService).deliver('second', now);
 
     expect(webPush.sendNotification).toHaveBeenCalledTimes(2);
-    expect(updateMany.mock.calls.some(([call]) =>
-      call.data.dispatchStartedAt === null,
-    )).toBe(true);
+    expect(
+      updateMany.mock.calls.some(
+        ([call]) => call.data.dispatchStartedAt === null,
+      ),
+    ).toBe(true);
   });
   it('keeps periodic notification kinds outside status history deduplication', async () => {
     const row = statusDelivery('periodic', 'state-a');

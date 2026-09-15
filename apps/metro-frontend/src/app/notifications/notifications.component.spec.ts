@@ -139,15 +139,13 @@ describe('NotificationsComponent', () => {
   });
 
   it('sorts line targets naturally in a trigger summary', () => {
-    const targets: NotificationTrigger['targets'] = [10, 2, 1].map(
-      (code) => ({
-        id: `line-${code}`,
-        kind: 'rail_line',
-        label: `Linha ${code}`,
-        available: true,
-        railLineCode: code,
-      }),
-    );
+    const targets: NotificationTrigger['targets'] = [10, 2, 1].map((code) => ({
+      id: `line-${code}`,
+      kind: 'rail_line',
+      label: `Linha ${code}`,
+      available: true,
+      railLineCode: code,
+    }));
     component.configuration.set({
       ...configuration,
       triggers: [

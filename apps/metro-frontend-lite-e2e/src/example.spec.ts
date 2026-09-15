@@ -1,14 +1,14 @@
 import { test, expect, type Locator } from '@playwright/test';
 
-test('renders the São Paulo dashboard at the regional root', async ({ page }) => {
+test('renders the São Paulo dashboard at the regional root', async ({
+  page,
+}) => {
   await page.goto('/');
 
   await expect(
     page.getByRole('heading', { name: 'Transporte Metropolitano' }),
   ).toBeVisible();
-  await expect(
-    page.getByRole('heading', { name: 'Painel' }),
-  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Painel' })).toBeVisible();
 });
 
 const searchActivations = [

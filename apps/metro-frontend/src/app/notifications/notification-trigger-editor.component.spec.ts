@@ -256,32 +256,66 @@ describe('NotificationTriggerEditorComponent', () => {
       expect.objectContaining({ id: 'trigger-1', expectedRevision: 3 }),
     );
   });
-  it.each(['full', 'number', 'code', 'color'] as const)('updates the preview and saves the %s line-name preference', (lineNameFormat) => {
-    const saved = jest.fn();
-    component.saved.subscribe(saved);
-    component.form.controls.name.setValue('Minha viagem');
-    component.selectTarget({ id: 'line-1', kind: 'rail_line', label: 'Linha 1 - Azul', available: true, railLineCode: 1 });
-    component.form.controls.lineNameFormat.setValue(lineNameFormat);
-    fixture.detectChanges();
-    const expected = { full: 'Linha 1 - Azul', number: '1', code: 'L1', color: 'Azul' }[lineNameFormat];
-    expect(fixture.nativeElement.querySelector('.notification-preview').textContent).toContain(`${expected}: Velocidade Reduzida`);
-    component.submit();
-    expect(saved).toHaveBeenCalledWith(expect.objectContaining({ input: expect.objectContaining({ lineNameFormat }) }));
-  });
+  it.each(['full', 'number', 'code', 'color'] as const)(
+    'updates the preview and saves the %s line-name preference',
+    (lineNameFormat) => {
+      const saved = jest.fn();
+      component.saved.subscribe(saved);
+      component.form.controls.name.setValue('Minha viagem');
+      component.selectTarget({
+        id: 'line-1',
+        kind: 'rail_line',
+        label: 'Linha 1 - Azul',
+        available: true,
+        railLineCode: 1,
+      });
+      component.form.controls.lineNameFormat.setValue(lineNameFormat);
+      fixture.detectChanges();
+      const expected = {
+        full: 'Linha 1 - Azul',
+        number: '1',
+        code: 'L1',
+        color: 'Azul',
+      }[lineNameFormat];
+      expect(
+        fixture.nativeElement.querySelector('.notification-preview')
+          .textContent,
+      ).toContain(`${expected}: Velocidade Reduzida`);
+      component.submit();
+      expect(saved).toHaveBeenCalledWith(
+        expect.objectContaining({
+          input: expect.objectContaining({ lineNameFormat }),
+        }),
+      );
+    },
+  );
 
   it('always previews L1, L2 and L3 independently of the saved selection', () => {
-    component.selectTarget({ id: 'line-9', kind: 'rail_line', label: 'Linha 9 - Esmeralda', available: true, railLineCode: 9 });
+    component.selectTarget({
+      id: 'line-9',
+      kind: 'rail_line',
+      label: 'Linha 9 - Esmeralda',
+      available: true,
+      railLineCode: 9,
+    });
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.notification-preview p').textContent).toBe(
+    expect(
+      fixture.nativeElement.querySelector('.notification-preview p')
+        .textContent,
+    ).toBe(
       'L1: Velocidade Reduzida\nL2: Operação normalizada\nL3: Operação Normal',
     );
-    expect(fixture.nativeElement.textContent).not.toContain('Cenário de exemplo');
+    expect(fixture.nativeElement.textContent).not.toContain(
+      'Cenário de exemplo',
+    );
     expect(fixture.nativeElement.textContent).toContain('Dados fictícios');
     component.removeTarget(component.selectedTargets()[0]);
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.notification-preview p').textContent).toBe(
+    expect(
+      fixture.nativeElement.querySelector('.notification-preview p')
+        .textContent,
+    ).toBe(
       'L1: Velocidade Reduzida\nL2: Operação normalizada\nL3: Operação Normal',
     );
   });
-
 });

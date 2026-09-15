@@ -126,7 +126,9 @@ export class MapNearbyModeService {
   }
 
   private fallbackToDefaultLocation(): void {
-    this.logger.info('Using default city location', { city: this.cityContext.id() });
+    this.logger.info('Using default city location', {
+      city: this.cityContext.id(),
+    });
     this.dataLoader.loadNearbyStops(
       this.cityContext.city().map.center.latitude,
       this.cityContext.city().map.center.longitude,

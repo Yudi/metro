@@ -4,10 +4,7 @@ import { haversineDistanceKm } from '../../common/utils/geo-distance.util';
 import { BusStop } from '../entities/geography.entity';
 import { BusStopService } from './bus-stop.service';
 import { SAO_PAULO_CITY } from '@metro/shared/cities';
-import {
-  normalizeStationName,
-  shouldMergeStations,
-} from '@metro/shared/utils';
+import { normalizeStationName, shouldMergeStations } from '@metro/shared/utils';
 
 @Injectable()
 export class SubwayStationService {

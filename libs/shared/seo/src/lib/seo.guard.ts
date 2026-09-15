@@ -12,7 +12,10 @@ import {
 export class SeoGuard implements CanActivate, CanActivateChild {
   private seo = inject(SeoService);
   private readonly location = inject(Location);
-  canActivateChild(route: ActivatedRouteSnapshot, state: RouterStateSnapshot): boolean {
+  canActivateChild(
+    route: ActivatedRouteSnapshot,
+    state: RouterStateSnapshot,
+  ): boolean {
     return this.canActivate(route, state);
   }
 

@@ -36,7 +36,10 @@ import {
 } from '@metro/shared/utils';
 
 type LiteSpecialRailService = Pick<SpecialRailService, 'code'> & {
-  stations: Pick<SpecialRailService['stations'][number], 'stationCode' | 'name'>[];
+  stations: Pick<
+    SpecialRailService['stations'][number],
+    'stationCode' | 'name'
+  >[];
 };
 
 /**

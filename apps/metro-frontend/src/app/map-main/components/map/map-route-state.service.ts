@@ -230,7 +230,10 @@ export class MapRouteStateService {
       this.mapService
         .getVectorTileLayerService()
         .setLayerVisibility(VectorTileLayerType.RAIL_ROUTES, false);
-      this.mapService.centerOn(this.cityContext.center(), this.cityContext.city().map.zoom);
+      this.mapService.centerOn(
+        this.cityContext.center(),
+        this.cityContext.city().map.zoom,
+      );
       this.dataLoader.syncVectorTileFilters();
       this.displayService.updateMapDisplay();
     } finally {

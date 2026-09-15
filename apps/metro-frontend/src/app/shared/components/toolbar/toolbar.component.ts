@@ -162,12 +162,15 @@ export class ToolbarComponent {
     this.closeSidenav();
 
     const mapCommands = [this.cityContext.path('/mapa')];
-    const isOnMap = this.router.isActive(this.router.createUrlTree(mapCommands), {
-      paths: 'exact',
-      queryParams: 'ignored',
-      fragment: 'ignored',
-      matrixParams: 'ignored',
-    });
+    const isOnMap = this.router.isActive(
+      this.router.createUrlTree(mapCommands),
+      {
+        paths: 'exact',
+        queryParams: 'ignored',
+        fragment: 'ignored',
+        matrixParams: 'ignored',
+      },
+    );
 
     if (isOnMap) {
       this.mapViewStateStorage.requestDefaultState();
@@ -261,8 +264,7 @@ export class ToolbarComponent {
     const path = `/${relativeSegments.map((segment) => segment.path).join('/')}`;
 
     return (
-      this.safeBackPaths.has(path) ||
-      /^\/itinerarios\/[^/]+\/[^/]+$/.test(path)
+      this.safeBackPaths.has(path) || /^\/itinerarios\/[^/]+\/[^/]+$/.test(path)
     );
   }
 }

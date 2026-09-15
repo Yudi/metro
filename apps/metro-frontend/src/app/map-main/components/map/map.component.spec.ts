@@ -165,7 +165,10 @@ describe('MapComponent', () => {
   it('does not create duplicate maps when initializeMap is called multiple times', () => {
     const mapService = TestBed.inject(MapService);
     const options = {
-      center: [DEFAULT_CITY.map.center.longitude, DEFAULT_CITY.map.center.latitude],
+      center: [
+        DEFAULT_CITY.map.center.longitude,
+        DEFAULT_CITY.map.center.latitude,
+      ],
       zoom: DEFAULT_CITY.map.zoom,
       showControls: true,
       additionalLayers: [],

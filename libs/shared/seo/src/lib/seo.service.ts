@@ -29,15 +29,15 @@ export class SeoService {
   }
 
   setTitle(title: string): SeoService {
-    const actualTitle = !title || title === this.siteTitle
-      ? this.siteTitle
-      : `${title} | ${this.siteTitle}`;
+    const actualTitle =
+      !title || title === this.siteTitle
+        ? this.siteTitle
+        : `${title} | ${this.siteTitle}`;
     this.title.setTitle(actualTitle);
     return this;
   }
   setDescription(description: string): SeoService {
-    const actualDescription =
-      description || this.city.description;
+    const actualDescription = description || this.city.description;
     this.meta.updateTag({
       name: 'description',
       content: actualDescription,
@@ -49,9 +49,10 @@ export class SeoService {
     href: string;
     type?: string;
   }): SeoService {
-    const existing = attributes.rel === 'canonical'
-      ? this.document.head.querySelector('link[rel="canonical"]')
-      : null;
+    const existing =
+      attributes.rel === 'canonical'
+        ? this.document.head.querySelector('link[rel="canonical"]')
+        : null;
     const link = existing ?? this.renderer.createElement('link');
     this.renderer.setAttribute(link, 'rel', attributes.rel);
     this.renderer.setAttribute(link, 'href', attributes.href);

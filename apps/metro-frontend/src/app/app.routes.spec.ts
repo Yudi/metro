@@ -33,9 +33,7 @@ describe('application city routes', () => {
 
   it('renders the São Paulo rail status at root and /sp', async () => {
     const rootRoute = routes.find((route) => route.path === '');
-    const cityRoute = routes.find(
-      (route) => route.path === DEFAULT_CITY.id,
-    );
+    const cityRoute = routes.find((route) => route.path === DEFAULT_CITY.id);
     const rootHome = rootRoute?.children?.find((route) => route.path === '');
     const cityHome = cityRoute?.children?.find((route) => route.path === '');
     const featurePaths = cityRoute?.children?.map((route) => route.path);

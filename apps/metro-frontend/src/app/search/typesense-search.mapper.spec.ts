@@ -50,7 +50,11 @@ describe('mapTypesenseSearchResponse', () => {
     ]);
 
     expect(response.results.map((result) => result.document.id)).toEqual([
-      'artesp:001', 'artesp:stop', 'L1', 'rail-central', 'bike-central',
+      'artesp:001',
+      'artesp:stop',
+      'L1',
+      'rail-central',
+      'bike-central',
     ]);
     expect(response.results[0].document).toMatchObject(route);
     expect(response.results[1].document).toMatchObject({

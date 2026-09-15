@@ -13,14 +13,26 @@ describe('city route context', () => {
 
   it('resolves the city on initial activation and on navigation', () => {
     const events = new Subject<NavigationEnd>();
-    TestBed.configureTestingModule({ providers: [{ provide: Router, useValue: {
-      url: '/', events,
-      getCurrentNavigation: () => ({ extractedUrl: { toString: () => '/sp/mapa' } }),
-    } }] });
+    TestBed.configureTestingModule({
+      providers: [
+        {
+          provide: Router,
+          useValue: {
+            url: '/',
+            events,
+            getCurrentNavigation: () => ({
+              extractedUrl: { toString: () => '/sp/mapa' },
+            }),
+          },
+        },
+      ],
+    });
     const context = TestBed.inject(CityContextService);
     expect(context.id()).toBe('sp');
     events.next(new NavigationEnd(1, '/sp/mapa', '/sp/mapa'));
-    expect(context.path('itinerarios/example/1')).toBe('/sp/itinerarios/example/1');
+    expect(context.path('itinerarios/example/1')).toBe(
+      '/sp/itinerarios/example/1',
+    );
     expect(context.center()).toEqual([-46.6339471, -23.5503953]);
   });
 });

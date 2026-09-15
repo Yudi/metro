@@ -194,7 +194,9 @@ export function statusLabelFormat(statusLabel: string): string {
   }
 }
 
-export function statusTone(status: Pick<RailLineStatus, 'statusColor'> | undefined): string {
+export function statusTone(
+  status: Pick<RailLineStatus, 'statusColor'> | undefined,
+): string {
   if (!status) {
     return 'unknown';
   }

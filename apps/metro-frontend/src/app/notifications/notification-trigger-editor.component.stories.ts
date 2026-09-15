@@ -126,8 +126,11 @@ export const StatusDeVariasLinhas: Story = {
       lineNameFormat: 'code',
       targetIds: ['line-1', 'line-2', 'line-3'],
       targets: [1, 2, 3].map((code) => ({
-        id: `line-${code}`, kind: 'rail_line', label: `Linha ${code}`,
-        available: true, railLineCode: code,
+        id: `line-${code}`,
+        kind: 'rail_line',
+        label: `Linha ${code}`,
+        available: true,
+        railLineCode: code,
       })),
     },
   },

@@ -477,17 +477,44 @@ describe('NotificationSettingsService', () => {
       deviceId,
     );
   });
-  it.each(['full', 'number', 'code', 'color'] as const)('persists and returns the %s line-name preference', async (lineNameFormat) => {
-    const input = { ...triggerInput, lineNameFormat };
-    prisma.notificationTrigger.create.mockResolvedValue({ id: triggerId, revision: 0, config: input, targets: [] });
-    expect(await service.saveTrigger('user-id', input)).toMatchObject({ lineNameFormat });
-    expect(prisma.notificationTrigger.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ config: expect.objectContaining({ lineNameFormat }) }) }));
-  });
+  it.each(['full', 'number', 'code', 'color'] as const)(
+    'persists and returns the %s line-name preference',
+    async (lineNameFormat) => {
+      const input = { ...triggerInput, lineNameFormat };
+      prisma.notificationTrigger.create.mockResolvedValue({
+        id: triggerId,
+        revision: 0,
+        config: input,
+        targets: [],
+      });
+      expect(await service.saveTrigger('user-id', input)).toMatchObject({
+        lineNameFormat,
+      });
+      expect(prisma.notificationTrigger.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            config: expect.objectContaining({ lineNameFormat }),
+          }),
+        }),
+      );
+    },
+  );
 
   it('rejects unknown formatting and defaults older saved alerts to code', async () => {
-    await expect(service.saveTrigger('user-id', { ...triggerInput, lineNameFormat: 'invalid' })).rejects.toMatchObject({ status: 400 });
-    prisma.notificationTrigger.create.mockResolvedValue({ id: triggerId, revision: 0, config: triggerInput, targets: [] });
-    expect(await service.saveTrigger('user-id', triggerInput)).toMatchObject({ lineNameFormat: 'code' });
+    await expect(
+      service.saveTrigger('user-id', {
+        ...triggerInput,
+        lineNameFormat: 'invalid',
+      }),
+    ).rejects.toMatchObject({ status: 400 });
+    prisma.notificationTrigger.create.mockResolvedValue({
+      id: triggerId,
+      revision: 0,
+      config: triggerInput,
+      targets: [],
+    });
+    expect(await service.saveTrigger('user-id', triggerInput)).toMatchObject({
+      lineNameFormat: 'code',
+    });
   });
-
 });

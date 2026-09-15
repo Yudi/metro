@@ -17,8 +17,12 @@ export function cityPath(path = '', cityId = DEFAULT_CITY.id): string {
     throw new Error('Expected an internal application path');
   }
   const relative = path.replace(/^\/+/, '');
-  if (relative === cityId || relative.startsWith(`${cityId}/`) ||
-      relative.startsWith(`${cityId}?`) || relative.startsWith(`${cityId}#`)) {
+  if (
+    relative === cityId ||
+    relative.startsWith(`${cityId}/`) ||
+    relative.startsWith(`${cityId}?`) ||
+    relative.startsWith(`${cityId}#`)
+  ) {
     return `/${relative}`;
   }
   return `/${cityId}${relative && !/^[?#]/.test(relative) ? '/' : ''}${relative}`;

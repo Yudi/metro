@@ -80,14 +80,39 @@ describe('issue episode identities', () => {
     );
   });
   it('starts a new episode for a changed disruption status and for closure', async () => {
-    findUniqueOrThrow.mockResolvedValue({ observationClass: `incident:${notificationHash('VelocidadeReduzida').slice(0, 20)}`, observationEpisode: 'episode-1', observationAt: snapshot.observedAt });
-    const reduced = await notificationIssueIdentity(tx, 'rail_status', 'line', { ...snapshot, statusCode: 'VelocidadeReduzida' });
-    const stopped = await notificationIssueIdentity(tx, 'rail_status', 'line', { ...snapshot, statusCode: 'Paralisada', observedAt: new Date(snapshot.observedAt.getTime() + 60_000) });
+    findUniqueOrThrow.mockResolvedValue({
+      observationClass: `incident:${notificationHash('VelocidadeReduzida').slice(0, 20)}`,
+      observationEpisode: 'episode-1',
+      observationAt: snapshot.observedAt,
+    });
+    const reduced = await notificationIssueIdentity(tx, 'rail_status', 'line', {
+      ...snapshot,
+      statusCode: 'VelocidadeReduzida',
+    });
+    const stopped = await notificationIssueIdentity(tx, 'rail_status', 'line', {
+      ...snapshot,
+      statusCode: 'Paralisada',
+      observedAt: new Date(snapshot.observedAt.getTime() + 60_000),
+    });
     expect(stopped).not.toBe(reduced);
-    expect(update).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ observationClass: `incident:${notificationHash('Paralisada').slice(0, 20)}` }) }));
-    const closed = await notificationIssueIdentity(tx, 'rail_status', 'line', { ...snapshot, statusCode: 'OperacaoEncerrada', important: false, observedAt: new Date(snapshot.observedAt.getTime() + 120_000) });
+    expect(update).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          observationClass: `incident:${notificationHash('Paralisada').slice(0, 20)}`,
+        }),
+      }),
+    );
+    const closed = await notificationIssueIdentity(tx, 'rail_status', 'line', {
+      ...snapshot,
+      statusCode: 'OperacaoEncerrada',
+      important: false,
+      observedAt: new Date(snapshot.observedAt.getTime() + 120_000),
+    });
     expect(closed).not.toBe(reduced);
-    expect(update).toHaveBeenLastCalledWith(expect.objectContaining({ data: expect.objectContaining({ observationClass: 'closed' }) }));
+    expect(update).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ observationClass: 'closed' }),
+      }),
+    );
   });
-
 });

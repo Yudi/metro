@@ -13,7 +13,6 @@ import { BusStopRow, mapBusStop } from './bus-catalog.utils';
  */
 @Injectable()
 export class BusStopServiceOptimized {
-
   constructor(
     private prisma: PrismaService,
     private queryOptimization: QueryOptimizationService,

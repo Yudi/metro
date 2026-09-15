@@ -1,7 +1,5 @@
 import { formatScheduledRailTime } from '@metro/shared/utils';
-import type {
-  RailScheduledDeparture,
-} from '@metro/shared/utils';
+import type { RailScheduledDeparture } from '@metro/shared/utils';
 import type { LiteRailScheduledService } from './lite-search.types';
 
 export function formatLiteScheduledServiceTime(

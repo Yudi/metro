@@ -438,7 +438,10 @@ export class MapDisplayService {
   }
 
   centerOnCity(): void {
-    this.mapService.centerOn(this.cityContext.center(), this.cityContext.city().map.zoom);
+    this.mapService.centerOn(
+      this.cityContext.center(),
+      this.cityContext.city().map.zoom,
+    );
   }
 
   centerOn(coordinates: [number, number], zoom: number): void {

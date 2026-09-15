@@ -1,4 +1,9 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  inject,
+  signal,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule } from '@angular/material/dialog';
 import { FavoritesService } from '@metro/shared/api';
@@ -19,9 +24,25 @@ import { FavoritesService } from '@metro/shared/api';
       }
     </mat-dialog-content>
     <mat-dialog-actions align="end">
-      <button mat-button mat-dialog-close type="button" [disabled]="pending()">Agora não</button>
-      <button mat-button type="button" [disabled]="pending()" (click)="resolve(false)">Descartar</button>
-      <button mat-flat-button type="button" [disabled]="pending()" (click)="resolve(true)">Transferir</button>
+      <button mat-button mat-dialog-close type="button" [disabled]="pending()">
+        Agora não
+      </button>
+      <button
+        mat-button
+        type="button"
+        [disabled]="pending()"
+        (click)="resolve(false)"
+      >
+        Descartar
+      </button>
+      <button
+        mat-flat-button
+        type="button"
+        [disabled]="pending()"
+        (click)="resolve(true)"
+      >
+        Transferir
+      </button>
     </mat-dialog-actions>
   `,
 })

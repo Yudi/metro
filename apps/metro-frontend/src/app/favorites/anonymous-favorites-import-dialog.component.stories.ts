@@ -7,16 +7,20 @@ const meta: Meta<AnonymousFavoritesImportDialogComponent> = {
   title: 'Favorites/AnonymousImportDialog',
   component: AnonymousFavoritesImportDialogComponent,
   tags: ['autodocs'],
-  decorators: [applicationConfig({
-    providers: [{
-      provide: FavoritesService,
-      useValue: {
-        anonymousFavoritesImportCount: signal(2),
-        importAnonymousFavorites: async () => undefined,
-        discardAnonymousFavorites: async () => undefined,
-      },
-    }],
-  })],
+  decorators: [
+    applicationConfig({
+      providers: [
+        {
+          provide: FavoritesService,
+          useValue: {
+            anonymousFavoritesImportCount: signal(2),
+            importAnonymousFavorites: async () => undefined,
+            discardAnonymousFavorites: async () => undefined,
+          },
+        },
+      ],
+    }),
+  ],
 };
 export default meta;
 type Story = StoryObj<AnonymousFavoritesImportDialogComponent>;
@@ -29,7 +33,9 @@ export const Saving: Story = {
   render: () => ({ props: { pending: signal(true) } }),
 };
 export const StorageError: Story = {
-  render: () => ({ props: {
-    error: signal('Não foi possível salvar sua escolha. Tente novamente.'),
-  } }),
+  render: () => ({
+    props: {
+      error: signal('Não foi possível salvar sua escolha. Tente novamente.'),
+    },
+  }),
 };

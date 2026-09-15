@@ -152,7 +152,10 @@ export class ExploreLocationSearchService {
       return 0;
     }
 
-    if (normalizedCity && this.cityContext.city().searchPriorityCities.includes(normalizedCity)) {
+    if (
+      normalizedCity &&
+      this.cityContext.city().searchPriorityCities.includes(normalizedCity)
+    ) {
       return 1;
     }
 

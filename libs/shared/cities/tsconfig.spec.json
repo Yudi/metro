@@ -3,7 +3,8 @@
   "compilerOptions": {
     "outDir": "../../../dist/out-tsc",
     "module": "commonjs",
-    "moduleResolution": "bundler","types": ["jest", "node"]
+    "moduleResolution": "bundler",
+    "types": ["jest", "node"]
   },
   "include": [
     "jest.config.ts",

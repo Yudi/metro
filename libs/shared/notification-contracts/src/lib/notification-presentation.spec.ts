@@ -77,7 +77,7 @@ describe('notification presentation shared with the preview', () => {
       }),
     ).toEqual({
       title: 'Operação encerrada',
-      body: 'L1: Operação Encerrada - sem embarque\nL2: Operação Normal',
+      body: 'L1: Operação Encerrada\nL2: Operação Normal',
     });
     expect(
       buildRailNotificationSummary([line(1, 'Dados Indisponíveis')], {

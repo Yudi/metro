@@ -182,7 +182,7 @@ function railStatusText(
   recovered: ReadonlySet<string>,
   reopened: ReadonlySet<string>,
 ): string {
-  if (state === 'closed') return 'Operação Encerrada - sem embarque';
+  if (state === 'closed') return 'Operação Encerrada';
   if (state === 'unknown') return 'Sem dados recentes';
   if (recovered.has(line.targetId)) {
     const transitional =

@@ -237,3 +237,43 @@ test('identifies an authorized device by browser and operating system', async ({
     page.getByText('Chrome · Windows', { exact: true }),
   ).toBeVisible();
 });
+
+test('previews three fixed rail lines in each name format on desktop and mobile', async ({ page }) => {
+  await mkdir(captures, { recursive: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('/iframe.html?id=notifications-trigger-editor--status-de-varias-linhas&viewMode=story');
+  const preview = page.locator('.notification-preview');
+  for (const [option, first, second, third] of [
+    ['Nome completo: Linha 1 - Azul', 'Linha 1 - Azul', 'Linha 2 - Verde', 'Linha 3 - Vermelha'],
+    ['Somente número: 1', '1', '2', '3'],
+    ['Cor: Azul', 'Azul', 'Verde', 'Vermelha'],
+    ['Código: L1', 'L1', 'L2', 'L3'],
+  ]) {
+    await page.getByRole('combobox', { name: 'Nome das linhas no aviso', exact: true }).click();
+    await page.getByRole('option', { name: option, exact: true }).click();
+    await expect(page.locator('.cdk-overlay-pane')).toHaveCount(0);
+    await expect(preview.locator('p')).toHaveText(`${first}: Velocidade Reduzida\n${second}: Operação normalizada\n${third}: Operação Normal`);
+  }
+  await expect(page.getByRole('combobox', { name: 'Cenário de exemplo', exact: true })).toHaveCount(0);
+  await page.locator('.preview-section').screenshot({ path: resolve(captures, 'status-preview-desktop.png') });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('combobox', { name: 'Nome das linhas no aviso', exact: true }).click();
+  await page.getByRole('option', { name: 'Nome completo: Linha 1 - Azul', exact: true }).click();
+  await expect(page.locator('.cdk-overlay-pane')).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.locator('.preview-section').screenshot({ path: resolve(captures, 'status-preview-mobile.png') });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.locator('.preview-section').screenshot({ path: resolve(captures, 'status-preview-mobile-dark.png') });
+});
+
+test('keeps the line-name preference after saving, pausing and reopening the editor', async ({ page }) => {
+  await page.goto('/iframe.html?id=pages-notifications--aviso-configurado&viewMode=story');
+  await page.getByRole('button', { name: 'Editar Minha ida para a faculdade' }).click();
+  await page.getByRole('combobox', { name: 'Nome das linhas no aviso', exact: true }).click();
+  await page.getByRole('option', { name: 'Cor: Azul', exact: true }).click();
+  await page.getByRole('button', { name: 'Salvar aviso', exact: true }).click();
+  await page.getByRole('switch', { name: 'Desativar Minha ida para a faculdade' }).click();
+  await page.getByRole('button', { name: 'Editar Minha ida para a faculdade' }).click();
+  await expect(page.getByRole('combobox', { name: 'Nome das linhas no aviso', exact: true })).toContainText('Cor: Azul');
+  await expect(page.locator('.notification-preview p')).toHaveText('Azul: Velocidade Reduzida\nVerde: Operação normalizada\nVermelha: Operação Normal');
+});

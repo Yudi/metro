@@ -8,6 +8,9 @@ export const NOTIFICATION_KINDS = [
 ] as const;
 export const NOTIFICATION_TIMEZONE = 'America/Sao_Paulo';
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
+export const NOTIFICATION_LINE_NAME_FORMATS = ['full', 'number', 'code', 'color'] as const;
+export type NotificationLineNameFormat = (typeof NOTIFICATION_LINE_NAME_FORMATS)[number];
+export const DEFAULT_NOTIFICATION_LINE_NAME_FORMAT: NotificationLineNameFormat = 'code';
 export type NotificationTargetKind =
   | 'rail_line'
   | 'rail_station'
@@ -46,6 +49,7 @@ export interface NotificationTriggerInput {
   kind: NotificationKind;
   targetIds: string[];
   statusMode: 'all' | 'abnormal';
+  lineNameFormat?: NotificationLineNameFormat;
 }
 export interface NotificationTrigger extends NotificationTriggerInput {
   id: string;
@@ -186,6 +190,8 @@ export function validateNotificationTrigger(value: unknown): string | null {
     return 'Selecione de 1 a 20 linhas, estações ou pontos.';
   if (v.statusMode !== 'all' && v.statusMode !== 'abnormal')
     return 'Selecione quando avisar sobre a operação.';
+  if (v.lineNameFormat !== undefined && !NOTIFICATION_LINE_NAME_FORMATS.includes(v.lineNameFormat))
+    return 'Selecione um formato válido para o nome das linhas.';
   return null;
 }
 function validTime(value: unknown): value is string {

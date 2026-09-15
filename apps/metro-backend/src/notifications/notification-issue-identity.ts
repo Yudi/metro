@@ -1,5 +1,5 @@
 import type { Prisma } from '../../generated/prisma/client';
-import type { NotificationKind } from '@metro/shared/notification-contracts';
+import { notificationRailState, type NotificationKind } from '@metro/shared/notification-contracts';
 import { randomUUID } from 'node:crypto';
 import { NotificationSnapshot, notificationHash } from './notification-message';
 
@@ -13,9 +13,15 @@ export async function notificationIssueIdentity(
   if (kind === 'bus_notices')
     return notificationHash(`bus-notice-${snapshot.fingerprint}`);
   if (kind !== 'rail_status') return null;
-  // Severity and wording may change within one issue. Only observed normal
-  // operation closes its episode and permits a future incident alert.
-  const observationClass = snapshot.normal ? 'normal' : 'incident';
+  // A new status deserves an update even within an ongoing disruption.
+  // Description-only changes keep the episode; closure is separate from both
+  // a disruption and normal operation. A -> B -> A starts three episodes.
+  const state = notificationRailState(snapshot);
+  if (state === 'unknown') return undefined;
+  const status = snapshot.statusCode ?? snapshot.statusLabel?.trim();
+  const observationClass = state === 'operational' ? 'normal'
+    : state === 'closed' ? 'closed'
+    : status ? `incident:${notificationHash(status).slice(0, 20)}` : 'incident';
   await tx.$queryRaw`SELECT id FROM public.notification_targets WHERE id = ${targetId}::uuid FOR UPDATE`;
   const target = await tx.notificationTarget.findUniqueOrThrow({
     where: { id: targetId },

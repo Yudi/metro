@@ -46,6 +46,9 @@ describe('notification evaluation to durable outbox integration', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     createMany.mockReset();
+    prisma.notificationDelivery.findFirst.mockReset().mockResolvedValue(null);
+    prisma.pushSubscription.findMany.mockResolvedValue([{ id: 'device' }]);
+    prisma.notificationIssueReceipt.createMany.mockResolvedValue({ count: 1 });
     prisma.notificationTarget.update.mockReset();
     prisma.$transaction.mockImplementation(async (callback) =>
       callback(prisma),
@@ -89,31 +92,73 @@ describe('notification evaluation to durable outbox integration', () => {
   afterEach(() => jest.useRealTimers());
   it('reuses persisted episodes and outbox identities across fresh engine instances', async () => {
     const targets = ['line-1', 'line-2'];
-    const row = { id: 'trigger', userId: 'user', user: { last_login: now }, revision: 1,
+    const row = {
+      id: 'trigger',
+      userId: 'user',
+      user: { last_login: now },
+      revision: 1,
       config: { ...config, statusMode: 'all', targetIds: targets },
       targets: targets.map((id) => ({ target: { id, available: true } })),
     };
     findMany.mockResolvedValue([row]);
-    const states = new Map<string, { observationClass?: string; observationEpisode?: string; observationAt?: Date }>();
-    prisma.notificationTarget.findUniqueOrThrow.mockImplementation(async ({ where }: { where: { id: string } }) => states.get(where.id) ?? {});
-    prisma.notificationTarget.update.mockImplementation(async ({ where, data }: { where: { id: string }; data: { observationClass: string; observationEpisode: string; observationAt: Date } }) => {
-      states.set(where.id, data);
-      return data;
-    });
+    const states = new Map<
+      string,
+      {
+        observationClass?: string;
+        observationEpisode?: string;
+        observationAt?: Date;
+      }
+    >();
+    prisma.notificationTarget.findUniqueOrThrow.mockImplementation(
+      async ({ where }: { where: { id: string } }) =>
+        states.get(where.id) ?? {},
+    );
+    prisma.notificationTarget.update.mockImplementation(
+      async ({
+        where,
+        data,
+      }: {
+        where: { id: string };
+        data: {
+          observationClass: string;
+          observationEpisode: string;
+          observationAt: Date;
+        };
+      }) => {
+        states.set(where.id, data);
+        return data;
+      },
+    );
     const outboxKeys = new Set<string>();
-    createMany.mockImplementation(async ({ data }: { data: Array<{ fingerprint: string }> }) => {
-      const previousSize = outboxKeys.size;
-      data.forEach((delivery) => outboxKeys.add(delivery.fingerprint));
-      return { count: outboxKeys.size - previousSize };
-    });
-    read.mockImplementation(async (_kind: string, target: { id: string }, observedAt: Date) => [{
-      title: target.id, body: 'Operação Normal', fingerprint: 'normal', normal: true, important: false,
-      observedAt, statusLabel: 'Operação Normal', lineCode: target.id === 'line-1' ? 'L1' : 'L2', url: '/',
-    }]);
+    createMany.mockImplementation(
+      async ({ data }: { data: Array<{ fingerprint: string }> }) => {
+        const previousSize = outboxKeys.size;
+        data.forEach((delivery) => outboxKeys.add(delivery.fingerprint));
+        return { count: outboxKeys.size - previousSize };
+      },
+    );
+    read.mockImplementation(
+      async (_kind: string, target: { id: string }, observedAt: Date) => [
+        {
+          title: target.id,
+          body: 'Operação Normal',
+          fingerprint: 'normal',
+          normal: true,
+          important: false,
+          observedAt,
+          statusLabel: 'Operação Normal',
+          lineCode: target.id === 'line-1' ? 'L1' : 'L2',
+          url: '/',
+        },
+      ],
+    );
     await engine.evaluateDue(now);
     for (let restart = 1; restart <= 3; restart++) {
       row.targets.reverse();
-      const restarted = new NotificationEngineService(prisma as unknown as PrismaService, { readMany: read } as unknown as NotificationSnapshotService);
+      const restarted = new NotificationEngineService(
+        prisma as unknown as PrismaService,
+        { readMany: read } as unknown as NotificationSnapshotService,
+      );
       await restarted.evaluateDue(new Date(now.getTime() + restart * 60_000));
     }
     expect(outboxKeys.size).toBe(1);
@@ -122,36 +167,84 @@ describe('notification evaluation to durable outbox integration', () => {
 
   it('waits for every selected line before announcing normal service after warm-up', async () => {
     const targets = ['line-1', 'line-2'];
-    findMany.mockResolvedValue([{ id: 'trigger', userId: 'user', user: { last_login: now }, revision: 1,
-      config: { ...config, statusMode: 'all', targetIds: targets },
-      targets: targets.map((id) => ({ target: { id, available: true } })),
-    }]);
+    findMany.mockResolvedValue([
+      {
+        id: 'trigger',
+        userId: 'user',
+        user: { last_login: now },
+        revision: 1,
+        config: { ...config, statusMode: 'all', targetIds: targets },
+        targets: targets.map((id) => ({ target: { id, available: true } })),
+      },
+    ]);
     let ready = false;
-    read.mockImplementation(async (_kind: string, target: { id: string }) => target.id === 'line-2' && !ready ? [] : [{
-      title: target.id, body: 'Operação Normal', fingerprint: 'normal', normal: true, important: false,
-      observedAt: now, statusLabel: 'Operação Normal', lineCode: target.id === 'line-1' ? 'L1' : 'L2', url: '/',
-    }]);
+    read.mockImplementation(async (_kind: string, target: { id: string }) =>
+      target.id === 'line-2' && !ready
+        ? []
+        : [
+            {
+              title: target.id,
+              body: 'Operação Normal',
+              fingerprint: 'normal',
+              normal: true,
+              important: false,
+              observedAt: now,
+              statusLabel: 'Operação Normal',
+              lineCode: target.id === 'line-1' ? 'L1' : 'L2',
+              url: '/',
+            },
+          ],
+    );
     await engine.evaluateDue(now);
     expect(createMany).not.toHaveBeenCalled();
     ready = true;
     await engine.evaluateDue(now);
     expect(createMany).toHaveBeenCalledTimes(1);
-    expect(createMany.mock.calls[0][0].data[0].payload.notification.body).toBe('L1, L2: Operação Normal');
+    expect(createMany.mock.calls[0][0].data[0].payload.notification.body).toBe(
+      'L1, L2: Operação Normal',
+    );
   });
 
   it('still reports a known issue when another selected line is unavailable', async () => {
     const targets = ['line-1', 'line-2'];
-    findMany.mockResolvedValue([{ id: 'trigger', userId: 'user', user: { last_login: now }, revision: 1,
-      config: { ...config, statusMode: 'all', targetIds: targets },
-      targets: targets.map((id) => ({ target: { id, available: true } })),
-    }]);
-    read.mockImplementation(async (_kind: string, target: { id: string }) => target.id === 'line-2' ? [] : [{
-      title: 'Linha 1', body: 'Operação Parcial', fingerprint: 'issue', normal: false, important: true,
-      observedAt: now, statusLabel: 'Operação Parcial', lineCode: 'L1', url: '/',
-    }]);
+    findMany.mockResolvedValue([
+      {
+        id: 'trigger',
+        userId: 'user',
+        user: { last_login: now },
+        revision: 1,
+        config: { ...config, statusMode: 'all', targetIds: targets },
+        targets: targets.map((id) => ({
+          target: {
+            id,
+            label: id === 'line-1' ? 'Linha 1 - Azul' : 'Linha 2 - Verde',
+            available: true,
+          },
+        })),
+      },
+    ]);
+    read.mockImplementation(async (_kind: string, target: { id: string }) =>
+      target.id === 'line-2'
+        ? []
+        : [
+            {
+              title: 'Linha 1',
+              body: 'Operação Parcial',
+              fingerprint: 'issue',
+              normal: false,
+              important: true,
+              observedAt: now,
+              statusLabel: 'Operação Parcial',
+              lineCode: 'L1',
+              url: '/',
+            },
+          ],
+    );
     await engine.evaluateDue(now);
     expect(createMany).toHaveBeenCalledTimes(1);
-    expect(createMany.mock.calls[0][0].data[0].payload.notification.body).toBe("1 linha com 'Operação Parcial'");
+    expect(createMany.mock.calls[0][0].data[0].payload.notification.body).toBe(
+      'L1: Operação Parcial\nL2: Sem dados recentes',
+    );
   });
   it('persists an ongoing off-window incident on window entry with per-device deduplication', async () => {
     await engine.evaluateDue(now);
@@ -430,7 +523,137 @@ describe('notification evaluation to durable outbox integration', () => {
 
     expect(createMany).toHaveBeenCalledTimes(1);
     expect(createMany.mock.calls[0][0].data[0].payload.notification.body).toBe(
-      "1 linha com 'Operação Encerrada'\n2 linhas com 'Operação Parcial'",
+      'L1, L2: Operação Parcial\nL3: Operação Encerrada\nL4: Operação Normal',
+    );
+  });
+  function selectLines(statusMode: 'all' | 'abnormal' = 'abnormal') {
+    findMany.mockResolvedValue([
+      {
+        id: 'trigger',
+        userId: 'user',
+        user: { last_login: now },
+        revision: 1,
+        config: { ...config, statusMode, targetIds: ['line-1', 'line-2'] },
+        targets: [1, 2].map((code) => ({
+          target: {
+            id: `line-${code}`,
+            label: `Linha ${code}`,
+            available: true,
+          },
+        })),
+      },
+    ]);
+    read.mockImplementation(async (_kind: string, target: { id: string }) => [
+      {
+        title: target.id,
+        body: 'Operação Normal',
+        fingerprint: 'normal',
+        normal: true,
+        important: false,
+        observedAt: now,
+        statusLabel: 'Operação Normal',
+        lineCode: target.id === 'line-1' ? 'L1' : 'L2',
+        url: '/',
+      },
+    ]);
+  }
+
+  function priorPayload(firstState: string, secondState = 'operational') {
+    return {
+      payload: {
+        notification: {
+          data: {
+            railStates: [
+              { targetId: 'line-1', state: firstState },
+              { targetId: 'line-2', state: secondState },
+            ],
+          },
+        },
+      },
+    };
+  }
+
+  it('sends recovery in incident-only mode once, based on the last successful delivery', async () => {
+    selectLines();
+    prisma.notificationDelivery.findFirst.mockResolvedValue(
+      priorPayload('issue'),
+    );
+    await engine.evaluateDue(now);
+    expect(createMany).toHaveBeenCalledTimes(1);
+    const message = createMany.mock.calls[0][0].data[0].payload.notification;
+    expect(message.body).toBe('L1: Operação normalizada\nL2: Operação Normal');
+    expect(prisma.notificationDelivery.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          subscriptionId: 'device',
+          sentAt: { not: null },
+        }),
+      }),
+    );
+    prisma.notificationDelivery.findFirst.mockResolvedValue({
+      payload: { notification: message },
+    });
+    await engine.evaluateDue(now);
+    expect(createMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports partial recovery even if the remaining incident was already receipted', async () => {
+    selectLines();
+    prisma.notificationDelivery.findFirst.mockResolvedValue(
+      priorPayload('issue', 'issue'),
+    );
+    prisma.notificationIssueReceipt.createMany.mockResolvedValue({ count: 0 });
+    read.mockImplementation(async (_kind: string, target: { id: string }) => [
+      {
+        title: target.id,
+        body: target.id === 'line-1' ? 'Operação Normal' : 'Operação Parcial',
+        fingerprint: target.id,
+        normal: target.id === 'line-1',
+        important: target.id === 'line-2',
+        observedAt: now,
+        statusLabel:
+          target.id === 'line-1' ? 'Operação Normal' : 'Operação Parcial',
+        lineCode: target.id === 'line-1' ? 'L1' : 'L2',
+        url: '/',
+      },
+    ]);
+    await engine.evaluateDue(now);
+    expect(createMany).toHaveBeenCalledTimes(1);
+    expect(createMany.mock.calls[0][0].data[0].payload.notification.body).toBe(
+      'L2: Operação Parcial\nL1: Operação normalizada',
+    );
+  });
+
+  it('does not manufacture recovery for a device that never received the disruption', async () => {
+    selectLines('all');
+    prisma.pushSubscription.findMany.mockResolvedValue([
+      { id: 'existing-device' },
+      { id: 'new-device' },
+    ]);
+    prisma.notificationDelivery.findFirst.mockImplementation(
+      async ({ where }: { where: { subscriptionId: string } }) =>
+        where.subscriptionId === 'existing-device'
+          ? priorPayload('issue')
+          : null,
+    );
+    await engine.evaluateDue(now);
+    expect(createMany).toHaveBeenCalledTimes(2);
+    expect(createMany.mock.calls[0][0].data[0].payload.notification.title).toBe(
+      'Operação normalizada',
+    );
+    expect(createMany.mock.calls[1][0].data[0].payload.notification.title).toBe(
+      'Suas linhas estão operacionais',
+    );
+  });
+
+  it('describes a previously closed line as reopened, not recovered from an incident', async () => {
+    selectLines();
+    prisma.notificationDelivery.findFirst.mockResolvedValue(
+      priorPayload('closed'),
+    );
+    await engine.evaluateDue(now);
+    expect(createMany.mock.calls[0][0].data[0].payload.notification.body).toBe(
+      'L1: Operação retomada\nL2: Operação Normal',
     );
   });
 });

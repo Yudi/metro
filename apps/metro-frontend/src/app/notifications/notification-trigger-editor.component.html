@@ -3,8 +3,8 @@
     <div>
       <h2>{{ title() }}</h2>
       <p>
-        Escolha quando e onde você quer receber este aviso. Cada ocorrência é
-        avisada uma vez.
+        Escolha as linhas ou destinos e os horários que fazem parte da sua
+        rotina.
       </p>
     </div>
     <button
@@ -246,8 +246,8 @@
           <div>
             <h3 id="smart-title">Aviso antecipado</h3>
             <p>
-              Antecipe apenas alterações importantes. Cada ocorrência é avisada
-              uma vez; avisos normais seguem as faixas.
+              Receba alterações importantes antes da faixa escolhida.
+              Normalizações e encerramentos seguem os horários configurados.
             </p>
           </div>
           <mat-slide-toggle formControlName="smart">
@@ -279,12 +279,51 @@
         <mat-label>Quando avisar sobre a operação</mat-label>
         <mat-select formControlName="statusMode">
           <mat-option value="abnormal"
-            >Somente quando houver alteração</mat-option
+            >Alterações, encerramentos e normalizações</mat-option
           >
-          <mat-option value="all">Sempre que o status mudar</mat-option>
+          <mat-option value="all"
+            >Resumo na faixa e mudanças de status</mat-option
+          >
         </mat-select>
+        <mat-hint>Operação normal e transitória não são incidentes.</mat-hint>
       </mat-form-field>
     }
+
+    <section
+      class="preview-section wide-field"
+      aria-labelledby="notification-preview-title"
+    >
+      <div class="section-heading">
+        <div>
+          <h3 id="notification-preview-title">Prévia do aviso</h3>
+          <p>Dados fictícios para visualizar como o aviso aparece.</p>
+        </div>
+      </div>
+      @if (isRailKind()) {
+        <mat-form-field appearance="outline">
+          <mat-label>Nome das linhas no aviso</mat-label>
+          <mat-select formControlName="lineNameFormat">
+            @for (format of lineNameFormats; track format.value) {
+              <mat-option [value]="format.value"
+                >{{ format.label }}: {{ format.example }}</mat-option
+              >
+            }
+          </mat-select>
+        </mat-form-field>
+      }
+      <div
+        class="notification-preview"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        <mat-icon aria-hidden="true">notifications</mat-icon>
+        <div>
+          <strong>{{ preview().title }}</strong>
+          <p>{{ preview().body }}</p>
+        </div>
+      </div>
+    </section>
   </div>
 
   <div class="editor-actions">

@@ -63,8 +63,8 @@ export class NotificationRetentionService {
               expiresAt,
               payload: {
                 notification: {
-                  title: 'Seus avisos vão expirar',
-                  body: `Seus avisos e dispositivos serão excluídos em até ${stage} ${stage === 1 ? 'dia' : 'dias'} por inatividade. Entre na sua conta para mantê-los.`,
+                  title: `Seus avisos expiram em até ${stage} ${stage === 1 ? 'dia' : 'dias'}`,
+                  body: `Entre na sua conta até ${new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(expiry)} (horário de São Paulo) para manter seus avisos e dispositivos. Após essa data, eles serão excluídos por inatividade.`,
                   tag: 'metro-notification-retention',
                   renotify: false,
                   data: {

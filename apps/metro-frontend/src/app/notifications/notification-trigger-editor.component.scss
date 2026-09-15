@@ -145,11 +145,51 @@
 }
 
 .targets-section,
-.smart-section {
+.smart-section,
+.preview-section {
   display: grid;
   gap: 8px;
   padding-top: 8px;
   border-top: 1px solid var(--mat-sys-outline-variant);
+}
+
+.preview-section {
+  margin-top: 12px;
+  min-width: 0;
+}
+
+.preview-section h3 {
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+
+.notification-preview {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--mat-sys-surface-container);
+  color: var(--mat-sys-on-surface);
+  overflow-wrap: anywhere;
+}
+
+.notification-preview mat-icon {
+  flex: 0 0 auto;
+}
+
+.notification-preview p {
+  margin: 6px 0 0;
+  white-space: pre-line;
+  line-height: 1.5;
+}
+
+.preview-help {
+  margin: 4px 0;
+  max-width: 72ch;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--mat-sys-on-surface-variant);
 }
 
 .target-search-field {

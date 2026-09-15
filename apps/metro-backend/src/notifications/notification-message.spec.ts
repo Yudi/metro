@@ -29,54 +29,171 @@ const incident: NotificationSnapshot = {
 };
 describe('notification messages', () => {
   it('persists restart-stable status content separately from outbox episode keys and windows', () => {
-    const first = buildNotificationMessage(trigger, 't', 'one', incident, new Date('2026-09-07T11:00:00Z'));
-    const restarted = buildNotificationMessage(trigger, 't', 'one', {
-      ...incident, fingerprint: 'new-episode', observedAt: new Date('2026-09-07T11:01:00Z'),
-    }, new Date('2026-09-07T11:01:00Z'));
+    const statusMessage = (snapshot: NotificationSnapshot, now: Date) =>
+      buildAggregatedRailStatusMessage(
+        trigger,
+        't',
+        [{ targetId: 'one', snapshot }],
+        now,
+      );
+    const first = statusMessage(incident, new Date('2026-09-07T11:00:00Z'));
+    const restarted = statusMessage(
+      {
+        ...incident,
+        fingerprint: 'new-episode',
+        observedAt: new Date('2026-09-07T11:01:00Z'),
+      },
+      new Date('2026-09-07T11:01:00Z'),
+    );
     expect(first?.fingerprint).not.toBe(restarted?.fingerprint);
-    expect(first?.payload.notification.data.stateFingerprint).toBe(restarted?.payload.notification.data.stateFingerprint);
-    expect(first?.payload.notification.data.stateScope).toBe(restarted?.payload.notification.data.stateScope);
-    const changed = buildNotificationMessage(trigger, 't', 'one', { ...incident, body: 'Operação Parcial' }, new Date('2026-09-07T11:02:00Z'));
-    expect(changed?.payload.notification.data.stateFingerprint).not.toBe(first?.payload.notification.data.stateFingerprint);
-    const nextWeek = buildNotificationMessage(trigger, 't', 'one', incident, new Date('2026-09-14T11:00:00Z'));
-    expect(nextWeek?.payload.notification.data.windowKey).not.toBe(first?.payload.notification.data.windowKey);
+    expect(first?.payload.notification.data.stateFingerprint).toBe(
+      restarted?.payload.notification.data.stateFingerprint,
+    );
+    expect(first?.payload.notification.data.stateScope).toBe(
+      restarted?.payload.notification.data.stateScope,
+    );
+    const changed = statusMessage(
+      { ...incident, body: 'Operação Parcial' },
+      new Date('2026-09-07T11:02:00Z'),
+    );
+    expect(changed?.payload.notification.data.stateFingerprint).not.toBe(
+      first?.payload.notification.data.stateFingerprint,
+    );
+    const nextWeek = statusMessage(incident, new Date('2026-09-14T11:00:00Z'));
+    expect(nextWeek?.payload.notification.data.windowKey).not.toBe(
+      first?.payload.notification.data.windowKey,
+    );
   });
 
   it('distinguishes changed line statuses even when merged counts look identical', () => {
     const now = new Date('2026-09-07T11:00:00Z');
-    const first = buildAggregatedRailStatusMessage(trigger, 't', [
-      { targetId: 'one', snapshot: { ...incident, statusLabel: 'Operação Parcial', body: 'Operação Parcial' } },
-      { targetId: 'two', snapshot: { ...incident, statusLabel: 'Velocidade Reduzida', body: 'Velocidade Reduzida' } },
-    ], now);
-    const changed = buildAggregatedRailStatusMessage(trigger, 't', [
-      { targetId: 'two', snapshot: { ...incident, statusLabel: 'Operação Parcial', body: 'Operação Parcial' } },
-      { targetId: 'one', snapshot: { ...incident, statusLabel: 'Velocidade Reduzida', body: 'Velocidade Reduzida' } },
-    ], now);
-    expect(first?.payload.notification.body).toBe(changed?.payload.notification.body);
-    expect(first?.payload.notification.data.stateFingerprint).not.toBe(changed?.payload.notification.data.stateFingerprint);
+    const first = buildAggregatedRailStatusMessage(
+      trigger,
+      't',
+      [
+        {
+          targetId: 'one',
+          snapshot: {
+            ...incident,
+            lineCode: 'L1',
+            statusLabel: 'Operação Parcial',
+            body: 'Operação Parcial',
+          },
+        },
+        {
+          targetId: 'two',
+          snapshot: {
+            ...incident,
+            lineCode: 'L2',
+            statusLabel: 'Velocidade Reduzida',
+            body: 'Velocidade Reduzida',
+          },
+        },
+      ],
+      now,
+    );
+    const changed = buildAggregatedRailStatusMessage(
+      trigger,
+      't',
+      [
+        {
+          targetId: 'two',
+          snapshot: {
+            ...incident,
+            lineCode: 'L2',
+            statusLabel: 'Operação Parcial',
+            body: 'Operação Parcial',
+          },
+        },
+        {
+          targetId: 'one',
+          snapshot: {
+            ...incident,
+            lineCode: 'L1',
+            statusLabel: 'Velocidade Reduzida',
+            body: 'Velocidade Reduzida',
+          },
+        },
+      ],
+      now,
+    );
+    expect(first?.payload.notification.body).not.toBe(
+      changed?.payload.notification.body,
+    );
+    expect(first?.payload.notification.data.stateFingerprint).not.toBe(
+      changed?.payload.notification.data.stateFingerprint,
+    );
   });
 
   it('naturally sorts merged line numbers and keeps the payload stable across query order', () => {
     const entries = [11, 2, 10, 9, 1].map((number) => ({
       targetId: `line-${number}`,
-      snapshot: { ...incident, normal: true, important: false, lineCode: `L${number}`, statusLabel: 'Operação Normal' },
+      snapshot: {
+        ...incident,
+        normal: true,
+        important: false,
+        lineCode: `L${number}`,
+        statusLabel: 'Operação Normal',
+      },
     }));
     const now = new Date('2026-09-07T11:00:00Z');
-    const first = buildAggregatedRailStatusMessage({ ...trigger, statusMode: 'all' }, 't', entries, now);
-    const restarted = buildAggregatedRailStatusMessage({ ...trigger, statusMode: 'all' }, 't', [...entries].reverse(), now);
-    expect(first?.payload.notification.body).toBe('L1, L2, L9, L10, L11: Operação Normal');
-    expect(first?.payload.notification.data.targetIds).toEqual(['line-1', 'line-2', 'line-9', 'line-10', 'line-11']);
+    const first = buildAggregatedRailStatusMessage(
+      {
+        ...trigger,
+        statusMode: 'all',
+        targetIds: entries.map((entry) => entry.targetId),
+      },
+      't',
+      entries,
+      now,
+    );
+    const restarted = buildAggregatedRailStatusMessage(
+      {
+        ...trigger,
+        statusMode: 'all',
+        targetIds: entries.map((entry) => entry.targetId),
+      },
+      't',
+      [...entries].reverse(),
+      now,
+    );
+    expect(first?.payload.notification.body).toBe(
+      'L1, L2, L9, L10, L11: Operação Normal',
+    );
+    expect(first?.payload.notification.data.targetIds).toEqual([
+      'line-1',
+      'line-2',
+      'line-9',
+      'line-10',
+      'line-11',
+    ]);
     expect(restarted).toEqual(first);
-    expect(entries.map((entry) => entry.snapshot.lineCode)).toEqual(['L11', 'L2', 'L10', 'L9', 'L1']);
+    expect(entries.map((entry) => entry.snapshot.lineCode)).toEqual([
+      'L11',
+      'L2',
+      'L10',
+      'L9',
+      'L1',
+    ]);
   });
 
   it('uses the public line number when a fallback label has no lineCode', () => {
-    const normal = { ...incident, normal: true, important: false, statusLabel: 'Operação Normal' };
-    const message = buildAggregatedRailStatusMessage({ ...trigger, statusMode: 'all' }, 't', [
-      { targetId: 'ten', snapshot: { ...normal, lineCode: 'L10' } },
-      { targetId: 'two', label: 'Linha 2 - Verde', snapshot: normal },
-    ], new Date('2026-09-07T11:00:00Z'));
-    expect(message?.payload.notification.body).toBe('Linha 2 - Verde, L10: Operação Normal');
+    const normal = {
+      ...incident,
+      normal: true,
+      important: false,
+      statusLabel: 'Operação Normal',
+    };
+    const message = buildAggregatedRailStatusMessage(
+      { ...trigger, statusMode: 'all', targetIds: ['ten', 'two'] },
+      't',
+      [
+        { targetId: 'ten', snapshot: { ...normal, lineCode: 'L10' } },
+        { targetId: 'two', label: 'Linha 2 - Verde', snapshot: normal },
+      ],
+      new Date('2026-09-07T11:00:00Z'),
+    );
+    expect(message?.payload.notification.body).toBe('L2, L10: Operação Normal');
   });
 
   it('delivers an ongoing incident when the window opens even when it started earlier', () => {
@@ -165,7 +282,7 @@ describe('notification messages', () => {
       now,
     );
     expect(message?.payload.notification.body).toContain(
-      'Luz: 08:02 (em 2 min)',
+      'Luz: em 2 min (08:02)',
     );
     expect(message?.payload.notification.body).not.toContain('Jundiaí');
     expect(message?.payload.notification.body).not.toContain('Já passou');
@@ -271,9 +388,9 @@ describe('notification messages', () => {
     );
 
     expect(message?.payload.notification.body).toBe(
-      "1 linha com 'Operação Encerrada'\n2 linhas com 'Operação Parcial'",
+      'L1, L2: Operação Parcial\nL3: Operação Encerrada\nL4: Operação Normal',
     );
-    expect(message?.payload.notification.body).not.toContain('Operação Normal');
+    expect(message?.payload.notification.body).toContain('L4: Operação Normal');
     expect(message?.payload.notification.data.important).toBe(true);
     expect(message?.fingerprint).toBe(reversed?.fingerprint);
   });
@@ -298,4 +415,165 @@ describe('notification messages', () => {
 
     expect(message?.payload.notification.body).toBe('L1');
   });
+  it('sorts arrivals by the soonest boarding opportunity before limiting the list', () => {
+    const now = new Date('2026-09-07T11:00:00Z');
+    const arrivals = [5, 4, 3, 2, 1].map((minutes) => ({
+      destination: `Destino ${minutes}`,
+      expectedAt: now.getTime() + minutes * 60_000,
+    }));
+    const message = buildNotificationMessage(
+      { ...trigger, kind: 'rail_arrivals' },
+      't',
+      'one',
+      {
+        ...incident,
+        normal: true,
+        important: false,
+        stationName: 'Sé',
+        lineCode: 'L1',
+        arrivals: [
+          ...arrivals,
+          {
+            destination: 'Jabaquara',
+            expectedAt: now.getTime() + 30_000,
+            atPlatform: true,
+          },
+        ],
+      },
+      now,
+    );
+    expect(message?.payload.notification.title).toBe(
+      'Próximos trens - Sé - L1',
+    );
+    expect(message?.payload.notification.body.split('\n')[0]).toBe(
+      'Jabaquara: na plataforma',
+    );
+    expect(message?.payload.notification.body).toContain(
+      'Destino 1: em 1 min (08:01)',
+    );
+    expect(message?.payload.notification.body).not.toContain('Destino 5');
+  });
+
+  it('still records normal-to-transitional changes within the same operational episode', () => {
+    const now = new Date('2026-09-07T11:00:00Z');
+    const normal = {
+      targetId: 'one',
+      issueKey: 'same-episode',
+      snapshot: {
+        ...incident,
+        normal: true,
+        important: false,
+        statusCode: 'OperacaoNormal' as const,
+        statusLabel: 'Operação Normal',
+        lineCode: 'L1',
+      },
+    };
+    const first = buildAggregatedRailStatusMessage(
+      { ...trigger, statusMode: 'all' },
+      't',
+      [normal],
+      now,
+    );
+    const changed = buildAggregatedRailStatusMessage(
+      { ...trigger, statusMode: 'all' },
+      't',
+      [
+        {
+          ...normal,
+          snapshot: {
+            ...normal.snapshot,
+            statusCode: 'OperacaoTransitoria',
+            statusLabel: 'Operação Transitória',
+          },
+        },
+      ],
+      now,
+    );
+    expect(changed?.fingerprint).not.toBe(first?.fingerprint);
+    expect(changed?.payload.notification.body).toBe('L1: Operação Transitória');
+  });
+
+  it('preserves the notified state of temporarily missing lines for a later recovery', () => {
+    const now = new Date('2026-09-07T11:00:00Z');
+    const message = buildAggregatedRailStatusMessage(
+      { ...trigger, targetIds: ['one', 'two'] },
+      't',
+      [
+        {
+          targetId: 'one',
+          snapshot: {
+            ...incident,
+            lineCode: 'L1',
+            normal: true,
+            important: false,
+            statusLabel: 'Operação Normal',
+          },
+        },
+      ],
+      now,
+      new Map([
+        ['one', 'issue'],
+        ['two', 'issue'],
+      ]),
+      [
+        { targetId: 'one', label: 'Linha 1 - Azul' },
+        { targetId: 'two', label: 'Linha 2 - Verde' },
+      ],
+    );
+    expect(message?.payload.notification.title).toBe(
+      'Status parcial das suas linhas',
+    );
+    expect(message?.payload.notification.body).toContain(
+      'L1: Operação normalizada',
+    );
+    expect(message?.payload.notification.body).toContain(
+      'L2: Sem dados recentes',
+    );
+    expect(message?.payload.notification.data.railStates).toContainEqual({
+      targetId: 'two',
+      state: 'issue',
+    });
+  });
+
+  it.each(['full', 'number', 'code', 'color'] as const)(
+    'names every unavailable selected line using the %s format',
+    (lineNameFormat) => {
+      const message = buildAggregatedRailStatusMessage(
+        {
+          ...trigger,
+          targetIds: ['one', 'opaque-two', 'opaque-three'],
+          lineNameFormat,
+        },
+        't',
+        [
+          {
+            targetId: 'one',
+            snapshot: {
+              ...incident,
+              lineCode: 'L1',
+              statusLabel: 'Operação Parcial',
+            },
+          },
+        ],
+        new Date('2026-09-07T11:00:00Z'),
+        new Map(),
+        [
+          { targetId: 'one', label: 'Linha 1 - Azul' },
+          { targetId: 'opaque-two', label: 'Linha 2 - Verde' },
+          { targetId: 'opaque-three', label: 'Linha 3 - Vermelha' },
+        ],
+      );
+      const expected = {
+        full: 'Linha 2 - Verde, Linha 3 - Vermelha',
+        number: '2, 3',
+        code: 'L2, L3',
+        color: 'Verde, Vermelha',
+      }[lineNameFormat];
+      expect(message?.payload.notification.body).toContain(
+        `${expected}: Sem dados recentes`,
+      );
+      expect(message?.payload.notification.body).not.toContain('opaque-');
+      expect(message?.payload.notification.title).not.toContain('operacionais');
+    },
+  );
 });

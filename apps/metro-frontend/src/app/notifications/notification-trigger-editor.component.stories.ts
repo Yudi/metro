@@ -115,3 +115,20 @@ export const AvisosDeOnibus: Story = {
 export const NovoAviso: Story = {
   args: { trigger: null },
 };
+
+export const StatusDeVariasLinhas: Story = {
+  args: {
+    trigger: {
+      ...trigger,
+      kind: 'rail_status',
+      name: 'Minha viagem',
+      statusMode: 'all',
+      lineNameFormat: 'code',
+      targetIds: ['line-1', 'line-2', 'line-3'],
+      targets: [1, 2, 3].map((code) => ({
+        id: `line-${code}`, kind: 'rail_line', label: `Linha ${code}`,
+        available: true, railLineCode: code,
+      })),
+    },
+  },
+};

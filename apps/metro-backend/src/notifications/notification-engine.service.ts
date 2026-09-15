@@ -4,6 +4,7 @@ import {
   NotificationTriggerInput,
   notificationEligibility,
   validateNotificationTrigger,
+  notificationRailState,
 } from '@metro/shared/notification-contracts';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationSnapshotService } from './notification-snapshot.service';
@@ -11,7 +12,10 @@ import {
   buildAggregatedRailStatusMessage,
   buildNotificationMessage,
   notificationHash,
+  railNotificationStateScope,
+  readDeliveredRailStates,
   type NotificationRailStatusEntry,
+  type NotificationRailStatusTarget,
 } from './notification-message';
 import { nextNotificationEvaluation } from './notification-next-evaluation';
 import { notificationIssueIdentity } from './notification-issue-identity';
@@ -75,8 +79,7 @@ export class NotificationEngineService {
               nextEvaluationAt = new Date(now.getTime() + 300_000);
               return;
             }
-            const aggregateRailStatuses =
-              config.kind === 'rail_status' && trigger.targets.length > 1;
+            const aggregateRailStatuses = config.kind === 'rail_status';
             const railStatusEntries: NotificationRailStatusEntry[] = [];
             for (const { target } of trigger.targets) {
               try {
@@ -190,6 +193,7 @@ export class NotificationEngineService {
                   subscriptions,
                   railStatusEntries,
                   now,
+                  trigger.targets.map(({ target }) => ({ targetId: target.id, label: target.label })),
                 );
               } catch (error) {
                 this.logger.warn(
@@ -217,6 +221,7 @@ export class NotificationEngineService {
     subscriptions: readonly { id: string }[],
     entries: readonly NotificationRailStatusEntry[],
     now: Date,
+    selectedTargets: readonly NotificationRailStatusTarget[],
   ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       // Revalidate the claim once after all provider reads and keep episode,
@@ -245,10 +250,7 @@ export class NotificationEngineService {
           entry.snapshot,
         );
         if (issueKey === undefined) continue;
-        if (
-          !notificationEligibility(config, now, entry.snapshot.important) ||
-          (config.statusMode === 'abnormal' && entry.snapshot.normal)
-        ) {
+        if (!notificationEligibility(config, now, entry.snapshot.important)) {
           continue;
         }
         if (issueKey && !entry.snapshot.normal) {
@@ -264,36 +266,40 @@ export class NotificationEngineService {
       const deliverable = currentEntries
         .sort((left, right) => left.index - right.index)
         .map(({ entry }) => entry);
-      // Missing or stale lines during provider warm-up are not a recovery.
-      // Wait for the complete selection before announcing normal operation.
-      const observedTargetIds = new Set(deliverable.map((entry) => entry.targetId));
-      if (deliverable.every((entry) => entry.snapshot.normal) &&
-        config.targetIds.some((targetId) => !observedTargetIds.has(targetId))) {
-        return;
-      }
-      const message = buildAggregatedRailStatusMessage(
-        config,
-        triggerId,
-        deliverable,
-        now,
-      );
-      if (!message) return;
-      // Keep the complete current state in a mixed update. If every issue was
-      // already receipted, suppress the update instead of emitting a normal
-      // only summary while another line is still broken.
-      if (deliverable.some((entry) => !entry.snapshot.normal) && !freshIssue)
-        return;
+      for (const subscription of subscriptions) {
+        // Compare with what this device was actually sent, across schedule
+        // windows. Queued/expired messages must never manufacture a recovery.
+        const prior = await tx.notificationDelivery.findFirst({
+          where: {
+            subscriptionId: subscription.id,
+            sentAt: { not: null },
+            payload: {
+              path: ['notification', 'data', 'stateScope'],
+              equals: railNotificationStateScope(config.targetIds),
+            },
+          },
+          orderBy: { sentAt: 'desc' },
+          select: { payload: true },
+        });
+        const previousStates = readDeliveredRailStates(prior?.payload);
+        const message = buildAggregatedRailStatusMessage(config, triggerId, deliverable, now, previousStates, selectedTargets);
+        if (!message) continue;
+        const { recoveredTargetIds, reopenedTargetIds } = message.payload.notification.data;
+        const hasRecovery = recoveredTargetIds.length > 0 || reopenedTargetIds.length > 0;
+        const hasAlert = deliverable.some((entry) => ['issue', 'closed'].includes(notificationRailState(entry.snapshot)));
+        if (hasAlert && !freshIssue && !hasRecovery) continue;
 
-      await tx.notificationDelivery.createMany({
-        data: subscriptions.map((subscription) => ({
-          triggerId,
-          subscriptionId: subscription.id,
-          revision,
-          ...message,
-          fingerprint: notificationHash(`${revision}-${message.fingerprint}`),
-        })),
-        skipDuplicates: true,
-      });
+        await tx.notificationDelivery.createMany({
+          data: [{
+            triggerId,
+            subscriptionId: subscription.id,
+            revision,
+            ...message,
+            fingerprint: notificationHash(`${revision}-${message.fingerprint}`),
+          }],
+          skipDuplicates: true,
+        });
+      }
     });
   }
 

@@ -1029,6 +1029,7 @@ export class NotificationsComponent {
       kind: trigger.kind,
       targetIds: [...trigger.targetIds],
       statusMode: trigger.statusMode,
+      lineNameFormat: trigger.lineNameFormat ?? 'code',
     };
   }
 

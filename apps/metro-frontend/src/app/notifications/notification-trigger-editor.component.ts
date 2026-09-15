@@ -33,6 +33,10 @@ import {
   NOTIFICATION_TIMEZONE,
   TARGET_KIND_FOR_NOTIFICATION,
   validateNotificationTrigger,
+  buildRailNotificationSummary,
+  formatNotificationLineName,
+  DEFAULT_NOTIFICATION_LINE_NAME_FORMAT,
+  type NotificationLineNameFormat,
 } from '@metro/shared/notification-contracts';
 import type {
   NotificationKind,
@@ -79,6 +83,7 @@ interface TriggerFormControls {
   arrivalLeadMinutes: FormControl<number>;
   intervalMinutes: FormControl<number>;
   statusMode: FormControl<'all' | 'abnormal'>;
+  lineNameFormat: FormControl<NotificationLineNameFormat>;
   targetIds: FormControl<string[]>;
 }
 
@@ -123,6 +128,7 @@ const TARGET_KIND_LABELS: Record<NotificationTargetKind, string> = {
   bus_stop: 'pontos',
   special_line: 'serviços',
 };
+
 
 function normalizeTargetSearch(value: string): string {
   return value
@@ -227,6 +233,39 @@ export class NotificationTriggerEditorComponent implements OnChanges {
     this.trigger() ? 'Editar aviso' : 'Novo aviso',
   );
   readonly isRailStatus = computed(() => this.selectedKind() === 'rail_status');
+  readonly isRailKind = computed(() => this.selectedKind().startsWith('rail_'));
+  readonly lineNameFormat = signal(DEFAULT_NOTIFICATION_LINE_NAME_FORMAT);
+  readonly lineNameFormats = [
+    { value: 'full', label: 'Nome completo', example: 'Linha 1 - Azul' },
+    { value: 'number', label: 'Somente número', example: '1' },
+    { value: 'code', label: 'Código', example: 'L1' },
+    { value: 'color', label: 'Cor', example: 'Azul' },
+  ] as const;
+  readonly preview = computed(() => {
+    const targets = this.sortedSelectedTargets();
+    const format = this.lineNameFormat();
+    const target = targets[0];
+    const station = target?.label.split('\u00b7', 1)[0]?.trim() || 'Sé';
+    const lineName = formatNotificationLineName(target?.railLineCode ?? 1, target?.label ?? 'Linha 1 - Azul', format);
+    switch (this.selectedKind()) {
+      case 'rail_headway': return { title: `Intervalo médio - ${station} - ${lineName}`, body: 'Jabaquara: 3 min - Tucuruvi: 4 min (estimativa)' };
+      case 'rail_arrivals': return { title: `Próximos trens - ${station} - ${lineName}`, body: 'Jabaquara: na plataforma\nTucuruvi: em 2 min (08:02)' };
+      case 'bus_arrivals': return { title: `Chegadas de ônibus - ${target?.label ?? 'Praça da Sé'}`, body: '8000-10 - Terminal Lapa: em 2 min (08:02)\n702P-10 - Metrô Belém: em 4 min (08:04)' };
+      case 'bus_notices': return { title: `Ônibus ${target?.busRouteShortName ?? '702P-10'} - Desvio de itinerário`, body: 'Hoje, das 08:00 às 12:00\nEmbarque transferido para o ponto seguinte durante as obras.' };
+      case 'special_departures': return { title: `Próximas partidas - ${target?.label ?? 'Expresso Aeroporto'}`, body: 'Sentido aeroporto: 08:30\nSentido centro: 09:00' };
+    }
+    const lines = [1, 2, 3].map((code) => ({
+      targetId: `preview-${code}`,
+      label: `Linha ${code}`,
+      lineCode: `L${code}`,
+      normal: code !== 1,
+      statusLabel: code === 1 ? 'Velocidade Reduzida' : 'Operação Normal',
+    }));
+    return buildRailNotificationSummary(lines, {
+      lineNameFormat: format,
+      recoveredTargetIds: ['preview-2'],
+    });
+  });
   readonly isArrivalKind = computed(
     () =>
       this.selectedKind() === 'rail_arrivals' ||
@@ -270,6 +309,7 @@ export class NotificationTriggerEditorComponent implements OnChanges {
     statusMode: new FormControl(DEFAULT_TRIGGER.statusMode, {
       nonNullable: true,
     }),
+    lineNameFormat: new FormControl(DEFAULT_NOTIFICATION_LINE_NAME_FORMAT, { nonNullable: true }),
     targetIds: new FormControl([...DEFAULT_TRIGGER.targetIds], {
       nonNullable: true,
     }),
@@ -288,6 +328,9 @@ export class NotificationTriggerEditorComponent implements OnChanges {
 
   constructor() {
     this.addWindow(DEFAULT_TRIGGER.windows[0]);
+    this.form.controls.lineNameFormat.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((format) => this.lineNameFormat.set(format));
 
     this.form.controls.kind.valueChanges
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -492,6 +535,7 @@ export class NotificationTriggerEditorComponent implements OnChanges {
       kind: value.kind,
       targetIds: [...value.targetIds],
       statusMode: value.statusMode,
+      lineNameFormat: value.lineNameFormat,
     };
     const validationError = validateNotificationTrigger(input);
     if (validationError) {
@@ -521,6 +565,7 @@ export class NotificationTriggerEditorComponent implements OnChanges {
         arrivalLeadMinutes: value.arrivalLeadMinutes ?? 5,
         intervalMinutes: value.intervalMinutes,
         statusMode: value.statusMode,
+        lineNameFormat: value.lineNameFormat ?? DEFAULT_NOTIFICATION_LINE_NAME_FORMAT,
         targetIds: [...value.targetIds],
       },
       { emitEvent: false },
@@ -535,6 +580,7 @@ export class NotificationTriggerEditorComponent implements OnChanges {
 
     const targets = trigger?.targets ?? [];
     this.selectedKind.set(value.kind);
+    this.lineNameFormat.set(value.lineNameFormat ?? DEFAULT_NOTIFICATION_LINE_NAME_FORMAT);
     this.updateIntervalValidators(value.kind, value.kind);
     this.selectedTargets.set(targets);
     this.rawTargetResults.set([]);

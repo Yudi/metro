@@ -768,6 +768,7 @@ function parseTriggerInput(value: unknown): NotificationTriggerInput {
     kind: input.kind,
     targetIds: [...input.targetIds],
     statusMode: input.statusMode,
+    lineNameFormat: input.lineNameFormat ?? 'code',
   };
 }
 

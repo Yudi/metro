@@ -1,4 +1,5 @@
 import type { NotificationKind } from '@metro/shared/notification-contracts';
+import { RAIL_LINES, STATUS_CODE_TO_LABEL } from '@metro/shared/utils';
 import {
   NotificationSnapshotService,
   NotificationSnapshotTarget,
@@ -151,7 +152,7 @@ describe('NotificationSnapshotService', () => {
     expect(parseArrivalPrediction('not-a-time', lateEvening)).toBeNull();
   });
 
-  it('reads a fresh rail status and preserves non-normal operation as abnormal', async () => {
+  it('reads a fresh transitional status as operational without hiding its label', async () => {
     const setup = service();
     setup.rail.getLinesStatus.mockResolvedValue({
       lines: [
@@ -175,7 +176,7 @@ describe('NotificationSnapshotService', () => {
 
     expect(snapshot).toMatchObject({
       title: 'Linha 1 - Azul',
-      normal: false,
+      normal: true,
       important: false,
       statusLabel: 'Operação Transitória',
       lineCode: 'L1',
@@ -654,8 +655,8 @@ describe('NotificationSnapshotService', () => {
 
     expect(snapshots).toHaveLength(2);
     expect(snapshots.map((snapshot) => snapshot.title)).toEqual([
-      'Desvio',
-      'Obra',
+      'Ônibus 8000-10 - Desvio',
+      'Ônibus 8000-10 - Obra',
     ]);
   });
 
@@ -684,7 +685,7 @@ describe('NotificationSnapshotService', () => {
         target('special_line', { code: 'EA' }),
         NOW,
       ),
-    ).resolves.toMatchObject({ title: 'Expresso Aeroporto', normal: true });
+    ).resolves.toMatchObject({ title: 'Próximas partidas - Expresso Aeroporto', normal: true });
     await expect(
       setup.service.read(
         'special_departures',
@@ -705,6 +706,62 @@ describe('NotificationSnapshotService', () => {
     ).resolves.toBeNull();
     expect(setup.rail.getLinesStatus).not.toHaveBeenCalled();
   });
+  it.each(['OperacaoNormal', 'OperacaoTransitoria'] as const)('allows a complete network all-clear with %s', async (statusCode) => {
+    const setup = service();
+    setup.rail.getLinesStatus.mockResolvedValue({ success: true, lastUpdated: NOW,
+      lines: RAIL_LINES.map((line) => ({ code: line.code, line: line.fullName, statusCode, statusLabel: STATUS_CODE_TO_LABEL[statusCode] })),
+    });
+    const snapshot = await setup.service.read('rail_status', target('rail_line', { lineCode: 'L1' }), NOW);
+    expect(snapshot).toMatchObject({ networkAllOperational: true, normal: true });
+  });
+
+  it.each(['OperacaoEncerrada', 'OperacaoParcial', 'DadosIndisponiveis', 'missing'] as const)('keeps the all-clear scoped when an unselected line is %s', async (state) => {
+    const setup = service();
+    const lines = RAIL_LINES.map((line) => ({ code: line.code, line: line.fullName,
+      statusCode: line.code === 2 && state !== 'missing' ? state : 'OperacaoNormal', statusLabel: 'Operação Normal' }));
+    setup.rail.getLinesStatus.mockResolvedValue({ success: true, lastUpdated: NOW,
+      lines: state === 'missing' ? lines.filter((line) => line.code !== 2) : lines,
+    });
+    const snapshot = await setup.service.read('rail_status', target('rail_line', { lineCode: 'L1' }), NOW);
+    expect(snapshot).toMatchObject({ networkAllOperational: false, normal: true });
+  });
+
+  it('keeps a closed selected line distinct from both an incident and operational service', async () => {
+    const setup = service();
+    setup.rail.getLinesStatus.mockResolvedValue({ success: true, lastUpdated: NOW, lines: [{
+      code: 1, line: 'Linha 1 - Azul', statusCode: 'OperacaoEncerrada', statusLabel: 'Operação Encerrada',
+    }] });
+    expect(await setup.service.read('rail_status', target('rail_line', { lineCode: 'L1' }), NOW)).toMatchObject({
+      normal: false, important: false, statusCode: 'OperacaoEncerrada', networkAllOperational: false,
+    });
+  });
+
+  it('does not keep a cached all-clear beyond the observation freshness limit', async () => {
+    const setup = service();
+    setup.rail.getLinesStatus.mockResolvedValue({ success: true, lastUpdated: new Date(NOW.getTime() - 599_000), lines: [{
+      code: 1, line: 'Linha 1 - Azul', statusCode: 'OperacaoNormal', statusLabel: 'Operação Normal',
+    }] });
+    const selection = target('rail_line', { lineCode: 'L1' });
+    expect(await setup.service.read('rail_status', selection, NOW)).not.toBeNull();
+    expect(await setup.service.read('rail_status', selection, new Date(NOW.getTime() + 2_000))).toBeNull();
+  });
+
+  it('suppresses headway estimates when current operation is closed', async () => {
+    const setup = service();
+    setup.rail.getLinesStatus.mockResolvedValue({ success: true, lastUpdated: NOW, lines: [{
+      code: 10, line: 'Linha 10', statusCode: 'OperacaoEncerrada', statusLabel: 'Operação Encerrada',
+    }] });
+    expect(await setup.service.read('rail_headway', target('rail_station', { lineCode: 'L10', stationCode: 'LUZ' }), NOW)).toBeNull();
+    expect(setup.headway.getHeadway).not.toHaveBeenCalled();
+  });
+
+  it.each(['OperacaoEncerrada', 'Paralisada'])('suppresses special departures when the service is %s', async (statusCode) => {
+    const setup = service();
+    setup.specialRail.getSpecialLinesStatus.mockResolvedValue([{ code: 'EA', line: 'Expresso Aeroporto', statusCode,
+      nextDepartures: [{ label: 'Aeroporto', time: '09:30' }], issues: [] }]);
+    expect(await setup.service.read('special_departures', target('special_line', { code: 'EA' }), NOW)).toBeNull();
+  });
+
 });
 
 const CACHE_TTL_FOR_TEST = 60_001;

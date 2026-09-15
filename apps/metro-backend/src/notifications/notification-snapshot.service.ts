@@ -2,10 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   NOTIFICATION_KINDS,
   TARGET_KIND_FOR_NOTIFICATION,
+  notificationRailState,
   type NotificationKind,
 } from '@metro/shared/notification-contracts';
 import {
   HEADWAY_DEFAULT_ENABLED_LINES,
+  RAIL_LINES,
   SPECIAL_RAIL_LINE_CODES,
   getRailLineByCode,
   type RailStatusCode,
@@ -136,7 +138,7 @@ export class NotificationSnapshotService {
         // Reinsert as the most recently used entry for bounded LRU eviction.
         this.cache.delete(key);
         this.cache.set(key, cached);
-        return cached.snapshots;
+        return cached.snapshots.filter((snapshot) => snapshot.validUntil === undefined || snapshot.validUntil > now.getTime());
       }
       this.cache.delete(key);
     }
@@ -186,7 +188,7 @@ export class NotificationSnapshotService {
       case 'rail_status':
         return this.readRailStatus(descriptor, now).then(asSnapshotArray);
       case 'rail_headway':
-        return this.readRailHeadway(target, descriptor, now).then(
+        return this.readRailHeadway(descriptor, now).then(
           asSnapshotArray,
         );
       case 'rail_arrivals':
@@ -216,9 +218,9 @@ export class NotificationSnapshotService {
     if (!lineCode) return null;
 
     const result = (await this.rail.getLinesStatus()) as RailStatusResult;
-    const observedAt = new Date(result.lastUpdated).getTime();
+    const observedAt = new Date(result?.lastUpdated ?? Number.NaN).getTime();
     if (
-      result.success !== true ||
+      !result || result.success !== true ||
       result.errorMessage ||
       !Number.isFinite(observedAt) ||
       observedAt > now.getTime() + 60_000 ||
@@ -234,14 +236,15 @@ export class NotificationSnapshotService {
       return null;
     }
 
-    const details = [line.description, line.detail]
+    const details = [...new Set([line.description, line.detail]
       .map((value) => value?.trim())
-      .filter((value): value is string => Boolean(value));
+      .filter((value): value is string => Boolean(value)))];
     const body = [line.statusLabel, ...details].join(': ');
-    // `normal` is deliberately exact: incident-only mode must still see
-    // transitional, special, and differentiated operation states. The
-    // separate importance flag controls smart lead time for benign states.
-    const normal = line.statusCode === 'OperacaoNormal';
+    const normal = notificationRailState({ ...line, normal: false }) === 'operational';
+    const networkAllOperational = result.lines.every((candidate) => notificationRailState({ ...candidate, normal: false }) === 'operational') && RAIL_LINES.every((expected) => {
+      const observations = result.lines.filter((candidate) => candidate.code === expected.code);
+      return observations.length === 1 && notificationRailState({ ...observations[0], normal: false }) === 'operational';
+    });
     const semantic = {
       kind: 'rail_status',
       lineCode,
@@ -259,14 +262,17 @@ export class NotificationSnapshotService {
       important: !BENIGN_RAIL_STATUSES.has(line.statusCode),
       normal,
       statusLabel: line.statusLabel,
+      statusCode: line.statusCode,
+      details: details.join(' - '),
+      networkAllOperational,
       lineCode,
       observedAt: new Date(observedAt),
+      validUntil: observedAt + MAX_RAIL_STATUS_AGE_MS,
       url: '/',
     };
   }
 
   private async readRailHeadway(
-    target: NotificationSnapshotTarget,
     descriptor: Record<string, unknown>,
     now: Date,
   ): Promise<NotificationSnapshot | null> {
@@ -281,6 +287,9 @@ export class NotificationSnapshotService {
       (candidate) => candidate.code === stationCode,
     );
     if (!station) return null;
+
+    const operation = await this.readRailStatus({ lineCode }, now);
+    if (operation?.statusCode === 'OperacaoEncerrada' || operation?.statusCode === 'Paralisada') return null;
 
     const headway = await this.headway.getHeadway(lineCode, stationCode);
     if (
@@ -329,7 +338,7 @@ export class NotificationSnapshotService {
           `${direction.direction}: ${Math.max(
             1,
             Math.round(direction.averageSeconds / 60),
-          )} min`,
+          )} min${direction.isFallback ? ' (estimativa)' : ''}`,
       )
       .join(' · ');
     const semantic = {
@@ -341,7 +350,9 @@ export class NotificationSnapshotService {
 
     return {
       title: `Intervalo médio · ${station.name}`,
-      body: target.label ? `${target.label}: ${body}` : body,
+      body,
+      lineCode,
+      stationName: station.name,
       fingerprint: notificationHash(stableJson(semantic)),
       important: false,
       normal: true,
@@ -433,6 +444,8 @@ export class NotificationSnapshotService {
     return {
       title: `Próximas chegadas · ${station.name}`,
       body: target.label ? `${target.label}: ${body}` : body,
+      lineCode,
+      stationName: station.name,
       fingerprint: notificationHash(
         stableJson({
           kind: 'rail_arrivals',
@@ -592,8 +605,8 @@ export class NotificationSnapshotService {
     if (!notices.length) return [];
 
     const snapshots = notices.map((notice) => ({
-      title: notice.title,
-      body: notice.description,
+      title: `Ônibus ${routeName} - ${notice.title}`,
+      body: [notice.periodText, notice.description].filter(Boolean).join('\n'),
       // Source IDs, listed dates, collection timestamps, selected route, and
       // list ordering are intentionally absent from the semantic event.
       fingerprint: notificationHash(
@@ -629,6 +642,8 @@ export class NotificationSnapshotService {
     if (
       !line ||
       UNKNOWN_RAIL_STATUSES.has(line.statusCode) ||
+      line.statusCode === 'OperacaoEncerrada' ||
+      line.statusCode === 'Paralisada' ||
       !line.nextDepartures.length
     ) {
       return null;
@@ -639,10 +654,10 @@ export class NotificationSnapshotService {
         label: departure.label.trim(),
         time: departure.time.trim(),
       }))
-      .filter(
-        (departure) =>
-          departure.label && /^\d{2}:[0-5]\d$/.test(departure.time),
-      );
+      .filter((departure) => departure.label && /^([01]\d|2[0-3]):[0-5]\d$/.test(departure.time))
+      .map((departure) => ({ ...departure, expectedAt: parseArrivalPrediction(departure.time, now) }))
+      .filter((departure) => departure.expectedAt !== null && departure.expectedAt > now.getTime())
+      .sort((left, right) => (left.expectedAt ?? 0) - (right.expectedAt ?? 0));
     if (!departures.length) return null;
     const issues = line.issues
       .map((issue) => ({
@@ -657,10 +672,12 @@ export class NotificationSnapshotService {
     const normal = line.statusCode === 'OperacaoNormal';
 
     return {
-      title: line.line,
-      body: departures
-        .map((departure) => `${departure.label}: ${departure.time}`)
-        .join(' · '),
+      title: `Próximas partidas - ${line.line}`,
+      body: [
+        ...(!normal ? [line.statusLabel] : []),
+        ...departures.slice(0, 5).map((departure) => `${departure.label}: ${departure.time}`),
+        ...issues.map((issue) => `${issue.line}: ${issue.description}`),
+      ].join('\n'),
       fingerprint: notificationHash(
         stableJson({
           kind: 'special_departures',
@@ -673,6 +690,7 @@ export class NotificationSnapshotService {
       important: !BENIGN_RAIL_STATUSES.has(line.statusCode),
       normal,
       observedAt: now,
+      validUntil: departures[0].expectedAt ?? undefined,
       url: '/',
     };
   }

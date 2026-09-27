@@ -8,7 +8,6 @@ import type {
   NearbyGraphQLResponse,
   NearbyStopsResponse,
   SearchGraphQLResponse,
-  TypesenseRoute,
   TypesenseSearchResponse,
   TypesenseStop,
 } from './typesense-search.types';
@@ -62,9 +61,16 @@ export class TypesenseSearchService {
         },
       })
       .pipe(
-        map((response) =>
-          mapTypesenseSearchResponse(query, response.data?.search || []),
-        ),
+        map((response) => {
+          if (
+            response.errors?.length ||
+            !Array.isArray(response.data?.search)
+          ) {
+            throw new Error('Search failed');
+          }
+
+          return mapTypesenseSearchResponse(query, response.data.search);
+        }),
         catchError((error) => {
           this.logger.error('Search error', error);
           return of({
@@ -99,9 +105,16 @@ export class TypesenseSearchService {
       })
       .pipe(
         map((response) => {
+          if (
+            response.errors?.length ||
+            !Array.isArray(response.data?.nearbyStops)
+          ) {
+            throw new Error('Nearby search failed');
+          }
+
           const mapped = mapTypesenseSearchResponse(
             '',
-            response.data?.nearbyStops || [],
+            response.data.nearbyStops,
           );
           const stops = mapped.results
             .filter((result) => result.type === 'stop')
@@ -125,28 +138,6 @@ export class TypesenseSearchService {
           });
         }),
       );
-  }
-
-  /**
-   * Get route details by ID using GraphQL (for detailed information)
-   * This can be used when you need more detailed route information like trips, schedules, etc.
-   */
-  getRouteDetails(routeId: string): Observable<TypesenseRoute | null> {
-    // Route details are loaded by GeographyGraphQLService.
-    // For now, return the basic route info from Typesense search results
-    this.logger.debug('Route details requested for:', routeId);
-    return of(null);
-  }
-
-  /**
-   * Get stop details by ID using GraphQL (for detailed information)
-   * This can be used when you need more detailed stop information like stop times, routes, etc.
-   */
-  getStopDetails(stopId: string): Observable<TypesenseStop | null> {
-    // Stop details are loaded by GeographyGraphQLService.
-    // For now, return the basic stop info from Typesense search results
-    this.logger.debug('Stop details requested for:', stopId);
-    return of(null);
   }
 
   /**

@@ -43,3 +43,54 @@ describe('MenuComponent', () => {
     ]);
   });
 });
+
+describe('menu search handoff', () => {
+  it('buffers typing across lazy loading, mirrors dialog edits, and restores focus without reopening', async () => {
+    const { MatDialog } = await import('@angular/material/dialog');
+    const { Subject } = await import('rxjs');
+    const closed = new Subject<void>();
+    const open = jest.fn().mockReturnValue({ afterClosed: () => closed });
+    TestBed.configureTestingModule({
+      imports: [MenuComponent],
+      providers: [
+        provideRouter([]),
+        {
+          provide: AuthService,
+          useValue: { loginGoogle: jest.fn(), logout: jest.fn() },
+        },
+      ],
+    });
+    TestBed.overrideProvider(MatDialog, { useValue: { open } });
+    const fixture = TestBed.createComponent(MenuComponent);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    const opening = component.openSearch();
+    component.searchControl.setValue('Pin');
+    component.searchControl.setValue('Pinheiros');
+    await opening;
+
+    expect(open).toHaveBeenCalledTimes(1);
+    const options = open.mock.calls[0][1];
+    const received: string[] = [];
+    const subscription = options.data.queryChanges.subscribe((query: string) =>
+      received.push(query),
+    );
+    expect(received).toEqual(['Pinheiros']);
+    component.searchControl.setValue('Pinheiros estação');
+    expect(received).toEqual(['Pinheiros', 'Pinheiros estação']);
+
+    options.data.onQueryChange('Consolação');
+    expect(component.searchControl.value).toBe('Consolação');
+    expect(received).toHaveLength(2);
+    closed.next();
+    fixture.detectChanges();
+    expect(document.activeElement).toBe(
+      fixture.nativeElement.querySelector('input'),
+    );
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(component.searchOpen()).toBe(false);
+    await component.openSearch();
+    expect(open).toHaveBeenCalledTimes(2);
+    subscription.unsubscribe();
+  });
+});

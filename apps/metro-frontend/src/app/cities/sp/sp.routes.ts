@@ -16,31 +16,7 @@ export const homeRoute: Route = {
 };
 
 export const spFeatureRoutes: Routes = [
-  {
-    path: 'itinerarios/:agency/:line',
-    ...page('Itinerários'),
-    loadComponent: () =>
-      import('../../itineraries/itineraries.component').then(
-        (m) => m.ItinerariesComponent,
-      ),
-  },
-  {
-    path: 'itinerarios',
-    ...page('Itinerários'),
-    loadComponent: () =>
-      import('../../itineraries/itineraries.component').then(
-        (m) => m.ItinerariesComponent,
-      ),
-  },
   homeRoute,
-  {
-    path: 'proxima-chegada',
-    ...page('Próxima chegada'),
-    loadComponent: () =>
-      import('../../next-arrival/next-arrival.component').then(
-        (m) => m.NextArrivalComponent,
-      ),
-  },
   {
     path: 'proximo-trem',
     ...page('Próxima chegada'),

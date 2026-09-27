@@ -87,4 +87,32 @@ describe('MapFeatureInteractionService', () => {
     expect(snackBar.open.mock.calls[0][0]).not.toContain('estimate-uuid');
     expect(snackBar.open.mock.calls[0][0]).not.toContain('previsões');
   });
+
+  it('shows the train and full rail line name for a tracked vehicle', () => {
+    const properties = { vehicleId: 'S048', lineCode: 'L11' };
+    service.handleFeatureSelection({
+      get: () => undefined,
+      getProperties: () => properties,
+    } as never);
+
+    expect(snackBar.open).toHaveBeenCalledWith(
+      'Trem S048 - Linha 11 - Coral',
+      'Fechar',
+      { duration: 3000 },
+    );
+  });
+
+  it('keeps the bus label for bus vehicles', () => {
+    const properties = { vehicleId: '1234', routeShortName: '8000-10' };
+    service.handleFeatureSelection({
+      get: () => undefined,
+      getProperties: () => properties,
+    } as never);
+
+    expect(snackBar.open).toHaveBeenCalledWith(
+      'Ônibus 1234 - Linha 8000-10',
+      'Close',
+      { duration: 3000 },
+    );
+  });
 });

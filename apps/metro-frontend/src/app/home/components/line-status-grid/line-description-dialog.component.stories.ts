@@ -66,7 +66,8 @@ type Story = StoryObj<LineDescriptionDialogComponent>;
 export const Paese: Story = {
   decorators: storyProviders({
     title: '1 - Azul',
-    description: 'Circulação com velocidade reduzida. PAESE disponível entre as estações.',
+    description:
+      'Circulação com velocidade reduzida. PAESE disponível entre as estações.',
     paese: true,
   }),
 };

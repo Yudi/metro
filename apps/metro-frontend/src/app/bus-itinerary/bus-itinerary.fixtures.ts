@@ -6,8 +6,8 @@ import type {
   TypesenseRoute,
   TypesenseSearchResult,
 } from '../search/typesense-search.service';
-import type { PublishedItinerary } from './itineraries.service';
-import type { ItineraryPattern, RouteItinerary } from './itineraries.service';
+import type { PublishedItinerary } from './bus-itinerary.service';
+import type { ItineraryPattern, RouteItinerary } from './bus-itinerary.service';
 
 function scheduledTimes(
   start: number,

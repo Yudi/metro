@@ -1,4 +1,63 @@
 import { HistoricalService } from './historical.service';
+import {
+  buildHeadwaySnapshotData,
+  buildRailEventData,
+  getRailAgency,
+} from './historical-data.utils';
+
+describe('historical rail agency attribution', () => {
+  it.each([
+    ['L11', '2026-07-24T02:59:59.999Z', 'triviatrens'],
+    ['L11', '2026-07-24T03:00:00.000Z', 'cptm'],
+    ['L12', '2026-10-23T02:59:59.999Z', 'cptm'],
+    ['L13', '2026-10-23T03:00:00.000Z', 'triviatrens'],
+    ['L10', '2026-09-27T12:00:00.000Z', 'cptm'],
+  ])('attributes %s at %s to %s', (lineCode, timestamp, agency) => {
+    expect(getRailAgency(lineCode, new Date(timestamp))).toBe(agency);
+  });
+
+  it('uses the recorded headway timestamp rather than the insert time', () => {
+    const observedAt = new Date('2026-10-23T03:00:00.000Z');
+    const snapshot = buildHeadwaySnapshotData(
+      {
+        lineCode: 'L11',
+        stationCode: 'TEST',
+        updatedAt: observedAt.getTime(),
+        directions: [],
+      },
+      { direction: 'Terminal', averageSeconds: 300, sampleCount: 3 },
+      undefined,
+      undefined,
+      (lineCode, at) => getRailAgency(lineCode, at) ?? '',
+    );
+
+    expect(snapshot).toMatchObject({ observedAt, agency: 'triviatrens' });
+  });
+
+  it('records a rail status event with the agency for its observation time', () => {
+    jest.useFakeTimers({ now: new Date('2026-10-22T12:00:00.000Z') });
+    try {
+      const event = buildRailEventData(
+        {
+          code: 13,
+          colorName: 'Jade',
+          colorHex: '#00A88E',
+          line: 'Linha 13 - Jade',
+          statusCode: 'OperacaoNormal',
+          statusLabel: 'Operação Normal',
+          statusColor: 'verde',
+        },
+        undefined,
+        (lineCode, at) => getRailAgency(lineCode, at) ?? '',
+      );
+
+      expect(event).toMatchObject({ agency: 'cptm' });
+      expect(event.observedAt).toEqual(new Date('2026-10-22T12:00:00.000Z'));
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});
 
 describe('HistoricalService public projection', () => {
   it('records backend lifecycle events with the stable system source', async () => {
@@ -253,5 +312,20 @@ describe('HistoricalService polling errors', () => {
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(prisma.historicalHeadwaySnapshot.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the observation date for error snapshot agency attribution', async () => {
+    const { service, prisma } = setup();
+
+    await service.recordHeadwayError({
+      lineCode: 'L11',
+      stationCode: 'TEST',
+      reason: 'station_poll_failed',
+      observedAt: new Date('2026-10-23T02:59:59.999Z'),
+    });
+
+    expect(prisma.historicalHeadwaySnapshot.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ agency: 'cptm' }),
+    });
   });
 });

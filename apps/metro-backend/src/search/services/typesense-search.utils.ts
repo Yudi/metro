@@ -68,6 +68,7 @@ export async function searchTypesense(
         q: query,
         query_by: 'line_code,line_fullname,agency',
         query_by_weights: '8,12,1',
+        sort_by: '_text_match:desc,line_code:asc',
         per_page: safeLimit,
         typo_tokens_threshold: 2,
       },
@@ -84,6 +85,7 @@ export async function searchTypesense(
         q: query,
         query_by: 'station_code,station_name,station_aliases',
         query_by_weights: '2,8,4',
+        sort_by: '_text_match:desc,station_code:asc',
         per_page: safeLimit,
         typo_tokens_threshold: 2,
       },
@@ -91,12 +93,15 @@ export async function searchTypesense(
   }
 
   if (types.includes('busRoute')) {
+    const busQuery = query.replace(/\bEMTU\b/gi, 'artesp');
     searches.push({
       type: SearchTypesEnum.BusRoute,
       request: {
         collection: context.getReadCollectionName(GTFS_ROUTES_COLLECTION_NAME),
-        q: query,
-        query_by: 'route_short_name,route_long_name',
+        q: busQuery,
+        query_by: 'route_id,route_short_name,route_long_name,sourceAgency',
+        query_by_weights: '10,8,3,1',
+        sort_by: '_text_match:desc,route_id:asc',
         per_page: safeLimit,
         typo_tokens_threshold: 2,
       },
@@ -110,6 +115,7 @@ export async function searchTypesense(
         collection: context.getReadCollectionName(GTFS_STOPS_COLLECTION_NAME),
         q: query,
         query_by: 'stop_name,stop_desc',
+        sort_by: '_text_match:desc,stop_id:asc',
         per_page: safeLimit,
         typo_tokens_threshold: 2,
       },
@@ -125,6 +131,7 @@ export async function searchTypesense(
         ),
         q: query,
         query_by: 'station_id,station_name',
+        sort_by: '_text_match:desc,station_id:asc',
         per_page: safeLimit,
         typo_tokens_threshold: 2,
       },
@@ -144,6 +151,10 @@ export async function searchTypesense(
     >({
       searches: searches.map((search) => search.request),
     });
+    assertNoMultiSearchErrors(
+      results.results,
+      'Search returned a collection error',
+    );
 
     return results.results.flatMap((result, index) =>
       (result.hits ?? [])
@@ -235,6 +246,10 @@ export async function searchNearbyStops(
     >({
       searches: searches.map((search) => search.request),
     });
+    assertNoMultiSearchErrors(
+      results.results,
+      'Nearby stops search returned a collection error',
+    );
 
     const hits = results.results
       .flatMap((result, index) =>
@@ -265,13 +280,54 @@ export async function searchNearbyStops(
       .sort((a, b) => {
         const aDist = a.geo_distance_meters?.location ?? Number.MAX_VALUE;
         const bDist = b.geo_distance_meters?.location ?? Number.MAX_VALUE;
-        return aDist - bDist;
+        const distanceOrder = aDist - bDist;
+        if (distanceOrder !== 0) {
+          return distanceOrder;
+        }
+
+        const aId = getNearbyDocumentId(a.document);
+        const bId = getNearbyDocumentId(b.document);
+        return compareStableValues(aId, bId);
       });
 
     return hits.slice(0, limit);
   } catch (error) {
     return context.throwSearchFailure('Nearby stops search failed', error);
   }
+}
+
+function assertNoMultiSearchErrors(
+  results: Array<{ error?: string; code?: number }>,
+  fallbackMessage: string,
+): void {
+  const failedResult = results.find(
+    (result) => result.error || result.code !== undefined,
+  );
+  if (!failedResult) {
+    return;
+  }
+
+  const error = new Error(failedResult.error || fallbackMessage);
+  if (failedResult.code !== undefined) {
+    Object.assign(error, { httpStatus: failedResult.code });
+  }
+  throw error;
+}
+
+function getNearbyDocumentId(document: NearbySearchDocument): string {
+  if ('stop_id' in document) {
+    return document.stop_id;
+  }
+
+  if ('station_code' in document) {
+    return document.station_code;
+  }
+
+  return document.station_id;
+}
+
+function compareStableValues(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 function isGtfsRailSearchResult(result: SearchResult): boolean {

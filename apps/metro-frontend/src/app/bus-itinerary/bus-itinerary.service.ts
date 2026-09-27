@@ -41,7 +41,7 @@ export interface RouteItinerary {
 }
 
 @Injectable({ providedIn: 'root' })
-export class ItinerariesService {
+export class BusItineraryService {
   private readonly http = inject(HttpClient);
 
   published(routeId: string) {

@@ -4,16 +4,16 @@ import {
   HttpTestingController,
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
-import { ItinerariesService } from './itineraries.service';
+import { BusItineraryService } from './bus-itinerary.service';
 
-describe('ItinerariesService', () => {
-  let service: ItinerariesService;
+describe('BusItineraryService', () => {
+  let service: BusItineraryService;
   let http: HttpTestingController;
   beforeEach(() => {
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting()],
     });
-    service = TestBed.inject(ItinerariesService);
+    service = TestBed.inject(BusItineraryService);
     http = TestBed.inject(HttpTestingController);
   });
   afterEach(() => http.verify());

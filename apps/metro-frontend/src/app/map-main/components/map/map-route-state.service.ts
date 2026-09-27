@@ -358,6 +358,14 @@ export class MapRouteStateService {
       }
     }
 
+    for (const lineId of (paramGet('railRoutes') ?? '')
+      .split(',')
+      .filter(Boolean)) {
+      this.applyFavoriteSelection(`queryRailRoute:${lineId}`, () => {
+        this.interactionService.addRailLineToSelection(lineId);
+      });
+    }
+
     const mappings: Array<{
       param: string;
       kind: 'layer' | 'vector' | 'feature';

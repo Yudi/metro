@@ -1,18 +1,18 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   computed,
   inject,
   signal,
 } from '@angular/core';
 import { DatePipe, NgOptimizedImage } from '@angular/common';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import {
-  takeUntilDestroyed,
-  toObservable,
-  toSignal,
-} from '@angular/core/rxjs-interop';
+  MAT_DIALOG_DATA,
+  MatDialogModule,
+  MatDialogRef,
+} from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -22,11 +22,9 @@ import {
   catchError,
   distinctUntilChanged,
   map,
-  merge,
   of,
   startWith,
   switchMap,
-  timer,
 } from 'rxjs';
 import {
   formatBusFare,
@@ -39,30 +37,20 @@ import type {
   PublishedDayKind,
   PublishedRouteDirection,
 } from '@metro/shared/bus-itinerary-contracts';
-import { TypesenseSearchService } from '../search/typesense-search.service';
-import {
-  SearchResult,
-  SearchResultCardComponent,
-} from '../map-main/components/search-dialog/search-result-card/search-result-card.component';
-import {
-  mapTypesenseResult,
-  orderSearchResults,
-} from '../map-main/components/search-dialog/search-dialog.utils';
 import {
   BusInformationService,
   BusNoticesResult,
 } from '../map-main/components/bus-information/bus-information.service';
 import { BusInformationComponent } from '../map-main/components/bus-information/bus-information.component';
 import { routeNoticeView } from '../map-main/components/bus-information/bus-notice-view';
-import { TransitSearchFieldComponent } from '../shared/components/transit-search-field/transit-search-field.component';
 import { ScheduledDeparturesComponent } from '../shared/components/scheduled-departures/scheduled-departures.component';
 import { CityContextService } from '../cities/city-context.service';
 import {
-  ItinerariesService,
+  BusItineraryService,
   ItineraryPattern,
   RouteItinerary,
   PublishedItinerary,
-} from './itineraries.service';
+} from './bus-itinerary.service';
 import { summarizeDepartureIntervals } from './departure-intervals';
 
 export function saoPauloServiceDate(now = new Date()): string {
@@ -91,40 +79,39 @@ export function serviceDayKind(date: string): PublishedDayKind {
   return weekday === 0 ? 'sunday' : weekday === 6 ? 'saturday' : 'weekday';
 }
 
+export interface BusItineraryDialogData {
+  routeId: string;
+  serviceDate?: string;
+}
+
 @Component({
-  selector: 'app-itineraries',
+  selector: 'app-bus-itinerary-dialog',
   imports: [
     DatePipe,
     NgOptimizedImage,
     RouterLink,
+    MatDialogModule,
     MatButtonModule,
     MatFormFieldModule,
     MatIconModule,
     MatSelectModule,
     MatProgressBarModule,
-    TransitSearchFieldComponent,
-    SearchResultCardComponent,
     BusInformationComponent,
     ScheduledDeparturesComponent,
   ],
-  templateUrl: './itineraries.component.html',
-  styleUrl: './itineraries.component.scss',
+  templateUrl: './bus-itinerary-dialog.component.html',
+  styleUrl: './bus-itinerary-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ItinerariesComponent {
-  private readonly router = inject(Router);
-  private readonly activatedRoute = inject(ActivatedRoute);
+export class BusItineraryDialogComponent {
+  private readonly dialogData = inject<BusItineraryDialogData>(MAT_DIALOG_DATA);
+  private readonly dialogRef = inject(
+    MatDialogRef<BusItineraryDialogComponent>,
+  );
   readonly cityContext = inject(CityContextService);
-  private readonly searchService = inject(TypesenseSearchService);
-  private readonly itineraries = inject(ItinerariesService);
+  private readonly itineraries = inject(BusItineraryService);
   private readonly information = inject(BusInformationService);
-  private readonly destroyRef = inject(DestroyRef);
-  private readonly params = toSignal(this.activatedRoute.queryParamMap, {
-    initialValue: this.activatedRoute.snapshot.queryParamMap,
-  });
-  private readonly pathParams = toSignal(this.activatedRoute.paramMap, {
-    initialValue: this.activatedRoute.snapshot.paramMap,
-  });
+  readonly routeId = this.dialogData.routeId;
   readonly today = saoPauloServiceDate();
   readonly days = Array.from({ length: 7 }, (_, index) => {
     const date = new Date(`${this.today}T12:00:00Z`);
@@ -142,22 +129,10 @@ export class ItinerariesComponent {
               }).format(date),
     };
   });
-  readonly serviceDate = computed(() => {
-    const date = this.params().get('dia');
-    return this.days.some((day) => day.value === date)
-      ? (date as string)
-      : this.today;
-  });
-  readonly routeId = computed(() => {
-    const agency = this.pathParams().get('agency');
-    const line = this.pathParams().get('line');
-    return agency && line
-      ? agency === 'sptrans'
-        ? line
-        : `${agency}:${line}`
-      : '';
-  });
-  readonly query = signal('');
+  readonly serviceDate = signal(
+    this.days.find((day) => day.value === this.dialogData.serviceDate)?.value ??
+      this.today,
+  );
   readonly retryCount = signal(0);
   readonly incrementRetry = (value: number) => value + 1;
   readonly selectedPatternId = signal('');
@@ -176,53 +151,8 @@ export class ItinerariesComponent {
     interpeak: 'Entrepico',
     afternoon: 'Tarde',
   };
-  readonly searchState = toSignal(
-    toObservable(this.query).pipe(
-      switchMap((query) =>
-        query.trim().length < 2
-          ? of({ loading: false, error: false, results: [] as SearchResult[] })
-          : timer(250).pipe(
-              switchMap(() => this.searchService.search(query, ['busRoute'])),
-              map((response) => ({
-                loading: false,
-                error: !response.success,
-                results: orderSearchResults(
-                  response.results
-                    .map(mapTypesenseResult)
-                    .filter(
-                      (result): result is SearchResult =>
-                        result !== null &&
-                        result.type === 'route' &&
-                        result.source !== 'rail',
-                    ),
-                ),
-              })),
-              catchError(() =>
-                of({
-                  loading: false,
-                  error: true,
-                  results: [] as SearchResult[],
-                }),
-              ),
-              startWith({
-                loading: true,
-                error: false,
-                results: [] as SearchResult[],
-              }),
-            ),
-      ),
-    ),
-    {
-      initialValue: {
-        loading: false,
-        error: false,
-        results: [] as SearchResult[],
-      },
-    },
-  );
-
   private readonly request = computed(() => ({
-    routeId: this.routeId(),
+    routeId: this.routeId,
     serviceDate: this.serviceDate(),
     retry: this.retryCount(),
   }));
@@ -477,37 +407,14 @@ export class ItinerariesComponent {
     return this.cityContext.path(path);
   }
 
-  constructor() {
-    merge(this.activatedRoute.paramMap, this.activatedRoute.queryParamMap)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(() => this.selectedPatternId.set(''));
-  }
-
-  selectRoute(result: SearchResult): void {
-    if (!result.routeData) return;
-    const route = result.routeData;
-    const separator = route.route_id.indexOf(':');
-    const agency =
-      separator >= 0
-        ? route.route_id.slice(0, separator)
-        : route.sourceAgency?.toLowerCase() || 'sptrans';
-    const line =
-      separator >= 0 ? route.route_id.slice(separator + 1) : route.route_id;
-    this.query.set('');
-    this.selectedPatternId.set('');
-    void this.router.navigate(
-      [this.cityContext.path('/itinerarios'), agency, line],
-      {
-        queryParams: { dia: this.params().get('dia') },
-      },
-    );
+  close(): void {
+    this.dialogRef.close();
   }
 
   selectDate(date: string): void {
-    void this.router.navigate([], {
-      relativeTo: this.activatedRoute,
-      queryParams: { dia: date },
-      queryParamsHandling: 'merge',
-    });
+    if (!this.days.some((day) => day.value === date)) return;
+    this.selectedPatternId.set('');
+    this.showDepartureTimes.set(false);
+    this.serviceDate.set(date);
   }
 }

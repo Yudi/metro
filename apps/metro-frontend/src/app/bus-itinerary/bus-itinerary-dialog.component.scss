@@ -2,11 +2,16 @@
   display: block;
 }
 .itineraries {
-  max-width: 1080px;
-  margin-inline: auto;
+  max-width: none;
+  margin: 0;
 }
-h1 {
-  margin-bottom: 1rem;
+.dialog-title {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.dialog-title button {
+  margin-left: auto;
 }
 h2,
 h3 {
@@ -26,11 +31,6 @@ dt,
 .supporting {
   font-size: 0.875rem;
   line-height: 1.5;
-}
-.search-results {
-  display: grid;
-  gap: 0.5rem;
-  margin-bottom: 1.5rem;
 }
 .route-heading {
   display: flex;

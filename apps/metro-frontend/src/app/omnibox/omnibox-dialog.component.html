@@ -1,0 +1,140 @@
+<div class="dialog-heading">
+  <h2 mat-dialog-title>Buscar no site</h2>
+  <button
+    mat-icon-button
+    mat-dialog-close
+    type="button"
+    aria-label="Fechar busca"
+  >
+    <mat-icon>close</mat-icon>
+  </button>
+</div>
+<div class="search-controls">
+  <app-transit-search-field
+    label="Linhas, paradas e páginas"
+    placeholder="Ex.: 477A, Pinheiros ou favoritos"
+    [query]="query()"
+    [loading]="state().loading"
+    [clearable]="!!query()"
+    (queryChange)="setQuery($event)"
+    (cleared)="clear()"
+  />
+  <div class="search-tools">
+    <mat-chip-listbox
+      aria-label="Tipo de resultado"
+      [value]="filter()"
+      (change)="onFilterChange($event)"
+    >
+      @for (item of filters; track item.value) {
+        <mat-chip-option [value]="item.value">{{ item.label }}</mat-chip-option>
+      }
+    </mat-chip-listbox>
+    <button
+      mat-button
+      type="button"
+      (click)="searchNearby()"
+      [disabled]="
+        geolocation.isRequesting() ||
+        !geolocation.isSupported() ||
+        geolocation.isDisabled()
+      "
+      [attr.aria-pressed]="nearby()"
+    >
+      <mat-icon>near_me</mat-icon
+      >{{ geolocation.isRequesting() ? "Localizando…" : "Perto de mim" }}
+    </button>
+  </div>
+  @if (locationError()) {
+    <p role="alert">{{ locationError() }}</p>
+  }
+  @if (geolocation.isDisabled() || !geolocation.isSupported()) {
+    <p class="hint">{{ geolocation.permissionMessage() }}</p>
+  }
+</div>
+<mat-dialog-content class="search-content" [attr.aria-busy]="state().loading">
+  @if (!query().trim() && !nearby()) {
+    <p class="empty-state">
+      Busque uma linha para ver seu itinerário, uma parada para consultar
+      chegadas ou uma página do Metro.
+    </p>
+  }
+  @if (state().loading) {
+    <p role="status">Buscando…</p>
+  }
+  @if (state().error) {
+    <div class="error-state" role="alert">
+      <p>
+        A busca de transporte está indisponível. As páginas do Metro continuam
+        disponíveis.
+      </p>
+      <button mat-stroked-button type="button" (click)="retry()">
+        Tentar novamente
+      </button>
+    </div>
+  }
+  @if (detailError()) {
+    <p role="alert">{{ detailError() }}</p>
+  }
+  @if (openingId()) {
+    <mat-progress-bar mode="indeterminate" aria-label="Abrindo parada" />
+  }
+  @if (nearby()) {
+    <p class="hint">
+      Mais próximos primeiro, em até 1 km.
+      <button mat-button type="button" (click)="clear()">
+        Sair da busca por proximidade
+      </button>
+    </p>
+  }
+  @if (state().results.length) {
+    <h3>{{ nearby() ? "Perto de você · até 1 km" : "Transporte" }}</h3>
+    <div class="transit-results">
+      @for (result of state().results; track result.type + ":" + result.id) {
+        <app-search-result-card
+          [result]="result"
+          (resultClick)="selectResult($event)"
+        />
+      }
+    </div>
+  }
+  @if (pages().length) {
+    <h3>Páginas e atalhos</h3>
+    <nav aria-label="Resultados de páginas">
+      @for (item of pages(); track item.label) {
+        @if (item.route !== undefined) {
+          <a
+            class="page-result"
+            [routerLink]="cityContext.path(item.route)"
+            [queryParams]="item.queryParams"
+            (click)="dialogRef.close()"
+          >
+            <mat-icon aria-hidden="true">{{ item.icon }}</mat-icon
+            ><span>{{ item.label }}</span
+            ><mat-icon aria-hidden="true">arrow_forward</mat-icon>
+          </a>
+        } @else {
+          <a class="page-result" [href]="item.url"
+            ><mat-icon aria-hidden="true">{{ item.icon }}</mat-icon
+            ><span>{{ item.label }}</span
+            ><mat-icon aria-label="Site externo">open_in_new</mat-icon></a
+          >
+        }
+      }
+    </nav>
+  }
+  @if (
+    (query().trim() || nearby()) &&
+    !state().loading &&
+    !state().error &&
+    !state().results.length &&
+    !pages().length
+  ) {
+    <p class="empty-state" role="status">
+      {{
+        nearby()
+          ? "Nenhuma parada encontrada em até 1 km. Busque pelo nome."
+          : "Nenhum resultado. Tente outro nome, número de linha ou tipo de resultado."
+      }}
+    </p>
+  }
+</mat-dialog-content>

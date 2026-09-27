@@ -105,6 +105,14 @@ export function mergeSubwayStationResults(
       ...base,
       name: toTitleCase(normalizeStationName(base.name)),
       routes: Array.from(allRoutes).sort(),
+      lineCodes: [
+        ...new Set(stations.flatMap((station) => station.lineCodes ?? [])),
+      ].sort((a, b) => a - b),
+      liveTrainTrackingApiIds: [
+        ...new Set(
+          stations.flatMap((station) => station.liveTrainTrackingApiIds ?? []),
+        ),
+      ],
     });
   }
 

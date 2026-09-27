@@ -22,12 +22,6 @@ const baseItems: ToolbarItem[] = [
     icon: 'railway_alert',
   },
   {
-    label: 'Próxima chegada',
-    shortLabel: 'Chegadas',
-    route: '/proxima-chegada',
-    icon: 'schedule',
-  },
-  {
     label: 'Painel',
     shortLabel: 'Painel',
     route: '/painel',

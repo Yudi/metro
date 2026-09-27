@@ -144,11 +144,20 @@
               <tr>
                 <td>
                   {{ formatDateTime(row.snapshot.observedAt) }}
-                  @if (row.snapshot.startedAt && row.snapshot.occurrenceCount && row.snapshot.occurrenceCount > 1) {
+                  @if (
+                    row.snapshot.startedAt &&
+                    row.snapshot.occurrenceCount &&
+                    row.snapshot.occurrenceCount > 1
+                  ) {
                     <span class="error-period">
                       Desde {{ formatDateTime(row.snapshot.startedAt) }}<br />
                       {{ row.snapshot.occurrenceCount }} falhas em
-                      {{ formatObservedDuration(row.snapshot.startedAt, row.snapshot.observedAt) }}
+                      {{
+                        formatObservedDuration(
+                          row.snapshot.startedAt,
+                          row.snapshot.observedAt
+                        )
+                      }}
                     </span>
                   }
                 </td>
@@ -207,7 +216,14 @@
                         </div>
                         <div>
                           <dt>Duração observada</dt>
-                          <dd>{{ formatObservedDuration(row.snapshot.startedAt, row.snapshot.observedAt) }}</dd>
+                          <dd>
+                            {{
+                              formatObservedDuration(
+                                row.snapshot.startedAt,
+                                row.snapshot.observedAt
+                              )
+                            }}
+                          </dd>
                         </div>
                       }
                       @if (row.snapshot.occurrenceCount) {

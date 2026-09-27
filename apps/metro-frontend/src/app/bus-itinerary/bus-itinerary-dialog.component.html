@@ -1,44 +1,16 @@
-<main class="itineraries">
-  <h1 class="global-header">Itinerários</h1>
-  <app-transit-search-field
-    label="Número ou nome da linha"
-    placeholder="Ex.: 477A-10 ou Terminal Pinheiros"
-    [query]="query()"
-    [loading]="searchState().loading"
-    [clearable]="!!query()"
-    (queryChange)="query.set($event)"
-    (cleared)="query.set('')"
-  />
-
-  @if (query()) {
-    <section
-      class="search-results"
-      aria-label="Resultados da busca"
-      aria-live="polite"
-      [attr.aria-busy]="searchState().loading"
-    >
-      @if (searchState().loading) {
-        <p>Buscando linhas…</p>
-      } @else if (searchState().error) {
-        <p role="alert">
-          Não foi possível buscar as linhas. Tente digitar novamente.
-        </p>
-      } @else if (query().trim().length < 2) {
-        <p>Digite pelo menos 2 caracteres para buscar.</p>
-      } @else if (!searchState().results.length) {
-        <p>Nenhuma linha encontrada. Tente outro número ou destino.</p>
-      } @else {
-        @for (result of searchState().results; track result.id) {
-          <app-search-result-card
-            [result]="result"
-            (resultClick)="selectRoute($event)"
-          />
-        }
-      }
-    </section>
-  }
-
-  @if (routeId()) {
+<h2 mat-dialog-title class="dialog-title">
+  Itinerário de ônibus
+  <button
+    mat-icon-button
+    type="button"
+    aria-label="Fechar itinerário"
+    (click)="close()"
+  >
+    <mat-icon>close</mat-icon>
+  </button>
+</h2>
+<mat-dialog-content class="itineraries">
+  @if (routeId) {
     <section
       aria-label="Informações da linha"
       [attr.aria-busy]="detailState().loading"
@@ -80,6 +52,7 @@
             mat-stroked-button
             [routerLink]="cityPath('/mapa')"
             [queryParams]="mapParams()"
+            (click)="close()"
           >
             <mat-icon>map</mat-icon>Ver no mapa
           </a>
@@ -446,17 +419,12 @@
       } @else {
         <div class="empty-state">
           <h2>Linha não encontrada</h2>
-          <p>Busque pelo número ou nome para selecionar outra linha.</p>
+          <p>Não foi possível localizar as informações desta linha.</p>
         </div>
       }
     </section>
-  } @else if (!query()) {
-    <section class="empty-state">
-      <h2>Informações de linhas de ônibus</h2>
-      <p>
-        Busque uma linha da SPTrans ou Artesp para consultar sentidos, paradas,
-        horários e tarifas.
-      </p>
-    </section>
   }
-</main>
+</mat-dialog-content>
+<mat-dialog-actions align="end">
+  <button mat-button type="button" (click)="close()">Fechar</button>
+</mat-dialog-actions>

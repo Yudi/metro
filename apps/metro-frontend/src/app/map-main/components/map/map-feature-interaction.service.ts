@@ -1,7 +1,11 @@
 import { Service, inject } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { LoggerService } from '@metro/shared/api';
-import { formatBusFare, type BusFare } from '@metro/shared/utils';
+import {
+  formatBusFare,
+  getRailLineByCode,
+  type BusFare,
+} from '@metro/shared/utils';
 import { Feature } from 'ol';
 import { FeatureLike } from 'ol/Feature';
 import { BikeStationsService } from '../../geography/bike-stations.service';
@@ -237,6 +241,17 @@ export class MapFeatureInteractionService {
 
   private showVehicleInfo(properties: Record<string, unknown>): void {
     const vehicleId = String(properties['vehicleId'] || '');
+    const lineCode = properties['lineCode'];
+    if (typeof lineCode === 'string') {
+      const lineNumber = Number(lineCode.replace(/^L/, ''));
+      const lineName =
+        getRailLineByCode(lineNumber)?.fullName ?? `Linha ${lineCode}`;
+      this.snackBar.open(`Trem ${vehicleId} - ${lineName}`, 'Fechar', {
+        duration: 3000,
+      });
+      return;
+    }
+
     const routeShortName = String(properties['routeShortName'] || '');
 
     this.snackBar.open(

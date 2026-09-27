@@ -25,6 +25,8 @@ export const DEFAULT_HISTORY_LIMIT = 100;
 export const MAX_HISTORY_LIMIT = 500;
 export const BACKEND_LIFECYCLE_SOURCE = 'backend_lifecycle';
 export const RAIL_STATUS_SOURCE = 'rail_status';
+const CPTM_TEMPORARY_START_DATE = '2026-07-24';
+const CPTM_TEMPORARY_END_DATE_EXCLUSIVE = '2026-10-23';
 
 const saoPauloDate = new Intl.DateTimeFormat('en-US', {
   timeZone: 'America/Sao_Paulo',
@@ -34,11 +36,15 @@ const saoPauloDate = new Intl.DateTimeFormat('en-US', {
 });
 
 export function getHeadwayOperationalWindowKey(observedAt: Date): string {
+  return `${getSaoPauloDate(observedAt)}:${getHeadwayBucket(observedAt.getTime())}`;
+}
+
+function getSaoPauloDate(observedAt: Date): string {
   const parts = saoPauloDate.formatToParts(observedAt);
   const part = (type: string) =>
     parts.find((value) => value.type === type)?.value;
 
-  return `${part('year')}-${part('month')}-${part('day')}:${getHeadwayBucket(observedAt.getTime())}`;
+  return `${part('year')}-${part('month')}-${part('day')}`;
 }
 
 const NON_INCIDENT_RAIL_STATUS_CODES = new Set<RailStatusCode>([
@@ -134,16 +140,20 @@ export function getRailSeverity(line: RailLine): string {
 export function buildRailEventData(
   line: RailLine,
   metadata: Prisma.InputJsonValue | undefined,
-  getRequiredRailAgency: (lineCode: string | number) => string,
+  getRequiredRailAgency: (
+    lineCode: string | number,
+    observedAt: Date,
+  ) => string,
 ): Omit<Prisma.HistoricalIncidentEventCreateInput, 'eventType' | 'title'> {
+  const observedAt = new Date();
   return {
-    observedAt: new Date(),
+    observedAt,
     source: RAIL_STATUS_SOURCE,
     provider: 'merged_rail_status',
     lineCode: `L${line.code}`,
     lineNumber: line.code,
     lineName: line.line,
-    agency: getRequiredRailAgency(line.code),
+    agency: getRequiredRailAgency(line.code, observedAt),
     statusCode: line.statusCode,
     statusLabel: line.statusLabel,
     statusColor: line.statusColor,
@@ -160,12 +170,16 @@ export function buildHeadwaySnapshotData(
   direction: DirectionHeadway,
   samples: HeadwayCalculationSamples | undefined,
   stationName: string | undefined,
-  getRequiredRailAgency: (lineCode: string | number) => string,
+  getRequiredRailAgency: (
+    lineCode: string | number,
+    observedAt: Date,
+  ) => string,
 ): Prisma.HistoricalHeadwaySnapshotCreateManyInput {
+  const observedAt = new Date(headway.updatedAt);
   return {
-    observedAt: new Date(headway.updatedAt),
+    observedAt,
     lineCode: headway.lineCode,
-    agency: getRequiredRailAgency(headway.lineCode),
+    agency: getRequiredRailAgency(headway.lineCode, observedAt),
     stationCode: headway.stationCode,
     stationName,
     direction: direction.direction,
@@ -300,9 +314,21 @@ export function parseRailLineNumber(lineCode: string): number | undefined {
   return match ? Number.parseInt(match[1], 10) : undefined;
 }
 
-export function getRailAgency(lineCode: string | number): string | undefined {
+export function getRailAgency(
+  lineCode: string | number,
+  observedAt: Date,
+): string | undefined {
   const lineNumber =
     typeof lineCode === 'number' ? lineCode : parseRailLineNumber(lineCode);
+  if (lineNumber !== undefined && [11, 12, 13].includes(lineNumber)) {
+    const date = getSaoPauloDate(observedAt);
+    if (
+      date >= CPTM_TEMPORARY_START_DATE &&
+      date < CPTM_TEMPORARY_END_DATE_EXCLUSIVE
+    ) {
+      return 'cptm';
+    }
+  }
   return lineNumber === undefined
     ? undefined
     : getRailLineByCode(lineNumber)?.agency;

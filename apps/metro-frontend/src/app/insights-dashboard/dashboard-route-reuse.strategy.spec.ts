@@ -183,15 +183,13 @@ describe('Dashboard tab retention', () => {
     const harness = await RouterTestingHarness.create();
     await harness.navigateByUrl('/sp/painel', InsightsDashboardComponent);
     const http = TestBed.inject(HttpTestingController);
-    http
-      .expectOne('/api/graphql')
-      .flush({
-        data: {
-          mergedRailStations: [
-            { id: 'pinheiros', name: 'Pinheiros', lines: ['Esmeralda'] },
-          ],
-        },
-      });
+    http.expectOne('/api/graphql').flush({
+      data: {
+        mergedRailStations: [
+          { id: 'pinheiros', name: 'Pinheiros', lines: ['Esmeralda'] },
+        ],
+      },
+    });
     harness.detectChanges();
     await harness.fixture.whenStable();
     const service = TestBed.inject(NextTrainWebsocketService);

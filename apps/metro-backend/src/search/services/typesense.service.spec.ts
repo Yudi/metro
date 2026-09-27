@@ -2,6 +2,11 @@ import { ConfigService } from '@nestjs/config';
 import { ServiceUnavailableException } from '@nestjs/common';
 import { TypesenseService } from './typesense.service';
 import { formatTypesenseError } from './typesense.service';
+import { SearchTypesEnum } from '@metro/shared/utils';
+import {
+  busRouteSearchResult,
+  busStopSearchResult,
+} from '../testing/search.fixtures';
 
 describe('TypesenseService', () => {
   afterEach(() => {
@@ -65,26 +70,31 @@ describe('TypesenseService', () => {
     ).rejects.toThrow('rejected 1 malformed');
   });
 
-  it('applies a global search result limit across all selected indexes', async () => {
+  it('requests Typesense relevance order with stable per-collection ties', async () => {
+    const route1 = busRouteSearchResult({
+      id: 'route-1',
+      route_id: 'route-1',
+    });
+    const route2 = busRouteSearchResult({
+      id: 'route-2',
+      route_id: 'route-2',
+    });
+    const stop1 = busStopSearchResult({ id: 'stop-1', stop_id: 'stop-1' });
+    const stop2 = busStopSearchResult({ id: 'stop-2', stop_id: 'stop-2' });
+    const perform = jest.fn().mockResolvedValue({
+      results: [
+        {
+          hits: [{ document: route1.document }, { document: route2.document }],
+        },
+        {
+          hits: [{ document: stop1.document }, { document: stop2.document }],
+        },
+      ],
+    });
     const service = new TypesenseService(new ConfigService());
     (service as never as { client: unknown }).client = {
       multiSearch: {
-        perform: jest.fn().mockResolvedValue({
-          results: [
-            {
-              hits: [
-                { document: { id: 'route-1', route_id: 'route-1' } },
-                { document: { id: 'route-2', route_id: 'route-2' } },
-              ],
-            },
-            {
-              hits: [
-                { document: { id: 'stop-1', is_subway_station: false } },
-                { document: { id: 'stop-2', is_subway_station: false } },
-              ],
-            },
-          ],
-        }),
+        perform,
       },
     };
     (service as never as { initialized: boolean }).initialized = true;
@@ -92,6 +102,150 @@ describe('TypesenseService', () => {
     await expect(
       service.search('central', ['busRoute', 'busStop'], 2),
     ).resolves.toHaveLength(4);
+    const requests = perform.mock.calls[0][0].searches;
+    expect(requests).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          query_by: 'route_id,route_short_name,route_long_name,sourceAgency',
+          query_by_weights: '10,8,3,1',
+          sort_by: '_text_match:desc,route_id:asc',
+          per_page: 2,
+        }),
+        expect.objectContaining({
+          query_by: 'stop_name,stop_desc',
+          sort_by: '_text_match:desc,stop_id:asc',
+          per_page: 2,
+        }),
+      ]),
+    );
+    service.onModuleDestroy();
+  });
+
+  it('finds Artesp routes when users search for EMTU or Artesp', async () => {
+    const perform = jest.fn().mockResolvedValue({ results: [{ hits: [] }] });
+    const service = new TypesenseService(new ConfigService());
+    (service as never as { client: unknown }).client = {
+      multiSearch: { perform },
+    };
+    (service as never as { initialized: boolean }).initialized = true;
+
+    await service.search('EMTU 001', ['busRoute']);
+    await service.search('Artesp', ['busRoute']);
+
+    expect(perform.mock.calls[0][0].searches[0]).toMatchObject({
+      q: 'artesp 001',
+      query_by: 'route_id,route_short_name,route_long_name,sourceAgency',
+    });
+    expect(perform.mock.calls[1][0].searches[0].q).toBe('Artesp');
+    service.onModuleDestroy();
+  });
+
+  it('rejects partial search results when a multi-search collection fails', async () => {
+    const route = busRouteSearchResult();
+    const perform = jest.fn().mockResolvedValue({
+      results: [
+        { hits: [{ document: route.document }] },
+        { error: 'Invalid stop search field', code: 400 },
+      ],
+    });
+    const service = new TypesenseService(new ConfigService());
+    (service as never as { client: unknown }).client = {
+      multiSearch: { perform },
+    };
+    (service as never as { initialized: boolean }).initialized = true;
+
+    await expect(
+      service.search('Interlagos', ['busRoute', 'busStop']),
+    ).rejects.toThrow('Invalid stop search field');
+    service.onModuleDestroy();
+  });
+
+  it('keeps nearby distance primary and uses identity to break equal-distance ties', async () => {
+    const perform = jest.fn().mockResolvedValue({
+      results: [
+        {
+          hits: [
+            {
+              document: {
+                id: 'stop-z',
+                stop_id: 'stop-z',
+                stop_name: 'Stop Z',
+                stop_lat: -23.5,
+                stop_lon: -46.6,
+                is_subway_station: false,
+              },
+              geo_distance_meters: { location: 50 },
+            },
+            {
+              document: {
+                id: 'stop-nearest',
+                stop_id: 'stop-nearest',
+                stop_name: 'Nearest',
+                stop_lat: -23.5,
+                stop_lon: -46.6,
+                is_subway_station: false,
+              },
+              geo_distance_meters: { location: 20 },
+            },
+            {
+              document: {
+                id: 'stop-a',
+                stop_id: 'stop-a',
+                stop_name: 'Stop A',
+                stop_lat: -23.5,
+                stop_lon: -46.6,
+                is_subway_station: false,
+              },
+              geo_distance_meters: { location: 50 },
+            },
+          ],
+        },
+      ],
+    });
+    const service = new TypesenseService(new ConfigService());
+    (service as never as { client: unknown }).client = {
+      multiSearch: { perform },
+    };
+    (service as never as { initialized: boolean }).initialized = true;
+
+    const results = await service.searchNearbyStops(
+      -23.55,
+      -46.63,
+      1_000,
+      [SearchTypesEnum.BusStop],
+      3,
+    );
+
+    expect(
+      results.map((result) => (result.document as { stop_id: string }).stop_id),
+    ).toEqual(['stop-nearest', 'stop-a', 'stop-z']);
+    expect(perform.mock.calls[0][0].searches[0]).toMatchObject({
+      sort_by: 'location(-23.55, -46.63):asc',
+      per_page: 3,
+    });
+    service.onModuleDestroy();
+  });
+
+  it('fails nearby search when a requested collection returns an error response', async () => {
+    const perform = jest.fn().mockResolvedValue({
+      results: [
+        { hits: [] },
+        { error: 'Typesense collection unavailable', code: 503 },
+      ],
+    });
+    const service = new TypesenseService(new ConfigService());
+    (service as never as { client: unknown }).client = {
+      multiSearch: { perform },
+    };
+    (service as never as { initialized: boolean }).initialized = true;
+
+    await expect(
+      service.searchNearbyStops(-23.55, -46.63, 1_000, [
+        SearchTypesEnum.BusStop,
+        SearchTypesEnum.RailStation,
+      ]),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    expect(service.isAvailable()).toBe(false);
     service.onModuleDestroy();
   });
 

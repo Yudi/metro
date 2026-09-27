@@ -103,12 +103,14 @@ export type SearchGraphQLResult =
   | SearchGraphQLBikeStation;
 
 export interface SearchGraphQLResponse {
+  errors?: Array<{ message?: string }>;
   data?: {
     search?: SearchGraphQLResult[];
   };
 }
 
 export interface NearbyGraphQLResponse {
+  errors?: Array<{ message?: string }>;
   data?: {
     nearbyStops?: SearchGraphQLResult[];
   };

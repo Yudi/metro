@@ -1,42 +1,74 @@
 <div class="main-container">
-  <mat-nav-list>
+  <div class="account">
     @defer (when authReady(); prefetch on idle) {
-      <section mat-list-item class="auth-section">
+      <section class="auth-section">
         @if (firebaseUser(); as user) {
           <div class="header-item">
             <div class="header-content">
               <img
                 alt="Avatar do usuário"
                 class="avatar"
-                [src]="user.photoURL"
+                [ngSrc]="user.photoURL || '/app/icons/avatar-placeholder.avif'"
+                width="40"
+                height="40"
               />
-              <span matListItemTitle>{{ user.displayName }}</span>
+              <span>{{ user.displayName || "Minha conta" }}</span>
             </div>
-            <mat-icon class="auth-icon" button (click)="logout()">
-              logout
-            </mat-icon>
+            <button
+              mat-icon-button
+              type="button"
+              aria-label="Sair da conta"
+              (click)="logout()"
+            >
+              <mat-icon>logout</mat-icon>
+            </button>
           </div>
         } @else {
-          <div
+          <button
+            type="button"
             class="header-item login-header"
             (click)="login()"
-            (keypress)="login()"
-            tabindex="0"
           >
             <div class="header-content">
               <img
-                alt="user avatar"
+                alt=""
                 class="avatar"
-                src="/app/icons/avatar-placeholder.avif"
+                ngSrc="/app/icons/avatar-placeholder.avif"
+                width="40"
+                height="40"
               />
-              <span matListItemTitle>Fazer login com o Google</span>
+              <span>Fazer login com o Google</span>
             </div>
-            <mat-icon class="auth-icon" button>login</mat-icon>
-          </div>
+            <mat-icon aria-hidden="true">login</mat-icon>
+          </button>
         }
       </section>
     }
-
+  </div>
+  <div class="menu-search">
+    <mat-form-field appearance="outline" class="search-trigger">
+      <mat-label>Buscar linhas, paradas e páginas</mat-label>
+      <mat-icon matPrefix aria-hidden="true">search</mat-icon>
+      <input
+        #searchInput
+        matInput
+        type="search"
+        autocomplete="off"
+        placeholder="Ex.: 477A, Pinheiros ou favoritos"
+        aria-haspopup="dialog"
+        [attr.aria-expanded]="searchOpen()"
+        [formControl]="searchControl"
+        (focus)="openSearch()"
+        (click)="openSearch()"
+        (keydown.enter)="openSearch()"
+      />
+      <mat-hint>Itinerários, próximas chegadas e tudo no Metro.</mat-hint>
+    </mat-form-field>
+    @if (searchError()) {
+      <p role="alert">{{ searchError() }}</p>
+    }
+  </div>
+  <mat-nav-list aria-label="Páginas do Metro">
     <section>
       @for (section of sections; track section) {
         <div>

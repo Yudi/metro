@@ -43,6 +43,15 @@ import {
   hardNormalizeString,
 } from '@metro/shared/utils';
 
+const NORMALIZED_RAIL_LINE_METADATA = new Set(
+  RAIL_LINES.flatMap((line) => [
+    String(line.code),
+    line.lineId,
+    line.colorName,
+    line.fullName,
+  ]).map(hardNormalizeString),
+);
+
 @Resolver(() => SearchResultItem)
 export class SearchResolver {
   private readonly logger = new Logger(SearchResolver.name);
@@ -94,29 +103,11 @@ export class SearchResolver {
         ? this.typesenseService.search(input.query, types, input.limit ?? 10)
         : Promise.resolve([]));
 
-      const sortedByScore = typesenseResults.sort(
-        (a, b) =>
-          this.getAdjustedScore(b, input.query) -
-          this.getAdjustedScore(a, input.query),
+      const sortedByRelevance = [...typesenseResults].sort((a, b) =>
+        this.compareSearchResults(a, b, input.query),
       );
-      // Preserve rail/stop relevance and reorder only the bus-route positions.
-      const busRoutes = sortedByScore
-        .filter((hit) => hit.type === 'busRoute')
-        .sort((a, b) => {
-          const left = formatBusRouteDocument(a.document as RouteDocument);
-          const right = formatBusRouteDocument(b.document as RouteDocument);
-          return (
-            Number(left.sourceAgency === 'artesp') -
-            Number(right.sourceAgency === 'artesp')
-          );
-        });
-      let busIndex = 0;
-      for (let index = 0; index < sortedByScore.length; index++) {
-        if (sortedByScore[index].type === 'busRoute')
-          sortedByScore[index] = busRoutes[busIndex++];
-      }
 
-      return sortedByScore.slice(0, input.limit ?? 10).map((hit) => ({
+      return sortedByRelevance.slice(0, input.limit ?? 10).map((hit) => ({
         ...this.formatSearchDocument(hit.document, hit.type),
         score: hit.score,
         type: hit.type,
@@ -285,49 +276,117 @@ export class SearchResolver {
     return document;
   }
 
-  private getAdjustedScore(
+  private compareSearchResults(
     hit: Awaited<ReturnType<TypesenseService['search']>>[number],
+    other: Awaited<ReturnType<TypesenseService['search']>>[number],
     query: string,
   ): number {
-    const baseScore = hit.score ?? 0;
     const normalizedQuery = hardNormalizeString(query);
-
-    if (hit.type === 'railLine') {
-      const line = hit.document as LineDocument;
-      const normalizedLineCode = hardNormalizeString(line.line_code);
-      const normalizedLineId = hardNormalizeString(
-        this.formatRailLineCode(line.line_code),
-      );
-      const normalizedFullName = hardNormalizeString(line.line_fullname);
-      const lineInfo = getRailLineByCode(Number(line.line_code));
-      const normalizedColorName = lineInfo
-        ? hardNormalizeString(lineInfo.colorName)
-        : '';
-
-      if (
-        normalizedQuery === normalizedLineCode ||
-        normalizedQuery === normalizedLineId ||
-        normalizedFullName === normalizedQuery ||
-        normalizedColorName === normalizedQuery
-      ) {
-        return baseScore + 1_000_000;
-      }
-
-      if (
-        normalizedFullName.includes(normalizedQuery) ||
-        normalizedQuery.includes(normalizedLineId)
-      ) {
-        return baseScore + 50_000;
-      }
-
-      return baseScore + 10_000;
+    const exactMatchOrder =
+      Number(this.isExactIdentity(other, normalizedQuery)) -
+      Number(this.isExactIdentity(hit, normalizedQuery));
+    if (exactMatchOrder !== 0) {
+      return exactMatchOrder;
     }
 
-    if (hit.type === 'railStation') {
-      return baseScore + 1_000;
+    const scoreOrder = (other.score ?? 0) - (hit.score ?? 0);
+    if (scoreOrder !== 0) {
+      return scoreOrder;
     }
 
-    return baseScore;
+    const identityOrder = this.compareStableValues(
+      this.getSearchResultIdentity(hit),
+      this.getSearchResultIdentity(other),
+    );
+    return identityOrder;
+  }
+
+  private isExactIdentity(
+    hit: Awaited<ReturnType<TypesenseService['search']>>[number],
+    normalizedQuery: string,
+  ): boolean {
+    if (!normalizedQuery) {
+      return false;
+    }
+
+    let candidates: string[] = [];
+    switch (hit.type) {
+      case 'busRoute': {
+        const route = hit.document as RouteDocument;
+        candidates = [
+          route.route_id,
+          route.sourceId ?? '',
+          route.route_short_name,
+          route.route_long_name,
+        ];
+        break;
+      }
+      case 'busStop': {
+        const stop = hit.document as StopDocument;
+        candidates = [stop.stop_name];
+        break;
+      }
+      case 'railLine': {
+        const line = hit.document as LineDocument;
+        candidates = [
+          line.line_code,
+          this.formatRailLineCode(line.line_code),
+          line.line_fullname,
+          getRailLineByCode(Number(line.line_code))?.colorName ?? '',
+        ];
+        break;
+      }
+      case 'railStation': {
+        const station = hit.document as StationDocument;
+        candidates = [
+          station.station_code,
+          station.station_name,
+          ...(station.station_aliases ?? []).filter(
+            (alias) =>
+              !NORMALIZED_RAIL_LINE_METADATA.has(hardNormalizeString(alias)),
+          ),
+        ];
+        break;
+      }
+      case 'bikeStation': {
+        const station = hit.document as BikeStationDocument;
+        candidates = [station.station_id, station.station_name];
+        break;
+      }
+    }
+
+    return candidates.some(
+      (candidate) => hardNormalizeString(candidate) === normalizedQuery,
+    );
+  }
+
+  private getSearchResultIdentity(
+    hit: Awaited<ReturnType<TypesenseService['search']>>[number],
+  ): string {
+    let id = hit.document.id;
+    switch (hit.type) {
+      case 'busRoute':
+        id = (hit.document as RouteDocument).route_id;
+        break;
+      case 'busStop':
+        id = (hit.document as StopDocument).stop_id;
+        break;
+      case 'railLine':
+        id = (hit.document as LineDocument).line_code;
+        break;
+      case 'railStation':
+        id = (hit.document as StationDocument).station_code;
+        break;
+      case 'bikeStation':
+        id = (hit.document as BikeStationDocument).station_id;
+        break;
+    }
+
+    return `${hit.type}:${id}`;
+  }
+
+  private compareStableValues(left: string, right: string): number {
+    return left < right ? -1 : left > right ? 1 : 0;
   }
 
   private formatRailLineCode(lineCode: string): string {

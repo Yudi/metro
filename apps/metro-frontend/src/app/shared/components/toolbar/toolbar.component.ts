@@ -49,8 +49,6 @@ export class ToolbarComponent {
   readonly footerLinks = footerLinks;
   private readonly safeBackPaths = new Set([
     '/',
-    '/proxima-chegada',
-    '/itinerarios',
     '/proximo-trem',
     '/painel',
     '/mapa',
@@ -69,12 +67,6 @@ export class ToolbarComponent {
       shortLabel: 'Estado',
       route: '',
       icon: 'railway_alert',
-    },
-    {
-      label: 'Próxima chegada',
-      shortLabel: 'Próx. chegada',
-      route: '/proxima-chegada',
-      icon: 'schedule',
     },
     {
       label: 'Painel',
@@ -263,9 +255,7 @@ export class ToolbarComponent {
     const relativeSegments = segments.slice(1);
     const path = `/${relativeSegments.map((segment) => segment.path).join('/')}`;
 
-    return (
-      this.safeBackPaths.has(path) || /^\/itinerarios\/[^/]+\/[^/]+$/.test(path)
-    );
+    return this.safeBackPaths.has(path);
   }
 }
 

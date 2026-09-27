@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import {
   VectorTilesService,
   VectorTileLayer,
@@ -32,6 +33,10 @@ import { DevOnly } from '../common/decorators/development-only.decorator';
  */
 @ApiTags('Vector Tiles')
 @Controller('tiles')
+@Throttle({
+  default: { limit: 1_200, ttl: 60_000 },
+  strict: { limit: 1_200, ttl: 60_000 },
+})
 export class VectorTilesController {
   constructor(
     private readonly vectorTilesService: VectorTilesService,

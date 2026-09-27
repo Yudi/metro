@@ -83,10 +83,14 @@ describe('LineStatusGridComponent', () => {
     component.retryFetch();
     fixture.detectChanges();
 
-    const card = fixture.nativeElement.querySelector('.regular-grid .line-card') as HTMLElement;
+    const card = fixture.nativeElement.querySelector(
+      '.regular-grid .line-card',
+    ) as HTMLElement;
     expect(card.querySelectorAll('.status-badge')).toHaveLength(2);
     expect(card.querySelector('.paese-badge')?.textContent).toContain('PAESE');
-    expect(card.querySelector('.paese-badge mat-icon')?.textContent).toContain('directions_bus');
+    expect(card.querySelector('.paese-badge mat-icon')?.textContent).toContain(
+      'directions_bus',
+    );
     expect(component.isLineClickable(line)).toBe(true);
 
     card.click();

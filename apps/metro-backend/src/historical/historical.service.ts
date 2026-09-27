@@ -224,7 +224,7 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
       const data = {
         observedAt,
         lineCode: params.lineCode,
-        agency: this.getRequiredRailAgency(params.lineCode),
+        agency: this.getRequiredRailAgency(params.lineCode, observedAt),
         stationCode: params.stationCode,
         stationName: await this.resolveStationName(
           params.lineCode,
@@ -242,7 +242,10 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
         metadata: params.metadata,
       };
 
-      if (source !== 'headway_polling' || params.reason !== 'upstream_api_error') {
+      if (
+        source !== 'headway_polling' ||
+        params.reason !== 'upstream_api_error'
+      ) {
         await this.prisma.historicalHeadwaySnapshot.create({ data });
         return;
       }
@@ -487,8 +490,11 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
     return getStaticHistoricalStationName(lineCode, stationCode);
   }
 
-  private getRequiredRailAgency(lineCode: string | number): string {
-    const agency = getRailAgency(lineCode);
+  private getRequiredRailAgency(
+    lineCode: string | number,
+    observedAt: Date,
+  ): string {
+    const agency = getRailAgency(lineCode, observedAt);
 
     if (!agency) {
       throw new Error(`No transit agency configured for line ${lineCode}`);

@@ -72,16 +72,14 @@ describe('ToolbarComponent', () => {
     expect(navigateByUrl).toHaveBeenCalledWith('/sp/favoritos');
   });
 
-  it('preserves query and fragment on a city itinerary back route', () => {
+  it('rejects removed itinerary back routes', () => {
     queryParamMap.next(
       convertToParamMap({
         back: '/sp/itinerarios/sptrans/477A-10?dia=2026-09-12#horarios',
       }),
     );
 
-    expect(component.backRoute()).toBe(
-      '/sp/itinerarios/sptrans/477A-10?dia=2026-09-12#horarios',
-    );
+    expect(component.backRoute()).toBeNull();
   });
 
   it('rejects unprefixed feature paths', () => {

@@ -70,6 +70,7 @@ describe('NextTrainWebsocketService', () => {
     });
 
     secondRelease();
+    expect(service.subscribedStations()).toEqual([]);
     expect(service.getStationData('L9', 'HBR')).toBeNull();
     expect(socket.emit).toHaveBeenCalledWith('unsubscribe_station', {
       lineCode: 'L9',
@@ -232,6 +233,7 @@ describe('NextTrainWebsocketService', () => {
     const service = TestBed.inject(NextTrainWebsocketService);
     const firstRelease = service.subscribeToCptmVehicles('L8');
     const secondRelease = service.subscribeToCptmVehicles('L8');
+    expect(service.subscribedVehicleLines()).toEqual(['L8']);
 
     expect(socket.emit).toHaveBeenCalledTimes(1);
     expect(socket.emit).toHaveBeenCalledWith('subscribe_cptm_vehicles', {
@@ -262,11 +264,13 @@ describe('NextTrainWebsocketService', () => {
 
     expect(service.getCptmVehicles('L8')).toHaveLength(1);
     firstRelease();
+    expect(service.subscribedVehicleLines()).toEqual(['L8']);
     expect(socket.emit).not.toHaveBeenCalledWith('unsubscribe_cptm_vehicles', {
       lineCode: 'L8',
     });
 
     secondRelease();
+    expect(service.subscribedVehicleLines()).toEqual([]);
     expect(socket.emit).toHaveBeenCalledWith('unsubscribe_cptm_vehicles', {
       lineCode: 'L8',
     });

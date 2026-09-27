@@ -19,6 +19,7 @@ import { MapDisplayService } from './map-display.service';
 import { MapSelectionService } from './map-selection.service';
 import { MapStateService } from './map-state.service';
 import { GeographyGraphQLService } from '../../geography/geography-graphql.service';
+import { MapPanelService } from './map-panel/map-panel.service';
 
 @Service()
 export class MapFeatureInteractionService {
@@ -30,6 +31,7 @@ export class MapFeatureInteractionService {
   private readonly bikeStationsService = inject(BikeStationsService);
   private readonly vectorTileService = inject(VectorTileLayerService);
   private readonly detailsService = inject(MapDetailsDialogService);
+  private readonly panelService = inject(MapPanelService);
   private readonly selectionService = inject(MapSelectionService);
   private readonly geographyService = inject(GeographyGraphQLService, {
     optional: true,
@@ -246,19 +248,21 @@ export class MapFeatureInteractionService {
       const lineNumber = Number(lineCode.replace(/^L/, ''));
       const lineName =
         getRailLineByCode(lineNumber)?.fullName ?? `Linha ${lineCode}`;
-      this.snackBar.open(`Trem ${vehicleId} - ${lineName}`, 'Fechar', {
-        duration: 3000,
+      this.panelService.openNotice({
+        title: `Trem ${vehicleId}`,
+        summary: lineName,
+        icon: 'train',
       });
       return;
     }
 
     const routeShortName = String(properties['routeShortName'] || '');
 
-    this.snackBar.open(
-      `Ônibus ${vehicleId} - Linha ${routeShortName}`,
-      'Close',
-      { duration: 3000 },
-    );
+    this.panelService.openNotice({
+      title: `Ônibus ${vehicleId}`,
+      summary: routeShortName ? `Linha ${routeShortName}` : 'Linha não informada',
+      icon: 'directions_bus',
+    });
   }
 
   private showEstimatedVehicleInfo(properties: Record<string, unknown>): void {
@@ -276,8 +280,10 @@ export class MapFeatureInteractionService {
         ? `Posição estimada ${estimatedPositionDescription}.`
         : 'Localização estimada. A posição exibida pode diferir da posição real do trem.';
 
-    this.snackBar.open(`Linha ${lineCode}${direction}: ${position}`, 'Fechar', {
-      duration: 5000,
+    this.panelService.openNotice({
+      title: `Linha ${lineCode}${direction}`,
+      summary: position,
+      icon: 'train',
     });
   }
 

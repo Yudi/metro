@@ -1,4 +1,8 @@
-<mat-toolbar class="app-toolbar" color="primary">
+<mat-toolbar
+  class="app-toolbar"
+  [class.map-viewport]="viewportLayout()"
+  color="primary"
+>
   @if (backRoute()) {
     <button
       mat-icon-button
@@ -47,7 +51,11 @@
   </nav>
 </mat-toolbar>
 
-<main class="toolbar-content" [class.no-x-padding]="noXPadding()">
+<main
+  class="toolbar-content"
+  [class.no-x-padding]="noXPadding()"
+  [class.viewport-content]="viewportLayout()"
+>
   <ng-content />
 </main>
 <app-bottom-toolbar

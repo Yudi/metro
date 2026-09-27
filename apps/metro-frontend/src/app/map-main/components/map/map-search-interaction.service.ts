@@ -9,6 +9,7 @@ import { MapDisplayService } from './map-display.service';
 import { MapSelectionService } from './map-selection.service';
 import { MapStateService } from './map-state.service';
 import { SearchResult, SelectedStop } from './map.types';
+import { MapPanelService } from './map-panel/map-panel.service';
 
 @Service()
 export class MapSearchInteractionService {
@@ -20,6 +21,7 @@ export class MapSearchInteractionService {
   private readonly bikeStationsService = inject(BikeStationsService);
   private readonly selectionService = inject(MapSelectionService);
   private readonly detailsService = inject(MapDetailsDialogService);
+  private readonly panelService = inject(MapPanelService);
 
   openSearchModal(): void {
     const dialogRef = this.dialog.open(SearchDialogComponent, {
@@ -47,6 +49,7 @@ export class MapSearchInteractionService {
       }
 
       this.handleSearchResult(result);
+      this.panelService.compactOnMobile();
     });
   }
 

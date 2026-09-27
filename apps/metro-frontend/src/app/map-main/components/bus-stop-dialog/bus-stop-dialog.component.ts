@@ -28,6 +28,10 @@ import {
   getContrastColor,
 } from '@metro/shared/utils';
 import { DialogHeaderComponent } from '../../../shared/components/dialog-header/dialog-header.component';
+import {
+  closeMapPanelOrDialog,
+  MAP_PANEL_REF,
+} from '../map/map-panel/map-panel-ref';
 
 export interface BusStopDialogData {
   stop: BusStopGraphQL;
@@ -36,6 +40,10 @@ export interface BusStopDialogData {
   /** Whether to show map-specific actions (add to selection, show route on map). Default: true */
   showMapActions?: boolean;
 }
+
+export type BusStopDialogResult =
+  | { action: 'add'; stopId: string }
+  | { action: 'selectRoute'; routeId: string };
 
 @Component({
   selector: 'app-bus-stop-dialog',
@@ -52,7 +60,11 @@ export interface BusStopDialogData {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BusStopDialogComponent {
-  readonly dialogRef = inject(MatDialogRef<BusStopDialogComponent>);
+  protected readonly panelRef = inject(MAP_PANEL_REF, { optional: true });
+  private readonly dialogRef = inject(
+    MatDialogRef<BusStopDialogComponent, BusStopDialogResult>,
+    { optional: true },
+  );
   readonly data = inject<BusStopDialogData>(MAT_DIALOG_DATA);
   readonly stopDescription =
     this.data.stop.description?.trim() ===
@@ -133,11 +145,14 @@ export class BusStopDialogComponent {
   }
 
   close(): void {
-    this.dialogRef.close();
+    closeMapPanelOrDialog(this.panelRef, this.dialogRef);
   }
 
   addToSelection(): void {
-    this.dialogRef.close({ action: 'add', stopId: this.data.stop.stopId });
+    closeMapPanelOrDialog(this.panelRef, this.dialogRef, {
+      action: 'add',
+      stopId: this.data.stop.stopId,
+    });
   }
 
   addToFavorites(): void {
@@ -176,14 +191,20 @@ export class BusStopDialogComponent {
     if (this.data.selectedRoutes.has(routeId)) {
       return;
     }
-    this.dialogRef.close({ action: 'selectRoute', routeId });
+    closeMapPanelOrDialog(this.panelRef, this.dialogRef, {
+      action: 'selectRoute',
+      routeId,
+    });
   }
 
   selectRouteById(routeId: string): void {
     if (this.data.selectedRoutes.has(routeId)) {
       return;
     }
-    this.dialogRef.close({ action: 'selectRoute', routeId });
+    closeMapPanelOrDialog(this.panelRef, this.dialogRef, {
+      action: 'selectRoute',
+      routeId,
+    });
   }
 
   getContrastColor(hexColor: string): string {

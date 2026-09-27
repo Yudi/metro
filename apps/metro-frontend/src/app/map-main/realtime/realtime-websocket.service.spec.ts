@@ -42,6 +42,19 @@ describe('RealtimeWebsocketService', () => {
     TestBed.inject(RealtimeWebsocketService).ngOnDestroy();
   });
 
+  it('opens only for active subscriptions and closes after the last release', () => {
+    const service = TestBed.inject(RealtimeWebsocketService);
+    expect(io).not.toHaveBeenCalled();
+
+    const release = service.subscribeToRoute('477A');
+    expect(io).toHaveBeenCalledTimes(1);
+    expect(service.subscribedRoutes()).toEqual(['477A']);
+
+    release();
+    expect(service.subscribedRoutes()).toEqual([]);
+    expect(socket.disconnect).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps a shared stop subscription until its final owner releases it', () => {
     const service = TestBed.inject(RealtimeWebsocketService);
     const firstRelease = service.subscribeToStop('1234');

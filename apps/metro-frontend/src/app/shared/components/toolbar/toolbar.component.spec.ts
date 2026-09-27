@@ -43,6 +43,32 @@ describe('ToolbarComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('uses a viewport layout only while the map route is active', async () => {
+    router.resetConfig([
+      {
+        path: 'sp',
+        children: [
+          {
+            path: 'mapa',
+            component: ToolbarComponent,
+            data: { viewportLayout: true, noXPadding: true },
+          },
+          { path: 'sobre', component: ToolbarComponent },
+        ],
+      },
+    ]);
+
+    await router.navigateByUrl('/sp/mapa');
+    fixture.detectChanges();
+    expect(component.viewportLayout()).toBe(true);
+    expect(fixture.nativeElement.querySelector('main.viewport-content')).not.toBeNull();
+
+    await router.navigateByUrl('/sp/sobre');
+    fixture.detectChanges();
+    expect(component.viewportLayout()).toBe(false);
+    expect(fixture.nativeElement.querySelector('main.viewport-content')).toBeNull();
+  });
+
   it('shows a back route for whitelisted app paths', () => {
     queryParamMap.next(convertToParamMap({ back: '/sp/mapa' }));
 

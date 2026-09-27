@@ -1,63 +1,34 @@
-import { Meta, StoryObj, applicationConfig } from '@storybook/angular';
 import { signal } from '@angular/core';
-import { MapFooterComponent } from './map-footer.component';
-import { RealtimeStatusComponent } from '../../realtime-status/realtime-status.component';
-import { RealtimeWebsocketService } from '../../../realtime/realtime-websocket.service';
-import { MatIconModule } from '@angular/material/icon';
-import { MatButtonModule } from '@angular/material/button';
+import { Meta, StoryObj, applicationConfig } from '@storybook/angular';
 import { OLHOVIVO_POLL_INTERVAL_MS } from '@metro/shared/utils';
+import { MapRealtimeStatusService, MapRealtimeState } from '../../../realtime/map-realtime-status.service';
+import { RealtimeWebsocketService } from '../../../realtime/realtime-websocket.service';
+import { MapFooterComponent } from './map-footer.component';
 
-// Mock service factory
-function createMockRealtimeService(
-  connected: boolean,
-  vehicleCount: number,
-  stopCount: number,
-) {
-  const lastUpdateTimestamp = signal(Date.now());
-
-  // Simulate polling behavior - reset timestamp every poll interval
-  if (connected) {
-    setInterval(() => {
-      lastUpdateTimestamp.set(Date.now());
-    }, OLHOVIVO_POLL_INTERVAL_MS);
-  }
-
+function footerStory(
+  hasSelectedFeature: boolean,
+  state: MapRealtimeState,
+  tooltip: string,
+): Story {
   return {
-    connected: signal(connected),
-    lastUpdateTimestamp,
-    vehiclePositions: signal(
-      new Map(
-        Array.from({ length: vehicleCount }, (_, i) => [
-          `route-${i}`,
+    args: { hasSelectedFeature },
+    decorators: [
+      applicationConfig({
+        providers: [
           {
-            routeShortName: `${100 + i}`,
-            hr: new Date().toISOString(),
-            l: [],
-            cacheTimestamp: Date.now(),
+            provide: MapRealtimeStatusService,
+            useValue: { state: signal(state), tooltip: signal(tooltip) },
           },
-        ]),
-      ),
-    ),
-    stopArrivals: signal(
-      new Map(
-        Array.from({ length: stopCount }, (_, i) => [
-          `stop-${i}`,
           {
-            stopCode: `${1000 + i}`,
-            hr: new Date().toISOString(),
-            p: {
-              cp: 1000 + i,
-              np: `Stop ${i}`,
-              py: 0,
-              px: 0,
-              l: [],
+            provide: RealtimeWebsocketService,
+            useValue: {
+              lastUpdateTimestamp: signal(Date.now()),
+              POLL_INTERVAL_MS: OLHOVIVO_POLL_INTERVAL_MS,
             },
-            cacheTimestamp: Date.now(),
           },
-        ]),
-      ),
-    ),
-    POLL_INTERVAL_MS: OLHOVIVO_POLL_INTERVAL_MS,
+        ],
+      }),
+    ],
   };
 }
 
@@ -65,98 +36,40 @@ const meta: Meta<MapFooterComponent> = {
   title: 'Bus/Map/MapFooter',
   component: MapFooterComponent,
   tags: ['autodocs'],
-  decorators: [
-    (story) => ({
-      ...story(),
-      imports: [MatIconModule, MatButtonModule, RealtimeStatusComponent],
-    }),
-  ],
 };
 export default meta;
-
 type Story = StoryObj<MapFooterComponent>;
 
-export const Default: Story = {
-  args: {
-    hasSelectedFeature: false,
-  },
-  decorators: [
-    applicationConfig({
-      providers: [
-        {
-          provide: RealtimeWebsocketService,
-          useValue: createMockRealtimeService(true, 25, 10),
-        },
-      ],
-    }),
-  ],
-};
+export const Default: Story = footerStory(
+  false,
+  'connected',
+  'Acompanhamento em tempo real conectado\nÔnibus: 1 rota (477A)\nBicicletas: estações do mapa',
+);
 
-export const WithSelectedFeature: Story = {
-  args: {
-    hasSelectedFeature: true,
-  },
-  decorators: [
-    applicationConfig({
-      providers: [
-        {
-          provide: RealtimeWebsocketService,
-          useValue: createMockRealtimeService(true, 25, 10),
-        },
-      ],
-    }),
-  ],
-};
+export const WithSelectedFeature: Story = footerStory(
+  true,
+  'connected',
+  'Acompanhamento em tempo real conectado\nÔnibus: 1 rota (477A)',
+);
 
-// Storybook interaction test for input
+export const WithOfflineRealtime: Story = footerStory(
+  false,
+  'offline',
+  'Acompanhamento em tempo real desconectado\nÔnibus: 1 rota (477A)',
+);
+
+export const SelectedFeatureHighTraffic: Story = footerStory(
+  true,
+  'connected',
+  'Acompanhamento em tempo real conectado\nÔnibus: 20 rotas\nParadas: 50 paradas\nTrens: 9 linhas',
+);
+
 Default.play = async ({ canvasElement }) => {
-  // Check that the feature info button is disabled when hasSelectedFeature is false
   const button = canvasElement.querySelector('button');
-  if (!button) throw new Error('Button not found');
-  if (!button.disabled) throw new Error('Button should be disabled');
+  if (button) throw new Error('Details button should not appear without a selection');
 };
 
 WithSelectedFeature.play = async ({ canvasElement }) => {
-  // Check that the feature info button is enabled when hasSelectedFeature is true
   const button = canvasElement.querySelector('button');
-  if (!button) throw new Error('Button not found');
-  if (button.disabled) throw new Error('Button should be enabled');
-};
-
-/**
- * Map footer with offline realtime status
- */
-export const WithOfflineRealtime: Story = {
-  args: {
-    hasSelectedFeature: false,
-  },
-  decorators: [
-    applicationConfig({
-      providers: [
-        {
-          provide: RealtimeWebsocketService,
-          useValue: createMockRealtimeService(false, 0, 0),
-        },
-      ],
-    }),
-  ],
-};
-
-/**
- * Map footer with selected feature and high traffic realtime data
- */
-export const SelectedFeatureHighTraffic: Story = {
-  args: {
-    hasSelectedFeature: true,
-  },
-  decorators: [
-    applicationConfig({
-      providers: [
-        {
-          provide: RealtimeWebsocketService,
-          useValue: createMockRealtimeService(true, 999_999, 999_999),
-        },
-      ],
-    }),
-  ],
+  if (!button || button.disabled) throw new Error('Details button should be enabled');
 };

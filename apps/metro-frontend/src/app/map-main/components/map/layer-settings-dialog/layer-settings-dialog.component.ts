@@ -15,6 +15,7 @@ import { MapService } from '.././map.service';
 import { LayerType } from '../layers/map-layer.service';
 import { VectorTileLayerType } from '../vector-tiles/vector-tile-layer.service';
 import { LoggerService } from '@metro/shared/api';
+import { MAP_PANEL_REF } from '../map-panel/map-panel-ref';
 
 /**
  * Unified layer configuration for the settings dialog
@@ -43,7 +44,10 @@ interface LayerToggleConfig {
 })
 export class LayerSettingsDialogComponent {
   private mapService = inject(MapService);
-  private dialogRef = inject(MatDialogRef<LayerSettingsDialogComponent>);
+  protected readonly panelRef = inject(MAP_PANEL_REF, { optional: true });
+  private readonly dialogRef =
+    this.panelRef ??
+    inject(MatDialogRef<LayerSettingsDialogComponent>);
   private logger = inject(LoggerService);
   private layerService = this.mapService.getLayerService();
   private vectorTileLayerService = this.mapService.getVectorTileLayerService();

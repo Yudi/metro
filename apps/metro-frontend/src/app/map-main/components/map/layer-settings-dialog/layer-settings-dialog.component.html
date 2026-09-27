@@ -28,7 +28,9 @@
     </div>
   </mat-dialog-content>
 
-  <mat-dialog-actions align="end">
-    <button mat-button (click)="close()">Fechar</button>
-  </mat-dialog-actions>
+  @if (!panelRef) {
+    <mat-dialog-actions align="end">
+      <button mat-button (click)="close()">Fechar</button>
+    </mat-dialog-actions>
+  }
 </div>

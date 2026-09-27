@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { MapComponent } from './components/map/map.component';
 
 @Component({
@@ -6,5 +6,6 @@ import { MapComponent } from './components/map/map.component';
   imports: [MapComponent],
   templateUrl: './map-main.component.html',
   styleUrl: './map-main.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MapMainComponent {}

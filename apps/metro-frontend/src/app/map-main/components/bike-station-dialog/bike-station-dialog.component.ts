@@ -19,6 +19,10 @@ import { MatChipsModule } from '@angular/material/chips';
 import { FavoritesService } from '@metro/shared/api';
 import { BikeStation, BikeVehicleAvailability } from '../map/map.types';
 import { DialogHeaderComponent } from '../../../shared/components/dialog-header/dialog-header.component';
+import {
+  closeMapPanelOrDialog,
+  MAP_PANEL_REF,
+} from '../map/map-panel/map-panel-ref';
 
 export interface BikeStationDialogData {
   station: BikeStation;
@@ -46,8 +50,10 @@ export interface BikeStationDialogResult {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BikeStationDialogComponent {
+  protected readonly panelRef = inject(MAP_PANEL_REF, { optional: true });
   private readonly dialogRef = inject(
     MatDialogRef<BikeStationDialogComponent, BikeStationDialogResult>,
+    { optional: true },
   );
   private readonly dialogData = inject<BikeStationDialogData>(MAT_DIALOG_DATA);
   public readonly isDevMode = isDevMode();
@@ -98,7 +104,7 @@ export class BikeStationDialogComponent {
   }
 
   close(): void {
-    this.dialogRef.close();
+    closeMapPanelOrDialog(this.panelRef, this.dialogRef);
   }
 
   toggleFavorite(): void {
@@ -150,7 +156,7 @@ export class BikeStationDialogComponent {
   }
 
   selectStation(): void {
-    this.dialogRef.close({
+    closeMapPanelOrDialog(this.panelRef, this.dialogRef, {
       action: 'select',
       stationId: this.station().stationId,
     });

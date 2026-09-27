@@ -28,7 +28,7 @@ export class MapBaseTileService {
     const tileLayer = new TileLayer({
       source: new XYZ({
         url: isDarkMode ? DARK_TILE_URL : LIGHT_TILE_URL,
-        attributions: '© OpenStreetMap contributors, © CartoDB',
+        attributions: `<a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, <a href="https://carto.com/legal/basemap-terms/">CARTO</a>`,
       }),
     });
     this.baseTileLayer = tileLayer;
@@ -43,7 +43,7 @@ export class MapBaseTileService {
         this.baseTileLayer?.setSource(
           new XYZ({
             url: matches ? DARK_TILE_URL : LIGHT_TILE_URL,
-            attributions: '© OpenStreetMap contributors, © CartoDB',
+            attributions: `<a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, <a href="https://carto.com/legal/basemap-terms/">CARTO</a>`,
           }),
         );
         this.logger.info(

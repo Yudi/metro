@@ -9,10 +9,12 @@ import { BikeStationsService } from '../../geography/bike-stations.service';
 import { VectorTileLayerService } from './vector-tiles/vector-tile-layer.service';
 import { MapDetailsDialogService } from './map-details-dialog.service';
 import { MapSelectionService } from './map-selection.service';
+import { MapPanelService } from './map-panel/map-panel.service';
 
 describe('MapFeatureInteractionService', () => {
   let service: MapFeatureInteractionService;
   let snackBar: { open: jest.Mock };
+  let panels: MapPanelService;
 
   beforeEach(() => {
     snackBar = { open: jest.fn() };
@@ -61,6 +63,7 @@ describe('MapFeatureInteractionService', () => {
       ],
     });
     service = TestBed.inject(MapFeatureInteractionService);
+    panels = TestBed.inject(MapPanelService);
   });
 
   it('explains an estimated train location without exposing source details', () => {
@@ -78,14 +81,16 @@ describe('MapFeatureInteractionService', () => {
 
     service.handleFeatureSelection(feature as never);
 
-    expect(snackBar.open).toHaveBeenCalledWith(
-      'Linha L8 rumo a Itapevi: Posição estimada entre Osasco e Comandante Sampaio.',
-      'Fechar',
-      { duration: 5000 },
+    expect(panels.panel()).toEqual(
+      expect.objectContaining({
+        title: 'Linha L8 rumo a Itapevi',
+        summary: 'Posição estimada entre Osasco e Comandante Sampaio.',
+      }),
     );
-    expect(snackBar.open.mock.calls[0][0]).not.toContain('Ônibus');
-    expect(snackBar.open.mock.calls[0][0]).not.toContain('estimate-uuid');
-    expect(snackBar.open.mock.calls[0][0]).not.toContain('previsões');
+    const content = `${panels.panel()?.title}: ${panels.panel()?.summary}`;
+    expect(content).not.toContain('Ônibus');
+    expect(content).not.toContain('estimate-uuid');
+    expect(content).not.toContain('previsões');
   });
 
   it('shows the train and full rail line name for a tracked vehicle', () => {
@@ -95,10 +100,11 @@ describe('MapFeatureInteractionService', () => {
       getProperties: () => properties,
     } as never);
 
-    expect(snackBar.open).toHaveBeenCalledWith(
-      'Trem S048 - Linha 11 - Coral',
-      'Fechar',
-      { duration: 3000 },
+    expect(panels.panel()).toEqual(
+      expect.objectContaining({
+        title: 'Trem S048',
+        summary: 'Linha 11 - Coral',
+      }),
     );
   });
 
@@ -109,10 +115,11 @@ describe('MapFeatureInteractionService', () => {
       getProperties: () => properties,
     } as never);
 
-    expect(snackBar.open).toHaveBeenCalledWith(
-      'Ônibus 1234 - Linha 8000-10',
-      'Close',
-      { duration: 3000 },
+    expect(panels.panel()).toEqual(
+      expect.objectContaining({
+        title: 'Ônibus 1234',
+        summary: 'Linha 8000-10',
+      }),
     );
   });
 });

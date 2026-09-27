@@ -11,10 +11,12 @@ import {
   ChangeDetectionStrategy,
   DestroyRef,
   isDevMode,
+  signal,
+  computed,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatProgressBarModule } from '@angular/material/progress-bar';
 
 import { MapService, MapOptions } from './map.service';
 import { MapStateService } from './map-state.service';
@@ -30,7 +32,8 @@ import { LayerType } from './layers/map-layer.service';
 import { VectorTileLayerType } from './vector-tiles/vector-tile-layer.service';
 import { MapHeaderComponent } from './map-header/map-header.component';
 import { MapStatusBarComponent } from './map-status-bar/map-status-bar.component';
-import { MapFabMenuComponent } from './map-fab-menu/map-fab-menu.component';
+import { MapPanelComponent } from './map-panel/map-panel.component';
+import { MapPanelService } from './map-panel/map-panel.service';
 import { MapSelectionsPanelComponent } from './map-selections-panel/map-selections-panel.component';
 import { MapFooterComponent } from './map-footer/map-footer.component';
 import { GeolocationService } from '@metro/shared/geolocation';
@@ -41,10 +44,10 @@ import { MapRouteStateService } from './map-route-state.service';
 @Component({
   selector: 'app-map',
   imports: [
-    MatDialogModule,
+    MatProgressBarModule,
     MapHeaderComponent,
     MapStatusBarComponent,
-    MapFabMenuComponent,
+    MapPanelComponent,
     MapSelectionsPanelComponent,
     MapFooterComponent,
   ],
@@ -61,7 +64,13 @@ export class MapComponent implements AfterViewInit, OnDestroy {
   private dataLoader = inject(MapDataLoaderService);
   private displayService = inject(MapDisplayService);
   private interactionService = inject(MapInteractionService);
-  private dialog = inject(MatDialog);
+  readonly mapPanel = inject(MapPanelService);
+  readonly sheetHeight = signal(0);
+  readonly sheetExpandedProgress = signal(0);
+  readonly sheetDragging = signal(false);
+  readonly layersOpen = computed(
+    () => this.mapPanel.panel()?.component === LayerSettingsDialogComponent,
+  );
   private logger = inject(LoggerService);
   private vehicleLayerService = inject(RealtimeVehicleLayerService);
   private cptmVehicleLayerService = inject(CptmVehicleLayerService);
@@ -200,6 +209,7 @@ export class MapComponent implements AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.destroyed = true;
+    this.mapPanel.clear();
     if (this.initializationTimer) {
       clearTimeout(this.initializationTimer);
       this.initializationTimer = null;
@@ -300,6 +310,10 @@ export class MapComponent implements AfterViewInit, OnDestroy {
     await this.userLocationLayer.centerOnUser();
   }
 
+  compactMapPanel(): void {
+    this.mapPanel.compactOnMobile();
+  }
+
   // Handle display mode changes from header
   onDisplayModeChange(newMode: 'selected' | 'nearby'): void {
     const currentMode = this.displayMode();
@@ -367,11 +381,16 @@ export class MapComponent implements AfterViewInit, OnDestroy {
 
   // Open layer settings dialog
   openLayerSettings(): void {
-    this.dialog.open(LayerSettingsDialogComponent, {
-      width: '400px',
-      maxWidth: '90vw',
-      autoFocus: false,
-      restoreFocus: true,
+    if (this.layersOpen()) {
+      this.mapPanel.close();
+      return;
+    }
+    this.mapPanel.openComponent({
+      component: LayerSettingsDialogComponent,
+      data: undefined,
+      title: 'Camadas do mapa',
+      summary: '',
+      initialSnap: 'expanded',
     });
   }
 }

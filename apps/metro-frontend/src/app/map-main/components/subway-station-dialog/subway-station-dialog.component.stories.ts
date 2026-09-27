@@ -476,9 +476,8 @@ export const L9LoadingNextTrain: Story = {
 };
 
 /**
- * Multi-Line Station (Osasco): Shows L8 and L9 next train cards with line names
- * This demonstrates how stations served by multiple ViaMobilidade lines
- * display the full line name to differentiate the cards.
+ * Multi-Line Station (Osasco): Select between L8 and L9 train data.
+ * Both lines have arrivals ready when the user switches chips.
  */
 export const MultiLineStationOsasco: Story = {
   decorators: [

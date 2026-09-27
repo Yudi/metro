@@ -66,10 +66,13 @@ export class BikeStationsService implements OnDestroy {
   readonly ttl = signal<number | null>(null);
   readonly fetchedAt = signal<number | null>(null);
   readonly connected = signal(false);
+  readonly active = signal(false);
+  readonly pendingDetailsCount = signal(0);
   readonly paused = signal(false);
   readonly refreshTick = signal(0);
 
   async activate(): Promise<void> {
+    this.active.set(true);
     this.paused.set(false);
     this.ensureSocket();
   }
@@ -92,6 +95,7 @@ export class BikeStationsService implements OnDestroy {
   }
 
   disconnect(): void {
+    this.active.set(false);
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
@@ -118,6 +122,7 @@ export class BikeStationsService implements OnDestroy {
 
     this.ensureSocket();
     this.inFlightDetailRequests.add(stationId);
+    this.pendingDetailsCount.set(this.inFlightDetailRequests.size);
     this.startDetailTimeout(stationId);
 
     this.socket?.emit(BIKE_WS_DETAILS_REQUEST_EVENT, { stationId });
@@ -304,6 +309,7 @@ export class BikeStationsService implements OnDestroy {
 
     const timeout = setTimeout(() => {
       this.inFlightDetailRequests.delete(stationId);
+      this.pendingDetailsCount.set(this.inFlightDetailRequests.size);
       this.pendingDetailTimeouts.delete(stationId);
       this.markDetailsError(stationId);
     }, BIKE_DETAILS_REQUEST_TIMEOUT_MS);
@@ -313,6 +319,7 @@ export class BikeStationsService implements OnDestroy {
 
   private clearDetailTracking(stationId: string): void {
     this.inFlightDetailRequests.delete(stationId);
+    this.pendingDetailsCount.set(this.inFlightDetailRequests.size);
     const timeout = this.pendingDetailTimeouts.get(stationId);
     if (timeout) {
       clearTimeout(timeout);
@@ -322,6 +329,7 @@ export class BikeStationsService implements OnDestroy {
 
   private clearAllDetailTracking(): void {
     this.inFlightDetailRequests.clear();
+    this.pendingDetailsCount.set(0);
     this.pendingDetailTimeouts.forEach((timeout) => clearTimeout(timeout));
     this.pendingDetailTimeouts.clear();
   }

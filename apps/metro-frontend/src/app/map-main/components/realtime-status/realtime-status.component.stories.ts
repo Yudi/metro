@@ -1,360 +1,61 @@
-import { Meta, StoryObj, applicationConfig } from '@storybook/angular';
 import { signal } from '@angular/core';
-import { RealtimeStatusComponent } from './realtime-status.component';
-import { RealtimeWebsocketService } from '../../realtime/realtime-websocket.service';
+import { Meta, StoryObj, applicationConfig } from '@storybook/angular';
 import { OLHOVIVO_POLL_INTERVAL_MS } from '@metro/shared/utils';
+import { MapRealtimeStatusService, MapRealtimeState } from '../../realtime/map-realtime-status.service';
+import { RealtimeWebsocketService } from '../../realtime/realtime-websocket.service';
+import { RealtimeStatusComponent } from './realtime-status.component';
 
-// Mock service factory
-function createMockRealtimeService(
-  connected: boolean,
-  vehicleCount: number,
-  stopCount: number,
-  hasRecentUpdate: boolean,
-) {
-  const lastUpdateTimestamp = signal(
-    hasRecentUpdate ? Date.now() : Date.now() - OLHOVIVO_POLL_INTERVAL_MS * 2,
-  );
-
-  // Simulate polling behavior - reset timestamp every poll interval
-  if (connected && hasRecentUpdate) {
-    setInterval(() => {
-      lastUpdateTimestamp.set(Date.now());
-    }, OLHOVIVO_POLL_INTERVAL_MS);
-  }
-
+function statusStory(state: MapRealtimeState, tooltip: string): Story {
   return {
-    connected: signal(connected),
-    lastUpdateTimestamp,
-    vehiclePositions: signal(
-      new Map(
-        Array.from({ length: vehicleCount }, (_, i) => [
-          `route-${i}`,
+    decorators: [
+      applicationConfig({
+        providers: [
           {
-            routeShortName: `${100 + i}`,
-            hr: new Date().toISOString(),
-            l: [],
-            cacheTimestamp: Date.now(),
+            provide: MapRealtimeStatusService,
+            useValue: { state: signal(state), tooltip: signal(tooltip) },
           },
-        ]),
-      ),
-    ),
-    stopArrivals: signal(
-      new Map(
-        Array.from({ length: stopCount }, (_, i) => [
-          `stop-${i}`,
           {
-            stopCode: `${1000 + i}`,
-            hr: new Date().toISOString(),
-            p: {
-              cp: 1000 + i,
-              np: `Stop ${i}`,
-              py: 0,
-              px: 0,
-              l: [],
+            provide: RealtimeWebsocketService,
+            useValue: {
+              lastUpdateTimestamp: signal(Date.now()),
+              POLL_INTERVAL_MS: OLHOVIVO_POLL_INTERVAL_MS,
             },
-            cacheTimestamp: Date.now(),
           },
-        ]),
-      ),
-    ),
-    POLL_INTERVAL_MS: OLHOVIVO_POLL_INTERVAL_MS,
+        ],
+      }),
+    ],
   };
 }
 
 const meta: Meta<RealtimeStatusComponent> = {
-  title: 'Bus/RealtimeStatus',
+  title: 'Map/RealtimeStatus',
   component: RealtimeStatusComponent,
   tags: ['autodocs'],
 };
-
 export default meta;
-
 type Story = StoryObj<RealtimeStatusComponent>;
 
-/**
- * Connected state with active tracking
- * Shows the breathing animation and progress border
- */
-export const Connected: Story = {
-  decorators: [
-    applicationConfig({
-      providers: [
-        {
-          provide: RealtimeWebsocketService,
-          useValue: createMockRealtimeService(true, 25, 10, true),
-        },
-      ],
-    }),
-  ],
-};
+export const Connected: Story = statusStory(
+  'connected',
+  'Acompanhamento em tempo real conectado\nÔnibus: 2 rotas (477A, 875A)\nTrens: 1 linha (L9)\nBicicletas: estações do mapa',
+);
 
-/**
- * Connected state with many vehicles and stops
- */
-export const ConnectedHighTraffic: Story = {
-  decorators: [
-    applicationConfig({
-      providers: [
-        {
-          provide: RealtimeWebsocketService,
-          useValue: createMockRealtimeService(true, 999_999, 999_999, true),
-        },
-      ],
-    }),
-  ],
-};
+export const RailOnly: Story = statusStory(
+  'connected',
+  'Acompanhamento em tempo real conectado\nTrens: 1 linha (L9)\nEstações: 1 estação (L9:HBR)',
+);
 
-/**
- * Connected state with few vehicles
- */
-export const ConnectedLowTraffic: Story = {
-  decorators: [
-    applicationConfig({
-      providers: [
-        {
-          provide: RealtimeWebsocketService,
-          useValue: createMockRealtimeService(true, 3, 1, true),
-        },
-      ],
-    }),
-  ],
-};
+export const PartialConnection: Story = statusStory(
+  'partial',
+  'Parte do acompanhamento está desconectada\nÔnibus: 1 rota (477A)\nTrens: 1 linha (L9)',
+);
 
-/**
- * Connected but no recent updates (progress will be near complete)
- */
-export const ConnectedStaleData: Story = {
-  decorators: [
-    applicationConfig({
-      providers: [
-        {
-          provide: RealtimeWebsocketService,
-          useValue: createMockRealtimeService(true, 25, 10, false),
-        },
-      ],
-    }),
-  ],
-};
+export const Offline: Story = statusStory(
+  'offline',
+  'Acompanhamento em tempo real desconectado\nÔnibus: 1 rota (477A)',
+);
 
-/**
- * Offline/disconnected state
- * Shows red indicator without animation
- */
-export const Offline: Story = {
-  decorators: [
-    applicationConfig({
-      providers: [
-        {
-          provide: RealtimeWebsocketService,
-          useValue: createMockRealtimeService(false, 0, 0, false),
-        },
-      ],
-    }),
-  ],
-};
-
-/**
- * Initial state - no data yet
- */
-export const ConnectedNoData: Story = {
-  decorators: [
-    applicationConfig({
-      providers: [
-        {
-          provide: RealtimeWebsocketService,
-          useValue: createMockRealtimeService(true, 0, 0, true),
-        },
-      ],
-    }),
-  ],
-};
-
-/**
- * Progress at 25% - countdown just started
- * Shows the circular progress border at beginning of cycle
- */
-export const CountdownProgress25: Story = {
-  decorators: [
-    applicationConfig({
-      providers: [
-        {
-          provide: RealtimeWebsocketService,
-          useValue: (() => {
-            const lastUpdateTimestamp = signal(
-              Date.now() - OLHOVIVO_POLL_INTERVAL_MS * 0.25,
-            );
-            // Keep the offset constant by continuously updating
-            setInterval(() => {
-              lastUpdateTimestamp.set(Date.now() - 3750);
-            }, 100);
-            return {
-              connected: signal(true),
-              lastUpdateTimestamp,
-              vehiclePositions: signal(
-                new Map([
-                  [
-                    'route-1',
-                    {
-                      routeShortName: '100',
-                      hr: new Date().toISOString(),
-                      l: [],
-                      cacheTimestamp: Date.now(),
-                    },
-                  ],
-                ]),
-              ),
-              stopArrivals: signal(
-                new Map([
-                  [
-                    'stop-1',
-                    {
-                      stopCode: '1000',
-                      hr: new Date().toISOString(),
-                      p: {
-                        cp: 1000,
-                        np: 'Stop 1',
-                        py: 0,
-                        px: 0,
-                        l: [],
-                      },
-                      cacheTimestamp: Date.now(),
-                    },
-                  ],
-                ]),
-              ),
-              POLL_INTERVAL_MS: OLHOVIVO_POLL_INTERVAL_MS,
-            };
-          })(),
-        },
-      ],
-    }),
-  ],
-};
-
-/**
- * Progress at 50% - countdown halfway
- * Shows the circular progress border at middle of cycle
- */
-export const CountdownProgress50: Story = {
-  decorators: [
-    applicationConfig({
-      providers: [
-        {
-          provide: RealtimeWebsocketService,
-          useValue: (() => {
-            const lastUpdateTimestamp = signal(
-              Date.now() - OLHOVIVO_POLL_INTERVAL_MS * 0.5,
-            );
-            // Keep the offset constant by continuously updating
-            setInterval(() => {
-              lastUpdateTimestamp.set(
-                Date.now() - OLHOVIVO_POLL_INTERVAL_MS * 0.5,
-              );
-            }, 100);
-            return {
-              connected: signal(true),
-              lastUpdateTimestamp,
-              vehiclePositions: signal(
-                new Map([
-                  [
-                    'route-1',
-                    {
-                      routeShortName: '100',
-                      hr: new Date().toISOString(),
-                      l: [],
-                      cacheTimestamp: Date.now(),
-                    },
-                  ],
-                ]),
-              ),
-              stopArrivals: signal(
-                new Map([
-                  [
-                    'stop-1',
-                    {
-                      stopCode: '1000',
-                      hr: new Date().toISOString(),
-                      p: {
-                        cp: 1000,
-                        np: 'Stop 1',
-                        py: 0,
-                        px: 0,
-                        l: [],
-                      },
-                      cacheTimestamp: Date.now(),
-                    },
-                  ],
-                ]),
-              ),
-              POLL_INTERVAL_MS: OLHOVIVO_POLL_INTERVAL_MS,
-            };
-          })(),
-        },
-      ],
-    }),
-  ],
-};
-
-/**
- * Progress at 90% - countdown almost complete
- * Shows the circular progress border near end of cycle
- */
-export const CountdownProgress90: Story = {
-  decorators: [
-    applicationConfig({
-      providers: [
-        {
-          provide: RealtimeWebsocketService,
-          useValue: (() => {
-            const lastUpdateTimestamp = signal(
-              Date.now() - OLHOVIVO_POLL_INTERVAL_MS * 0.9,
-            );
-            // Keep the offset constant by continuously updating
-            setInterval(() => {
-              lastUpdateTimestamp.set(
-                Date.now() - OLHOVIVO_POLL_INTERVAL_MS * 0.9,
-              );
-            }, 100);
-            return {
-              connected: signal(true),
-              lastUpdateTimestamp,
-              vehiclePositions: signal(
-                new Map([
-                  [
-                    'route-1',
-                    {
-                      routeShortName: '100',
-                      hr: new Date().toISOString(),
-                      l: [],
-                      cacheTimestamp: Date.now(),
-                    },
-                  ],
-                ]),
-              ),
-              stopArrivals: signal(
-                new Map([
-                  [
-                    'stop-1',
-                    {
-                      stopCode: '1000',
-                      hr: new Date().toISOString(),
-                      p: {
-                        cp: 1000,
-                        np: 'Stop 1',
-                        py: 0,
-                        px: 0,
-                        l: [],
-                      },
-                      cacheTimestamp: Date.now(),
-                    },
-                  ],
-                ]),
-              ),
-              POLL_INTERVAL_MS: OLHOVIVO_POLL_INTERVAL_MS,
-            };
-          })(),
-        },
-      ],
-    }),
-  ],
-};
+export const Idle: Story = statusStory(
+  'idle',
+  'Aguardando conexão',
+);

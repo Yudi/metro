@@ -1,94 +1,159 @@
 <header class="map-header">
-  <div class="header-content">
-    <!-- Display Mode Toggle -->
-    <mat-button-toggle-group
-      class="display-mode-toggle"
-      [value]="displayMode()"
-      (change)="onDisplayModeChange($event.value)"
-      hideSingleSelectionIndicator
-    >
-      <mat-button-toggle value="selected" aria-label="Modo selecionados">
-        <mat-icon>playlist_add_check</mat-icon>
-        <span class="toggle-label">Seleção</span>
-      </mat-button-toggle>
-      <mat-button-toggle
-        value="nearby"
-        aria-label="Modo próximos"
-        [disabled]="isNearbyDisabled()"
-        [matTooltip]="nearbyTooltip()"
-      >
-        @if (isRequestingLocation()) {
-          <mat-spinner diameter="18" class="toggle-spinner"></mat-spinner>
-        } @else {
-          <mat-icon>{{
-            isNearbyDisabled() ? "location_off" : "near_me"
-          }}</mat-icon>
-        }
-        <span class="toggle-label">Próximos</span>
-      </mat-button-toggle>
-    </mat-button-toggle-group>
-
-    <!-- Desktop Actions -->
-    <div class="desktop-actions">
+  @if (showPrimaryControls()) {
+    <div class="primary-actions">
       <button
-        mat-icon-button
+        matButton="filled"
+        type="button"
+        class="search-button"
         (click)="searchClick.emit()"
         matTooltip="Pesquisar linhas e paradas"
-        aria-label="Pesquisar"
+        matTooltipPosition="above"
+        aria-label="Pesquisar no mapa"
       >
-        <mat-icon>search</mat-icon>
+        <mat-icon aria-hidden="true">search</mat-icon>
+        <span>Pesquisar</span>
       </button>
 
-      <button
-        mat-icon-button
-        (click)="exploreClick.emit()"
-        matTooltip="Explorar outro local"
-        aria-label="Explorar outro local"
+      <span
+        class="nearby-button-container"
+        [matTooltip]="locationMessage()"
+        matTooltipPosition="above"
+        [attr.title]="
+          isLocationActionDisabled() ? locationMessage() : null
+        "
       >
-        <mat-icon>explore</mat-icon>
-      </button>
+        <button
+          matButton="tonal"
+          type="button"
+          class="nearby-button"
+          (click)="onNearbyClick()"
+          [disabled]="isLocationActionDisabled()"
+          aria-label="Perto de mim"
+          [attr.aria-description]="locationMessage()"
+          [attr.aria-pressed]="displayMode() === 'nearby'"
+          [attr.aria-busy]="isRequestingLocation() ? 'true' : null"
+        >
+          @if (isRequestingLocation()) {
+            <mat-spinner diameter="20" aria-hidden="true"></mat-spinner>
+          } @else {
+            <mat-icon aria-hidden="true">{{ locationIcon() }}</mat-icon>
+          }
+          <span>Perto de mim</span>
+        </button>
+      </span>
+    </div>
+  }
 
+  @if (showSecondaryControls()) {
+    <div class="secondary-actions">
       <button
-        mat-icon-button
+        matIconButton
+        type="button"
+        class="icon-action"
         (click)="layersClick.emit()"
         matTooltip="Configurar camadas"
+        matTooltipPosition="below"
         aria-label="Camadas"
+        [attr.aria-pressed]="layersOpen()"
       >
-        <mat-icon>layers</mat-icon>
+        <mat-icon aria-hidden="true">layers</mat-icon>
       </button>
 
       <button
-        mat-icon-button
-        [disabled]="isLocationDisabled() || isRequestingLocation()"
-        (click)="centerOnUserClick.emit()"
-        matTooltip="Centralizar em sua localização"
-        aria-label="Centralizar em minha localização"
+        matButton
+        type="button"
+        class="options-button"
+        [matMenuTriggerFor]="optionsMenu"
+        [matTooltip]="optionsAriaLabel()"
+        matTooltipPosition="below"
+        [attr.aria-label]="optionsAriaLabel()"
       >
-        <mat-icon>{{
-          isLocationDisabled() ? "location_off" : "my_location"
-        }}</mat-icon>
+        <mat-icon aria-hidden="true">{{ optionsIcon() }}</mat-icon>
+        <span>{{ optionsLabel() }}</span>
       </button>
-
-      <button
-        mat-icon-button
-        (click)="centerClick.emit()"
-        [matTooltip]="'Centralizar em ' + cityContext.city().name"
-        aria-label="Centralizar mapa"
-      >
-        <mat-icon>location_city</mat-icon>
-      </button>
-
-      @if (hasSelections()) {
-        <button
-          mat-icon-button
-          color="warn"
-          (click)="clearClick.emit()"
-          matTooltip="Limpar seleções"
-          aria-label="Limpar todas as seleções"
-        >
-          <mat-icon>clear_all</mat-icon>
-        </button>
-      }
     </div>
-  </div>
+  }
 </header>
+
+<mat-menu #optionsMenu="matMenu" aria-label="Opções do mapa">
+  <button mat-menu-item type="button" (click)="exploreClick.emit()">
+    <mat-icon aria-hidden="true">explore</mat-icon>
+    <span>Explorar outro local</span>
+  </button>
+
+  <button mat-menu-item type="button" (click)="centerClick.emit()">
+    <mat-icon aria-hidden="true">location_city</mat-icon>
+    <span>Centralizar em {{ cityContext.city().name }}</span>
+  </button>
+
+  <mat-divider></mat-divider>
+
+  <button
+    mat-menu-item
+    type="button"
+    role="menuitemradio"
+    [attr.aria-checked]="displayMode() === 'selected'"
+    (click)="onDisplayModeChange('selected')"
+  >
+    <mat-icon aria-hidden="true">
+      {{
+        displayMode() === "selected"
+          ? "radio_button_checked"
+          : "radio_button_unchecked"
+      }}
+    </mat-icon>
+    <span>Seleção manual</span>
+  </button>
+
+  <button
+    mat-menu-item
+    type="button"
+    class="nearby-menu-item"
+    role="menuitemradio"
+    [attr.aria-checked]="displayMode() === 'nearby'"
+    [attr.aria-description]="
+      isNearbyDisabled() ? nearbyDisabledMessage() : null
+    "
+    [disabled]="isNearbyDisabled()"
+    (click)="onDisplayModeChange('nearby')"
+  >
+    <mat-icon aria-hidden="true">
+      {{
+        displayMode() === "nearby"
+          ? "radio_button_checked"
+          : "radio_button_unchecked"
+      }}
+    </mat-icon>
+    <span class="menu-item-copy">
+      <span>Paradas próximas</span>
+      @if (isNearbyDisabled()) {
+        <span class="menu-item-detail">{{ nearbyDisabledMessage() }}</span>
+      }
+    </span>
+  </button>
+
+  <mat-divider></mat-divider>
+
+  <button
+    mat-menu-item
+    type="button"
+    aria-label="Enquadrar itens visíveis"
+    [disabled]="!hasFeatures()"
+    (click)="fitClick.emit()"
+  >
+    <mat-icon aria-hidden="true">zoom_out_map</mat-icon>
+    <span>Enquadrar itens visíveis</span>
+  </button>
+
+  @if (hasSelections()) {
+    <button
+      mat-menu-item
+      type="button"
+      (click)="clearClick.emit()"
+      aria-label="Limpar todas as seleções"
+    >
+      <mat-icon aria-hidden="true">clear_all</mat-icon>
+      <span>Limpar seleções</span>
+    </button>
+  }
+</mat-menu>

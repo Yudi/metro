@@ -2,20 +2,22 @@ import {
   Component,
   inject,
   computed,
+  effect,
   signal,
   OnDestroy,
   ChangeDetectionStrategy,
 } from '@angular/core';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RealtimeWebsocketService } from '../../realtime/realtime-websocket.service';
+import { MapRealtimeStatusService } from '../../realtime/map-realtime-status.service';
 import { BreathingAnimationService } from '../../../shared/services/breathing-animation.service';
 
 /**
  * Realtime status indicator chip with:
  * - Circular default state that expands on hover
- * - Progress border showing time until next refresh
+ * - Optional progress border for a predictable refresh schedule
  * - Breathing animation indicating live status
- * - Offline state always showing full text
+ * - Disconnected state showing its label; waiting state as three dots
  */
 @Component({
   selector: 'app-realtime-status',
@@ -24,18 +26,21 @@ import { BreathingAnimationService } from '../../../shared/services/breathing-an
   template: `
     <div
       class="realtime-chip"
-      [class.connected]="realtimeService.connected()"
-      [class.expanded]="isExpanded() || !realtimeService.connected()"
-      [class.offline]="!realtimeService.connected()"
+      [class.connected]="status.state() === 'connected'"
+      [class.partial]="status.state() === 'partial'"
+      [class.idle]="status.state() === 'idle'"
+      [class.expanded]="status.state() !== 'idle' && (isExpanded() || status.state() !== 'connected')"
+      [class.offline]="status.state() === 'offline'"
       [matTooltip]="tooltipText()"
+      matTooltipClass="map-realtime-tooltip"
       matTooltipPosition="below"
       (mouseenter)="onMouseEnter()"
       (mouseleave)="onMouseLeave()"
       (click)="onTap()"
       (keydown.enter)="onTap()"
       (keydown.space)="onTap(); $event.preventDefault()"
-      tabindex="0"
-      role="button"
+      [attr.tabindex]="status.state() === 'idle' ? -1 : 0"
+      [attr.role]="status.state() === 'idle' ? 'status' : 'button'"
       [attr.aria-label]="tooltipText()"
       [style.--progress]="progressPercent()"
     >
@@ -43,12 +48,18 @@ import { BreathingAnimationService } from '../../../shared/services/breathing-an
       <div class="border-bg"></div>
 
       <!-- Progress border (only when connected) -->
-      @if (realtimeService.connected()) {
+      @if (showProgress && status.state() === 'connected') {
         <div class="border-progress"></div>
       }
 
-      <!-- Breathing indicator (fixed position, only when connected) -->
-      @if (realtimeService.connected()) {
+      <!-- Breathing indicator for active connections -->
+      @if (status.state() === 'idle') {
+        <span class="connecting-dots" aria-hidden="true">
+          <span [style.--brightness]="waitingBrightness()[0]"></span>
+          <span [style.--brightness]="waitingBrightness()[1]"></span>
+          <span [style.--brightness]="waitingBrightness()[2]"></span>
+        </span>
+      } @else if (status.state() === 'connected' || status.state() === 'partial') {
         <div
           class="breathing-dot"
           [style.--brightness]="breathingBrightness()"
@@ -57,10 +68,7 @@ import { BreathingAnimationService } from '../../../shared/services/breathing-an
         <div class="offline-dot"></div>
       }
 
-      <!-- Text label (visible when expanded or offline) -->
-      <span class="status-text">
-        {{ statusText() }}
-      </span>
+      <span class="status-text">{{ statusText() }}</span>
     </div>
   `,
   styles: [
@@ -75,6 +83,8 @@ import { BreathingAnimationService } from '../../../shared/services/breathing-an
         --color-primary: #4caf50;
         --color-secondary: #81c784;
         --color-error: #ba1a1a;
+        --color-warning: #8b5e00;
+        --color-idle: #5f6368;
         --progress: 0;
 
         position: relative;
@@ -82,27 +92,53 @@ import { BreathingAnimationService } from '../../../shared/services/breathing-an
         align-items: center;
         justify-content: flex-start;
         height: var(--chip-size);
-        width: var(--chip-size);
+        min-width: var(--chip-size);
+        width: max-content;
+        max-width: var(--chip-size);
+        padding-right: 12px;
+        overflow: hidden;
         border-radius: calc(var(--chip-size) / 2);
         background: transparent;
         box-sizing: border-box;
         cursor: pointer;
         user-select: none;
         transition:
-          width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+          max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
           background 0.3s ease;
 
         &.expanded {
-          width: 120px;
+          max-width: 260px;
           background: var(--color-error);
 
           &.connected {
             background: var(--color-primary);
           }
+          &.partial {
+            background: var(--color-warning);
+          }
         }
 
         &.offline {
-          width: 100px;
+          min-width: var(--chip-size);
+        }
+
+        &.idle {
+          cursor: default;
+        }
+      }
+
+      @supports (interpolate-size: allow-keywords) {
+        .realtime-chip {
+          interpolate-size: allow-keywords;
+          width: var(--chip-size);
+          max-width: none;
+          transition:
+            width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+            background 0.3s ease;
+        }
+
+        .realtime-chip.expanded {
+          width: max-content;
         }
       }
 
@@ -208,14 +244,22 @@ import { BreathingAnimationService } from '../../../shared/services/breathing-an
         );
       }
 
+      .partial .breathing-dot {
+        background: var(--color-warning);
+      }
+
+      .expanded.partial .breathing-dot {
+        background: white;
+      }
+
       /* Offline static dot */
       .offline-dot {
         position: absolute;
-        left: calc((var(--chip-size) - 8px) / 2);
+        left: calc((var(--chip-size) - 12px) / 2);
         top: 50%;
         transform: translateY(-50%);
-        width: 8px;
-        height: 8px;
+        width: 12px;
+        height: 12px;
         border-radius: 50%;
         background: var(--color-error);
         flex-shrink: 0;
@@ -223,13 +267,33 @@ import { BreathingAnimationService } from '../../../shared/services/breathing-an
         z-index: 2;
       }
 
+      .connecting-dots {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        display: flex;
+        gap: 3px;
+        transform: translate(-50%, -50%);
+
+        span {
+          --brightness: 15;
+          width: 5px;
+          height: 5px;
+          border-radius: 50%;
+          background: color-mix(
+            in srgb,
+            var(--color-idle) calc(var(--brightness) * 1%),
+            transparent
+          );
+        }
+      }
+
       .expanded .offline-dot {
         background: white;
       }
 
       .status-text {
-        position: absolute;
-        left: var(--chip-size);
+        margin-left: var(--chip-size);
         font-size: 11px;
         font-weight: 500;
         text-transform: uppercase;
@@ -247,6 +311,14 @@ import { BreathingAnimationService } from '../../../shared/services/breathing-an
         color: var(--color-secondary);
       }
 
+      .partial .status-text {
+        color: var(--color-warning);
+      }
+
+      .idle .status-text {
+        color: var(--color-idle);
+      }
+
       .expanded .status-text {
         opacity: 1;
         color: white;
@@ -256,7 +328,13 @@ import { BreathingAnimationService } from '../../../shared/services/breathing-an
 })
 export class RealtimeStatusComponent implements OnDestroy {
   readonly realtimeService = inject(RealtimeWebsocketService);
+  readonly status = inject(MapRealtimeStatusService);
   private readonly breathingService = inject(BreathingAnimationService);
+  private readonly waitingStartedAt = Date.now();
+
+  // Updates are pushed when each server feed changes. There is no shared
+  // client refresh deadline to show, but retain the progress implementation.
+  readonly showProgress = false;
 
   /** Track hover state for expansion (desktop) */
   private readonly isHovered = signal(false);
@@ -273,16 +351,19 @@ export class RealtimeStatusComponent implements OnDestroy {
   /** Current timestamp for reactive updates (updated via requestAnimationFrame) */
   private readonly currentTime = signal(Date.now());
 
-  /** Unsubscribe function for breathing animation */
-  private readonly unsubscribeBreathing: () => void;
-
   constructor() {
-    this.unsubscribeBreathing = this.breathingService.subscribe();
-    this.startAnimationLoop();
+    effect((onCleanup) => {
+      const state = this.status.state();
+      if (state !== 'offline') {
+        onCleanup(this.breathingService.subscribe());
+      }
+    });
+    if (this.showProgress) {
+      this.startAnimationLoop();
+    }
   }
 
   ngOnDestroy(): void {
-    this.unsubscribeBreathing();
     this.stopAnimationLoop();
   }
 
@@ -298,23 +379,20 @@ export class RealtimeStatusComponent implements OnDestroy {
 
   /** Handle tap/click (mobile toggle) */
   onTap(): void {
+    if (this.status.state() === 'idle') return;
     this.isTapped.update((v) => !v);
   }
 
   /** Status text label */
-  readonly statusText = computed(() =>
-    this.realtimeService.connected() ? 'Tempo Real' : 'Offline',
-  );
+  readonly statusText = computed(() => ({
+    idle: '',
+    connected: 'Tempo real',
+    partial: 'Conexão parcial',
+    offline: 'Offline',
+  })[this.status.state()]);
 
   /** Tooltip with detailed information */
-  readonly tooltipText = computed(() => {
-    if (this.realtimeService.connected()) {
-      const vehicleCount = this.realtimeService.vehiclePositions().size;
-      const stopCount = this.realtimeService.stopArrivals().size;
-      return `Conectado ao serviço de tempo real\n${vehicleCount} rotas rastreadas\n${stopCount} paradas monitoradas`;
-    }
-    return 'Desconectado do serviço de tempo real';
-  });
+  readonly tooltipText = this.status.tooltip;
 
   /**
    * Calculate progress as a value between 0 and 1 for CSS.
@@ -323,7 +401,7 @@ export class RealtimeStatusComponent implements OnDestroy {
     const lastUpdate = this.realtimeService.lastUpdateTimestamp();
     const now = this.currentTime();
 
-    if (!lastUpdate || !this.realtimeService.connected()) {
+    if (!lastUpdate || this.status.state() !== 'connected') {
       return 0;
     }
 
@@ -338,10 +416,20 @@ export class RealtimeStatusComponent implements OnDestroy {
    * Returns static 50% brightness when offline.
    */
   readonly breathingBrightness = computed(() => {
-    if (!this.realtimeService.connected()) {
+    if (this.status.state() === 'offline' || this.status.state() === 'idle') {
       return 50; // Static brightness when offline
     }
     return this.breathingService.breathingBrightness();
+  });
+
+  readonly waitingBrightness = computed(() => {
+    const elapsed = this.breathingService.currentTime() - this.waitingStartedAt;
+    const period = this.breathingService.periodMs;
+    return [0, 1, 2].map((index) =>
+      this.breathingService.brightnessAt(
+        elapsed + period / 2 - (index * period) / 3,
+      ),
+    );
   });
 
   /**

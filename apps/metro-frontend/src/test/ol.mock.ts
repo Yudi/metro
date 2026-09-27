@@ -297,3 +297,7 @@ export const isEmpty = (extent: unknown): boolean => {
 };
 
 export default OpenLayersMockObject;
+
+export function defaults(): unknown[] {
+  return [];
+}

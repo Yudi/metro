@@ -11,3 +11,8 @@
   line-height: $size;
   text-align: center;
 }
+
+@mixin rounded-square($size: 24px, $font-size: 12px, $radius: 6px) {
+  @include circle($size, $font-size);
+  border-radius: $radius;
+}

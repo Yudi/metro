@@ -126,6 +126,14 @@ export class ToolbarComponent {
     },
   );
 
+  readonly viewportLayout = toSignal(
+    this.router.events.pipe(
+      filter((event): event is NavigationEnd => event instanceof NavigationEnd),
+      map(() => this.getRouteData<boolean>('viewportLayout') ?? false),
+    ),
+    { initialValue: this.getRouteData<boolean>('viewportLayout') ?? false },
+  );
+
   toggleSidenav() {
     this._opened.update((v) => !v);
   }

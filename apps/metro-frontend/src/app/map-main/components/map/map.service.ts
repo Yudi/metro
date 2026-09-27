@@ -5,6 +5,7 @@ import { createEmpty, extend, isEmpty } from 'ol/extent';
 import { Feature } from 'ol';
 import { FeatureLike } from 'ol/Feature';
 import Overlay from 'ol/Overlay';
+import { defaults as defaultControls } from 'ol/control/defaults';
 import { MapLayerService, LayerType } from './layers/map-layer.service';
 import { VectorTileLayerService } from './vector-tiles/vector-tile-layer.service';
 import { LoggerService } from '@metro/shared/api';
@@ -95,7 +96,16 @@ export class MapService {
         center: fromLonLat(center),
         zoom,
       }),
-      controls: showControls ? undefined : [],
+      controls: showControls
+        ? defaultControls({
+            attributionOptions: { collapsible: false },
+            zoomOptions: {
+              zoomInTipLabel: 'Ampliar mapa',
+              zoomOutTipLabel: 'Reduzir mapa',
+            },
+            rotateOptions: { tipLabel: 'Restaurar orientação do mapa' },
+          })
+        : [],
     });
 
     // Add managed layers from layer service

@@ -13,6 +13,7 @@ import { MapMainComponent } from './map-main.component';
 
 import { BikeStationsService } from './geography/bike-stations.service';
 import { RealtimeWebsocketService } from './realtime/realtime-websocket.service';
+import { MapRealtimeStatusService } from './realtime/map-realtime-status.service';
 import { RealtimeVehicleLayerService } from './realtime/realtime-vehicle-layer.service';
 import { CptmVehicleLayerService } from './realtime/cptm-vehicle-layer.service';
 import { UserLocationLayerService } from './components/map/user-location-layer.service';
@@ -29,6 +30,7 @@ describe('Bus', () => {
     await TestBed.configureTestingModule({
       imports: [MapMainComponent],
       providers: [
+        { provide: MapRealtimeStatusService, useValue: { state: signal('idle'), tooltip: signal('Aguardando conexão em tempo real') } },
         { provide: ActivatedRoute, useValue: activatedRouteStub },
         {
           provide: BikeStationsService,

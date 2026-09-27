@@ -40,7 +40,9 @@
   >
     <mat-icon>{{ favoriteIcon() }}</mat-icon>
   </button>
-  <button mat-button (click)="close()">Fechar</button>
+  @if (!panelRef) {
+    <button mat-button (click)="close()">Fechar</button>
+  }
   @if (showMapActions) {
     <button mat-raised-button color="primary" (click)="addToSelection()">
       Adicionar à seleção

@@ -54,6 +54,8 @@ export class NextTrainWebsocketService implements OnDestroy {
   // Signals for reactive state
   readonly connected = signal(false);
   readonly lastUpdate = signal<number | null>(null);
+  readonly subscribedStations = signal<readonly string[]>([]);
+  readonly subscribedVehicleLines = signal<readonly TrackedRailLineCode[]>([]);
 
   // Station data: Map<"L9:HBR", StationTrainData>
   private readonly _stationData = signal<
@@ -109,6 +111,9 @@ export class NextTrainWebsocketService implements OnDestroy {
     const key: SubscriptionKey = `${lineCode}:${stationCode}`;
     const owners = this.activeSubscriptions.get(key) ?? 0;
     this.activeSubscriptions.set(key, owners + 1);
+    if (owners === 0) {
+      this.subscribedStations.set([...this.activeSubscriptions.keys()]);
+    }
     this.ensureConnected();
 
     if (owners === 0 && this.socket?.connected) {
@@ -142,6 +147,7 @@ export class NextTrainWebsocketService implements OnDestroy {
     }
 
     this.activeSubscriptions.delete(key);
+    this.subscribedStations.set([...this.activeSubscriptions.keys()]);
 
     if (this.socket?.connected) {
       this.socket.emit(NEXT_TRAIN_UNSUBSCRIBE_EVENT, { lineCode, stationCode });
@@ -199,6 +205,11 @@ export class NextTrainWebsocketService implements OnDestroy {
 
     const owners = this.cptmVehicleSubscriptions.get(lineCode) ?? 0;
     this.cptmVehicleSubscriptions.set(lineCode, owners + 1);
+    if (owners === 0) {
+      this.subscribedVehicleLines.set([
+        ...this.cptmVehicleSubscriptions.keys(),
+      ]);
+    }
     this.ensureConnected();
 
     if (owners === 0 && this.socket?.connected) {
@@ -230,6 +241,7 @@ export class NextTrainWebsocketService implements OnDestroy {
     }
 
     this.cptmVehicleSubscriptions.delete(lineCode);
+    this.subscribedVehicleLines.set([...this.cptmVehicleSubscriptions.keys()]);
 
     if (this.socket?.connected) {
       this.socket.emit(CPTM_VEHICLE_UNSUBSCRIBE_EVENT, { lineCode });

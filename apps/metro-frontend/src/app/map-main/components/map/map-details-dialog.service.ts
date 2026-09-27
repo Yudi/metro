@@ -1,9 +1,5 @@
-import { Service, effect, inject } from '@angular/core';
-import {
-  MatDialog,
-  MatDialogRef,
-  MatDialogState,
-} from '@angular/material/dialog';
+import { Service, computed, effect, inject } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { LoggerService } from '@metro/shared/api';
 import { BikeStationsService } from '../../geography/bike-stations.service';
@@ -16,6 +12,7 @@ import {
 import {
   BusStopDialogComponent,
   BusStopDialogData,
+  BusStopDialogResult,
 } from '../bus-stop-dialog/bus-stop-dialog.component';
 import {
   SubwayStationDialogComponent,
@@ -24,6 +21,9 @@ import {
 import { MapDisplayService } from './map-display.service';
 import { MapSelectionService } from './map-selection.service';
 import { MapStateService } from './map-state.service';
+import { MapPanelRef } from './map-panel/map-panel-ref';
+import { MapPanelService } from './map-panel/map-panel.service';
+import { buildMapPanelAgencyLineGroups } from './map-panel/map-panel-agency-lines';
 
 export interface SubwayStationTileDialogData {
   id: string;
@@ -37,49 +37,49 @@ export interface SubwayStationTileDialogData {
 export class MapDetailsDialogService {
   private readonly geographyService = inject(GeographyGraphQLService);
   private readonly snackBar = inject(MatSnackBar);
-  private readonly dialog = inject(MatDialog);
+  private readonly panelService = inject(MapPanelService);
   private readonly mapState = inject(MapStateService);
   private readonly displayService = inject(MapDisplayService);
   private readonly logger = inject(LoggerService);
   private readonly bikeStationsService = inject(BikeStationsService);
   private readonly selectionService = inject(MapSelectionService);
 
-  private bikeStationDialogRef: MatDialogRef<
-    BikeStationDialogComponent,
-    BikeStationDialogResult | undefined
+  private bikeStationPanelRef: MapPanelRef<
+    BikeStationDialogData,
+    BikeStationDialogResult
   > | null = null;
   private activeBikeStationId: string | null = null;
 
   constructor() {
     effect(() => {
       const stations = this.mapState.bikeStations();
-      const dialogRef = this.bikeStationDialogRef;
+      const panelRef = this.bikeStationPanelRef;
+      const stationId = this.activeBikeStationId;
 
       if (
-        !dialogRef ||
-        dialogRef.getState() !== MatDialogState.OPEN ||
-        !this.activeBikeStationId
+        !panelRef ||
+        !stationId ||
+        this.panelService.panel()?.id !== panelRef.id
       ) {
         return;
       }
 
       const nextStation = stations.find(
-        (station) => station.stationId === this.activeBikeStationId,
+        (station) => station.stationId === stationId,
       );
 
       if (nextStation) {
-        dialogRef.componentInstance?.updateStation(nextStation);
+        panelRef.updateData({ station: nextStation });
       }
     });
   }
 
   openSubwayStationDialog(stationData: SubwayStationTileDialogData): void {
     const stopId = String(stationData.id);
-
     const dialogData: SubwayStationDialogData = {
       stop: {
         id: stopId,
-        stopId: stopId,
+        stopId,
         name: stationData.name,
         latitude: 0,
         longitude: 0,
@@ -89,15 +89,7 @@ export class MapDetailsDialogService {
       },
     };
 
-    const dialogRef = this.dialog.open(SubwayStationDialogComponent, {
-      data: dialogData,
-      width: '500px',
-      maxWidth: '90vw',
-    });
-
-    dialogRef.afterClosed().subscribe(() => {
-      this.displayService.updateMapDisplay();
-    });
+    this.openSubwayStationPanel(dialogData);
   }
 
   showBikeStationDetails(stationId: string): void {
@@ -112,34 +104,49 @@ export class MapDetailsDialogService {
       return;
     }
 
-    this.activeBikeStationId = station.stationId;
-
+    const existingRef = this.bikeStationPanelRef;
     if (
-      this.bikeStationDialogRef &&
-      this.bikeStationDialogRef.getState() === MatDialogState.OPEN
+      existingRef &&
+      this.activeBikeStationId === station.stationId &&
+      this.panelService.panel()?.id === existingRef.id
     ) {
-      this.bikeStationDialogRef.componentInstance?.updateStation(station);
+      existingRef.updateData({ station });
       return;
     }
 
-    this.bikeStationDialogRef = this.dialog.open<
-      BikeStationDialogComponent,
-      BikeStationDialogData,
-      BikeStationDialogResult | undefined
-    >(BikeStationDialogComponent, {
-      width: '480px',
-      maxWidth: '96vw',
-      data: { station },
-      autoFocus: false,
+    const data: BikeStationDialogData = { station };
+    const summary = computed(() => {
+      const currentStation =
+        this.mapState
+          .bikeStations()
+          .find((item) => item.stationId === station.stationId) ?? station;
+      return `${currentStation.numBikesAvailable} bicicletas · ${currentStation.numDocksAvailable} vagas livres`;
     });
+    const panelRef = this.panelService.openComponent<
+      BikeStationDialogData,
+      BikeStationDialogResult
+    >({
+      component: BikeStationDialogComponent,
+      data,
+      title: station.name,
+      summary,
+      icon: 'pedal_bike',
+    });
+    panelRef.setDataUpdater<BikeStationDialogComponent>((component, nextData) =>
+      component.updateStation(nextData.station),
+    );
 
-    this.bikeStationDialogRef.afterClosed().subscribe((result) => {
-      this.bikeStationDialogRef = null;
-      this.activeBikeStationId = null;
+    this.activeBikeStationId = station.stationId;
+    this.bikeStationPanelRef = panelRef;
+    panelRef.afterClosed().subscribe((result) => {
+      if (this.bikeStationPanelRef === panelRef) {
+        this.bikeStationPanelRef = null;
+        this.activeBikeStationId = null;
+      }
 
       if (result?.action === 'select' && result.stationId) {
         this.selectionService.addBikeStationToSelection(result.stationId);
-      } else {
+      } else if (panelRef.closeReason === 'dismissed') {
         this.displayService.updateMapDisplay();
       }
     });
@@ -147,86 +154,119 @@ export class MapDetailsDialogService {
 
   async showRoutesForStop(stopId: string): Promise<void> {
     this.logger.debug('Showing routes for stop', { stopId });
+    const loadingRef = this.panelService.openNotice({
+      title: 'Carregando parada',
+      summary: 'Buscando linhas…',
+      icon: 'directions_bus',
+    });
+    const requestGeneration = this.panelService.generation;
+    const isCurrentRequest = () =>
+      this.panelService.generation === requestGeneration &&
+      this.panelService.panel()?.id === loadingRef.id;
+
     try {
-      const stop = await this.geographyService.getBusStop(stopId).toPromise();
-      this.logger.debug(
-        'Stop data fetched',
-        stop
-          ? {
-              id: stop.id,
-              stopId: stop.stopId,
-              name: stop.name,
-              agencies: stop.agencies,
-              routeShortNames: stop.routeShortNames,
-            }
-          : { data: 'null' },
+      const stop = await firstValueFrom(
+        this.geographyService.getBusStop(stopId),
       );
+      if (!isCurrentRequest()) {
+        return;
+      }
 
       if (!stop) {
         this.logger.warn('No stop data found', { stopId });
-        this.snackBar.open('Stop not found', 'Close', { duration: 3000 });
+        loadingRef.close();
+        this.snackBar.open('Parada não encontrada', 'Fechar', {
+          duration: 3000,
+        });
         return;
       }
 
       if (stop.isSubwayStation) {
-        const dialogData: SubwayStationDialogData = {
-          stop: stop,
-        };
-
-        const dialogRef = this.dialog.open(SubwayStationDialogComponent, {
-          data: dialogData,
-          width: '500px',
-          maxWidth: '90vw',
-        });
-
-        dialogRef.afterClosed().subscribe(() => {
-          this.displayService.updateMapDisplay();
-        });
+        this.openSubwayStationPanel({ stop });
         return;
       }
 
-      const routes = await this.geographyService
-        .getRoutesForStop(stopId)
-        .toPromise();
+      const routes = await firstValueFrom(
+        this.geographyService.getRoutesForStop(stopId),
+      );
+      if (!isCurrentRequest()) {
+        return;
+      }
 
-      this.logger.debug('Current state', {
-        selectedRoutes: Array.from(this.mapState.selectedRoutes().keys()),
-        routesForStop: routes?.map((route) => ({
-          id: route.id,
-          routeId: route.routeId,
-          shortName: route.shortName,
-        })),
-      });
-
-      const dialogData: BusStopDialogData = {
-        stop: stop,
-        routes: routes || [],
+      const routeList = routes ?? [];
+      const data: BusStopDialogData = {
+        stop,
+        routes: routeList,
         selectedRoutes: this.mapState.selectedRouteIds(),
       };
-
-      const dialogRef = this.dialog.open(BusStopDialogComponent, {
-        data: dialogData,
-        width: '600px',
-        maxWidth: '90vw',
+      const routeSummary =
+        routeList.length === 1
+          ? '1 linha'
+          : routeList.length > 1
+            ? `${routeList.length} linhas`
+            : '';
+      const panelRef = this.panelService.openComponent<
+        BusStopDialogData,
+        BusStopDialogResult
+      >({
+        component: BusStopDialogComponent,
+        data,
+        title: stop.name,
+        summary: routeSummary,
+        icon: 'directions_bus',
       });
 
-      dialogRef.afterClosed().subscribe((result) => {
+      panelRef.afterClosed().subscribe((result) => {
         if (result?.action === 'add') {
           this.selectionService.addStopToSelection(result.stopId);
         } else if (result?.action === 'selectRoute') {
-          this.logger.debug('Adding route from stop dialog', {
+          this.logger.debug('Adding route from stop details', {
             routeId: result.routeId,
           });
           this.selectionService.addRouteToSelection(result.routeId, true);
-        } else {
+        } else if (panelRef.closeReason === 'dismissed') {
           this.displayService.updateMapDisplay();
         }
       });
     } catch (error) {
+      if (!isCurrentRequest()) {
+        return;
+      }
+
       this.logger.error('Error loading stop details', error);
-      this.snackBar.open('Error loading stop details', 'Close', {
-        duration: 3000,
-      });
+      loadingRef.close();
+      this.snackBar.open(
+        'Não foi possível carregar os detalhes da parada',
+        'Fechar',
+        { duration: 3000 },
+      );
     }
+  }
+
+  private openSubwayStationPanel(data: SubwayStationDialogData): void {
+    const lines = data.stop.routeShortNames?.filter(Boolean) ?? [];
+    const titleLineGroups = buildMapPanelAgencyLineGroups(lines);
+    const summary = titleLineGroups.length
+      ? ''
+      : lines.length
+        ? `Linhas ${lines.join(' · ')}`
+        : '';
+    const panelRef = this.panelService.openComponent<
+      SubwayStationDialogData,
+      void
+    >({
+      component: SubwayStationDialogComponent,
+      data,
+      title: data.stop.name,
+      summary,
+      titleLineGroups,
+      icon: 'train',
+    });
+
+    panelRef.afterClosed().subscribe(() => {
+      if (panelRef.closeReason === 'dismissed') {
+        this.displayService.updateMapDisplay();
+      }
+    });
   }
 }

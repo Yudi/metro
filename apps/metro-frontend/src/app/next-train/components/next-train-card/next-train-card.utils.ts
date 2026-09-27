@@ -5,9 +5,14 @@ import type {
 } from './next-train-card.types';
 import {
   formatScheduledRailTime,
+  getStaticRailStationsByLine,
   hardNormalizeString,
 } from '@metro/shared/utils';
-import type { RailScheduledService } from '@metro/shared/utils';
+import type {
+  ExtendedNextTrainLineCode,
+  RailScheduledService,
+  StaticRailStation,
+} from '@metro/shared/utils';
 
 export type ScheduledServiceForDisplay = RailScheduledService;
 
@@ -48,14 +53,76 @@ function getMinutesUntilArrival(arrivalTime: string): number | null {
   return Math.round((arrival.getTime() - now.getTime()) / 60000);
 }
 
+/** Editorial terminal order. Station positions, including future extensions,
+ * come from the catalog rather than from this list of current endpoints.
+ */
+const DIRECTION_ANCHORS: Partial<
+  Record<ExtendedNextTrainLineCode, readonly [string, string]>
+> = {
+  L1: ['TUC', 'JAB'],
+  L2: ['VMD', 'VPT'],
+  L3: ['BFU', 'ITQ'],
+  L4: ['VLS', 'LUZ'],
+  L5: ['CPR', 'CKB'],
+  L6: ['JOP', 'PDZ'],
+  L7: ['BFU', 'JUN'],
+  L8: ['JPR', 'ABU'],
+  L9: ['OSA', 'VAG'],
+  L10: ['BFU', 'RGS'],
+  L11: ['BFU', 'EST'],
+  L12: ['BAS', 'CMV'],
+  L13: ['EGO', 'AGU'],
+  L15: ['VPT', 'IGT'],
+  L17: ['MOB', 'JDA'],
+};
+
 export function sortDirections(
   directions: readonly TrainDirectionView[],
-  terminals: readonly string[],
+  lineCode: ExtendedNextTrainLineCode,
+  stations: readonly StaticRailStation[] = getStaticRailStationsByLine(
+    lineCode,
+  ) ?? [],
 ): TrainDirectionView[] {
+  const anchors = DIRECTION_ANCHORS[lineCode];
+  if (!anchors) return [...directions];
+
+  const firstAnchorIndex = stations.findIndex(
+    (station) => station.code === anchors[0],
+  );
+  const lastAnchorIndex = stations.findIndex(
+    (station) => station.code === anchors[1],
+  );
+  if (
+    firstAnchorIndex < 0 ||
+    lastAnchorIndex < 0 ||
+    firstAnchorIndex === lastAnchorIndex
+  ) {
+    return [...directions];
+  }
+
+  const stationIndexes = new Map<string, number>();
+  stations.forEach((station, index) => {
+    for (const name of [
+      station.code,
+      station.name,
+      ...(station.alternativeNames ?? []),
+    ]) {
+      stationIndexes.set(hardNormalizeString(name), index);
+    }
+  });
+  const direction = Math.sign(lastAnchorIndex - firstAnchorIndex);
+  const position = (terminal: string): number => {
+    const index = stationIndexes.get(hardNormalizeString(terminal));
+    return index === undefined
+      ? Number.POSITIVE_INFINITY
+      : (index - firstAnchorIndex) * direction;
+  };
+
   return [...directions].sort((first, second) => {
-    const firstIndex = terminals.indexOf(first.terminal);
-    const secondIndex = terminals.indexOf(second.terminal);
-    return firstIndex - secondIndex;
+    const firstPosition = position(first.terminal);
+    const secondPosition = position(second.terminal);
+    if (firstPosition === secondPosition) return 0;
+    return firstPosition - secondPosition;
   });
 }
 

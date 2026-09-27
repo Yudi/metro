@@ -39,10 +39,10 @@
         <span>{{ errorMessage() }}</span>
       </div>
     }
-    @if (stationStatusCards().length > 0) {
+    @if (visibleStationStatusCards().length > 0) {
       <!-- Always show lines immediately using static info, status loads in background -->
       <div class="subway-lines-grid">
-        @for (card of stationStatusCards(); track card.code) {
+        @for (card of visibleStationStatusCards(); track card.code) {
           <div class="subway-line-card" [class.has-issue]="card.hasIssue">
             <div class="line-badge" [style.background-color]="card.colorHex">
               {{ card.code }}
@@ -95,7 +95,7 @@
           Atualizado às {{ lastUpdated() | date: "HH:mm" }}
         </p>
       }
-    } @else if (!loadingStatus()) {
+    } @else if (!panelRef && !loadingStatus()) {
       <div class="no-lines-info">
         <mat-icon>info</mat-icon>
         <p>Informações das linhas não disponíveis</p>
@@ -103,56 +103,63 @@
     }
   </div>
 
-  <!-- Next Train Section for L4/L8/L9/CPTM stations -->
-  @if (hasNextTrainFeature()) {
+  @if (trainLines().length > 0) {
     <mat-divider></mat-divider>
     <div class="next-train-section">
-      @for (station of resolvedNextTrainStations(); track station.lineCode) {
-        <app-next-train-card
-          [lineCode]="station.lineCode"
-          [stationCode]="station.stationCode"
-          [stationName]="displayName"
-          [showLineName]="showLineNameInCards()"
-        />
-      }
-    </div>
-  }
+      <h3>Trens nesta estação</h3>
+      <div class="train-line-chips" role="group" aria-label="Selecionar linha">
+        @for (line of trainLines(); track line.lineCode) {
+          <button
+            type="button"
+            class="train-line-chip"
+            [class.train-line-chip--selected]="selectedTrainLine()?.lineCode === line.lineCode"
+            [attr.aria-pressed]="selectedTrainLine()?.lineCode === line.lineCode"
+            (click)="selectTrainLine(line.lineCode)"
+          >
+            <span
+              class="train-line-chip__badge"
+              [style.background-color]="line.colorHex"
+              [style.color]="getContrastColor(line.colorHex)"
+            >{{ line.badge }}</span>
+            <span>{{ line.name }}</span>
+          </button>
+        }
+      </div>
 
-  @if (staticCompositionGroups().length > 0) {
-    <mat-divider></mat-divider>
-    <div class="static-composition-section">
-      @for (group of staticCompositionGroups(); track group.line.lineId) {
-        <section class="static-composition-line">
-          <div class="static-composition-line__header">
-            <div
-              class="line-badge static-composition-line__badge"
-              [style.background-color]="group.line.colorHex"
-            >
-              {{ group.line.code }}
-            </div>
-            <span class="static-composition-line__name">
-              {{ group.line.fullName }}
-            </span>
-          </div>
-
-          <div class="static-composition-line__directions">
-            @for (
-              composition of group.compositions;
-              track composition.directionName
-            ) {
-              <div class="static-composition-line__direction">
-                <div class="static-composition-line__direction-header">
-                  <mat-icon>arrow_forward</mat-icon>
-                  <span>{{ composition.directionName }}</span>
-                </div>
-                <lib-train-composition
-                  [composition]="composition"
-                  [compactContext]="true"
-                />
+      @for (line of trainLines(); track line.lineCode) {
+        @if (selectedTrainLine()?.lineCode === line.lineCode) {
+          <div
+            class="train-line-content"
+            role="region"
+            [attr.aria-label]="'Trens da linha ' + line.badge + ' ' + line.name"
+          >
+            @if (line.station; as station) {
+              <app-next-train-card
+                [lineCode]="station.lineCode"
+                [stationCode]="station.stationCode"
+                [stationName]="displayName"
+              />
+            } @else if (line.compositions; as compositions) {
+              <div class="static-composition-line__directions">
+                @for (
+                  composition of compositions;
+                  track composition.directionName
+                ) {
+                  <div class="static-composition-line__direction">
+                    <div class="static-composition-line__direction-header">
+                      <mat-icon>arrow_forward</mat-icon>
+                      <span>{{ composition.directionName }}</span>
+                    </div>
+                    <lib-train-composition
+                      [composition]="composition"
+                      [compactContext]="true"
+                    />
+                  </div>
+                }
               </div>
             }
           </div>
-        </section>
+        }
       }
     </div>
   }
@@ -173,5 +180,7 @@
   >
     <mat-icon>{{ favoriteIcon() }}</mat-icon>
   </button>
-  <button mat-button (click)="close()">Fechar</button>
+  @if (!panelRef) {
+    <button mat-button (click)="close()">Fechar</button>
+  }
 </mat-dialog-actions>

@@ -19,7 +19,6 @@ import {
   DEFAULT_TRANSIT_TIME_ZONE,
   formatTransitTime,
   getRailLineById,
-  getTerminalStations,
   getTerminalForDestination,
   ExtendedNextTrainLineCode,
   NextTrainLineCode,
@@ -191,19 +190,9 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
       : undefined;
   });
 
-  /** Terminal stations for direction labels (L4/L8/L9 only) */
-  readonly terminals = computed(() => {
-    const lineCode = this.lineCode();
-    if (!this.hasTerminalDirections(lineCode)) {
-      return [] as const;
-    }
-    return getTerminalStations(lineCode, this.stationCode());
-  });
-
   /** Group live trains by terminal direction, including pre-computed headway. */
   readonly trainsByDirection = computed<readonly TrainDirectionView[]>(() => {
     const trains = this.trains();
-    const terminals = this.terminals();
     const lineCode = this.lineCode();
     const stationCode = this.stationCode();
     const headwayData = this.headway();
@@ -248,7 +237,7 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
       });
     }
 
-    return sortDirections(directions, terminals);
+    return sortDirections(directions, lineCode);
   });
 
   /**
@@ -334,7 +323,7 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
       existingDirectionKeys.add(directionKey);
     }
 
-    return sortDirections(directions, this.terminals());
+    return sortDirections(directions, this.lineCode());
   });
 
   readonly viewModel = computed<NextTrainCardViewModel>(() => {

@@ -1,70 +1,94 @@
-<div class="map-wrapper">
-  <!-- Header with Display Mode Toggle and Desktop Actions -->
+<div
+  class="map-wrapper"
+  [class.is-panel-expanded]="mapPanel.snap() === 'expanded'"
+  [class.is-panel-dragging]="sheetDragging()"
+  [style.--map-sheet-height.px]="sheetHeight()"
+  [style.--map-sheet-expanded-progress]="sheetExpandedProgress()"
+>
+  <div
+    id="ol-map-tab"
+    class="map-container"
+    tabindex="0"
+    role="region"
+    aria-label="Mapa de transporte. Use as setas para mover e os botões para ampliar ou reduzir."
+  ></div>
+
+  @if (isLoading()) {
+    <mat-progress-bar
+      class="map-loading"
+      mode="indeterminate"
+      aria-label="Carregando dados do mapa"
+    />
+  }
+
   <app-map-header
+    class="map-secondary-controls"
+    controls="secondary"
     [displayMode]="displayMode()"
     [hasSelections]="hasSelections()"
     [hasFeatures]="features().length > 0"
+    [layersOpen]="layersOpen()"
     [locationPermission]="locationPermission()"
     [isRequestingLocation]="isRequestingLocation()"
     [isLocationDisabled]="isLocationDisabled()"
     (displayModeChange)="onDisplayModeChange($event)"
-    (searchClick)="openSearchModal()"
     (exploreClick)="openExploreModal()"
     (layersClick)="openLayerSettings()"
     (centerClick)="centerOnCity()"
-    (centerOnUserClick)="centerOnUserLocation()"
+    (fitClick)="fitToAllFeatures()"
     (clearClick)="clearAllSelections()"
   />
 
-  <!-- Status Bar -->
-  @if (isDevMode) {
-    <app-map-status-bar
-      [isLoading]="isLoading()"
+  @if (!mapPanel.panel()) {
+    <app-map-footer
+      [hasSelectedFeature]="!!selectedFeature()"
+      (featureInfoClick)="onFeatureInfoClick()"
+    />
+
+    @if (isDevMode) {
+      <details class="map-diagnostics">
+        <summary>Diagnóstico</summary>
+        <app-map-status-bar
+          [isLoading]="isLoading()"
+          [displayMode]="displayMode()"
+          [routeCount]="selectedRoutes().size"
+          [stopCount]="selectedStops().size"
+          [visibleCount]="displayedRoutes().length + displayedStops().length"
+          [nearbyRadius]="nearbyRadius()"
+          [nearbyStopsCount]="displayedStops().length"
+        />
+      </details>
+    }
+  }
+
+  <app-map-panel [hasSelections]="hasSelections()" (heightChange)="sheetHeight.set($event)"
+    (expandedProgressChange)="sheetExpandedProgress.set($event)"
+    (draggingChange)="sheetDragging.set($event)"
+    (clearSelections)="clearAllSelections()">
+    <app-map-header
+      mapPrimaryControls
+      controls="primary"
       [displayMode]="displayMode()"
-      [routeCount]="selectedRoutes().size"
-      [stopCount]="selectedStops().size"
-      [visibleCount]="displayedRoutes().length + displayedStops().length"
-      [nearbyRadius]="nearbyRadius()"
-      [nearbyStopsCount]="displayedStops().length"
+      [locationPermission]="locationPermission()"
+      [isRequestingLocation]="isRequestingLocation()"
+      [isLocationDisabled]="isLocationDisabled()"
+      (searchClick)="openSearchModal()"
+      (nearbyClick)="compactMapPanel()"
+      (displayModeChange)="onDisplayModeChange($event)"
+      (centerOnUserClick)="centerOnUserLocation()"
     />
-  }
-
-  <!-- Map Container -->
-  <div id="ol-map-tab" class="map-container"></div>
-
-  <!-- Mobile FAB Menu -->
-  <app-map-fab-menu
-    [hasSelections]="hasSelections()"
-    [hasFeatures]="features().length > 0"
-    (searchClick)="openSearchModal()"
-    (exploreClick)="openExploreModal()"
-    (layersClick)="openLayerSettings()"
-    (centerClick)="centerOnCity()"
-    (centerOnUserClick)="centerOnUserLocation()"
-    (clearClick)="clearAllSelections()"
-    [isRequestingLocation]="isRequestingLocation()"
-    [isLocationDisabled]="isLocationDisabled()"
-  />
-
-  <!-- Footer with Realtime Status -->
-  <app-map-footer
-    [hasSelectedFeature]="!!selectedFeature()"
-    (featureInfoClick)="onFeatureInfoClick()"
-  />
-
-  <!-- Selections Panel (when items selected) -->
-  @if (hasSelections()) {
-    <app-map-selections-panel
-      [selectedRoutes]="selectedRoutes()"
-      [selectedStops]="selectedStops()"
-      [selectedBikeStations]="selectedBikeStations()"
-      (removeRoute)="removeRouteFromSelection($event)"
-      (removeStop)="removeStopFromSelection($event)"
-      (removeBikeStation)="removeBikeStationFromSelection($event)"
-      (clearAll)="clearAllSelections()"
-    />
-  }
-
-  <!-- Popup Container -->
+    @if (hasSelections()) {
+      <app-map-selections-panel
+        mapSelectionControls
+        [selectedRoutes]="selectedRoutes()"
+        [selectedStops]="selectedStops()"
+        [selectedBikeStations]="selectedBikeStations()"
+        (removeRoute)="removeRouteFromSelection($event)"
+        (removeStop)="removeStopFromSelection($event)"
+        (removeBikeStation)="removeBikeStationFromSelection($event)"
+        (clearAll)="clearAllSelections()"
+      />
+    }
+  </app-map-panel>
   <ng-container #popupContainer></ng-container>
 </div>

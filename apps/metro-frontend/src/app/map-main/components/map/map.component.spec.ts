@@ -15,6 +15,7 @@ import {
 import { emptyFavorites } from '@metro/shared/utils';
 import { GeolocationService } from '@metro/shared/geolocation';
 import { RealtimeWebsocketService } from '../../realtime/realtime-websocket.service';
+import { MapRealtimeStatusService } from '../../realtime/map-realtime-status.service';
 import { RealtimeVehicleLayerService } from '../../realtime/realtime-vehicle-layer.service';
 import { CptmVehicleLayerService } from '../../realtime/cptm-vehicle-layer.service';
 import { UserLocationLayerService } from './user-location-layer.service';
@@ -54,6 +55,7 @@ describe('MapComponent', () => {
     await TestBed.configureTestingModule({
       imports: [MapComponent],
       providers: [
+        { provide: MapRealtimeStatusService, useValue: { state: signal('idle'), tooltip: signal('Aguardando conexão em tempo real') } },
         { provide: ActivatedRoute, useValue: activatedRouteStub },
         { provide: BikeStationsService, useValue: mockBikeStationsService },
         {
@@ -206,6 +208,7 @@ describe('MapComponent', () => {
       await TestBed.configureTestingModule({
         imports: [MapComponent],
         providers: [
+          { provide: MapRealtimeStatusService, useValue: { state: signal('idle'), tooltip: signal('Aguardando conexão em tempo real') } },
           { provide: ActivatedRoute, useValue: activatedRouteStub },
           { provide: BikeStationsService, useValue: mockBikeStationsService },
           {

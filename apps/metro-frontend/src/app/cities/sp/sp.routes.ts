@@ -35,7 +35,7 @@ export const spFeatureRoutes: Routes = [
   },
   {
     path: 'mapa',
-    ...page('Mapa', { noXPadding: true }),
+    ...page('Mapa', { noXPadding: true, viewportLayout: true }),
     loadComponent: () =>
       import('../../map-main/map-main.component').then(
         (m) => m.MapMainComponent,

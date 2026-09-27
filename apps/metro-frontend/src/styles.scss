@@ -66,3 +66,7 @@ body {
   color: var(--mat-sys-primary);
   margin-bottom: 10px;
 }
+
+.map-realtime-tooltip .mdc-tooltip__surface {
+  white-space: pre-line;
+}

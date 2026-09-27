@@ -77,19 +77,17 @@ export class RealtimeWebsocketService implements OnDestroy {
     new Map(),
   );
   readonly stopArrivals = signal<Map<string, StopArrivalUpdate>>(new Map());
+  readonly subscribedRoutes = signal<readonly string[]>([]);
+  readonly subscribedStops = signal<readonly string[]>([]);
 
   // Track owners rather than only keys. A map/details component can observe
   // the same route or stop at the same time, so releasing one owner must not
   // tear down the shared upstream subscription for the others.
-  private subscribedRoutes = new Map<string, number>();
-  private subscribedStops = new Map<string, number>();
+  private routeOwners = new Map<string, number>();
+  private stopOwners = new Map<string, number>();
 
   private readonly latestRouteUpdateTimestamps = new Map<string, number>();
   private readonly latestStopUpdateTimestamps = new Map<string, number>();
-
-  constructor() {
-    this.connect();
-  }
 
   ngOnDestroy(): void {
     this.disconnect();
@@ -100,6 +98,10 @@ export class RealtimeWebsocketService implements OnDestroy {
    */
   private connect(): void {
     if (this.socket?.connected) {
+      return;
+    }
+    if (this.socket) {
+      this.socket.connect();
       return;
     }
 
@@ -165,10 +167,12 @@ export class RealtimeWebsocketService implements OnDestroy {
    * Subscribe to real-time vehicle positions for a route
    */
   subscribeToRoute(routeShortName: string): RealtimeSubscriptionRelease {
-    const owners = this.subscribedRoutes.get(routeShortName) ?? 0;
-    this.subscribedRoutes.set(routeShortName, owners + 1);
+    const owners = this.routeOwners.get(routeShortName) ?? 0;
+    this.routeOwners.set(routeShortName, owners + 1);
+    this.connect();
 
     if (owners === 0) {
+      this.subscribedRoutes.set([...this.routeOwners.keys()]);
       this.logger.debug(`Subscribing to route: ${routeShortName}`);
 
       if (this.socket?.connected) {
@@ -197,17 +201,18 @@ export class RealtimeWebsocketService implements OnDestroy {
    * Unsubscribe from real-time vehicle positions for a route
    */
   unsubscribeFromRoute(routeShortName: string): void {
-    const owners = this.subscribedRoutes.get(routeShortName);
+    const owners = this.routeOwners.get(routeShortName);
     if (!owners) {
       return; // Not subscribed
     }
 
     if (owners > 1) {
-      this.subscribedRoutes.set(routeShortName, owners - 1);
+      this.routeOwners.set(routeShortName, owners - 1);
       return;
     }
 
-    this.subscribedRoutes.delete(routeShortName);
+    this.routeOwners.delete(routeShortName);
+    this.subscribedRoutes.set([...this.routeOwners.keys()]);
 
     if (this.socket?.connected) {
       this.socket.emit(RealtimeMessageType.UNSUBSCRIBE_ROUTE, {
@@ -221,14 +226,19 @@ export class RealtimeWebsocketService implements OnDestroy {
     positions.delete(routeShortName);
     this.vehiclePositions.set(new Map(positions));
     this.latestRouteUpdateTimestamps.delete(routeShortName);
+    this.disconnectIfUnused();
   }
 
   /**
    * Subscribe to real-time arrival predictions for a stop
    */
   subscribeToStop(stopCode: string): RealtimeSubscriptionRelease {
-    const owners = this.subscribedStops.get(stopCode) ?? 0;
-    this.subscribedStops.set(stopCode, owners + 1);
+    const owners = this.stopOwners.get(stopCode) ?? 0;
+    this.stopOwners.set(stopCode, owners + 1);
+    this.connect();
+    if (owners === 0) {
+      this.subscribedStops.set([...this.stopOwners.keys()]);
+    }
 
     if (owners === 0 && this.socket?.connected) {
       this.socket.emit(RealtimeMessageType.SUBSCRIBE_STOP, {
@@ -251,17 +261,18 @@ export class RealtimeWebsocketService implements OnDestroy {
    * Unsubscribe from real-time arrival predictions for a stop
    */
   unsubscribeFromStop(stopCode: string): void {
-    const owners = this.subscribedStops.get(stopCode);
+    const owners = this.stopOwners.get(stopCode);
     if (!owners) {
       return; // Not subscribed
     }
 
     if (owners > 1) {
-      this.subscribedStops.set(stopCode, owners - 1);
+      this.stopOwners.set(stopCode, owners - 1);
       return;
     }
 
-    this.subscribedStops.delete(stopCode);
+    this.stopOwners.delete(stopCode);
+    this.subscribedStops.set([...this.stopOwners.keys()]);
 
     if (this.socket?.connected) {
       this.socket.emit(RealtimeMessageType.UNSUBSCRIBE_STOP, {
@@ -275,26 +286,27 @@ export class RealtimeWebsocketService implements OnDestroy {
     arrivals.delete(stopCode);
     this.stopArrivals.set(new Map(arrivals));
     this.latestStopUpdateTimestamps.delete(stopCode);
+    this.disconnectIfUnused();
   }
 
   /**
    * Re-subscribe to all active subscriptions after reconnection
    */
   private resubscribeAll(): void {
-    for (const routeShortName of this.subscribedRoutes.keys()) {
+    for (const routeShortName of this.routeOwners.keys()) {
       this.socket?.emit(RealtimeMessageType.SUBSCRIBE_ROUTE, {
         routeShortName,
       });
     }
 
-    for (const stopCode of this.subscribedStops.keys()) {
+    for (const stopCode of this.stopOwners.keys()) {
       this.socket?.emit(RealtimeMessageType.SUBSCRIBE_STOP, {
         stopCode,
       });
     }
 
     this.logger.debug(
-      `Re-subscribed to ${this.subscribedRoutes.size} routes and ${this.subscribedStops.size} stops`,
+      `Re-subscribed to ${this.routeOwners.size} routes and ${this.stopOwners.size} stops`,
     );
   }
 
@@ -396,5 +408,11 @@ export class RealtimeWebsocketService implements OnDestroy {
     this.lastUpdateTimestamp.set(
       current === null ? next : Math.max(current, next),
     );
+  }
+
+  private disconnectIfUnused(): void {
+    if (this.routeOwners.size === 0 && this.stopOwners.size === 0) {
+      this.disconnect();
+    }
   }
 }

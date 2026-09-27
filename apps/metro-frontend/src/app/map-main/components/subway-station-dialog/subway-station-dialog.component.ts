@@ -1,10 +1,12 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
+  effect,
   inject,
+  OnDestroy,
   OnInit,
   signal,
-  computed,
 } from '@angular/core';
 import {
   MatDialogModule,
@@ -23,8 +25,11 @@ import {
 } from '@metro/shared/api';
 import {
   findNextTrainStations,
+  CPTM_LINE_CONFIG,
   getLineCodesFromColorNames,
   getContrastColor,
+  getRailLineById,
+  hasDashboardStatusIssue,
   getRailStationFavoriteKey,
   RAIL_LINES,
   RailLineInfo,
@@ -39,6 +44,7 @@ import {
 } from '@metro/shared/utils';
 import { DialogHeaderComponent } from '../../../shared/components/dialog-header/dialog-header.component';
 import { NextTrainCardComponent } from '../../../next-train/components/next-train-card/next-train-card.component';
+import { NextTrainWebsocketService } from '../../../next-train/next-train-websocket.service';
 import { DatePipe } from '@angular/common';
 import {
   resolveStationTrainCompositionViews,
@@ -46,9 +52,25 @@ import {
   TrainCompositionComponent,
   TrainCompositionView,
 } from '@metro/shared/train-composition';
+import {
+  closeMapPanelOrDialog,
+  MAP_PANEL_REF,
+} from '../map/map-panel/map-panel-ref';
 
 export interface SubwayStationDialogData {
   stop: BusStopGraphQL;
+}
+
+interface TrainLineOption {
+  lineCode: string;
+  badge: string;
+  name: string;
+  colorHex: string;
+  station: {
+    lineCode: ExtendedNextTrainLineCode;
+    stationCode: string;
+  } | null;
+  compositions: readonly TrainCompositionView[] | null;
 }
 
 @Component({
@@ -67,13 +89,19 @@ export interface SubwayStationDialogData {
   styleUrls: ['./subway-station-dialog.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class SubwayStationDialogComponent implements OnInit {
-  readonly dialogRef = inject(MatDialogRef<SubwayStationDialogComponent>);
+export class SubwayStationDialogComponent implements OnInit, OnDestroy {
+  protected readonly panelRef = inject(MAP_PANEL_REF, { optional: true });
+  private readonly dialogRef = inject(
+    MatDialogRef<SubwayStationDialogComponent>,
+    { optional: true },
+  );
   readonly data = inject<SubwayStationDialogData>(MAT_DIALOG_DATA);
   private stationNameService = inject(StationNameService);
   private logger = inject(LoggerService);
   private railService = inject(RailGraphqlService);
+  private nextTrainService = inject(NextTrainWebsocketService);
   private favoritesService = inject(FavoritesService);
+  private readonly nextTrainSubscriptions = new Map<string, () => void>();
 
   // State signals
   readonly subwayLines = signal<RailLineStatus[]>([]);
@@ -167,6 +195,16 @@ export class SubwayStationDialogComponent implements OnInit {
     return cards;
   });
 
+  readonly visibleStationStatusCards = computed(() => {
+    const cards = this.stationStatusCards();
+    return this.panelRef
+      ? cards.filter(
+          ({ status }) =>
+            status !== undefined && hasDashboardStatusIssue(status.statusCode),
+        )
+      : cards;
+  });
+
   readonly bathroomInfo = computed(() => {
     const bathroom = resolveStationBathroomInfo(
       this.data.stop.name,
@@ -227,16 +265,6 @@ export class SubwayStationDialogComponent implements OnInit {
     );
   });
 
-  // Check if this station supports next train feature
-  readonly hasNextTrainFeature = computed(() => {
-    return this.pendingNextTrainStations().length > 0;
-  });
-
-  // Whether to show line name in next train cards (for multi-line stations)
-  readonly showLineNameInCards = computed(() => {
-    return this.resolvedNextTrainStations().length > 1;
-  });
-
   readonly staticCompositionGroups = computed(() => {
     const nextTrainLineCodes = new Set<string>(
       this.pendingNextTrainStations().map((station) => station.lineCode),
@@ -262,12 +290,99 @@ export class SubwayStationDialogComponent implements OnInit {
       );
   });
 
+  readonly trainLines = computed<TrainLineOption[]>(() => {
+    const liveLines = this.resolvedNextTrainStations().map((station) => {
+      const line = getRailLineById(station.lineCode);
+      const special =
+        station.lineCode === 'EA' || station.lineCode === '10X'
+          ? CPTM_LINE_CONFIG[station.lineCode]
+          : undefined;
+      return {
+        lineCode: station.lineCode,
+        badge: line
+          ? String(line.code)
+          : (special?.routeCode ?? station.lineCode),
+        name: line?.colorName ?? special?.name ?? station.lineCode,
+        colorHex:
+          line?.colorHex ?? (special ? `#${special.bgcolor}` : '#333333'),
+        station,
+        compositions: null,
+      };
+    });
+    const staticLines = this.staticCompositionGroups().map((group) => ({
+      lineCode: group.line.lineId,
+      badge: String(group.line.code),
+      name: group.line.colorName,
+      colorHex: group.line.colorHex,
+      station: null,
+      compositions: group.compositions,
+    }));
+
+    return [...liveLines, ...staticLines].sort((a, b) => {
+      const aNumber = Number(a.lineCode.match(/\d+/)?.[0] ?? Infinity);
+      const bNumber = Number(b.lineCode.match(/\d+/)?.[0] ?? Infinity);
+      return (
+        aNumber - bNumber ||
+        Number(a.lineCode === '10X') - Number(b.lineCode === '10X') ||
+        a.lineCode.localeCompare(b.lineCode)
+      );
+    });
+  });
+
+  readonly selectedTrainLineCode = signal<string | null>(null);
+  readonly selectedTrainLine = computed<TrainLineOption | undefined>(() => {
+    const lines = this.trainLines();
+    return (
+      lines.find((line) => line.lineCode === this.selectedTrainLineCode()) ??
+      lines[0]
+    );
+  });
+
+  selectTrainLine(lineCode: string): void {
+    this.selectedTrainLineCode.set(lineCode);
+  }
+
   // Display name normalized and formatted in title case for subway stations
   get displayName(): string {
     return this.stationNameService.formatStationName(this.data.stop.name, true);
   }
 
   constructor() {
+    effect(() => {
+      const stations = this.resolvedNextTrainStations();
+      const selectedLineCode = this.selectedTrainLine()?.lineCode;
+      const activeKeys = new Set(
+        stations.map((station) => `${station.lineCode}:${station.stationCode}`),
+      );
+
+      for (const [key, release] of this.nextTrainSubscriptions) {
+        if (!activeKeys.has(key)) {
+          release();
+          this.nextTrainSubscriptions.delete(key);
+        }
+      }
+
+      // Keep all snapshots available while the panel is open. Subscribe to
+      // the displayed line first when the socket connects.
+      const orderedStations = [...stations].sort(
+        (a, b) =>
+          Number(b.lineCode === selectedLineCode) -
+          Number(a.lineCode === selectedLineCode),
+      );
+      for (const station of orderedStations) {
+        const key = `${station.lineCode}:${station.stationCode}`;
+        if (!this.nextTrainSubscriptions.has(key)) {
+          this.nextTrainSubscriptions.set(
+            key,
+            this.nextTrainService.subscribe(
+              station.lineCode,
+              station.stationCode,
+            ),
+          );
+        }
+      }
+    });
+
     this.logger.debug('Subway station dialog created', {
       stopId: this.data.stop.stopId,
       stopName: this.data.stop.name,
@@ -334,6 +449,13 @@ export class SubwayStationDialogComponent implements OnInit {
     this.railService.fetchSpecialServices().subscribe();
   }
 
+  ngOnDestroy(): void {
+    for (const release of this.nextTrainSubscriptions.values()) {
+      release();
+    }
+    this.nextTrainSubscriptions.clear();
+  }
+
   private loadSubwayLineStatus(codes: number[]): void {
     this.logger.debug('Loading status for line codes:', codes);
 
@@ -392,7 +514,7 @@ export class SubwayStationDialogComponent implements OnInit {
   }
 
   close(): void {
-    this.dialogRef.close();
+    closeMapPanelOrDialog(this.panelRef, this.dialogRef);
   }
 
   toggleFavorite(): void {

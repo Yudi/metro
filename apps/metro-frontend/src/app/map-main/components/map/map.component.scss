@@ -1,122 +1,156 @@
-// ============================================================================
-// VARIABLES - Material 3 Design Tokens
-// ============================================================================
-
-$surface-container-low: var(--mat-sys-surface-container-low, #f9f5fa);
-$outline: var(--mat-sys-outline, #7a757f);
-$primary: var(--mat-sys-primary, #6750a4);
-
-// Elevation levels (Material 3)
-@mixin elevation-2 {
-  box-shadow:
-    0 2px 4px rgba(0, 0, 0, 0.06),
-    0 4px 6px rgba(0, 0, 0, 0.1);
+:host {
+  display: block;
+  height: 100%;
+  min-height: 0;
 }
 
-// ============================================================================
-// MAIN CONTAINER
-// ============================================================================
-
 .map-wrapper {
-  display: flex;
-  flex-direction: column;
-  background: $surface-container-low;
   position: relative;
-  // overflow: hidden;
-  margin-bottom: 5rem;
+  isolation: isolate;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--mat-sys-surface-container);
 }
 
 .map-container {
-  // flex: 1;
-  width: 100%;
-  position: relative;
-  background: #e8e8e8;
-  height: 60vh;
+  position: absolute;
+  inset: 0;
 }
 
-// ============================================================================
-// OPENLAYERS CUSTOMIZATION
-// ============================================================================
+.map-secondary-controls {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: auto;
+  max-width: calc(100% - 24px);
+  z-index: 3;
+}
+
+app-map-footer {
+  position: absolute;
+  right: 12px;
+  bottom: 28px;
+  z-index: 1;
+}
+
+.map-loading {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 4;
+}
+
+.map-diagnostics {
+  position: absolute;
+  right: 12px;
+  bottom: 76px;
+  z-index: 2;
+  max-width: calc(100% - 24px);
+  border-radius: 12px;
+  background: var(--mat-sys-surface-container-low);
+  box-shadow: var(--mat-sys-level1);
+  font-size: 0.75rem;
+
+  summary {
+    padding: 8px 12px;
+    cursor: pointer;
+  }
+}
+
+@media (max-width: 767px) {
+  app-map-footer {
+    right: auto;
+    left: 12px;
+    bottom: calc(var(--map-sheet-height, 0px) + 28px);
+  }
+
+  .map-diagnostics {
+    bottom: calc(var(--map-sheet-height, 0px) + 28px);
+  }
+
+  .map-wrapper {
+    --map-attribution-offset: var(--map-sheet-height, 0px);
+  }
+
+  :host ::ng-deep .ol-attribution {
+    opacity: calc(1 - var(--map-sheet-expanded-progress, 0));
+    transition: opacity 220ms linear;
+  }
+
+  :host ::ng-deep .map-wrapper.is-panel-dragging .ol-attribution {
+    transition: none;
+  }
+
+  :host ::ng-deep .map-wrapper.is-panel-expanded .ol-attribution {
+    pointer-events: none;
+  }
+}
 
 :host ::ng-deep {
   .ol-control {
-    border-radius: 8px;
-    overflow: hidden;
-    @include elevation-2;
+    background: var(--mat-sys-surface-container-low);
+    color: var(--mat-sys-on-surface);
+    border-radius: 12px;
+    box-shadow: var(--mat-sys-level2);
+    padding: 0;
 
     button {
-      border-radius: 0;
-      transition: background-color 0.2s ease;
+      background: transparent;
+      color: inherit;
+      width: 44px;
+      height: 44px;
+      margin: 0;
+      border-radius: 12px;
 
       &:hover {
-        background-color: rgba(0, 0, 0, 0.05);
+        background: var(--mat-sys-surface-container-highest);
       }
 
-      &:focus {
-        outline: 2px solid $primary;
-        outline-offset: 2px;
+      &:focus-visible {
+        outline: 2px solid var(--mat-sys-primary);
+        outline-offset: -3px;
       }
     }
   }
 
   .ol-zoom {
-    top: 16px;
-    left: 16px;
+    top: 76px;
+    right: 12px;
+    left: auto;
+  }
+
+  .ol-rotate {
+    top: 172px;
+    right: 12px;
   }
 
   .ol-attribution {
-    bottom: 8px;
-    right: 8px;
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 4px;
-    padding: 4px 8px;
-    font-size: 0.75rem;
-  }
-}
+    right: 0;
+    bottom: var(--map-attribution-offset, 0px);
+    max-width: 100%;
+    border-radius: 4px 0 0;
+    box-shadow: none;
+    font-size: 0.6875rem;
 
-// ============================================================================
-// RESPONSIVE DESIGN
-// ============================================================================
-
-@media (max-width: 768px) {
-  .map-wrapper {
-    min-height: 400px;
-  }
-
-  :host ::ng-deep {
-    .ol-zoom {
-      top: 12px;
-      left: 12px;
+    ul {
+      color: inherit;
+      text-shadow: none;
     }
 
-    .ol-attribution {
-      font-size: 0.625rem;
-      padding: 2px 6px;
+    a {
+      color: inherit;
     }
   }
 }
 
-@media (max-width: 480px) {
-  .map-wrapper {
-    min-height: 200px;
+@media (prefers-contrast: more) {
+  :host ::ng-deep .ol-control {
+    outline: 1px solid var(--mat-sys-outline);
   }
 }
-
-// ============================================================================
-// ACCESSIBILITY IMPROVEMENTS
-// ============================================================================
 
 @media (prefers-reduced-motion: reduce) {
-  * {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-}
-
-// High contrast mode support
-@media (prefers-contrast: high) {
-  :host ::ng-deep .ol-control {
-    border: 2px solid;
+  :host ::ng-deep .ol-attribution {
+    transition: none;
   }
 }

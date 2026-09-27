@@ -7,6 +7,7 @@ import { Service, signal, computed, OnDestroy } from '@angular/core';
  */
 @Service()
 export class BreathingAnimationService implements OnDestroy {
+  readonly periodMs = 5000;
   private animationFrameId: number | null = null;
   private subscriberCount = 0;
 
@@ -29,16 +30,20 @@ export class BreathingAnimationService implements OnDestroy {
    *
    * Attribution: https://github.com/makerportal/arduino-breathing-led
    */
-  readonly breathingBrightness = computed(() => {
-    const now = this.currentTime();
-    const breathingPeriod = 5000; // 5 second cycle
+  readonly breathingBrightness = computed(() =>
+    this.brightnessAt(this.currentTime()),
+  );
 
+  /** Evaluate the shared Gaussian curve at a chosen point in the cycle. */
+  brightnessAt(timestampMs: number): number {
     // Gaussian parameters
     const gamma = 0.14; // Width of peak (smaller = sharper peak, more darkness)
     const beta = 0.5; // Center of gaussian (0.5 = symmetric)
 
     // x cycles from 0 to 1 over the breathing period
-    const x = (now % breathingPeriod) / breathingPeriod;
+    const x =
+      (((timestampMs % this.periodMs) + this.periodMs) % this.periodMs) /
+      this.periodMs;
 
     // Gaussian formula: e^(-((x - beta) / gamma)^2 / 2)
     const exponent = -Math.pow((x - beta) / gamma, 2) / 2;
@@ -51,7 +56,7 @@ export class BreathingAnimationService implements OnDestroy {
       minBrightness + gaussianValue * (maxBrightness - minBrightness);
 
     return Math.round(brightness);
-  });
+  }
 
   /**
    * Breathing opacity value (0-1) for direct use in styles

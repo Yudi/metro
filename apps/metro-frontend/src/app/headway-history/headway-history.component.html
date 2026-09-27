@@ -142,7 +142,16 @@
           <tbody>
             @for (row of pagedRows(); track row.snapshot.id) {
               <tr>
-                <td>{{ formatDateTime(row.snapshot.observedAt) }}</td>
+                <td>
+                  {{ formatDateTime(row.snapshot.observedAt) }}
+                  @if (row.snapshot.startedAt && row.snapshot.occurrenceCount && row.snapshot.occurrenceCount > 1) {
+                    <span class="error-period">
+                      Desde {{ formatDateTime(row.snapshot.startedAt) }}<br />
+                      {{ row.snapshot.occurrenceCount }} falhas em
+                      {{ formatObservedDuration(row.snapshot.startedAt, row.snapshot.observedAt) }}
+                    </span>
+                  }
+                </td>
                 <td>
                   <app-history-line-identity
                     [name]="row.lineName"
@@ -191,6 +200,22 @@
                         <dt>Observado em</dt>
                         <dd>{{ row.snapshot.observedAt }}</dd>
                       </div>
+                      @if (row.snapshot.startedAt) {
+                        <div>
+                          <dt>Primeira falha observada</dt>
+                          <dd>{{ row.snapshot.startedAt }}</dd>
+                        </div>
+                        <div>
+                          <dt>Duração observada</dt>
+                          <dd>{{ formatObservedDuration(row.snapshot.startedAt, row.snapshot.observedAt) }}</dd>
+                        </div>
+                      }
+                      @if (row.snapshot.occurrenceCount) {
+                        <div>
+                          <dt>Falhas registradas</dt>
+                          <dd>{{ row.snapshot.occurrenceCount }}</dd>
+                        </div>
+                      }
                       <div>
                         <dt>Criado em</dt>
                         <dd>{{ row.snapshot.createdAt }}</dd>

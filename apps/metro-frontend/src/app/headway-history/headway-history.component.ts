@@ -231,6 +231,23 @@ export class HeadwayHistoryComponent {
     return formatTransitDateTime(value);
   }
 
+  formatObservedDuration(startedAt: string, observedAt: string): string {
+    const seconds = Math.max(
+      0,
+      Math.floor((Date.parse(observedAt) - Date.parse(startedAt)) / 1000),
+    );
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainingSeconds = seconds % 60;
+
+    if (hours > 0) {
+      return `${hours} h ${minutes} min`;
+    }
+    return minutes > 0
+      ? `${minutes} min ${remainingSeconds} s`
+      : `${remainingSeconds} s`;
+  }
+
   formatAverageSeconds(value: number | null | undefined): string {
     if (value === null || value === undefined) {
       return 'Indisponível';

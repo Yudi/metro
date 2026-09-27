@@ -1,6 +1,8 @@
 export interface HistoricalHeadwaySnapshot {
   id: string;
   observedAt: string;
+  startedAt?: string | null;
+  occurrenceCount?: number | null;
   lineCode: string;
   agency: string;
   stationCode?: string;

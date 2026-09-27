@@ -113,3 +113,145 @@ describe('HistoricalService public projection', () => {
     );
   });
 });
+
+describe('HistoricalService polling errors', () => {
+  function setup() {
+    const snapshots = {
+      findFirst: jest.fn(),
+      update: jest.fn().mockResolvedValue({}),
+      create: jest.fn().mockResolvedValue({}),
+    };
+    const transaction = {
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      historicalHeadwaySnapshot: snapshots,
+    };
+    const prisma = {
+      $transaction: jest.fn((callback) => callback(transaction)),
+      historicalHeadwaySnapshot: {
+        create: jest.fn().mockResolvedValue({}),
+      },
+    };
+    const service = new HistoricalService(
+      prisma as never,
+      { getStationName: jest.fn().mockResolvedValue('Ambuitá') } as never,
+    );
+    return { service, prisma, snapshots };
+  }
+
+  it('extends an upstream error within the same São Paulo headway bucket', async () => {
+    const { service, snapshots } = setup();
+    snapshots.findFirst.mockResolvedValue({
+      id: 'first-error',
+      observedAt: new Date('2026-09-27T15:39:42.267Z'),
+      startedAt: new Date('2026-09-27T15:35:00.000Z'),
+      occurrenceCount: 3,
+    });
+
+    await service.recordHeadwayError({
+      lineCode: 'L8',
+      stationCode: 'AMBUITA',
+      source: 'headway_polling',
+      reason: 'upstream_api_error',
+      observedAt: new Date('2026-09-27T15:41:59.246Z'),
+    });
+
+    expect(snapshots.update).toHaveBeenCalledWith({
+      where: { id: 'first-error' },
+      data: {
+        observedAt: new Date('2026-09-27T15:41:59.246Z'),
+        startedAt: new Date('2026-09-27T15:35:00.000Z'),
+        occurrenceCount: 4,
+      },
+    });
+    expect(snapshots.create).not.toHaveBeenCalled();
+  });
+
+  it('starts a new error at the next bucket boundary', async () => {
+    const { service, snapshots } = setup();
+    snapshots.findFirst.mockResolvedValue({
+      id: 'previous-bucket',
+      observedAt: new Date('2026-09-27T15:59:59.000Z'),
+      startedAt: new Date('2026-09-27T15:39:00.000Z'),
+      occurrenceCount: 2,
+    });
+
+    await service.recordHeadwayError({
+      lineCode: 'L8',
+      stationCode: 'AMBUITA',
+      source: 'headway_polling',
+      reason: 'upstream_api_error',
+      observedAt: new Date('2026-09-27T16:00:00.000Z'),
+    });
+
+    expect(snapshots.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        startedAt: new Date('2026-09-27T16:00:00.000Z'),
+        occurrenceCount: 1,
+      }),
+    });
+    expect(snapshots.update).not.toHaveBeenCalled();
+  });
+
+  it('keeps the same night bucket on different local dates separate', async () => {
+    const { service, snapshots } = setup();
+    snapshots.findFirst.mockResolvedValue({
+      id: 'previous-night',
+      observedAt: new Date('2026-09-28T02:59:00.000Z'),
+      startedAt: new Date('2026-09-28T02:40:00.000Z'),
+      occurrenceCount: 2,
+    });
+
+    await service.recordHeadwayError({
+      lineCode: 'L8',
+      stationCode: 'AMBUITA',
+      source: 'headway_polling',
+      reason: 'upstream_api_error',
+      observedAt: new Date('2026-09-29T02:59:00.000Z'),
+    });
+
+    expect(snapshots.create).toHaveBeenCalledTimes(1);
+    expect(snapshots.update).not.toHaveBeenCalled();
+  });
+
+  it('keeps the latest time and earlier start when polls finish out of order', async () => {
+    const { service, snapshots } = setup();
+    snapshots.findFirst.mockResolvedValue({
+      id: 'first-error',
+      observedAt: new Date('2026-09-27T15:41:59.246Z'),
+      startedAt: new Date('2026-09-27T15:39:42.267Z'),
+      occurrenceCount: 2,
+    });
+
+    await service.recordHeadwayError({
+      lineCode: 'L8',
+      stationCode: 'AMBUITA',
+      source: 'headway_polling',
+      reason: 'upstream_api_error',
+      observedAt: new Date('2026-09-27T15:38:00.000Z'),
+    });
+
+    expect(snapshots.update).toHaveBeenCalledWith({
+      where: { id: 'first-error' },
+      data: {
+        observedAt: new Date('2026-09-27T15:41:59.246Z'),
+        startedAt: new Date('2026-09-27T15:38:00.000Z'),
+        occurrenceCount: 3,
+      },
+    });
+  });
+
+  it('keeps other polling errors as individual rows', async () => {
+    const { service, prisma } = setup();
+
+    await service.recordHeadwayError({
+      lineCode: 'L8',
+      stationCode: 'AMBUITA',
+      source: 'headway_polling',
+      reason: 'station_poll_failed',
+      observedAt: new Date('2026-09-27T15:41:59.246Z'),
+    });
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.historicalHeadwaySnapshot.create).toHaveBeenCalledTimes(1);
+  });
+});

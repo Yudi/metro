@@ -23,6 +23,7 @@ export interface LineDescriptionDialogData {
   title: string;
   description?: string | null;
   detail?: string | null;
+  paese?: boolean;
   issues?: SpecialRailIssue[];
   details?: string[];
   scheduleSections?: readonly LineScheduleSection[];
@@ -106,6 +107,20 @@ export interface LineDescriptionDialogData {
         >
           {{ data.link.label }}
         </a>
+      }
+
+      @if (data.paese) {
+        <section class="paese-info" aria-label="Informação sobre reembolso">
+          <h3>
+            <mat-icon aria-hidden="true">info</mat-icon>
+            Informação
+          </h3>
+          <p>
+            Em caso de falhas no transporte, o passageiro pode ter o direito de
+            solicitar o reembolso da tarifa. Procure o supervisor da estação
+            antes de passar pela catraca de saída.
+          </p>
+        </section>
       }
     </mat-dialog-content>
     <mat-dialog-actions>
@@ -194,6 +209,29 @@ export interface LineDescriptionDialogData {
     .source-link {
       color: var(--mat-sys-on-surface-variant);
       font-size: 0.88rem;
+    }
+
+    .paese-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      padding-top: 0.9rem;
+      border-top: 1px solid var(--mat-sys-outline-variant);
+    }
+
+    .paese-info h3 {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin: 0;
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    .paese-info mat-icon {
+      width: 1.1rem;
+      height: 1.1rem;
+      font-size: 1.1rem;
     }
 
     .issue-section {

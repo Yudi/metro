@@ -162,23 +162,25 @@ model HistoricalIncidentEvent {
 }
 
 model HistoricalHeadwaySnapshot {
-  id             String   @id @default(uuid(7)) @db.Uuid
-  observedAt     DateTime @default(now()) @db.Timestamptz
-  lineCode       String   @db.Text
-  agency         String   @db.Text
-  stationCode    String   @db.Text
-  stationName    String?  @db.Text
-  direction      String   @db.Text
-  averageSeconds Float?
-  sampleCount    Int?
-  bucket         String?  @db.Text
-  bucketLabel    String?  @db.Text
-  isFallback     Boolean  @default(false)
-  samples        Json?
-  source         String   @default("headway_tracking") @db.Text
-  errors         Json?
-  metadata       Json?
-  createdAt      DateTime @default(now()) @db.Timestamptz
+  id              String    @id @default(uuid(7)) @db.Uuid
+  observedAt      DateTime  @default(now()) @db.Timestamptz
+  startedAt       DateTime? @db.Timestamptz
+  occurrenceCount Int?
+  lineCode        String    @db.Text
+  agency          String    @db.Text
+  stationCode     String    @db.Text
+  stationName     String?   @db.Text
+  direction       String    @db.Text
+  averageSeconds  Float?
+  sampleCount     Int?
+  bucket          String?   @db.Text
+  bucketLabel     String?   @db.Text
+  isFallback      Boolean   @default(false)
+  samples         Json?
+  source          String    @default("headway_tracking") @db.Text
+  errors          Json?
+  metadata        Json?
+  createdAt       DateTime  @default(now()) @db.Timestamptz
 
   @@index([lineCode, stationCode, observedAt(sort: Desc)])
   @@index([lineCode, stationName, observedAt(sort: Desc)])
@@ -201,6 +203,7 @@ model User {
   notificationIssueReceipts NotificationIssueReceipt[]
 
   @@index([last_login])
+  @@map("users")
 }
 
 model Favorite {

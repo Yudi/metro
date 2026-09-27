@@ -73,9 +73,11 @@ $status-unavailable-border: rgba(255, 152, 0, 0.2);
     &[data-status*="AtividadeProgramada"],
     &[data-status*="VelocidadeReduzida"],
     &[data-status*="OperacaoTransitoria"],
+    &[data-status*="OperacaoDiferenciada"],
     &[data-status*="OperacaoComImpactoPontual"],
     &[data-status*="CirculacaoDeTrens"],
-    &[data-status*="OperacaoParcial"] {
+    &[data-status*="OperacaoParcial"],
+    &[data-status*="MaioresIntervalos"] {
       background-color: $status-warning-bg;
       border-color: $status-warning-border;
 

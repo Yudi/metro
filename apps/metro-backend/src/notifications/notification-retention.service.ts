@@ -32,7 +32,7 @@ export class NotificationRetentionService {
       for (const { id } of users) {
         await this.prisma.$transaction(async (tx) => {
           // Authentication updates the same row, so login and expiry serialize.
-          await tx.$queryRaw`SELECT "id" FROM "public"."User" WHERE "id" = ${id} FOR UPDATE`;
+          await tx.$queryRaw`SELECT "id" FROM "public"."users" WHERE "id" = ${id} FOR UPDATE`;
           const user = await tx.user.findUnique({ where: { id } });
           if (!user) return;
           const expiry = notificationRetentionExpiry(user.last_login);

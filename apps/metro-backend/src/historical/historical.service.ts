@@ -36,6 +36,7 @@ import {
   countsRailStatusAsIncident,
   errorToJsonObject,
   getRailAgency,
+  getHeadwayOperationalWindowKey,
   getStaticHistoricalStationName,
   isExternalRailLine,
   isKnownHistoricalRailLine,
@@ -217,28 +218,77 @@ export class HistoricalService implements OnModuleInit, OnModuleDestroy {
 
   async recordHeadwayError(params: RecordHeadwayErrorParams): Promise<void> {
     await this.runSafely('record headway error snapshot', async () => {
-      await this.prisma.historicalHeadwaySnapshot.create({
-        data: {
-          observedAt: params.observedAt ?? new Date(),
-          lineCode: params.lineCode,
-          agency: this.getRequiredRailAgency(params.lineCode),
-          stationCode: params.stationCode,
-          stationName: await this.resolveStationName(
-            params.lineCode,
-            params.stationCode,
-          ),
-          direction: params.direction ?? 'unknown',
-          sampleCount: params.sampleCount,
-          bucket: params.bucket,
-          bucketLabel: params.bucketLabel,
-          source: params.source ?? 'headway_tracking',
-          errors: compactJsonObject({
-            reason: params.reason,
-            error: params.error ? errorToJsonObject(params.error) : undefined,
-          }),
-          metadata: params.metadata,
+      const observedAt = params.observedAt ?? new Date();
+      const source = params.source ?? 'headway_tracking';
+      const direction = params.direction ?? 'unknown';
+      const data = {
+        observedAt,
+        lineCode: params.lineCode,
+        agency: this.getRequiredRailAgency(params.lineCode),
+        stationCode: params.stationCode,
+        stationName: await this.resolveStationName(
+          params.lineCode,
+          params.stationCode,
+        ),
+        direction,
+        sampleCount: params.sampleCount,
+        bucket: params.bucket,
+        bucketLabel: params.bucketLabel,
+        source,
+        errors: compactJsonObject({
+          reason: params.reason,
+          error: params.error ? errorToJsonObject(params.error) : undefined,
+        }),
+        metadata: params.metadata,
+      };
+
+      if (source !== 'headway_polling' || params.reason !== 'upstream_api_error') {
+        await this.prisma.historicalHeadwaySnapshot.create({ data });
+        return;
+      }
+
+      await this.withIncidentLock(
+        `headway-error:${params.lineCode}:${params.stationCode}:${direction}`,
+        async (transaction) => {
+          const latest = await transaction.historicalHeadwaySnapshot.findFirst({
+            where: {
+              lineCode: params.lineCode,
+              stationCode: params.stationCode,
+              direction,
+              source,
+              errors: { path: ['reason'], equals: params.reason },
+            },
+            orderBy: { observedAt: 'desc' },
+          });
+
+          if (
+            latest &&
+            getHeadwayOperationalWindowKey(latest.observedAt) ===
+              getHeadwayOperationalWindowKey(observedAt)
+          ) {
+            await transaction.historicalHeadwaySnapshot.update({
+              where: { id: latest.id },
+              data: {
+                observedAt: new Date(
+                  Math.max(latest.observedAt.getTime(), observedAt.getTime()),
+                ),
+                startedAt: new Date(
+                  Math.min(
+                    (latest.startedAt ?? latest.observedAt).getTime(),
+                    observedAt.getTime(),
+                  ),
+                ),
+                occurrenceCount: (latest.occurrenceCount ?? 1) + 1,
+              },
+            });
+            return;
+          }
+
+          await transaction.historicalHeadwaySnapshot.create({
+            data: { ...data, startedAt: observedAt, occurrenceCount: 1 },
+          });
         },
-      });
+      );
     });
   }
 

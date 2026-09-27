@@ -68,6 +68,36 @@ describe('LineStatusGridComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it('shows PAESE below the line status and keeps its message in the dialog', () => {
+    const line = {
+      code: 1,
+      colorName: 'Azul',
+      colorHex: '#00529F',
+      line: 'Linha 1 - Azul',
+      statusCode: 'OperacaoNormal' as const,
+      statusLabel: 'Operação Normal',
+      statusColor: 'verde' as const,
+      description: 'PAESE disponível entre as estações.',
+    };
+    status.lines = [line];
+    component.retryFetch();
+    fixture.detectChanges();
+
+    const card = fixture.nativeElement.querySelector('.regular-grid .line-card') as HTMLElement;
+    expect(card.querySelectorAll('.status-badge')).toHaveLength(2);
+    expect(card.querySelector('.paese-badge')?.textContent).toContain('PAESE');
+    expect(card.querySelector('.paese-badge mat-icon')?.textContent).toContain('directions_bus');
+    expect(component.isLineClickable(line)).toBe(true);
+
+    card.click();
+    expect(dialogOpen).toHaveBeenCalledWith(LineDescriptionDialogComponent, {
+      data: expect.objectContaining({
+        description: line.description,
+        paese: true,
+      }),
+    });
+  });
+
   it('should include issue-only lines only when they have a dashboard issue', () => {
     status.lines = [
       {

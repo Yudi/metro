@@ -343,6 +343,16 @@ type HistoricalHeadwaySnapshotEntity {
   observedAt: DateTime!
 
   """
+  First observation in a grouped polling error
+  """
+  startedAt: DateTime
+
+  """
+  Number of failed polls in a grouped polling error
+  """
+  occurrenceCount: Int
+
+  """
   Number of interval samples used or available
   """
   sampleCount: Int

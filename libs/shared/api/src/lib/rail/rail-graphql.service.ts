@@ -433,6 +433,8 @@ export class RailGraphqlService {
           headwaySnapshots {
             id
             observedAt
+            startedAt
+            occurrenceCount
             lineCode
             agency
             stationName

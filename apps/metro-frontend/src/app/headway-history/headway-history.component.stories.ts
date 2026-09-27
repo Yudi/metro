@@ -103,6 +103,23 @@ const MOCK_ROWS: HistoricalHeadwaySnapshot[] = [
     },
     createdAt: '2026-06-10T11:50:02.000Z',
   },
+  {
+    id: 'snapshot-004',
+    startedAt: '2026-06-10T15:35:00.000Z',
+    observedAt: '2026-06-10T15:41:59.000Z',
+    occurrenceCount: 4,
+    lineCode: 'L8',
+    agency: 'viamobilidade',
+    stationCode: 'AMBUITA',
+    stationName: 'Ambuitá',
+    direction: 'unknown',
+    averageSeconds: null,
+    sampleCount: null,
+    isFallback: false,
+    source: 'headway_polling',
+    errors: { reason: 'upstream_api_error' },
+    createdAt: '2026-06-10T15:35:01.000Z',
+  },
 ];
 
 let activeArgs: HeadwayHistoryStoryArgs;
@@ -153,10 +170,16 @@ function createRows(
     const observedAt = new Date(source.observedAt);
 
     observedAt.setMinutes(observedAt.getMinutes() - index * 9);
+    const startedAt = source.startedAt
+      ? new Date(
+          Date.parse(source.startedAt) - index * 9 * 60 * 1000,
+        ).toISOString()
+      : source.startedAt;
 
     return {
       ...source,
       id: `${source.id}-${index}`,
+      startedAt,
       observedAt: observedAt.toISOString(),
       createdAt: observedAt.toISOString(),
     };

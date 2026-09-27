@@ -134,6 +134,14 @@ td {
   color: var(--mat-sys-on-surface);
 }
 
+.error-period {
+  color: var(--mat-sys-on-surface-variant);
+  display: block;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  margin-top: 4px;
+}
+
 .fallback-badge {
   border-radius: 999px;
   display: inline-flex;

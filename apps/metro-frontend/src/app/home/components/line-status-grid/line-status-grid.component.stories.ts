@@ -12,6 +12,8 @@ import {
   createMockApiService,
   ALL_LINES_NORMAL,
   ALL_LINES_CLOSED,
+  L1_NORMAL,
+  L1_REDUCED,
   createRailStatusResponse,
   type MockApiServiceOptions,
 } from '@metro/storybook-mocks';
@@ -198,6 +200,31 @@ export const WithIssues: Story = {
         fetchKind: 'issue',
         fetchDelayMs: 0,
       }),
+    }),
+  ],
+};
+
+/** PAESE appears below the operational state and opens the original message. */
+export const WithPaese: Story = {
+  decorators: [
+    applicationConfig({
+      providers: createFixedResponseProviders(
+        createRailStatusResponse([
+          {
+            ...L1_REDUCED,
+            description:
+              'Circulação com velocidade reduzida. PAESE disponível entre as estações.',
+          },
+          {
+            ...L1_NORMAL,
+            code: 2,
+            colorName: 'Verde',
+            colorHex: '#007449',
+            line: 'Linha 2 - Verde',
+            description: 'PAESE em operação no trecho afetado.',
+          },
+        ]),
+      ),
     }),
   ],
 };

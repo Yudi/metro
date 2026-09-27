@@ -181,7 +181,11 @@ export class LineStatusGridComponent {
   }
 
   isLineClickable(line: RailLineStatus): boolean {
-    return isStatusClickable(line.statusCode);
+    return isStatusClickable(line.statusCode) || this.hasPaese(line);
+  }
+
+  hasPaese(line: RailLineStatus): boolean {
+    return /\bPAESE\b/i.test(line.description ?? '');
   }
 
   isSpecialLineClickable(line: SpecialRailLineStatus): boolean {
@@ -237,6 +241,7 @@ export class LineStatusGridComponent {
         title: `${line.code} - ${line.colorName}`,
         description: line.description ?? 'Sem detalhes adicionais no momento.',
         detail: line.detail,
+        paese: this.hasPaese(line),
       } satisfies LineDescriptionDialogData,
     });
   }

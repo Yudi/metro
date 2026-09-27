@@ -153,6 +153,18 @@ export class HistoricalHeadwaySnapshotEntity {
   @Field(() => Date, { description: 'When this snapshot was observed' })
   observedAt!: Date;
 
+  @Field(() => Date, {
+    nullable: true,
+    description: 'First observation in a grouped polling error',
+  })
+  startedAt?: Date | null;
+
+  @Field(() => Int, {
+    nullable: true,
+    description: 'Number of failed polls in a grouped polling error',
+  })
+  occurrenceCount?: number | null;
+
   @Field(() => String, { description: 'Rail line code, such as L9' })
   lineCode!: string;
 

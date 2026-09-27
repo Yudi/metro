@@ -140,7 +140,7 @@ export const STATUS_CODE_TO_COLOR: Record<RailStatusCode, RailStatusColor> = {
   OperacaoNormal: 'verde',
   OperacaoTransitoria: 'amarelo',
   OperacaoEspecial: 'verde',
-  OperacaoDiferenciada: 'verde',
+  OperacaoDiferenciada: 'amarelo',
   OperacaoComImpactoPontual: 'amarelo',
   AtividadeProgramada: 'amarelo',
   VelocidadeReduzida: 'amarelo',
@@ -190,6 +190,8 @@ export function hasStatusIssue(statusCode: RailStatusCode): boolean {
   return (
     statusCode === 'VelocidadeReduzida' ||
     statusCode === 'OperacaoParcial' ||
+    statusCode === 'OperacaoDiferenciada' ||
+    statusCode === 'MaioresIntervalos' ||
     statusCode === 'Paralisada' ||
     statusCode === 'AtividadeProgramada'
   );

@@ -8,6 +8,7 @@ import {
   isKnownRailLineCode,
   isSpecialCptmLine,
   getStationName as getStaticStationName,
+  getHeadwayBucket,
 } from '@metro/shared/utils';
 import type {
   DirectionHeadway,
@@ -24,6 +25,21 @@ export const DEFAULT_HISTORY_LIMIT = 100;
 export const MAX_HISTORY_LIMIT = 500;
 export const BACKEND_LIFECYCLE_SOURCE = 'backend_lifecycle';
 export const RAIL_STATUS_SOURCE = 'rail_status';
+
+const saoPauloDate = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/Sao_Paulo',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+export function getHeadwayOperationalWindowKey(observedAt: Date): string {
+  const parts = saoPauloDate.formatToParts(observedAt);
+  const part = (type: string) =>
+    parts.find((value) => value.type === type)?.value;
+
+  return `${part('year')}-${part('month')}-${part('day')}:${getHeadwayBucket(observedAt.getTime())}`;
+}
 
 const NON_INCIDENT_RAIL_STATUS_CODES = new Set<RailStatusCode>([
   'OperacaoNormal',

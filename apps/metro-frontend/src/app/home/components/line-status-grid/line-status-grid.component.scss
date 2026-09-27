@@ -143,6 +143,16 @@
 // Shared status badge styles
 @include rail.status-badge;
 
+.paese-badge {
+  margin-top: 0.3rem;
+
+  mat-icon {
+    width: 1rem;
+    height: 1rem;
+    font-size: 1rem;
+  }
+}
+
 @media ((max-width: 513px) and (min-width: 478px)) or (max-width: 347px) {
   .grid {
     display: flex;

@@ -582,7 +582,7 @@ export class NotificationSettingsService {
     // an application process-local mutex.
     await client.$queryRaw`
       SELECT "id"
-      FROM "public"."User"
+      FROM "public"."users"
       WHERE "id" = ${userId}
       FOR UPDATE
     `;

@@ -44,7 +44,7 @@ export interface LineDescriptionDialogData {
     ScheduledDeparturesComponent,
   ],
   template: `
-    <h2 mat-dialog-title>{{ data.title }}</h2>
+    <h2 mat-dialog-title cdkFocusInitial tabindex="-1">{{ data.title }}</h2>
     <mat-dialog-content class="line-description-content">
       @if (data.description) {
         <p class="lead">{{ data.description }}</p>

@@ -23,6 +23,8 @@ import {
   SpecialRailService,
   TransitAgency,
   formatBusFare,
+  getContrastColor,
+  getRailLineById,
 } from '@metro/shared/utils';
 
 interface AgencyIdentity {
@@ -164,11 +166,27 @@ export class SearchResultCardComponent {
   }
 
   routeColor(route: TypesenseRoute): string {
+    const railLine = this.getRailLine(route);
+    if (railLine) {
+      return railLine.colorHex;
+    }
+
     return normalizeHexColor(route.route_color, '5f6368');
   }
 
   routeTextColor(route: TypesenseRoute): string {
+    const railLine = this.getRailLine(route);
+    if (railLine) {
+      return getContrastColor(railLine.colorHex);
+    }
+
     return normalizeHexColor(route.route_text_color, 'ffffff');
+  }
+
+  private getRailLine(route: TypesenseRoute) {
+    return route.source === 'rail'
+      ? getRailLineById(route.route_short_name)
+      : undefined;
   }
 
   formatDistance(distance: number): string {

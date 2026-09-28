@@ -73,6 +73,10 @@ describe('menu search handoff', () => {
     expect(open).toHaveBeenCalledTimes(1);
     expect(component.searchOpen()).toBe(true);
     const options = open.mock.calls[0][1];
+    expect(options).toEqual(expect.objectContaining({
+      autoFocus: 'input',
+      delayFocusTrap: false,
+    }));
     const received: string[] = [];
     const subscription = options.data.queryChanges.subscribe((query: string) =>
       received.push(query),

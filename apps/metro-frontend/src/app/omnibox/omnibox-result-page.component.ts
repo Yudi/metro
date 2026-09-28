@@ -332,6 +332,8 @@ export class OmniboxResultPageComponent {
           maxWidth: 'calc(100vw - 24px)',
           maxHeight: '90dvh',
           autoFocus: 'input',
+          // Accept typing as soon as the dialog renders, including during its animation.
+          delayFocusTrap: false,
           restoreFocus: true,
           data: {
             queryChanges: this.searchQueries.asObservable(),

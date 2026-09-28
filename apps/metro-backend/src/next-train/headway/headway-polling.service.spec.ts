@@ -186,7 +186,7 @@ describe('HeadwayPollingService', () => {
 
   it('skips off-hours polling when the line operation is closed', async () => {
     jest.useFakeTimers();
-    jest.setSystemTime(new Date('2026-06-06T02:00:00-03:00'));
+    jest.setSystemTime(new Date('2026-06-06T01:30:00-03:00'));
     const externalRailProvider = {
       fetchHeadwayObservations: jest.fn(async () => []),
     };
@@ -221,10 +221,10 @@ describe('HeadwayPollingService', () => {
   });
 
   it.each([
-    ['after closing', '2026-06-06T00:30:00-03:00'],
+    ['after closing', '2026-06-06T01:29:00-03:00'],
     ['before opening', '2026-06-06T03:30:00-03:00'],
   ])(
-    'polls with OperacaoEncerrada during the one-hour remaining-trains tolerance %s',
+    'polls with OperacaoEncerrada during the remaining-trains tolerance %s',
     async (_period, timestamp) => {
       jest.useFakeTimers();
       jest.setSystemTime(new Date(timestamp));

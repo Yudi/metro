@@ -244,7 +244,8 @@ test('forwards rapid menu typing into the dialog and searches the final query', 
     exact: true,
   });
   await menuSearch.focus();
-  await page.keyboard.type('paulista');
+  // Keep sending real keystrokes across the dialog's opening animation.
+  await page.keyboard.type('paulista', { delay: 20 });
 
   const dialogSearch = page.getByRole('searchbox', {
     name: 'Linhas, paradas e páginas',

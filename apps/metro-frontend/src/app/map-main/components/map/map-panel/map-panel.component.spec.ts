@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MapPanelComponent } from './map-panel.component';
@@ -11,9 +11,10 @@ import { MapPanelService } from './map-panel.service';
 class PanelContentStub {
   readonly panel = inject(MAP_PANEL_REF);
   readonly data = inject<string>(MAT_DIALOG_DATA);
-  readonly isFavorite = jest.fn(() => false);
-  readonly favoriteIcon = jest.fn(() => 'favorite_border');
-  readonly toggleFavorite = jest.fn();
+  private readonly favorite = signal(false);
+  readonly isFavorite = () => this.favorite();
+  readonly favoriteIcon = () => this.favorite() ? 'favorite' : 'favorite_border';
+  readonly toggleFavorite = jest.fn(() => this.favorite.update(value => !value));
 }
 
 describe('MapPanelComponent', () => {
@@ -102,6 +103,18 @@ describe('MapPanelComponent', () => {
     expect((fixture.componentInstance.favoriteContent() as PanelContentStub).toggleFavorite).toHaveBeenCalled();
     dismiss.click();
     expect(panels.panel()).toBeNull();
+  });
+
+  it('keeps the favorite action when favoriting changes map selections', () => {
+    open();
+    const favorite: HTMLButtonElement = fixture.nativeElement.querySelector('.map-panel__favorite');
+    favorite.click();
+    fixture.componentRef.setInput('hasSelections', true);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.map-panel__favorite')).toBe(favorite);
+    expect(favorite.getAttribute('aria-label')).toBe('Remover dos favoritos');
+    expect(favorite.querySelector('mat-icon')?.textContent).toBe('favorite');
   });
 
   it('keeps the map focusable and handles Escape only from within the panel', async () => {

@@ -322,9 +322,9 @@ describe('NextTrainPollingService', () => {
     expect(externalRailProvider.fetchNextTrains).not.toHaveBeenCalled();
   });
 
-  it('marks operation closed without polling upstream after the off-hours offset when no cached trains remain', async () => {
+  it('marks operation closed at 01:30 without polling upstream when no cached trains remain', async () => {
     jest.useFakeTimers();
-    jest.setSystemTime(new Date('2026-06-06T02:00:00-03:00'));
+    jest.setSystemTime(new Date('2026-06-06T01:30:00-03:00'));
     railService.getLineStatus.mockResolvedValue({
       statusCode: 'OperacaoEncerrada',
     });
@@ -415,14 +415,14 @@ describe('NextTrainPollingService', () => {
     );
   });
 
-  it('still polls during the one-hour remaining-trains tolerance after midnight', async () => {
+  it('still polls just before the 90-minute closing tolerance ends', async () => {
     jest.useFakeTimers();
-    jest.setSystemTime(new Date('2026-06-06T00:30:00-03:00'));
+    jest.setSystemTime(new Date('2026-06-06T01:29:00-03:00'));
     const train: NextTrainArrivalDto = {
       destinationCode: 'DEST',
       destinationName: 'Destino',
       trainCurrentStationName: 'Origem',
-      arrivalTime: '00:42',
+      arrivalTime: '01:42',
       isAtPlatform: false,
       isTrainStopped: null,
     };

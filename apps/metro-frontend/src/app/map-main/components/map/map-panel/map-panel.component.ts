@@ -151,6 +151,7 @@ export class MapPanelComponent {
   private observedHeader: HTMLElement | null = null;
   private previousFocus: HTMLElement | null = null;
   private wasOpen = false;
+  private activePanelId: number | null = null;
   private activePointer: PanelDrag | null = null;
   private suppressHandleClick = false;
 
@@ -175,14 +176,18 @@ export class MapPanelComponent {
     this.destroyRef.onDestroy(() => this.resizeObserver?.disconnect());
 
     effect(() => {
-      const isOpen = this.panelService.panel() !== null;
+      const panelId = this.panelService.panel()?.id ?? null;
+      const isOpen = panelId !== null;
       this.hasSelections();
       if (isOpen && !this.wasOpen) this.capturePreviousFocus();
       const shouldRestoreFocus = !isOpen && this.wasOpen;
       this.wasOpen = isOpen;
       this.activePointer = null;
       this.dragHeight.set(null);
-      this.favoriteContent.set(null);
+      if (panelId !== this.activePanelId) {
+        this.activePanelId = panelId;
+        this.favoriteContent.set(null);
+      }
       afterNextRender(() => {
         this.resetContentScroll();
         this.observeContentHeader();

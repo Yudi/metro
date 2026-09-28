@@ -1,9 +1,10 @@
-import { Service, computed, effect, inject } from '@angular/core';
+import { Service, computed, effect, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { LoggerService } from '@metro/shared/api';
 import { BikeStationsService } from '../../geography/bike-stations.service';
 import { GeographyGraphQLService } from '../../geography/geography-graphql.service';
+import type { BusStopGraphQL } from '../../geography/geography-graphql.service';
 import {
   BikeStationDialogComponent,
   BikeStationDialogData,
@@ -159,17 +160,79 @@ export class MapDetailsDialogService {
     });
   }
 
-  async showRoutesForStop(stopId: string): Promise<void> {
+  async showRoutesForStop(stopId: string, initialStop?: BusStopGraphQL): Promise<void> {
     this.logger.debug('Showing routes for stop', { stopId });
-    const loadingRef = this.panelService.openNotice({
-      title: 'Carregando parada',
-      summary: 'Buscando linhas…',
-      icon: 'directions_bus',
-    });
-    const requestGeneration = this.panelService.generation;
+    const knownStop = initialStop ??
+      this.mapState.allDisplayedStops().find((stop) => stop.stopId === stopId);
+    if (knownStop?.isSubwayStation) {
+      this.openSubwayStationPanel({ stop: knownStop });
+      return;
+    }
+    const panelTitle = signal(knownStop?.name ?? `Parada ${stopId}`);
+    const routeSummary = signal('');
+    let panelRef: MapPanelRef<BusStopDialogData, BusStopDialogResult> | null = null;
+    const currentPanelRef = () => panelRef;
+    const loadingRef = knownStop
+      ? null
+      : this.panelService.openNotice({
+          title: panelTitle(),
+          summary: '',
+          icon: 'directions_bus',
+        });
+    let requestGeneration = this.panelService.generation;
     const isCurrentRequest = () =>
       this.panelService.generation === requestGeneration &&
-      this.panelService.panel()?.id === loadingRef.id;
+      this.panelService.panel()?.id === (panelRef?.id ?? loadingRef?.id);
+
+    const openBusPanel = (stop: BusStopGraphQL) => {
+      const data: BusStopDialogData = {
+        stop,
+        routes: [],
+        routesLoading: true,
+        selectedRoutes: this.mapState.selectedRouteIds(),
+      };
+      panelTitle.set(stop.name);
+      panelRef = this.panelService.openComponent<BusStopDialogData, BusStopDialogResult>({
+        component: BusStopDialogComponent,
+        data,
+        title: panelTitle,
+        summary: routeSummary,
+        icon: 'directions_bus',
+      });
+      requestGeneration = this.panelService.generation;
+      panelRef.setDataUpdater<BusStopDialogComponent>((component, nextData) =>
+        component.updateDetails(nextData),
+      );
+      panelRef.afterClosed().subscribe((result) => {
+        if (result?.action === 'add') {
+          this.selectionService.addStopToSelection(result.stopId);
+        } else if (result?.action === 'selectRoute') {
+          this.selectionService.addRouteToSelection(result.routeId, true);
+        } else if (panelRef?.closeReason === 'dismissed') {
+          this.displayService.updateMapDisplay();
+        }
+      });
+    };
+
+    if (knownStop && !knownStop.isSubwayStation) {
+      openBusPanel(knownStop);
+    }
+
+    const loadRoutes = async () => {
+      try {
+        const routes = await firstValueFrom(this.geographyService.getRoutesForStop(stopId));
+        if (!isCurrentRequest() || !panelRef) return;
+        const routeList = routes ?? [];
+        routeSummary.set(routeList.length ? `${routeList.length} ${routeList.length === 1 ? 'linha' : 'linhas'}` : '');
+        panelRef.updateData({ ...panelRef.data, routes: routeList, routesLoading: false });
+      } catch (error) {
+        if (!isCurrentRequest() || !panelRef) return;
+        this.logger.error('Error loading routes for stop', error);
+        panelRef.updateData({ ...panelRef.data, routesLoading: false, routesError: true });
+      }
+    };
+
+    if (panelRef) void loadRoutes();
 
     try {
       const stop = await firstValueFrom(
@@ -181,10 +244,10 @@ export class MapDetailsDialogService {
 
       if (!stop) {
         this.logger.warn('No stop data found', { stopId });
-        loadingRef.close();
-        this.snackBar.open('Parada não encontrada', 'Fechar', {
-          duration: 3000,
-        });
+        if (!panelRef) {
+          loadingRef?.close();
+          this.snackBar.open('Parada não encontrada', 'Fechar', { duration: 3000 });
+        }
         return;
       }
 
@@ -192,61 +255,24 @@ export class MapDetailsDialogService {
         this.openSubwayStationPanel({ stop });
         return;
       }
-
-      const routes = await firstValueFrom(
-        this.geographyService.getRoutesForStop(stopId),
-      );
-      if (!isCurrentRequest()) {
-        return;
+      const activeRef = currentPanelRef();
+      if (activeRef) {
+        panelTitle.set(stop.name);
+        activeRef.updateData({ ...activeRef.data, stop });
+      } else {
+        openBusPanel(stop);
+        void loadRoutes();
       }
-
-      const routeList = routes ?? [];
-      const data: BusStopDialogData = {
-        stop,
-        routes: routeList,
-        selectedRoutes: this.mapState.selectedRouteIds(),
-      };
-      const routeSummary =
-        routeList.length === 1
-          ? '1 linha'
-          : routeList.length > 1
-            ? `${routeList.length} linhas`
-            : '';
-      const panelRef = this.panelService.openComponent<
-        BusStopDialogData,
-        BusStopDialogResult
-      >({
-        component: BusStopDialogComponent,
-        data,
-        title: stop.name,
-        summary: routeSummary,
-        icon: 'directions_bus',
-      });
-
-      panelRef.afterClosed().subscribe((result) => {
-        if (result?.action === 'add') {
-          this.selectionService.addStopToSelection(result.stopId);
-        } else if (result?.action === 'selectRoute') {
-          this.logger.debug('Adding route from stop details', {
-            routeId: result.routeId,
-          });
-          this.selectionService.addRouteToSelection(result.routeId, true);
-        } else if (panelRef.closeReason === 'dismissed') {
-          this.displayService.updateMapDisplay();
-        }
-      });
     } catch (error) {
       if (!isCurrentRequest()) {
         return;
       }
 
       this.logger.error('Error loading stop details', error);
-      loadingRef.close();
-      this.snackBar.open(
-        'Não foi possível carregar os detalhes da parada',
-        'Fechar',
-        { duration: 3000 },
-      );
+      if (!panelRef) {
+        loadingRef?.close();
+        this.snackBar.open('Não foi possível carregar os detalhes da parada', 'Fechar', { duration: 3000 });
+      }
     }
   }
 

@@ -312,6 +312,21 @@ export const LoadingArrivals: Story = {
   ],
 };
 
+/** Stop identity is ready while the route lookup is still running. */
+export const LoadingRoutes: Story = {
+  decorators: [
+    applicationConfig({
+      providers: createProviders({
+        dialogData: {
+          ...createDialogData(PINHEIROS_BUS_STOP, []),
+          routesLoading: true,
+        },
+        realtimeKind: 'loading',
+      }),
+    }),
+  ],
+};
+
 /**
  * Bus stop with no routes (edge case).
  */

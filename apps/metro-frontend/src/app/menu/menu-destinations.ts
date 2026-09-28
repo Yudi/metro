@@ -101,6 +101,11 @@ export function menuDestinations(
         icon: 'privacy_tip',
         url: 'https://yudi.com.br/privacy-policy',
       },
+      {
+        label: 'Versão leve (lite)',
+        icon: 'bolt',
+        url: 'https://metro.yudi.com.br/lite/',
+      },
     ],
   };
 }

@@ -38,6 +38,8 @@ export interface BusStopDialogData {
   stop: BusStopGraphQL;
   routes: BusRouteGraphQL[];
   selectedRoutes: Set<string>;
+  routesLoading?: boolean;
+  routesError?: boolean;
   /** Whether to show map-specific actions (add to selection, show route on map). Default: true */
   showMapActions?: boolean;
 }
@@ -69,15 +71,19 @@ export class BusStopDialogComponent {
     { optional: true },
   );
   readonly data = inject<BusStopDialogData>(MAT_DIALOG_DATA);
-  readonly stopDescription =
-    this.data.stop.description?.trim() ===
-    `Plataforma ${this.data.stop.platformCode}`
+  readonly stop = signal(this.data.stop);
+  readonly routes = signal(this.data.routes);
+  readonly routesLoading = signal(this.data.routesLoading ?? false);
+  readonly routesError = signal(this.data.routesError ?? false);
+  readonly stopDescription = computed(() =>
+    this.stop().description?.trim() === `Plataforma ${this.stop().platformCode}`
       ? null
-      : this.data.stop.description;
+      : this.stop().description,
+  );
   private logger = inject(LoggerService);
   private favoriteService = inject(FavoritesService);
   readonly favoriteStopIds = computed(() =>
-    getBusStopIdentityAliases(this.data.stop).filter((stopId) =>
+    getBusStopIdentityAliases(this.stop()).filter((stopId) =>
       this.favoriteService.isFavorite(stopId, 'busStop'),
     ),
   );
@@ -89,7 +95,7 @@ export class BusStopDialogComponent {
         .busRoute.map((routeId) => this.normalizeRouteCode(routeId)),
     );
 
-    return this.data.routes
+    return this.routes()
       .map((route, index) => ({ route, index }))
       .sort((a, b) => {
         const aIsFavorite = this.isFavoriteRoute(a.route, favoriteRouteIds);
@@ -126,13 +132,20 @@ export class BusStopDialogComponent {
     });
   }
 
+  updateDetails(data: BusStopDialogData): void {
+    this.stop.set(data.stop);
+    this.routes.set(data.routes);
+    this.routesLoading.set(data.routesLoading ?? false);
+    this.routesError.set(data.routesError ?? false);
+  }
+
   /** Whether to show map-specific actions */
   get showMapActions(): boolean {
     return this.data.showMapActions !== false;
   }
 
   get stopDisplayId(): string {
-    return getBusStopDisplayId(this.data.stop);
+    return getBusStopDisplayId(this.stop());
   }
 
   get selectedRoutes(): BusRouteGraphQL[] {
@@ -154,16 +167,16 @@ export class BusStopDialogComponent {
   addToSelection(): void {
     closeMapPanelOrDialog(this.panelRef, this.dialogRef, {
       action: 'add',
-      stopId: this.data.stop.stopId,
+      stopId: this.stop().stopId,
     });
   }
 
   addToFavorites(): void {
-    if (!this.data.stop.stopId) {
+    if (!this.stop().stopId) {
       return;
     }
 
-    this.favoriteService.addFavorite(this.data.stop.stopId, 'busStop');
+    this.favoriteService.addFavorite(this.stop().stopId, 'busStop');
   }
 
   removeFromFavorites(): void {

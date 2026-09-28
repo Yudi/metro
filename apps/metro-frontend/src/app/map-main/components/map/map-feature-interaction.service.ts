@@ -174,7 +174,18 @@ export class MapFeatureInteractionService {
       return;
     }
 
-    this.detailsService.showRoutesForStop(stopData.stopId);
+    this.detailsService.showRoutesForStop(stopData.stopId, {
+      id: stopData.stopId,
+      stopId: stopData.stopId,
+      name: stopData.name,
+      latitude: stopData.latitude,
+      longitude: stopData.longitude,
+      isSubwayStation: false,
+      sourceAgency: stopData.sourceAgency,
+      sourceId: stopData.sourceId,
+      platformCode: stopData.platformCode,
+      mergedStopIds: stopData.mergedStopIds,
+    });
   }
 
   private handleBusRouteTileClick(feature: FeatureLike): void {

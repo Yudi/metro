@@ -117,7 +117,7 @@ describe('MapDetailsDialogService map-panel lifecycle', () => {
     geographyService.getBusStop.mockReturnValue(stopRequest.asObservable());
 
     const pendingDetails = service.showRoutesForStop(stop.stopId);
-    expect(panelService.panel()?.title).toBe('Carregando parada');
+    expect(panelService.panel()?.title).toBe('Parada stop-1');
 
     panelService.close();
     stopRequest.next(stop);
@@ -147,6 +147,52 @@ describe('MapDetailsDialogService map-panel lifecycle', () => {
     await pendingDetails;
 
     expect(panelService.panel()?.title).toBe('Trem S048');
+  });
+
+  it('shows known stop details while routes load and updates the same panel', async () => {
+    const stopRequest = new Subject<BusStopGraphQL | null>();
+    const routeRequest = new Subject<BusRouteGraphQL[]>();
+    geographyService.getBusStop.mockReturnValue(stopRequest.asObservable());
+    geographyService.getRoutesForStop.mockReturnValue(routeRequest.asObservable());
+
+    const pendingDetails = service.showRoutesForStop(stop.stopId, stop);
+    const firstPanel = panelService.panel();
+    expect(firstPanel?.title).toBeDefined();
+    expect(firstPanel?.component).toBeTruthy();
+    expect((firstPanel?.ref.data as { routesLoading: boolean }).routesLoading).toBe(true);
+    expect(geographyService.getRoutesForStop).toHaveBeenCalledWith(stop.stopId);
+
+    routeRequest.next([]);
+    routeRequest.complete();
+    await Promise.resolve();
+    expect(panelService.panel()?.id).toBe(firstPanel?.id);
+    expect((firstPanel?.ref.data as { routesLoading: boolean }).routesLoading).toBe(false);
+
+    stopRequest.next({ ...stop, name: 'Praça da Sé - atualizado' });
+    stopRequest.complete();
+    await pendingDetails;
+    const title = panelService.panel()?.title;
+    expect(typeof title === 'function' ? title() : title).toBe('Praça da Sé - atualizado');
+    expect(panelService.panel()?.id).toBe(firstPanel?.id);
+  });
+
+  it('ignores late stop and route results after a known stop panel is dismissed', async () => {
+    const stopRequest = new Subject<BusStopGraphQL | null>();
+    const routeRequest = new Subject<BusRouteGraphQL[]>();
+    geographyService.getBusStop.mockReturnValue(stopRequest.asObservable());
+    geographyService.getRoutesForStop.mockReturnValue(routeRequest.asObservable());
+
+    const pendingDetails = service.showRoutesForStop(stop.stopId, stop);
+    expect(panelService.panel()?.component).toBeTruthy();
+    panelService.close();
+
+    routeRequest.next([]);
+    routeRequest.complete();
+    stopRequest.next(stop);
+    stopRequest.complete();
+    await pendingDetails;
+
+    expect(panelService.panel()).toBeNull();
   });
 
   it('switches bike details to the newly selected station and keeps its summary live', () => {

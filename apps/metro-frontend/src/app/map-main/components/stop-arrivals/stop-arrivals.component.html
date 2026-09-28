@@ -16,7 +16,7 @@
       @if (isLoading()) {
         <div class="loading-state">
           <mat-spinner [diameter]="compact() ? 24 : 40"></mat-spinner>
-          <p>{{ compact() ? "Carregando..." : "Carregando previsões..." }}</p>
+          <p>Consultando previsões de chegada…</p>
         </div>
       } @else if (hasArrivals()) {
         <div class="arrivals-list">

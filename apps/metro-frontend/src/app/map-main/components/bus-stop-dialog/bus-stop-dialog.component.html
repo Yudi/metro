@@ -1,23 +1,29 @@
 <app-dialog-header
   icon="directions_bus"
-  [title]="data.stop.name"
+  [title]="stop().name"
   [description]="
     'Ponto de ônibus · ID: ' +
     stopDisplayId +
-    (data.stop.platformCode ? ' · Plataforma: ' + data.stop.platformCode : '')
+    (stop().platformCode ? ' · Plataforma: ' + stop().platformCode : '')
   "
 />
 
 <mat-dialog-content class="stop-content">
-  @if (stopDescription) {
-    <p class="stop-description">{{ stopDescription }}</p>
+  @if (stopDescription()) {
+    <p class="stop-description">{{ stopDescription() }}</p>
     <mat-divider></mat-divider>
+  }
+
+  @if (routesLoading()) {
+    <p class="routes-state" role="status" aria-live="polite">Consultando linhas do ponto…</p>
+  } @else if (routesError()) {
+    <p class="routes-state" role="status">Não foi possível consultar as linhas deste ponto.</p>
   }
 
   <!-- Real-time arrivals -->
   <div class="arrivals-section">
     <app-stop-arrivals
-      [stop]="data.stop"
+      [stop]="stop()"
       [routes]="routesSortedByFavorite()"
       [selectedRoutes]="data.selectedRoutes"
       [showMapActions]="showMapActions"

@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { tileToBounds } from '../utils/vector-tile-geometry.util';
 import { VectorTileOptions } from '../vector-tile.types';
@@ -14,6 +15,7 @@ export class BusVectorTileService {
    *
    * The route filter is mandatory so the endpoint never becomes an
    * accidental "all bus shapes" export.
+   * Materialized ID sets keep filters indexable through both feed views.
    */
   async generateBusRoutesTile(
     z: number,
@@ -31,17 +33,30 @@ export class BusVectorTileService {
     const { minX, minY, maxX, maxY } = tileToBounds(z, x, y);
 
     try {
-      const result = await this.prisma.$queryRaw<[{ mvt: Buffer }]>`
+      return await this.queryTile(Prisma.sql`
         WITH bounds AS (
           SELECT ST_Transform(
             ST_MakeEnvelope(${minX}::float8, ${minY}::float8, ${maxX}::float8, ${maxY}::float8, 3857),
             4326
           ) AS geom
         ),
-        selected_routes AS (
-          SELECT route_id
+        selected_routes AS MATERIALIZED (
+          SELECT *
           FROM "public"."Gtfs_Route"
           WHERE route_id = ANY(${routeIds}::text[])
+            AND NOT (route_type IN (1, 2) OR route_id LIKE 'METRÔ%' OR route_id LIKE 'CPTM%')
+        ),
+        selected_trips AS MATERIALIZED (
+          SELECT DISTINCT route_id, shape_id
+          FROM "public"."Gtfs_Trip"
+          WHERE route_id = ANY(ARRAY(SELECT route_id FROM selected_routes))
+            AND shape_id IS NOT NULL
+        ),
+        selected_shapes AS MATERIALIZED (
+          SELECT shape_id, geom
+          FROM "public"."Gtfs_Shape"
+          WHERE shape_id = ANY(ARRAY(SELECT shape_id FROM selected_trips))
+            AND geom IS NOT NULL
         ),
         route_shapes AS (
           SELECT DISTINCT ON (r.route_id, sh.shape_id)
@@ -56,13 +71,10 @@ export class BusVectorTileService {
             (LOWER(COALESCE(r.source_agency, 'sptrans')) = 'sptrans'
               AND NOT (r.route_type IN (1, 2) OR r.route_id LIKE 'METRÔ%' OR r.route_id LIKE 'CPTM%')) AS supports_realtime,
             sh.geom
-          FROM selected_routes sr
-          INNER JOIN "public"."Gtfs_Trip" t ON t.route_id = sr.route_id
-          INNER JOIN "public"."Gtfs_Shape" sh ON sh.shape_id = t.shape_id
-          INNER JOIN "public"."Gtfs_Route" r ON r.route_id = t.route_id
-          WHERE sh.geom IS NOT NULL
-            AND NOT (r.route_type IN (1, 2) OR r.route_id LIKE 'METRÔ%' OR r.route_id LIKE 'CPTM%')
-          ORDER BY r.route_id, sh.shape_id, t.trip_id
+          FROM selected_routes r
+          INNER JOIN selected_trips t ON t.route_id = r.route_id
+          INNER JOIN selected_shapes sh ON sh.shape_id = t.shape_id
+          ORDER BY r.route_id, sh.shape_id
         ),
         mvtgeom AS (
           SELECT
@@ -88,9 +100,7 @@ export class BusVectorTileService {
         )
         SELECT ST_AsMVT(mvtgeom.*, 'bus-routes', 4096, 'geom') AS mvt
         FROM mvtgeom
-      `;
-
-      return result[0]?.mvt ?? null;
+      `);
     } catch (error) {
       this.logger.error(
         `Error generating bus routes tile (${z}/${x}/${y}):`,
@@ -105,6 +115,9 @@ export class BusVectorTileService {
    *
    * At least one filter is required: routeIds, stopIds, or a nearby circle.
    * This avoids sending every bus stop to the client.
+   * Resolve selected trips and tile members once; correlated joins through
+   * the feed views can otherwise rescan whole timetables for every stop.
+   * Bus eligibility uses the import-refreshed summary across all members.
    */
   async generateBusStopsTile(
     z: number,
@@ -132,12 +145,30 @@ export class BusVectorTileService {
       const nearbyLongitude = nearby?.longitude ?? 0;
       const nearbyRadiusMeters = nearby?.radiusMeters ?? 0;
 
-      const result = await this.prisma.$queryRaw<[{ mvt: Buffer }]>`
+      return await this.queryTile(Prisma.sql`
         WITH bounds AS (
           SELECT ST_Transform(
             ST_MakeEnvelope(${minX}::float8, ${minY}::float8, ${maxX}::float8, ${maxY}::float8, 3857),
             4326
           ) AS geom
+        ),
+        selected_bus_trips AS MATERIALIZED (
+          SELECT trip_id
+          FROM "public"."Gtfs_Trip" trip
+          WHERE ${hasRouteFilter}
+            AND trip.route_id = ANY(${routeIds}::text[])
+            AND EXISTS (
+              SELECT 1
+              FROM "public"."Gtfs_Route" route
+              WHERE route.route_id = trip.route_id
+                AND NOT (route.route_type IN (1, 2) OR route.route_id LIKE 'METRÔ%' OR route.route_id LIKE 'CPTM%')
+            )
+        ),
+        selected_route_stops AS MATERIALIZED (
+          SELECT DISTINCT stop_id
+          FROM "public"."Gtfs_StopTime"
+          WHERE ${hasRouteFilter}
+            AND trip_id = ANY(ARRAY(SELECT trip_id FROM selected_bus_trips))
         ),
         canonical_stops AS (
           SELECT
@@ -151,23 +182,42 @@ export class BusVectorTileService {
             AND stop.location IS NOT NULL
             AND stop.location && bounds.geom::geography
         ),
+        tile_members AS MATERIALIZED (
+          SELECT member.physical_stop_id, member.source_stop_id
+          FROM "public"."physical_stop_members" member
+          WHERE member.physical_stop_id = ANY(
+            ARRAY(SELECT physical_stop_id FROM canonical_stops)
+          )
+        ),
+        member_stops AS MATERIALIZED (
+          SELECT stop_id
+          FROM "public"."Gtfs_Stop"
+          WHERE stop_id = ANY(ARRAY(SELECT source_stop_id FROM tile_members))
+        ),
         grouped_stops AS (
           SELECT canonical.physical_stop_id, canonical.stop_id
           FROM canonical_stops canonical
           UNION ALL
           SELECT canonical.physical_stop_id, member_stop.stop_id
-          FROM canonical_stops canonical
-          INNER JOIN "public"."physical_stop_members" member
-            ON member.physical_stop_id = canonical.physical_stop_id
-          INNER JOIN "public"."Gtfs_Stop" member_stop
+          FROM tile_members member
+          INNER JOIN canonical_stops canonical
+            ON canonical.physical_stop_id = member.physical_stop_id
+          INNER JOIN member_stops member_stop
             ON member_stop.stop_id = member.source_stop_id
         ),
         merged_ids AS (
           SELECT
-            physical_stop_id,
-            ARRAY_AGG(DISTINCT stop_id ORDER BY stop_id) AS merged_stop_ids
-          FROM grouped_stops
-          GROUP BY physical_stop_id
+            member_stop.physical_stop_id,
+            ARRAY_AGG(DISTINCT member_stop.stop_id ORDER BY member_stop.stop_id) AS merged_stop_ids,
+            BOOL_OR(COALESCE(summary.serves_bus, false)) AS serves_bus,
+            BOOL_OR(member_stop.stop_id = ANY(${stopIds}::text[])) AS matches_stop,
+            BOOL_OR(route_stop.stop_id IS NOT NULL) AS matches_route
+          FROM grouped_stops member_stop
+          LEFT JOIN "public"."gtfs_stop_service_summary" summary
+            ON summary.stop_id = member_stop.stop_id
+          LEFT JOIN selected_route_stops route_stop
+            ON route_stop.stop_id = member_stop.stop_id
+          GROUP BY member_stop.physical_stop_id
         ),
         representatives AS (
           SELECT
@@ -182,6 +232,9 @@ export class BusVectorTileService {
             canonical.source_id,
             canonical.platform_code,
             merged_ids.merged_stop_ids,
+            merged_ids.serves_bus,
+            merged_ids.matches_stop,
+            merged_ids.matches_route,
             ST_SetSRID(ST_MakePoint(canonical.stop_lon, canonical.stop_lat), 4326) AS geom
           FROM canonical_stops canonical
           INNER JOIN merged_ids USING (physical_stop_id)
@@ -192,28 +245,11 @@ export class BusVectorTileService {
           WHERE (
             (
               ${hasRouteFilter}
-              AND EXISTS (
-                SELECT 1
-                FROM grouped_stops member_stop
-                INNER JOIN "public"."Gtfs_StopTime" st
-                  ON st.stop_id = member_stop.stop_id
-                INNER JOIN "public"."Gtfs_Trip" t
-                  ON t.trip_id = st.trip_id
-                INNER JOIN "public"."Gtfs_Route" r
-                  ON r.route_id = t.route_id
-                WHERE member_stop.physical_stop_id = representatives.physical_stop_id
-                  AND r.route_id = ANY(${routeIds}::text[])
-                  AND NOT (r.route_type IN (1, 2) OR r.route_id LIKE 'METRÔ%' OR r.route_id LIKE 'CPTM%')
-              )
+              AND representatives.matches_route
             )
             OR (
               ${hasStopFilter}
-              AND EXISTS (
-                SELECT 1
-                FROM grouped_stops member_stop
-                WHERE member_stop.physical_stop_id = representatives.physical_stop_id
-                  AND member_stop.stop_id = ANY(${stopIds}::text[])
-              )
+              AND representatives.matches_stop
             )
             OR (
               ${hasNearbyFilter}
@@ -224,16 +260,7 @@ export class BusVectorTileService {
               )
             )
           )
-          AND EXISTS (
-            SELECT 1
-            FROM grouped_stops member_stop
-            INNER JOIN "public"."Gtfs_StopTime" st
-              ON st.stop_id = member_stop.stop_id
-            INNER JOIN "public"."Gtfs_Trip" t ON t.trip_id = st.trip_id
-            INNER JOIN "public"."Gtfs_Route" r ON r.route_id = t.route_id
-            WHERE member_stop.physical_stop_id = representatives.physical_stop_id
-              AND NOT (r.route_type IN (1, 2) OR r.route_id LIKE 'METRÔ%' OR r.route_id LIKE 'CPTM%')
-          )
+          AND representatives.serves_bus
         ),
         mvtgeom AS (
           SELECT
@@ -260,9 +287,7 @@ export class BusVectorTileService {
         )
         SELECT ST_AsMVT(mvtgeom.*, 'bus-stops', 4096, 'geom') AS mvt
         FROM mvtgeom
-      `;
-
-      return result[0]?.mvt ?? null;
+      `);
     } catch (error) {
       this.logger.error(
         `Error generating bus stops tile (${z}/${x}/${y}):`,
@@ -270,6 +295,19 @@ export class BusVectorTileService {
       );
       throw error;
     }
+  }
+
+  private queryTile(query: Prisma.Sql): Promise<Buffer | null> {
+    // Cancel expensive SQL in PostgreSQL itself so abandoned map requests
+    // cannot hold the shared connection pool indefinitely.
+    return this.prisma.$transaction(
+      async (transaction) => {
+        await transaction.$executeRaw`SET LOCAL statement_timeout = '5s'`;
+        const result = await transaction.$queryRaw<[{ mvt: Buffer }]>(query);
+        return result[0]?.mvt ?? null;
+      },
+      { maxWait: 2_000, timeout: 10_000 },
+    );
   }
 
   normalizeIds(ids: string[] | undefined): string[] {

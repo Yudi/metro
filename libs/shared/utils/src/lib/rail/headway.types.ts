@@ -93,7 +93,8 @@ export const HEADWAY_BUCKETS: HeadwayBucketDefinition[] = [
 const SAO_PAULO_TZ = DEFAULT_CITY.timeZone;
 const OFF_HOURS_START_MINUTES = 0;
 const OFF_HOURS_END_MINUTES = 4 * 60;
-const OFF_HOURS_REMAINING_TRAINS_TOLERANCE_MINUTES = 60;
+const OFF_HOURS_CLOSING_TOLERANCE_MINUTES = 90;
+const OFF_HOURS_OPENING_TOLERANCE_MINUTES = 60;
 
 function getSaoPauloMinutesFromMidnight(timestamp?: number): number {
   const date = new Date(timestamp ?? Date.now());
@@ -128,9 +129,9 @@ export function isHeadwayOffHoursSuppressionWindow(
   const minutes = getSaoPauloMinutesFromMidnight(timestamp);
   return (
     minutes >=
-      OFF_HOURS_START_MINUTES + OFF_HOURS_REMAINING_TRAINS_TOLERANCE_MINUTES &&
+      OFF_HOURS_START_MINUTES + OFF_HOURS_CLOSING_TOLERANCE_MINUTES &&
     minutes <
-      OFF_HOURS_END_MINUTES - OFF_HOURS_REMAINING_TRAINS_TOLERANCE_MINUTES
+      OFF_HOURS_END_MINUTES - OFF_HOURS_OPENING_TOLERANCE_MINUTES
   );
 }
 

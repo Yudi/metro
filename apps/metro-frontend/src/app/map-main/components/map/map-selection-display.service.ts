@@ -115,6 +115,24 @@ export class MapSelectionDisplayService {
       }
     });
 
+    // Rail stations from search are backed by vector tiles rather than
+    // displayedStops, so their selected marker needs the URL coordinates.
+    const displayedStopIds = new Set(
+      this.mapState.displayedStops().map((stop) => stop.stopId),
+    );
+    this.mapState.selectedStops().forEach((stop) => {
+      if (!stop.isSubwayStation || displayedStopIds.has(stop.id)) return;
+      const alreadyExists = currentSelectionFeatures.some(
+        (feature) => feature.getId() === stop.id,
+      );
+      if (alreadyExists) return;
+      const feature = this.featureFactory.createStopFeature(
+        { ...stop, stopId: stop.id, isSubwayStation: true },
+        FeatureCreationSource.SELECTION,
+      );
+      layerService.addFeature(LayerType.SELECTION, feature);
+    });
+
     this.mapState.bikeStations().forEach((station) => {
       if (selectedBikeStationIds.has(station.stationId)) {
         const feature = this.featureFactory.createBikeStationFeature(

@@ -1,0 +1,71 @@
+<main class="result-page">
+  <div class="search-area" [class.search-area--dialog-open]="searchOpen()">
+    <app-transit-search-field
+      label="Linhas, paradas e páginas"
+      placeholder="Ex.: 477A, Pinheiros ou favoritos"
+      [query]="query()"
+      (activated)="openSearch()"
+      (queryChange)="openSearch($event)"
+    />
+  </div>
+  @if (searchError()) {
+    <p role="alert">{{ searchError() }}</p>
+  }
+
+  @if (state().loading) {
+    <p class="page-message" role="status">Carregando detalhes…</p>
+  } @else if (detail(); as result) {
+    <section
+      class="detail"
+      [class.detail--line]="result.kind === 'rail-line'"
+      [attr.aria-label]="result.title"
+    >
+      @if (result.kind === 'rail-line') {
+        <header class="line-heading">
+          <h1>{{ result.title }}</h1>
+          <a
+            mat-flat-button
+            [routerLink]="cityContext.path('/mapa')"
+            [queryParams]="result.mapParams"
+          >
+            <mat-icon aria-hidden="true">map</mat-icon>
+            Ver no mapa
+          </a>
+        </header>
+        <app-line-status-grid
+          [lineCodes]="[result.data.code]"
+          [showHeader]="false"
+          [showSpecialServices]="false"
+        />
+      } @else {
+        @if (result.mapParams; as mapParams) {
+          <div class="map-action">
+            <a
+              mat-flat-button
+              [routerLink]="cityContext.path('/mapa')"
+              [queryParams]="mapParams"
+            >
+              <mat-icon aria-hidden="true">map</mat-icon>
+              Ver no mapa
+            </a>
+          </div>
+        }
+        @if (detailComponent(); as component) {
+          @if (detailInjector(); as injector) {
+            <ng-container
+              *ngComponentOutlet="component; injector: injector; inputs: embeddedInputs()"
+            />
+          }
+        }
+      }
+    </section>
+  } @else {
+    <section class="page-message" role="alert">
+      <h1>Resultado indisponível</h1>
+      <p>Não foi possível carregar este resultado. Tente buscar novamente.</p>
+      <button mat-flat-button type="button" (click)="openSearch()">
+        Buscar novamente
+      </button>
+    </section>
+  }
+</main>

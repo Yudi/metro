@@ -7,6 +7,8 @@
     [placeholder]="placeholder()"
     [value]="query()"
     (input)="onInput($event)"
+    (click)="activated.emit()"
+    (keydown.enter)="activated.emit()"
     autocomplete="off"
   />
   <mat-icon matPrefix aria-hidden="true">search</mat-icon>

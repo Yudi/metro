@@ -46,7 +46,11 @@
     }
   </div>
   <div class="menu-search">
-    <mat-form-field appearance="outline" class="search-trigger">
+    <mat-form-field
+      appearance="outline"
+      class="search-trigger"
+      [class.search-trigger--dialog-open]="searchOpen()"
+    >
       <mat-label>Buscar linhas, paradas e páginas</mat-label>
       <mat-icon matPrefix aria-hidden="true">search</mat-icon>
       <input
@@ -58,9 +62,6 @@
         aria-haspopup="dialog"
         [attr.aria-expanded]="searchOpen()"
         [formControl]="searchControl"
-        (focus)="openSearch()"
-        (click)="openSearch()"
-        (keydown.enter)="openSearch()"
       />
       <mat-hint>Itinerários, próximas chegadas e conteúdo do site.</mat-hint>
     </mat-form-field>

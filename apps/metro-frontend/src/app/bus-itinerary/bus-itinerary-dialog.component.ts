@@ -3,6 +3,7 @@ import {
   Component,
   computed,
   inject,
+  input,
   signal,
 } from '@angular/core';
 import { DatePipe, NgOptimizedImage } from '@angular/common';
@@ -102,12 +103,12 @@ export interface BusItineraryDialogData {
   templateUrl: './bus-itinerary-dialog.component.html',
   styleUrl: './bus-itinerary-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '[class.embedded]': 'embedded()' },
 })
 export class BusItineraryDialogComponent {
+  readonly embedded = input(false);
   private readonly dialogData = inject<BusItineraryDialogData>(MAT_DIALOG_DATA);
-  private readonly dialogRef = inject(
-    MatDialogRef<BusItineraryDialogComponent>,
-  );
+  private readonly dialogRef = inject(MatDialogRef<BusItineraryDialogComponent>, { optional: true });
   readonly cityContext = inject(CityContextService);
   private readonly itineraries = inject(BusItineraryService);
   private readonly information = inject(BusInformationService);
@@ -408,7 +409,7 @@ export class BusItineraryDialogComponent {
   }
 
   close(): void {
-    this.dialogRef.close();
+    this.dialogRef?.close();
   }
 
   selectDate(date: string): void {

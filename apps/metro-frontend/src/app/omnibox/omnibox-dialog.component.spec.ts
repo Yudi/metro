@@ -1,16 +1,12 @@
 import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
-import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { provideRouter, Router } from '@angular/router';
+import { MatDialogRef } from '@angular/material/dialog';
 import { GeolocationService } from '@metro/shared/geolocation';
 import type { UserLocation } from '@metro/shared/geolocation';
 import { Subject, of, throwError } from 'rxjs';
 import { TypesenseSearchService } from '../search/typesense-search.service';
 import type { TypesenseSearchResponse } from '../search/typesense-search.types';
-import { GeographyGraphQLService } from '../map-main/geography/geography-graphql.service';
-import { BusStopDialogComponent } from '../map-main/components/bus-stop-dialog/bus-stop-dialog.component';
-import { BusItineraryDialogComponent } from '../bus-itinerary/bus-itinerary-dialog.component';
-import { SubwayStationDialogComponent } from '../map-main/components/subway-station-dialog/subway-station-dialog.component';
 import { OmniboxDialogComponent } from './omnibox-dialog.component';
 import {
   createOmniboxSearchResponse,
@@ -23,8 +19,6 @@ describe('OmniboxDialogComponent', () => {
   let fixture: ComponentFixture<OmniboxDialogComponent>;
   let component: OmniboxDialogComponent;
   const search = { search: jest.fn(), searchNearbyStops: jest.fn() };
-  const geography = { getBusStop: jest.fn(), getRoutesForStop: jest.fn() };
-  const dialog = { open: jest.fn() };
   const location = signal<UserLocation | null>(null);
   const requestLocation = jest.fn();
   let closing: Subject<void>;
@@ -41,8 +35,6 @@ describe('OmniboxDialogComponent', () => {
       providers: [
         provideRouter([]),
         { provide: TypesenseSearchService, useValue: search },
-        { provide: GeographyGraphQLService, useValue: geography },
-        { provide: MatDialog, useValue: dialog },
         {
           provide: MatDialogRef,
           useValue: { close: jest.fn(), beforeClosed: () => closing },
@@ -60,7 +52,6 @@ describe('OmniboxDialogComponent', () => {
         },
       ],
     });
-    TestBed.overrideProvider(MatDialog, { useValue: dialog });
     fixture = TestBed.createComponent(OmniboxDialogComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -94,30 +85,31 @@ describe('OmniboxDialogComponent', () => {
     );
   });
 
-  it('keeps server relevance order and opens bus itineraries and rail arrivals', () => {
+  it('keeps server relevance order and navigates to deep-linked detail pages', () => {
     searchFor('paulista');
+    const navigate = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     expect(component.state().results.map((item) => item.id)).toEqual([
       '477A-10',
       '340015325',
       'CONS',
       'bike-35',
     ]);
-    component.selectResult(component.state().results[0]);
-    expect(dialog.open).toHaveBeenCalledWith(
-      BusItineraryDialogComponent,
-      expect.objectContaining({ data: { routeId: '477A-10' } }),
+    for (const result of component.state().results) component.selectResult(result);
+    expect(navigate).toHaveBeenCalledWith(
+      ['/sp/busca', 'bus-route', '477A-10'],
+      { queryParams: expect.objectContaining({ q: 'paulista' }) },
     );
-    component.selectResult(component.state().results[2]);
-    expect(dialog.open).toHaveBeenCalledWith(
-      SubwayStationDialogComponent,
-      expect.objectContaining({
-        data: {
-          stop: expect.objectContaining({
-            stopId: 'CONS',
-            routeShortNames: ['Verde'],
-          }),
-        },
-      }),
+    expect(navigate).toHaveBeenCalledWith(
+      ['/sp/busca', 'bus-stop', '340015325'],
+      { queryParams: expect.objectContaining({ q: 'paulista' }) },
+    );
+    expect(navigate).toHaveBeenCalledWith(
+      ['/sp/busca', 'rail-station', 'CONS'],
+      { queryParams: expect.objectContaining({ q: 'paulista', name: 'Consolação' }) },
+    );
+    expect(navigate).toHaveBeenCalledWith(
+      ['/sp/busca', 'bike-station', 'bike-35'],
+      { queryParams: expect.objectContaining({ q: 'paulista', name: 'Estação 35 · Jardim Europa' }) },
     );
   });
 
@@ -188,37 +180,4 @@ describe('OmniboxDialogComponent', () => {
     expect(component.query()).toBe('paulista');
   });
 
-  it('cancels pending arrival details as soon as the search dialog starts closing', () => {
-    searchFor('paulista');
-    const pending = new Subject<unknown>();
-    geography.getBusStop.mockReturnValue(pending);
-    component.selectResult(component.state().results[1]);
-    expect(pending.observed).toBe(true);
-    closing.next();
-    expect(pending.observed).toBe(false);
-    expect(dialog.open).not.toHaveBeenCalled();
-  });
-
-  it('cancels obsolete detail loads and retains arrival access when routes fail', () => {
-    searchFor('paulista');
-    const stop = component.state().results[1];
-    const pending = new Subject<unknown>();
-    geography.getBusStop.mockReturnValueOnce(pending);
-    component.selectResult(stop);
-    component.clear();
-    expect(pending.observed).toBe(false);
-    geography.getBusStop.mockReturnValue(
-      of({ id: stop.id, stopId: stop.id, name: stop.name }),
-    );
-    geography.getRoutesForStop.mockReturnValue(
-      throwError(() => new Error('offline')),
-    );
-    component.selectResult(stop);
-    expect(dialog.open).toHaveBeenCalledWith(
-      BusStopDialogComponent,
-      expect.objectContaining({
-        data: expect.objectContaining({ routes: [], showMapActions: false }),
-      }),
-    );
-  });
 });

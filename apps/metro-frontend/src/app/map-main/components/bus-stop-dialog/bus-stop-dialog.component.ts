@@ -3,6 +3,7 @@ import {
   Component,
   computed,
   inject,
+  input,
   signal,
 } from '@angular/core';
 import {
@@ -58,8 +59,10 @@ export type BusStopDialogResult =
   templateUrl: './bus-stop-dialog.component.html',
   styleUrls: ['./bus-stop-dialog.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '[class.embedded]': 'embedded()' },
 })
 export class BusStopDialogComponent {
+  readonly embedded = input(false);
   protected readonly panelRef = inject(MAP_PANEL_REF, { optional: true });
   private readonly dialogRef = inject(
     MatDialogRef<BusStopDialogComponent, BusStopDialogResult>,

@@ -61,7 +61,9 @@ export class MenuComponent {
       .subscribe((query) => {
         this.searchQueries.next(query);
         // Typing after Escape should reopen search even when focus stayed here.
-        if (!this.searchOpen() && !this.restoringFocus) void this.openSearch();
+        if (query && !this.searchOpen() && !this.restoringFocus) {
+          void this.openSearch();
+        }
       });
   }
 

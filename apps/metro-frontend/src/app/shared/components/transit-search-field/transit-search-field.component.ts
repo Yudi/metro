@@ -34,6 +34,7 @@ export class TransitSearchFieldComponent {
 
   readonly queryChange = output<string>();
   readonly cleared = output<void>();
+  readonly activated = output<void>();
 
   @ViewChild('searchInput')
   private readonly searchInputRef?: ElementRef<HTMLInputElement>;

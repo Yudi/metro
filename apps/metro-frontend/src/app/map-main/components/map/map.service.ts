@@ -2,12 +2,16 @@ import { Service, Signal, signal, inject } from '@angular/core';
 import { Map, View } from 'ol';
 import { fromLonLat, toLonLat } from 'ol/proj';
 import { createEmpty, extend, isEmpty } from 'ol/extent';
+import { unByKey } from 'ol/Observable';
 import { Feature } from 'ol';
 import { FeatureLike } from 'ol/Feature';
 import Overlay from 'ol/Overlay';
 import { defaults as defaultControls } from 'ol/control/defaults';
 import { MapLayerService, LayerType } from './layers/map-layer.service';
-import { VectorTileLayerService } from './vector-tiles/vector-tile-layer.service';
+import {
+  VectorTileLayerService,
+  VectorTileLayerType,
+} from './vector-tiles/vector-tile-layer.service';
 import { LoggerService } from '@metro/shared/api';
 import type {
   MapFeature,
@@ -317,6 +321,47 @@ export class MapService {
         view.setZoom(zoom);
       }
     }
+  }
+
+  /** Fit a route loaded from vector tiles after the selection filter has rendered. */
+  focusVectorRoute(routeId: string, layerType: VectorTileLayerType): void {
+    const map = this.map();
+    const layer = this.vectorTileLayerService.getLayer(layerType);
+    if (!map || !layer) return;
+
+    const lineCode = Number(routeId.replace(/^L/i, ''));
+    const fit = () => {
+      const extent = createEmpty();
+      const features = layer.getFeaturesInExtent(
+        map.getView().calculateExtent(map.getSize()),
+      );
+      for (const feature of features) {
+        const matches =
+          layerType === VectorTileLayerType.RAIL_ROUTES
+            ? Number(feature.get('line_code') ?? feature.get('line_number')) ===
+              lineCode
+            : String(feature.get('route_id')) === routeId;
+        if (!matches) continue;
+        const geometry = feature.getGeometry();
+        if (geometry) extend(extent, geometry.getExtent());
+      }
+      if (isEmpty(extent)) return false;
+      map.getView().fit(extent, {
+        padding: [48, 48, 48, 48],
+        maxZoom: 15,
+      });
+      return true;
+    };
+
+    if (fit()) return;
+    const key = map.on('rendercomplete', () => {
+      if (fit()) {
+        unByKey(key);
+        clearTimeout(timeout);
+      }
+    });
+    const timeout = setTimeout(() => unByKey(key), 10_000);
+    map.render();
   }
 
   private updateCenterSignal(): void {

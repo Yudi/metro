@@ -1,13 +1,15 @@
 <h2 mat-dialog-title class="dialog-title">
   Itinerário de ônibus
-  <button
-    mat-icon-button
-    type="button"
-    aria-label="Fechar itinerário"
-    (click)="close()"
-  >
-    <mat-icon>close</mat-icon>
-  </button>
+  @if (!embedded()) {
+    <button
+      mat-icon-button
+      type="button"
+      aria-label="Fechar itinerário"
+      (click)="close()"
+    >
+      <mat-icon>close</mat-icon>
+    </button>
+  }
 </h2>
 <mat-dialog-content class="itineraries">
   @if (routeId) {
@@ -48,6 +50,7 @@
               {{ agency() }}
             </p>
           </div>
+          @if (!embedded()) {
           <a
             mat-stroked-button
             [routerLink]="cityPath('/mapa')"
@@ -56,6 +59,7 @@
           >
             <mat-icon>map</mat-icon>Ver no mapa
           </a>
+          }
         </header>
 
         <div class="controls">
@@ -425,6 +429,8 @@
     </section>
   }
 </mat-dialog-content>
-<mat-dialog-actions align="end">
-  <button mat-button type="button" (click)="close()">Fechar</button>
-</mat-dialog-actions>
+@if (!embedded()) {
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="close()">Fechar</button>
+  </mat-dialog-actions>
+}

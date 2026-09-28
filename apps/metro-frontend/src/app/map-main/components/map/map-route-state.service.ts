@@ -449,6 +449,42 @@ export class MapRouteStateService {
     const isValidZoom = (value: number | null) =>
       value !== null && value >= 0 && value <= 28;
 
+    const railStationId = paramGet('railStationId');
+    if (railStationId && isValidLat(lat) && isValidLon(lon)) {
+      this.applyFavoriteSelection(`queryRailStation:${railStationId}`, () => {
+        this.mapState.addStopToSelection({
+          id: railStationId,
+          name: paramGet('railStationName') || railStationId,
+          latitude: lat as number,
+          longitude: lon as number,
+          isSubwayStation: true,
+        });
+        this.dataLoader.syncVectorTileFilters();
+        this.displayService.updateMapDisplay();
+      });
+    }
+
+    const bikeStationId = paramGet('bikeStationId');
+    if (bikeStationId && isValidLat(lat) && isValidLon(lon)) {
+      this.applyFavoriteSelection(`queryBikeStation:${bikeStationId}`, () => {
+        if (!this.bikeStationsService.getStation(bikeStationId)) {
+          this.bikeStationsService.upsertStationSummary({
+            stationId: bikeStationId,
+            name: paramGet('bikeStationName') || bikeStationId,
+            latitude: lat as number,
+            longitude: lon as number,
+            capacity: null,
+            effectiveCapacity: 0,
+            numBikesAvailable: 0,
+            electricBikesAvailable: 0,
+          });
+        }
+        this.mapState.setBikeStations(this.bikeStationsService.stations());
+        this.interactionService.addBikeStationToSelection(bikeStationId, false);
+        this.bikeStationsService.ensureStationDetails(bikeStationId);
+      });
+    }
+
     if (isValidLat(lat) && isValidLon(lon)) {
       const useZoom = isValidZoom(zoom) ? (zoom as number) : undefined;
       try {

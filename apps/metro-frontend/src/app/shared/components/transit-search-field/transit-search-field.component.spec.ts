@@ -2,6 +2,18 @@ import { TestBed } from '@angular/core/testing';
 import { TransitSearchFieldComponent } from './transit-search-field.component';
 
 describe('TransitSearchFieldComponent', () => {
+  it('activates the search when its input is clicked or Enter is pressed', () => {
+    const fixture = TestBed.createComponent(TransitSearchFieldComponent);
+    const activated = jest.fn();
+    fixture.componentInstance.activated.subscribe(activated);
+    fixture.detectChanges();
+
+    const input = fixture.nativeElement.querySelector('input') as HTMLInputElement;
+    input.click();
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(activated).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps clearing available during a pending search and returns focus to the input', () => {
     const fixture = TestBed.createComponent(TransitSearchFieldComponent);
     fixture.componentRef.setInput('query', 'Paulista');

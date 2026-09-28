@@ -40,7 +40,7 @@
   >
     <mat-icon>{{ favoriteIcon() }}</mat-icon>
   </button>
-  @if (!panelRef) {
+  @if (!panelRef && !embedded()) {
     <button mat-button (click)="close()">Fechar</button>
   }
   @if (showMapActions) {

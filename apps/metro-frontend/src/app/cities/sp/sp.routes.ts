@@ -42,6 +42,14 @@ export const spFeatureRoutes: Routes = [
       ),
   },
   {
+    path: 'busca/:kind/:id',
+    ...page('Resultado da busca'),
+    loadComponent: () =>
+      import('../../omnibox/omnibox-result-page.component').then(
+        (m) => m.OmniboxResultPageComponent,
+      ),
+  },
+  {
     path: 'historico/ocorrencias',
     ...page('Histórico de ocorrências'),
     loadComponent: () =>

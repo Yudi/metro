@@ -8,8 +8,8 @@
   <section class="summary">
     <div class="summary-item">
       <span class="value">
-        {{ station().numBikesAvailable }}
-        @if (hasElectricBikes()) {
+        {{ availabilityUnknown() ? "—" : station().numBikesAvailable }}
+        @if (hasElectricBikes() && station().effectiveCapacity > 0) {
           <mat-icon
             class="electric-icon"
             aria-label="Bicicletas elétricas disponíveis"
@@ -20,17 +20,21 @@
       <span class="label">Bicicletas disponíveis</span>
     </div>
     <div class="summary-item">
-      <span class="value">{{ station().numDocksAvailable }}</span>
+      <span class="value">{{ availabilityUnknown() ? "—" : station().numDocksAvailable }}</span>
       <span class="label">Docks livres</span>
     </div>
     <!-- <div class="summary-item">
       <span class="value">{{ station().effectiveCapacity }}</span>
       <span class="label">Capacidade total</span>
     </div> -->
-    <p>Capacidade total: {{ station().effectiveCapacity }}</p>
-    <p class="last-updated">
-      Atualizado às {{ station().lastReportedIso | date: "HH:mm:ss" }}
-    </p>
+    @if (detailsLoaded() || station().effectiveCapacity > 0) {
+      <p>Capacidade total: {{ station().effectiveCapacity }}</p>
+    }
+    @if (station().lastReportedIso) {
+      <p class="last-updated">
+        Atualizado às {{ station().lastReportedIso | date: "HH:mm:ss" }}
+      </p>
+    }
   </section>
 
   <mat-chip-set aria-label="Status da estação" class="status-chips">
@@ -154,16 +158,18 @@
   >
     <mat-icon>{{ favoriteIcon() }}</mat-icon>
   </button>
-  @if (!panelRef) {
+  @if (!panelRef && !embedded()) {
     <button mat-button type="button" (click)="close()">Fechar</button>
   }
-  <button
-    mat-flat-button
-    color="primary"
-    type="button"
-    (click)="selectStation()"
-  >
-    <mat-icon>push_pin</mat-icon>
-    Fixar estação
-  </button>
+  @if (!embedded()) {
+    <button
+      mat-flat-button
+      color="primary"
+      type="button"
+      (click)="selectStation()"
+    >
+      <mat-icon>push_pin</mat-icon>
+      Fixar estação
+    </button>
+  }
 </mat-dialog-actions>

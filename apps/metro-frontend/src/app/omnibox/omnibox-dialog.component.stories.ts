@@ -320,15 +320,17 @@ async function openSearch(
   query?: string,
 ): Promise<ReturnType<typeof within>> {
   const canvas = within(canvasElement);
-  await userEvent.click(
+  await userEvent.type(
     await canvas.findByRole('searchbox', {
       name: 'Buscar linhas, paradas e páginas',
     }),
+    'p',
   );
   const dialog = within(canvasElement.ownerDocument.body);
   await dialog.findByRole('dialog', { name: 'Buscar no site' });
 
   if (query) {
+    await userEvent.clear(dialog.getByLabelText('Linhas, paradas e páginas'));
     await userEvent.type(
       dialog.getByLabelText('Linhas, paradas e páginas'),
       query,

@@ -4,6 +4,7 @@ import {
   computed,
   effect,
   inject,
+  input,
   OnDestroy,
   OnInit,
   signal,
@@ -88,8 +89,10 @@ interface TrainLineOption {
   templateUrl: './subway-station-dialog.component.html',
   styleUrls: ['./subway-station-dialog.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '[class.embedded]': 'embedded()' },
 })
 export class SubwayStationDialogComponent implements OnInit, OnDestroy {
+  readonly embedded = input(false);
   protected readonly panelRef = inject(MAP_PANEL_REF, { optional: true });
   private readonly dialogRef = inject(
     MatDialogRef<SubwayStationDialogComponent>,

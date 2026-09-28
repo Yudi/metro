@@ -1,6 +1,20 @@
 :host {
   display: block;
 }
+:host.embedded {
+  padding: 0 24px 24px;
+}
+:host.embedded mat-dialog-content {
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+}
+
+@media (max-width: 600px) {
+  :host.embedded {
+    padding-inline: 16px;
+  }
+}
 .itineraries {
   max-width: none;
   margin: 0;

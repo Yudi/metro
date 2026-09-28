@@ -179,3 +179,7 @@ mat-dialog-actions {
 .favorite-button.favorited:hover {
   color: #b71c1c;
 }
+:host.embedded mat-dialog-content {
+  max-height: none;
+  overflow: visible;
+}

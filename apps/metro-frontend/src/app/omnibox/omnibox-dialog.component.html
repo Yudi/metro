@@ -72,12 +72,6 @@
       </button>
     </div>
   }
-  @if (detailError()) {
-    <p role="alert">{{ detailError() }}</p>
-  }
-  @if (openingId()) {
-    <mat-progress-bar mode="indeterminate" aria-label="Abrindo parada" />
-  }
   @if (nearby()) {
     <p class="hint">
       Mais próximos primeiro, em até 1 km.

@@ -8,6 +8,11 @@
   min-width: 0;
 }
 
+:host.embedded mat-dialog-content {
+  max-height: none;
+  overflow: visible;
+}
+
 .station-content {
   min-width: 0;
   overflow-x: hidden;

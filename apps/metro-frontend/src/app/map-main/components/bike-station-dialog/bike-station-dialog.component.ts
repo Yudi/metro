@@ -4,6 +4,7 @@ import {
   Component,
   computed,
   inject,
+  input,
   signal,
   isDevMode,
 } from '@angular/core';
@@ -48,8 +49,11 @@ export interface BikeStationDialogResult {
   templateUrl: './bike-station-dialog.component.html',
   styleUrls: ['./bike-station-dialog.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '[class.embedded]': 'embedded()' },
 })
 export class BikeStationDialogComponent {
+  readonly embedded = input(false);
+  readonly stationOverride = input<BikeStation | null>(null);
   protected readonly panelRef = inject(MAP_PANEL_REF, { optional: true });
   private readonly dialogRef = inject(
     MatDialogRef<BikeStationDialogComponent, BikeStationDialogResult>,
@@ -61,7 +65,7 @@ export class BikeStationDialogComponent {
   private readonly favoritesService = inject(FavoritesService);
 
   private readonly stationSignal = signal(this.dialogData.station);
-  readonly station = this.stationSignal.asReadonly();
+  readonly station = computed(() => this.stationOverride() ?? this.stationSignal());
 
   readonly favoriteId = computed(() => this.station().stationId);
 
@@ -95,6 +99,9 @@ export class BikeStationDialogComponent {
 
   readonly detailsLoaded = computed(() => this.station().detailsLoaded);
   readonly detailsError = computed(() => this.station().detailsError ?? false);
+  readonly availabilityUnknown = computed(
+    () => !this.detailsLoaded() && this.station().effectiveCapacity === 0,
+  );
 
   updateStation(station: BikeStation): void {
     this.stationSignal.set(station);

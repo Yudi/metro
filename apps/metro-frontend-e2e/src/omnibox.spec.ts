@@ -134,15 +134,16 @@ async function installTransitGraphQL(
 
 async function openOmnibox(page: Page): Promise<void> {
   await page.goto('/sp/menu');
-  await page
-    .getByRole('searchbox', {
-      name: 'Buscar linhas, paradas e páginas',
-      exact: true,
-    })
-    .focus();
-  await expect(
-    page.getByRole('dialog', { name: 'Buscar no site' }),
-  ).toBeVisible();
+  const menuSearch = page.getByRole('searchbox', {
+    name: 'Buscar linhas, paradas e páginas',
+    exact: true,
+  });
+  await menuSearch.focus();
+
+  const searchDialog = page.getByRole('dialog', { name: 'Buscar no site' });
+  await expect(searchDialog).toHaveCount(0);
+  await menuSearch.pressSequentially('p');
+  await expect(searchDialog).toBeVisible();
 }
 
 test('preserves Typesense order and opens itinerary day and direction details', async ({
@@ -183,7 +184,9 @@ test('preserves Typesense order and opens itinerary day and direction details', 
     .locator('.result-card')
     .filter({ hasText: 'Sacomã – Pinheiros' })
     .click();
-  const itinerary = page.getByRole('dialog', { name: 'Itinerário de ônibus' });
+  await expect(page).toHaveURL(/\/sp\/busca\/bus-route\/477A-10\?q=paulista/);
+  const itinerary = page.locator('.detail');
+  await expect(page.getByRole('searchbox', { name: 'Linhas, paradas e páginas' })).toHaveValue('paulista');
   await expect(itinerary.locator('.route-heading')).toContainText('477A-10');
 
   await itinerary.getByRole('combobox', { name: 'Dia de operação' }).click();
@@ -217,9 +220,13 @@ test('opens arrival details from a bus stop result', async ({ page }) => {
     .filter({ hasText: 'Av. Paulista, 1000' })
     .click();
 
-  const stopDialog = page.getByRole('dialog', { name: 'Av. Paulista, 1000' });
-  await expect(stopDialog.getByText('Previsão de chegada')).toBeVisible();
-  await expect(stopDialog.getByText('Ponto de ônibus')).toBeVisible();
+  await expect(page).toHaveURL(/\/sp\/busca\/bus-stop\/340015325\?q=paulista/);
+  const stopDetail = page.locator('.detail');
+  await expect(stopDetail.getByText('Previsão de chegada')).toBeVisible();
+  await expect(stopDetail.getByText('Ponto de ônibus')).toBeVisible();
+  await page.reload();
+  await expect(stopDetail.getByText('Previsão de chegada')).toBeVisible();
+  await expect(stopDetail.getByRole('link', { name: 'Ver no mapa' })).toHaveAttribute('href', /busStops=340015325/);
 });
 
 test('forwards rapid menu typing into the dialog and searches the final query', async ({
@@ -244,6 +251,7 @@ test('forwards rapid menu typing into the dialog and searches the final query', 
     exact: true,
   });
   await expect(dialogSearch).toHaveValue('paulista');
+  await expect(menuSearch.locator('xpath=ancestor::mat-form-field')).toHaveCSS('visibility', 'hidden');
   await expect(page.locator('.result-card .result-title').first()).toHaveText(
     'Sacomã – Pinheiros',
   );
@@ -369,6 +377,7 @@ test('Escape closes search and restores focus to its menu trigger', async ({
     exact: true,
   });
   await trigger.focus();
+  await trigger.pressSequentially('p');
   await expect(
     page.getByRole('searchbox', {
       name: 'Linhas, paradas e páginas',
@@ -382,7 +391,7 @@ test('Escape closes search and restores focus to its menu trigger', async ({
     page.getByRole('dialog', { name: 'Buscar no site' }),
   ).toHaveCount(0);
   await expect(trigger).toBeFocused();
-  await trigger.dispatchEvent('click');
+  await trigger.pressSequentially('a');
   await expect(
     page.getByRole('dialog', { name: 'Buscar no site' }),
   ).toBeVisible();

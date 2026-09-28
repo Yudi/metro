@@ -11,17 +11,14 @@ import { NavigationStart, Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import {
   MAT_DIALOG_DATA,
-  MatDialog,
   MatDialogModule,
   MatDialogRef,
 } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatChipListboxChange, MatChipsModule } from '@angular/material/chips';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
 import {
   BehaviorSubject,
   Observable,
-  Subject,
   catchError,
   map,
   of,
@@ -30,7 +27,7 @@ import {
   timer,
 } from 'rxjs';
 import { GeolocationService } from '@metro/shared/geolocation';
-import { getUniqueAgencies, SearchTypes } from '@metro/shared/utils';
+import { SearchTypes } from '@metro/shared/utils';
 import { CityContextService } from '../cities/city-context.service';
 import {
   matchDestinations,
@@ -47,10 +44,7 @@ import {
   mapTypesenseResult,
   mergeSubwayStationResults,
 } from '../map-main/components/search-dialog/search-dialog.utils';
-import { GeographyGraphQLService } from '../map-main/geography/geography-graphql.service';
-import { BusStopDialogComponent } from '../map-main/components/bus-stop-dialog/bus-stop-dialog.component';
-import { SubwayStationDialogComponent } from '../map-main/components/subway-station-dialog/subway-station-dialog.component';
-import { BusItineraryDialogComponent } from '../bus-itinerary/bus-itinerary-dialog.component';
+import { resultKind, resultQueryParams } from './omnibox-result-link';
 
 export interface OmniboxDialogData {
   queryChanges?: Observable<string>;
@@ -86,7 +80,6 @@ const FILTER_TYPES: Record<Exclude<OmniboxFilter, 'pages'>, SearchTypes[]> = {
     MatButtonModule,
     MatIconModule,
     MatChipsModule,
-    MatProgressBarModule,
     RouterLink,
     TransitSearchFieldComponent,
     SearchResultCardComponent,
@@ -103,22 +96,17 @@ export class OmniboxDialogComponent {
   readonly cityContext = inject(CityContextService);
   readonly geolocation = inject(GeolocationService);
   private readonly search = inject(TypesenseSearchService);
-  private readonly geography = inject(GeographyGraphQLService);
-  private readonly dialog = inject(MatDialog);
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
   private readonly requests = new BehaviorSubject<SearchRequest>({
     query: '',
     filter: 'all',
   });
-  private readonly selections = new Subject<SearchResult | null>();
   private locationRequest = 0;
   readonly query = signal('');
   readonly filter = signal<OmniboxFilter>('all');
   readonly nearby = signal(false);
   readonly locationError = signal('');
-  readonly detailError = signal('');
-  readonly openingId = signal<string | null>(null);
   readonly filters: { value: OmniboxFilter; label: string }[] = [
     { value: 'all', label: 'Tudo' },
     { value: 'routes', label: 'Linhas' },
@@ -190,9 +178,7 @@ export class OmniboxDialogComponent {
       .beforeClosed()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => {
-        // A pending detail/location response must not reopen UI during closing.
         this.locationRequest++;
-        this.cancelSelection();
       });
     this.dialogData?.queryChanges
       ?.pipe(takeUntilDestroyed(this.destroyRef))
@@ -202,44 +188,6 @@ export class OmniboxDialogComponent {
       .subscribe((event) => {
         if (event instanceof NavigationStart) this.dialogRef.close();
       });
-    this.selections
-      .pipe(
-        switchMap((result) => {
-          if (!result) return of(null);
-          return this.geography.getBusStop(result.id).pipe(
-            switchMap((stop) => {
-              if (!stop) throw new Error('Stop unavailable');
-              return this.geography.getRoutesForStop(stop.stopId).pipe(
-                catchError(() => of([])),
-                map((routes) => ({ stop, routes })),
-              );
-            }),
-            catchError(() => {
-              this.detailError.set(
-                'Não foi possível abrir a parada. Selecione o resultado para tentar novamente.',
-              );
-              return of(null);
-            }),
-          );
-        }),
-        takeUntilDestroyed(this.destroyRef),
-      )
-      .subscribe((detail) => {
-        this.openingId.set(null);
-        if (detail) {
-          this.dialog.open(BusStopDialogComponent, {
-            ariaLabel: detail.stop.name,
-            data: {
-              ...detail,
-              selectedRoutes: new Set<string>(),
-              showMapActions: false,
-            },
-            width: '640px',
-            maxWidth: 'calc(100vw - 24px)',
-            maxHeight: '90dvh',
-          });
-        }
-      });
   }
 
   setQuery(query: string): void {
@@ -248,7 +196,6 @@ export class OmniboxDialogComponent {
     this.dialogData?.onQueryChange?.(query);
     this.nearby.set(false);
     this.locationError.set('');
-    this.cancelSelection();
     this.requests.next({ query, filter: this.filter() });
   }
 
@@ -288,7 +235,6 @@ export class OmniboxDialogComponent {
       );
       return;
     }
-    this.cancelSelection();
     this.query.set('');
     this.dialogData?.onQueryChange?.('');
     this.filter.set('stops');
@@ -300,60 +246,11 @@ export class OmniboxDialogComponent {
   }
 
   selectResult(result: SearchResult): void {
-    this.cancelSelection();
-    if (result.type === 'route' && result.routeData?.source !== 'rail') {
-      if (!result.routeData) return;
-      this.dialog.open(BusItineraryDialogComponent, {
-        data: { routeId: result.routeData.route_id },
-        width: '900px',
-        maxWidth: 'calc(100vw - 24px)',
-        maxHeight: '90dvh',
-      });
-    } else if (result.type === 'subway_station') {
-      this.dialog.open(SubwayStationDialogComponent, {
-        ariaLabel: result.name,
-        data: {
-          stop: {
-            id: result.id,
-            stopId: result.id,
-            name: result.name,
-            latitude: result.latitude ?? 0,
-            longitude: result.longitude ?? 0,
-            isSubwayStation: true,
-            agencies: getUniqueAgencies(result.routes ?? []),
-            routeShortNames: result.routes ?? [],
-          },
-        },
-        width: '600px',
-        maxWidth: 'calc(100vw - 24px)',
-        maxHeight: '90dvh',
-      });
-    } else if (result.type === 'bus_stop') {
-      this.openingId.set(result.id);
-      this.selections.next(result);
-    } else {
-      this.dialogRef.close();
-      void this.router.navigate([this.cityContext.path('/mapa')], {
-        queryParams:
-          result.type === 'route'
-            ? {
-                railRoutes: result.routeData?.route_id,
-                subwayStations: '1',
-                subwayRoutes: '1',
-              }
-            : {
-                bike: '1',
-                lat: result.latitude,
-                lon: result.longitude,
-                z: '17',
-              },
-      });
-    }
-  }
-
-  private cancelSelection(): void {
-    this.selections.next(null);
-    this.openingId.set(null);
-    this.detailError.set('');
+    const id = result.type === 'route' ? result.routeData?.route_id : result.id;
+    if (!id) return;
+    void this.router.navigate(
+      [this.cityContext.path('/busca'), resultKind(result), id],
+      { queryParams: resultQueryParams(result, this.query()) },
+    );
   }
 }

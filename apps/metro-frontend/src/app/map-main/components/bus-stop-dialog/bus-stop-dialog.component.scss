@@ -2,6 +2,11 @@
   margin-bottom: 16px;
 }
 
+:host.embedded mat-dialog-content {
+  max-height: none;
+  overflow: visible;
+}
+
 .arrivals-section {
   margin: 8px 0;
 }

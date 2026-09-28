@@ -13,6 +13,7 @@ export class RouteStopMappingService {
 
   // Cache for route short name -> SPTrans API line codes mapping (array for both directions)
   private routeCodeCache = new Map<string, number[] | null>();
+  private artespRouteShortNameCache = new Map<string, string | null>();
 
   // Cache for stop_id -> SPTrans API stop code mapping
   private stopCodeCache = new Map<string, number | null>();
@@ -113,7 +114,7 @@ export class RouteStopMappingService {
   async isKnownRealtimeRoute(routeShortName: string): Promise<boolean> {
     this.expireCachesIfNeeded();
     if (isArtespIdentifier(routeShortName)) {
-      return false;
+      return (await this.getArtespRouteShortName(routeShortName)) !== null;
     }
 
     routeShortName = routeShortName.trim();
@@ -143,6 +144,43 @@ export class RouteStopMappingService {
         error,
       );
       return false;
+    }
+  }
+
+  async getArtespRouteShortName(routeId: string): Promise<string | null> {
+    this.expireCachesIfNeeded();
+    const qualifiedRouteId = routeId.trim();
+    if (
+      !/^artesp:/i.test(qualifiedRouteId) ||
+      qualifiedRouteId.length > 128 ||
+      hasControlCharacters(qualifiedRouteId)
+    ) {
+      return null;
+    }
+
+    if (this.artespRouteShortNameCache.has(qualifiedRouteId)) {
+      return this.artespRouteShortNameCache.get(qualifiedRouteId) ?? null;
+    }
+
+    try {
+      const routes = await this.prisma.$queryRaw<
+        Array<{ route_short_name: string }>
+      >`
+        SELECT route_short_name
+        FROM "Gtfs_Route"
+        WHERE route_id = ${qualifiedRouteId}
+          AND source_agency = 'artesp'
+        LIMIT 1
+      `;
+      const routeShortName = routes[0]?.route_short_name?.trim() || null;
+      this.artespRouteShortNameCache.set(qualifiedRouteId, routeShortName);
+      return routeShortName;
+    } catch (error) {
+      this.logger.error(
+        `Error resolving realtime route label for ${qualifiedRouteId}:`,
+        error,
+      );
+      return null;
     }
   }
 
@@ -248,6 +286,7 @@ export class RouteStopMappingService {
    */
   clearCaches(): void {
     this.routeCodeCache.clear();
+    this.artespRouteShortNameCache.clear();
     this.stopCodeCache.clear();
     this.routeValidationCache.clear();
     this.stopValidationCache.clear();
@@ -271,4 +310,11 @@ export class RouteStopMappingService {
 
 function isArtespIdentifier(value: string): boolean {
   return /^artesp[:/]/i.test(value.trim());
+}
+
+function hasControlCharacters(value: string): boolean {
+  return Array.from(value).some((character) => {
+    const code = character.charCodeAt(0);
+    return code <= 31 || code === 127;
+  });
 }

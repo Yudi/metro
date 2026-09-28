@@ -15,6 +15,7 @@ import {
   getOlhoVivoOrigin,
   supportsSptransRealtime,
 } from '@metro/shared/utils';
+import type { BusVehiclePosition } from '@metro/shared/bus-itinerary-contracts';
 import { MapStateService } from '../components/map/map-state.service';
 
 /**
@@ -44,7 +45,7 @@ export class RealtimeVehicleLayerService {
       source: this.vehicleSource,
       style: (feature, resolution) => {
         const isAccessible = feature.get('accessible') as boolean;
-        const vehicleId = feature.get('vehicleId') as number;
+        const vehicleId = feature.get('vehicleId') as string | number;
         const heading = feature.get('heading') as number | null;
         const destination = feature.get('destination') as string | undefined;
         const routeShortName = feature.get('routeShortName') as string;
@@ -71,7 +72,7 @@ export class RealtimeVehicleLayerService {
 
   private createVehicleStyle(
     isAccessible: boolean,
-    vehicleId: number,
+    vehicleId: string | number,
     heading: number | null,
     resolution: number,
     routeShortName: string,
@@ -168,14 +169,18 @@ export class RealtimeVehicleLayerService {
     const activeVehicleIds = new Set<number>();
 
     // Add new markers for all tracked vehicles
-    for (const [routeShortName, data] of positions) {
+    for (const [realtimeRouteKey, data] of positions) {
+      const routeShortName =
+        data.routeLabel ??
+        this.mapState.selectedRoutes().get(realtimeRouteKey)?.shortName ??
+        realtimeRouteKey;
       for (const line of data.l || []) {
         for (const vehicle of line.vs || []) {
           // Convert lat/lon to map coordinates
           const coordinates = fromLonLat([vehicle.px, vehicle.py]);
 
           const destination = getOlhoVivoDestination(line);
-          const routeColor = this.getRouteColor(routeShortName, line.c);
+          const routeColor = this.getRouteColor(realtimeRouteKey, line.c);
 
           const feature = new Feature({
             geometry: new Point(coordinates),
@@ -193,11 +198,20 @@ export class RealtimeVehicleLayerService {
             heading: vehicle.heading ?? null,
           });
 
-          feature.setId(`vehicle-${vehicle.p}`);
+          feature.setId(`vehicle-${realtimeRouteKey}-${vehicle.p}`);
           this.vehicleSource.addFeature(feature);
           totalVehicles++;
           activeVehicleIds.add(vehicle.p);
         }
+      }
+
+      for (const vehicle of data.positions ?? []) {
+        this.addSanitizedVehicleMarker(
+          realtimeRouteKey,
+          routeShortName,
+          vehicle,
+        );
+        totalVehicles++;
       }
     }
 
@@ -234,18 +248,41 @@ export class RealtimeVehicleLayerService {
       this.mapState.selectedRoutes().values(),
     ).find(
       (route) =>
-        supportsSptransRealtime({
+        route.id === routeShortName ||
+        (supportsSptransRealtime({
           routeId: route.id,
           sourceAgency: route.sourceAgency,
           supportsRealtime: route.supportsRealtime,
         }) &&
         (route.shortName === routeShortName ||
           route.shortName === routeCode ||
-          route.id === routeShortName ||
-          route.id === routeCode),
+          route.id === routeCode)),
     );
 
     return this.normalizeHexColor(matchingRoute?.color);
+  }
+
+  private addSanitizedVehicleMarker(
+    realtimeRouteKey: string,
+    routeShortName: string,
+    vehicle: BusVehiclePosition,
+  ): void {
+    const coordinates = fromLonLat([vehicle.longitude, vehicle.latitude]);
+    const routeColor = this.getRouteColor(realtimeRouteKey, routeShortName);
+    const feature = new Feature({
+      geometry: new Point(coordinates),
+      vehicleId: vehicle.plate,
+      routeShortName,
+      routeCode: routeShortName,
+      timestamp: vehicle.recordedAt,
+      routeColor,
+      latitude: vehicle.latitude,
+      longitude: vehicle.longitude,
+      heading: null,
+    });
+
+    feature.setId(`vehicle-${realtimeRouteKey}-${vehicle.plate}`);
+    this.vehicleSource.addFeature(feature);
   }
 
   private getBusIcon(isAccessible: boolean, routeColor: string): Icon {

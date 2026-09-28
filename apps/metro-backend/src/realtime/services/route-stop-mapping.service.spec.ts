@@ -20,7 +20,8 @@ describe('RouteStopMappingService', () => {
     await expect(service.getApiStopCode('123junk')).resolves.toBeNull();
   });
 
-  it('rejects Artesp identifiers before any SPTrans lookup', async () => {
+  it('maps qualified ARTESP route IDs through the GTFS route catalogue', async () => {
+    prisma.$queryRaw.mockResolvedValue([{ route_short_name: '125' }]);
     const service = new RouteStopMappingService(
       prisma as never,
       olhoVivo as never,
@@ -29,11 +30,32 @@ describe('RouteStopMappingService', () => {
     await expect(service.getApiStopCode('artesp:2')).resolves.toBeNull();
     await expect(service.isKnownRealtimeStop('artesp:2')).resolves.toBe(false);
     await expect(service.getApiLineCodes('artesp:001')).resolves.toBeNull();
-    await expect(service.isKnownRealtimeRoute('artesp:001')).resolves.toBe(
-      false,
-    );
-    expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    await expect(
+      service.getArtespRouteShortName('artesp:route-2148'),
+    ).resolves.toBe('125');
+    await expect(
+      service.isKnownRealtimeRoute('artesp:route-2148'),
+    ).resolves.toBe(true);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
     expect(olhoVivo.searchLines).not.toHaveBeenCalled();
+  });
+
+  it('does not cache a route-label lookup failure for the full catalogue TTL', async () => {
+    prisma.$queryRaw
+      .mockRejectedValueOnce(new Error('database unavailable'))
+      .mockResolvedValueOnce([{ route_short_name: '125' }]);
+    const service = new RouteStopMappingService(
+      prisma as never,
+      olhoVivo as never,
+    );
+
+    await expect(
+      service.getArtespRouteShortName('artesp:route-2148'),
+    ).resolves.toBeNull();
+    await expect(
+      service.getArtespRouteShortName('artesp:route-2148'),
+    ).resolves.toBe('125');
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
   });
 
   it('expires mappings so an updated feed can be observed without restart', async () => {

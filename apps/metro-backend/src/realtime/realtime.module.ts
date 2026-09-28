@@ -7,6 +7,7 @@ import { OlhoVivoApiService } from './services/olhovivo-api.service';
 import { RouteStopMappingService } from './services/route-stop-mapping.service';
 import { RealtimePollingService } from './services/realtime-polling.service';
 import { VehicleDirectionBackendService } from './services/vehicle-direction-backend.service';
+import { BusVehiclePositionsClient } from './services/bus-vehicle-positions.client';
 import { RealtimeGateway } from './gateways/realtime.gateway';
 
 @Module({
@@ -16,6 +17,7 @@ import { RealtimeGateway } from './gateways/realtime.gateway';
     WsThrottlerGuard,
     OlhoVivoApiService,
     RouteStopMappingService,
+    BusVehiclePositionsClient,
     VehicleDirectionBackendService,
     RealtimePollingService,
     RealtimeGateway,

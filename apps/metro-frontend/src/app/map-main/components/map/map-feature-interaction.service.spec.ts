@@ -122,4 +122,19 @@ describe('MapFeatureInteractionService', () => {
       }),
     );
   });
+
+  it('shows the sanitized bus plate and GTFS route label in the existing popup', () => {
+    const properties = { vehicleId: 'ABC1D23', routeShortName: '001' };
+    service.handleFeatureSelection({
+      get: () => undefined,
+      getProperties: () => properties,
+    } as never);
+
+    expect(panels.panel()).toEqual(
+      expect.objectContaining({
+        title: 'Ônibus ABC1D23',
+        summary: 'Linha 001',
+      }),
+    );
+  });
 });

@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import type { BusVehiclePosition as BusVehiclePositionContract } from '@metro/shared/bus-itinerary-contracts';
 
 /**
  * Real-time vehicle position from OlhoVivo API
@@ -81,6 +82,20 @@ export interface LineSearchResult {
   ts: string; // Destination headsign for direction 2
 }
 
+export class BusVehiclePositionDto implements BusVehiclePositionContract {
+  @ApiProperty({ description: 'Vehicle plate' })
+  plate!: string;
+
+  @ApiProperty({ description: 'Latitude' })
+  latitude!: number;
+
+  @ApiProperty({ description: 'Longitude' })
+  longitude!: number;
+
+  @ApiProperty({ description: 'Timestamp when location was captured (ISO 8601)' })
+  recordedAt!: string;
+}
+
 /**
  * Response from position endpoints
  */
@@ -90,6 +105,12 @@ export class PositionResponse {
 
   @ApiProperty({ description: 'Lines with vehicles', type: [LineWithVehicles] })
   l!: LineWithVehicles[];
+
+  @ApiProperty({ required: false, type: [BusVehiclePositionDto] })
+  positions?: BusVehiclePositionContract[];
+
+  @ApiProperty({ required: false })
+  routeLabel?: string;
 }
 
 /**
@@ -192,6 +213,8 @@ export interface VehiclePositionUpdate {
   hr: string;
   l: LineWithVehicles[];
   cacheTimestamp: number;
+  positions?: BusVehiclePositionContract[];
+  routeLabel?: string;
 }
 
 /**

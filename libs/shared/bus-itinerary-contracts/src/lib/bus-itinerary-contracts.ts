@@ -1,3 +1,14 @@
+export interface BusVehiclePosition {
+  plate: string;
+  latitude: number;
+  longitude: number;
+  recordedAt: string;
+}
+
+export interface BusVehiclePositions {
+  positions: BusVehiclePosition[];
+}
+
 /** Sanitized published bus-route information, independent of upstream formats. */
 export interface PublishedRouteInformation {
   status: 'AVAILABLE' | 'UNAVAILABLE' | 'NOT_FOUND';

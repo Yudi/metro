@@ -256,6 +256,47 @@ export const RoutesSelected: Story = {
   },
 };
 
+export const ArtespVehiclePosition: Story = {
+  decorators: withMapState({
+    selectedRoutes: [selectedRoute(ROUTE_ARTESP_001)],
+    vehiclePositions: new Map([
+      [
+        ROUTE_ARTESP_001.routeId,
+        {
+          routeShortName: ROUTE_ARTESP_001.routeId,
+          routeLabel: ROUTE_ARTESP_001.shortName,
+          hr: '2026-09-28T12:00:00.000Z',
+          l: [],
+          positions: [
+            {
+              plate: 'ABC1D23',
+              latitude: -23.55,
+              longitude: -46.63,
+              recordedAt: '2026-09-28T12:00:00.000Z',
+            },
+          ],
+          cacheTimestamp: Date.parse('2026-09-28T12:00:00.000Z'),
+        },
+      ],
+    ]),
+  }),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Shows a synthetic ARTESP bus marker using the existing bus icon and route color, with the plate available from the map feature popup.',
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    await verifyMapShell(canvasElement);
+    const text = canvasElement.textContent ?? '';
+    if (!text.includes(ROUTE_ARTESP_001.shortName)) {
+      throw new Error('The selected ARTESP route label is not visible');
+    }
+  },
+};
+
 export const StationDetailsCompact: Story = {
   decorators: withMapState({
     stationDetail: {

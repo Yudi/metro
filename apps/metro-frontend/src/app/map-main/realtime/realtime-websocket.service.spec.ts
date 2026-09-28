@@ -116,4 +116,54 @@ describe('RealtimeWebsocketService', () => {
       routeShortName: '100',
     });
   });
+
+  it('keeps canonical route keys and sanitized positions in the shared cache', () => {
+    const service = TestBed.inject(RealtimeWebsocketService);
+    service.subscribeToRoute('artesp:001');
+
+    listeners.get('vehicle_positions')?.({
+      data: {
+        routeShortName: 'artesp:001',
+        routeLabel: '001',
+        hr: '2026-09-28T12:00:00.000Z',
+        l: [],
+        positions: [
+          {
+            plate: 'ABC1D23',
+            latitude: -23.55,
+            longitude: -46.63,
+            recordedAt: '2026-09-28T12:00:00.000Z',
+          },
+        ],
+        cacheTimestamp: 200,
+      },
+    });
+
+    expect(service.vehiclePositions().get('artesp:001')).toEqual(
+      expect.objectContaining({
+        routeLabel: '001',
+        positions: [expect.objectContaining({ plate: 'ABC1D23' })],
+      }),
+    );
+  });
+
+  it('ignores a route update that arrives after its final owner releases it', () => {
+    const service = TestBed.inject(RealtimeWebsocketService);
+    const release = service.subscribeToRoute('artesp:001');
+    release();
+
+    listeners.get('vehicle_positions')?.({
+      data: {
+        routeShortName: 'artesp:001',
+        routeLabel: '001',
+        hr: '2026-09-28T12:00:00.000Z',
+        l: [],
+        positions: [],
+        cacheTimestamp: 200,
+      },
+    });
+
+    expect(service.vehiclePositions().has('artesp:001')).toBe(false);
+    expect(service.subscribedRoutes()).toEqual([]);
+  });
 });

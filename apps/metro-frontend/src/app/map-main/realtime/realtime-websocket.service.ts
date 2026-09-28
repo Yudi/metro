@@ -3,6 +3,7 @@ import { io, Socket } from 'socket.io-client';
 import { environment } from '../../../environments/environment';
 import { LoggerService } from '@metro/shared/api';
 import { OLHOVIVO_POLL_INTERVAL_MS } from '@metro/shared/utils';
+import type { BusVehiclePosition } from '@metro/shared/bus-itinerary-contracts';
 
 export interface VehiclePosition {
   p: number; // Vehicle prefix
@@ -26,8 +27,10 @@ export interface LineWithVehicles {
 
 export interface VehiclePositionUpdate {
   routeShortName: string;
+  routeLabel?: string;
   hr: string; // Reference time
   l: LineWithVehicles[];
+  positions?: BusVehiclePosition[];
   cacheTimestamp: number;
 }
 
@@ -314,6 +317,13 @@ export class RealtimeWebsocketService implements OnDestroy {
    * Handle incoming vehicle position updates
    */
   private handleVehiclePositions(data: VehiclePositionUpdate): void {
+    if (!this.routeOwners.has(data.routeShortName)) {
+      this.logger.debug(
+        `Ignoring vehicle positions for unsubscribed route ${data.routeShortName}`,
+      );
+      return;
+    }
+
     const latestTimestamp = this.latestRouteUpdateTimestamps.get(
       data.routeShortName,
     );
@@ -342,7 +352,10 @@ export class RealtimeWebsocketService implements OnDestroy {
     this.logger.debug(
       `Updated vehicle positions for route ${data.routeShortName}: ${
         data.l?.length ?? 0
-      } lines, ${data.l?.reduce((sum, line) => sum + line.qv, 0) ?? 0} vehicles`,
+      } lines, ${
+        (data.positions?.length ?? 0) +
+        (data.l?.reduce((sum, line) => sum + line.qv, 0) ?? 0)
+      } vehicles`,
     );
   }
 

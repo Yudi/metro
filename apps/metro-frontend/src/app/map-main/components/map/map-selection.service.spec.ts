@@ -219,7 +219,7 @@ describe('MapSelectionService', () => {
   });
 
   it.each(['001', 'CPTM L10'])(
-    'never tracks an Artesp route with short name %s',
+    'subscribes to Artesp positions by canonical ID when its short name is %s',
     async (shortName) => {
       cache.getRoute.mockReturnValue(
         of({
@@ -230,20 +230,46 @@ describe('MapSelectionService', () => {
           textColor: 'FFFFFF',
           routeType: 3,
           sourceAgency: 'ARTESP',
-          supportsRealtime: true,
+          supportsRealtime: false,
         }),
       );
 
       await service.addRouteToSelection('artesp:001', false);
 
+      const realtime = TestBed.inject(RealtimeWebsocketService);
+      expect(realtime.subscribeToRoute).toHaveBeenCalledWith('artesp:001');
       expect(
         TestBed.inject(CptmVehicleLayerService).subscribeToLine,
       ).not.toHaveBeenCalled();
-      expect(
-        TestBed.inject(RealtimeWebsocketService).subscribeToRoute,
-      ).not.toHaveBeenCalled();
+
+      service.removeRouteFromSelection('artesp:001');
+
+      expect(realtime.unsubscribeFromRoute).toHaveBeenCalledWith('artesp:001');
     },
   );
+
+  it('keeps SPTrans realtime subscriptions keyed by short name', async () => {
+    cache.getRoute.mockReturnValue(
+      of({
+        routeId: 'sptrans:100',
+        shortName: '100',
+        longName: 'Route 100',
+        color: '112233',
+        textColor: 'FFFFFF',
+        sourceAgency: 'SPTRANS',
+        supportsRealtime: true,
+      }),
+    );
+
+    await service.addRouteToSelection('sptrans:100', false);
+
+    const realtime = TestBed.inject(RealtimeWebsocketService);
+    expect(realtime.subscribeToRoute).toHaveBeenCalledWith('100');
+
+    service.removeRouteFromSelection('sptrans:100');
+
+    expect(realtime.unsubscribeFromRoute).toHaveBeenCalledWith('100');
+  });
 
   it('subscribes and releases estimated rail markers for a selected L8 line', () => {
     service.addRailLineToSelection('L8', false);

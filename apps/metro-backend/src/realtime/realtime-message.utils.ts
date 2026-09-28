@@ -26,6 +26,12 @@ export function buildVehiclePositionsMessage(
   const latestTimestamp = Math.max(
     ...cacheEntries.map(([, entry]) => entry.timestamp),
   );
+  const hasPositions = cacheEntries.some(
+    ([, entry]) => entry.data.positions !== undefined,
+  );
+  const routeLabel = cacheEntries
+    .map(([, entry]) => entry.data.routeLabel)
+    .find((label): label is string => Boolean(label));
 
   return {
     type: RealtimeMessageType.VEHICLE_POSITIONS,
@@ -34,6 +40,14 @@ export function buildVehiclePositionsMessage(
       hr: cacheEntries[0][1].data.hr,
       l: cacheEntries.flatMap(([, entry]) => entry.data.l || []),
       cacheTimestamp: latestTimestamp,
+      ...(hasPositions
+        ? {
+            positions: cacheEntries.flatMap(
+              ([, entry]) => entry.data.positions ?? [],
+            ),
+          }
+        : {}),
+      ...(routeLabel ? { routeLabel } : {}),
     },
   };
 }
@@ -45,7 +59,7 @@ export function countVehicles(cacheEntries: PositionCacheEntry[]): number {
       (entry.data.l?.reduce(
         (lineSum, line) => lineSum + (line.vs?.length ?? 0),
         0,
-      ) ?? 0),
+      ) ?? 0) + (entry.data.positions?.length ?? 0),
     0,
   );
 }

@@ -15,6 +15,7 @@ const service = root.lookupService(
 );
 assert.deepEqual(Object.keys(service.methods), [
   "GetPublishedRouteInformation",
+  "GetVehiclePositions",
 ]);
 if (existsSync(privateProto)) {
   assert.ok(
@@ -59,6 +60,31 @@ const decoded = response.toObject(
   response.decode(response.encode(example).finish()),
 );
 assert.deepEqual(decoded, example);
+const positionsResponse = root.lookupType(
+  "metro.bus.itinerary.v1.BusVehiclePositions",
+);
+const position = root.lookupType("metro.bus.itinerary.v1.BusVehiclePosition");
+assert.deepEqual(Object.keys(position.fields), [
+  "plate",
+  "latitude",
+  "longitude",
+  "recordedAt",
+]);
+const positionsExample = {
+  positions: [{
+    plate: "ABC1D23",
+    latitude: -23.55,
+    longitude: -46.63,
+    recordedAt: "2026-09-28T03:00:00.000Z",
+  }],
+};
+assert.equal(positionsResponse.verify(positionsExample), null);
+assert.deepEqual(
+  positionsResponse.toObject(
+    positionsResponse.decode(positionsResponse.encode(positionsExample).finish()),
+  ),
+  positionsExample,
+);
 console.log(
-  "Verified bus itinerary RPC, structured payload round trip, and public/private parity.",
+  "Verified bus itinerary and position RPCs, payload round trips, and public/private parity.",
 );

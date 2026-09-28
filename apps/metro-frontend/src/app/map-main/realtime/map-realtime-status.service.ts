@@ -2,6 +2,7 @@ import { Injectable, computed, inject } from '@angular/core';
 import { BikeStationsService } from '../geography/bike-stations.service';
 import { NextTrainWebsocketService } from '../../next-train/next-train-websocket.service';
 import { RealtimeWebsocketService } from './realtime-websocket.service';
+import { MapStateService } from '../components/map/map-state.service';
 
 export type MapRealtimeState = 'idle' | 'connected' | 'partial' | 'offline';
 
@@ -11,6 +12,7 @@ export class MapRealtimeStatusService {
   private readonly buses = inject(RealtimeWebsocketService);
   private readonly trains = inject(NextTrainWebsocketService);
   private readonly bikes = inject(BikeStationsService);
+  private readonly mapState = inject(MapStateService);
 
   readonly busRoutes = this.buses.subscribedRoutes;
   readonly busStops = this.buses.subscribedStops;
@@ -41,7 +43,17 @@ export class MapRealtimeStatusService {
   readonly tooltip = computed(() => {
     const lines: string[] = [];
     if (this.busRoutes().length) {
-      lines.push(`Ônibus: ${describeSubscriptions(this.busRoutes(), 'rota', 'rotas')}`);
+      const selectedRoutes = this.mapState.selectedRoutes();
+      const positions = this.buses.vehiclePositions();
+      const busRouteLabels = this.busRoutes().map(
+        (routeKey) =>
+          positions.get(routeKey)?.routeLabel ??
+          selectedRoutes.get(routeKey)?.shortName ??
+          routeKey,
+      );
+      lines.push(
+        `Ônibus: ${describeSubscriptions(busRouteLabels, 'rota', 'rotas')}`,
+      );
     }
     if (this.busStops().length) {
       lines.push(`Paradas: ${describeSubscriptions(this.busStops(), 'parada', 'paradas')}`);

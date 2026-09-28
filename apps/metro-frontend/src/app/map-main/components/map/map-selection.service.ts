@@ -301,13 +301,19 @@ export class MapSelectionService {
   ): void {
     const shortName = route.shortName;
     const routeId = 'routeId' in route ? route.routeId : route.id;
+    if (!shortName) {
+      return;
+    }
+
     if (
-      !shortName ||
       isArtespRoute({
         routeId,
-        sourceAgency: 'sourceAgency' in route ? route.sourceAgency : undefined,
+        sourceAgency:
+          'sourceAgency' in route ? route.sourceAgency : undefined,
       })
     ) {
+      this.realtimeService.subscribeToRoute(routeId);
+      this.logger.info(`Subscribed to real-time for route: ${routeId}`);
       return;
     }
 
@@ -345,10 +351,13 @@ export class MapSelectionService {
   private unsubscribeFromRouteRealtime(route: SelectedRoute | undefined): void {
     const shortName = route?.shortName;
     const routeId = route?.id ?? '';
-    if (
-      !shortName ||
-      isArtespRoute({ routeId, sourceAgency: route?.sourceAgency })
-    ) {
+    if (!shortName) {
+      return;
+    }
+
+    if (isArtespRoute({ routeId, sourceAgency: route?.sourceAgency })) {
+      this.realtimeService.unsubscribeFromRoute(routeId);
+      this.logger.info(`Unsubscribed from real-time for route: ${routeId}`);
       return;
     }
 

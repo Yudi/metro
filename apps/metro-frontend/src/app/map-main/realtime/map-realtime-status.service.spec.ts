@@ -4,12 +4,15 @@ import { BikeStationsService } from '../geography/bike-stations.service';
 import { NextTrainWebsocketService } from '../../next-train/next-train-websocket.service';
 import { RealtimeWebsocketService } from './realtime-websocket.service';
 import { MapRealtimeStatusService } from './map-realtime-status.service';
+import { MapStateService } from '../components/map/map-state.service';
+import type { VehiclePositionUpdate } from './realtime-websocket.service';
 
 describe('MapRealtimeStatusService', () => {
   const buses = {
     connected: signal(false),
     subscribedRoutes: signal<readonly string[]>([]),
     subscribedStops: signal<readonly string[]>([]),
+    vehiclePositions: signal<Map<string, VehiclePositionUpdate>>(new Map()),
   };
   const trains = {
     connected: signal(false),
@@ -26,6 +29,7 @@ describe('MapRealtimeStatusService', () => {
     buses.connected.set(false);
     buses.subscribedRoutes.set([]);
     buses.subscribedStops.set([]);
+    buses.vehiclePositions.set(new Map());
     trains.connected.set(false);
     trains.subscribedVehicleLines.set([]);
     trains.subscribedStations.set([]);
@@ -35,6 +39,7 @@ describe('MapRealtimeStatusService', () => {
     TestBed.configureTestingModule({
       providers: [
         MapRealtimeStatusService,
+        MapStateService,
         { provide: RealtimeWebsocketService, useValue: buses },
         { provide: NextTrainWebsocketService, useValue: trains },
         { provide: BikeStationsService, useValue: bikes },
@@ -66,6 +71,45 @@ describe('MapRealtimeStatusService', () => {
     expect(status.tooltip()).toContain('Trens: 1 linha (L9)');
     expect(status.tooltip()).toContain('Estações: 1 estação (L9:HBR)');
     expect(status.tooltip()).toContain('Bicicletas: estações do mapa');
+  });
+
+  it('shows the public route label for canonical bus subscriptions', () => {
+    const status = TestBed.inject(MapRealtimeStatusService);
+    const mapState = TestBed.inject(MapStateService);
+    mapState.selectedRoutes.set(
+      new Map([
+        [
+          'artesp:001',
+          {
+            id: 'artesp:001',
+            shortName: '001',
+            longName: 'Terminal Regional – Centro',
+            sourceAgency: 'ARTESP',
+          },
+        ],
+      ]),
+    );
+    buses.subscribedRoutes.set(['artesp:001']);
+
+    expect(status.tooltip()).toContain('Ônibus: 1 rota (001)');
+    expect(status.tooltip()).not.toContain('artesp:001');
+
+    buses.vehiclePositions.set(
+      new Map([
+        [
+          'artesp:001',
+          {
+            routeShortName: 'artesp:001',
+            routeLabel: '001-SP',
+            hr: '',
+            l: [],
+            positions: [],
+            cacheTimestamp: 1,
+          },
+        ],
+      ]),
+    );
+    expect(status.tooltip()).toContain('Ônibus: 1 rota (001-SP)');
   });
 
   it('reports partial and offline connection from active feeds only', () => {

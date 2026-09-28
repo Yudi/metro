@@ -37,6 +37,7 @@ import { ToolbarLayoutComponent } from '../../../shared/layout/toolbar-layout/to
 import { MapMainComponent } from '../../map-main.component';
 import { BikeStationsService } from '../../geography/bike-stations.service';
 import { RealtimeWebsocketService } from '../../realtime/realtime-websocket.service';
+import type { VehiclePositionUpdate } from '../../realtime/realtime-websocket.service';
 import { MapRealtimeStatusService } from '../../realtime/map-realtime-status.service';
 import { RealtimeVehicleLayerService } from '../../realtime/realtime-vehicle-layer.service';
 import { CptmVehicleLayerService } from '../../realtime/cptm-vehicle-layer.service';
@@ -428,6 +429,7 @@ export class StoryVectorTileLayerService extends VectorTileLayerService {
 
 export interface MapStoryScenario {
   selectedRoutes?: SelectedRoute[];
+  vehiclePositions?: Map<string, VehiclePositionUpdate>;
   locationPermission?: LocationPermissionState;
   isRequestingLocation?: boolean;
   stationDetail?: {
@@ -509,12 +511,19 @@ export function createMapStoryProviders(scenario: MapStoryScenario = {}) {
     },
     {
       provide: RealtimeWebsocketService,
-      useValue: createMockRealtimeService({ fetchKind: 'no-arrivals' }),
+      useFactory: () => ({
+        ...createMockRealtimeService({ fetchKind: 'no-arrivals' }),
+        vehiclePositions: () => scenario.vehiclePositions ?? new Map(),
+      }),
     },
-    {
-      provide: RealtimeVehicleLayerService,
-      useValue: { getLayer: () => null },
-    },
+    ...(scenario.vehiclePositions
+      ? []
+      : [
+          {
+            provide: RealtimeVehicleLayerService,
+            useValue: { getLayer: () => null },
+          },
+        ]),
     {
       provide: CptmVehicleLayerService,
       useValue: { getLayer: () => null },

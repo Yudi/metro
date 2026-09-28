@@ -184,7 +184,7 @@ export class RealtimeGateway
       );
 
       // Trigger poll and wait for it
-      await this.pollingService.triggerImmediatePoll();
+      await this.pollingService.triggerImmediateRoutePoll(routeShortName);
 
       // Now try to get the data again using the index
       const freshDirectionKeys = routeIndex.get(routeShortName);
@@ -399,14 +399,7 @@ export class RealtimeGateway
         continue;
       }
 
-      // Combine all directions into a single response
-      const combinedLines = cacheEntries.flatMap(
-        ([, entry]) => entry.data.l || [],
-      );
-      const totalVehicles = combinedLines.reduce(
-        (sum, line) => sum + (line.vs?.length ?? 0),
-        0,
-      );
+      const totalVehicles = countVehicles(cacheEntries);
       // Find all clients subscribed to this route
       const subscribedClients: string[] = [];
       for (const [clientId, subs] of this.clientSubscriptions) {

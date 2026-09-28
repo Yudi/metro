@@ -3,9 +3,19 @@ package metro.bus.itinerary.v1;
 
 service BusItineraryService {
   rpc GetPublishedRouteInformation (RouteRequest) returns (PublishedRouteInformation);
+  rpc GetVehiclePositions (RouteRequest) returns (BusVehiclePositions);
 }
 
 message RouteRequest { string route_code = 1; }
+message BusVehiclePositions {
+  repeated BusVehiclePosition positions = 1;
+}
+message BusVehiclePosition {
+  string plate = 1;
+  double latitude = 2;
+  double longitude = 3;
+  string recorded_at = 4;
+}
 message PublishedRouteInformation {
   string status = 1;
   string route_code = 2;

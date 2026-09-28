@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { OLHOVIVO_POLL_INTERVAL_MS } from '@metro/shared/utils';
 import { OlhoVivoApiService } from './olhovivo-api.service';
+import { BusVehiclePositionsClient } from './bus-vehicle-positions.client';
 import { RouteStopMappingService } from './route-stop-mapping.service';
 import { VehicleDirectionBackendService } from './vehicle-direction-backend.service';
 import {
@@ -21,15 +22,22 @@ export class RealtimePollingService implements OnModuleDestroy {
   private readonly MAX_ACTIVE_ROUTES = 200;
   private readonly MAX_ACTIVE_STOPS = 500;
   private readonly STOP_POLL_CONCURRENCY = 8;
+  private readonly ARTESP_ROUTE_POLL_CONCURRENCY = 8;
   private readonly pollingCoordinator = new PollingCoordinator(
     this.logger,
     () => this.poll(),
+    this.POLL_INTERVAL,
+  );
+  private readonly artespPollingCoordinator = new PollingCoordinator(
+    this.logger,
+    () => this.pollArtespRoutePositions(Date.now()),
     this.POLL_INTERVAL,
   );
 
   private subscriptions: RealtimeSubscription = new RealtimeSubscription();
   private routeSubscriptionCounts = new Map<string, number>();
   private stopSubscriptionCounts = new Map<string, number>();
+  private routeSubscriptionTokens = new Map<string, object>();
 
   // Cached data - individual direction entries
   private vehiclePositionsCache = new Map<
@@ -49,10 +57,15 @@ export class RealtimePollingService implements OnModuleDestroy {
     private olhoVivoApi: OlhoVivoApiService,
     private mapping: RouteStopMappingService,
     private vehicleDirection: VehicleDirectionBackendService,
+    private vehiclePositionsClient: BusVehiclePositionsClient,
   ) {}
 
   async onModuleDestroy(): Promise<void> {
-    await this.pollingCoordinator.stopAndDrain();
+    this.routeSubscriptionTokens.clear();
+    await Promise.all([
+      this.pollingCoordinator.stopAndDrain(),
+      this.artespPollingCoordinator.stopAndDrain(),
+    ]);
     this.routeSubscriptionCounts.clear();
     this.stopSubscriptionCounts.clear();
     this.subscriptions.routeShortNames.clear();
@@ -67,6 +80,7 @@ export class RealtimePollingService implements OnModuleDestroy {
    */
   onPollComplete(listener: () => void): void {
     this.pollingCoordinator.onPollComplete(listener);
+    this.artespPollingCoordinator.onPollComplete(listener);
   }
 
   /**
@@ -74,6 +88,7 @@ export class RealtimePollingService implements OnModuleDestroy {
    */
   offPollComplete(listener: () => void): void {
     this.pollingCoordinator.offPollComplete(listener);
+    this.artespPollingCoordinator.offPollComplete(listener);
   }
 
   /**
@@ -93,6 +108,9 @@ export class RealtimePollingService implements OnModuleDestroy {
     const subscriptionCount =
       (this.routeSubscriptionCounts.get(routeShortName) ?? 0) + 1;
 
+    if (subscriptionCount === 1) {
+      this.routeSubscriptionTokens.set(routeShortName, {});
+    }
     this.routeSubscriptionCounts.set(routeShortName, subscriptionCount);
     this.subscriptions.routeShortNames.add(routeShortName);
     this.logger.debug(
@@ -114,6 +132,7 @@ export class RealtimePollingService implements OnModuleDestroy {
     } else {
       this.routeSubscriptionCounts.delete(routeShortName);
       this.subscriptions.routeShortNames.delete(routeShortName);
+      this.routeSubscriptionTokens.delete(routeShortName);
       this.clearRouteCache(routeShortName);
     }
 
@@ -211,13 +230,25 @@ export class RealtimePollingService implements OnModuleDestroy {
       return;
     }
 
-    this.pollingCoordinator.ensurePolling();
+    if (this.hasSptransSubscriptions()) {
+      this.pollingCoordinator.ensurePolling();
+    }
+    if (this.hasArtespSubscriptions()) {
+      this.artespPollingCoordinator.ensurePolling();
+    }
   }
 
   /**
    * Stop polling if no more subscriptions
    */
   private cleanupPolling(): void {
+    if (!this.hasSptransSubscriptions()) {
+      this.pollingCoordinator.stopPolling();
+    }
+    if (!this.hasArtespSubscriptions()) {
+      this.artespPollingCoordinator.stopPolling();
+    }
+
     if (!this.hasActiveSubscriptions()) {
       this.logger.debug(
         'Stopping real-time data polling (no active subscriptions)',
@@ -237,7 +268,6 @@ export class RealtimePollingService implements OnModuleDestroy {
   private async poll(): Promise<void> {
     const timestamp = Date.now();
 
-    // Poll vehicle positions for subscribed routes
     await this.pollRoutePositions(timestamp);
 
     // Poll arrival predictions for subscribed stops
@@ -250,26 +280,37 @@ export class RealtimePollingService implements OnModuleDestroy {
    * Then filters to only the routes we're subscribed to
    */
   private async pollRoutePositions(timestamp: number): Promise<void> {
-    if (this.subscriptions.routeShortNames.size === 0) {
+    const subscribedRoutes = new Map(
+      Array.from(this.subscriptions.routeShortNames)
+        .filter((routeId) => !isArtespRouteId(routeId))
+        .map((routeId) => [
+          routeId,
+          this.routeSubscriptionTokens.get(routeId),
+        ] as const),
+    );
+    if (subscribedRoutes.size === 0) {
       return;
     }
 
     this.logger.debug(
-      `Polling vehicle positions for ${this.subscriptions.routeShortNames.size} subscribed route${this.subscriptions.routeShortNames.size === 1 ? '' : 's'}`,
+      `Polling vehicle positions for ${subscribedRoutes.size} subscribed route${subscribedRoutes.size === 1 ? '' : 's'}`,
     );
     try {
       const allData = await this.olhoVivoApi.getAllPositions();
       this.logger.debug(`Received ${allData.l?.length ?? 0} lines from API`);
-      const subscribedRoutes = new Set(this.subscriptions.routeShortNames);
       const activeVehicleIds = new Set<number>();
-      for (const routeShortName of subscribedRoutes) {
+      for (const routeShortName of subscribedRoutes.keys()) {
         this.clearRouteCache(routeShortName);
       }
       // For each line, add heading to all vehicles and cache by route+direction
       // Note: line.c is the route code, line.sl is the direction (1 or 2)
       // We must cache separately for each direction to avoid overwriting
       for (const line of allData.l || []) {
-        if (!subscribedRoutes.has(line.c)) {
+        const token = subscribedRoutes.get(line.c);
+        if (
+          !token ||
+          !this.isCurrentRouteSubscription(line.c, token)
+        ) {
           continue;
         }
 
@@ -305,6 +346,107 @@ export class RealtimePollingService implements OnModuleDestroy {
     } catch (error) {
       this.logger.error('Error polling all positions:', error);
     }
+  }
+
+  private async pollArtespRoutePositions(timestamp: number): Promise<void> {
+    const subscribedRoutes = Array.from(this.subscriptions.routeShortNames)
+      .filter((routeId) => isArtespRouteId(routeId))
+      .map((routeId) => ({
+        routeId,
+        token: this.routeSubscriptionTokens.get(routeId),
+      }))
+      .filter(
+        (route): route is { routeId: string; token: object } =>
+          route.token !== undefined,
+      );
+
+    for (
+      let offset = 0;
+      offset < subscribedRoutes.length;
+      offset += this.ARTESP_ROUTE_POLL_CONCURRENCY
+    ) {
+      const batch = subscribedRoutes.slice(
+        offset,
+        offset + this.ARTESP_ROUTE_POLL_CONCURRENCY,
+      );
+      await Promise.all(
+        batch.map(async ({ routeId, token }) => {
+          if (!this.isCurrentRouteSubscription(routeId, token)) return;
+          let routeLabel = this.getCachedRouteLabel(routeId);
+          try {
+            const resolvedRouteLabel =
+              await this.mapping.getArtespRouteShortName(routeId);
+            if (!this.isCurrentRouteSubscription(routeId, token)) return;
+            if (!resolvedRouteLabel) {
+              throw new Error('Route is missing from the GTFS catalogue');
+            }
+            routeLabel = resolvedRouteLabel;
+
+            const positions =
+              await this.vehiclePositionsClient.getVehiclePositions(
+                resolvedRouteLabel,
+              );
+            if (!this.isCurrentRouteSubscription(routeId, token)) return;
+
+            this.replaceRouteSnapshot(
+              routeId,
+              {
+                hr: new Date(timestamp).toISOString(),
+                l: [],
+                positions,
+                routeLabel: resolvedRouteLabel,
+              },
+              timestamp,
+            );
+          } catch (error) {
+            const category = error instanceof Error ? error.name : typeof error;
+            this.logger.warn(
+              `Vehicle positions polling failed for ${routeId} (${category})`,
+            );
+            if (!this.isCurrentRouteSubscription(routeId, token)) return;
+
+            this.replaceRouteSnapshot(
+              routeId,
+              {
+                hr: new Date(timestamp).toISOString(),
+                l: [],
+                positions: [],
+                ...(routeLabel ? { routeLabel } : {}),
+              },
+              timestamp,
+            );
+          }
+        }),
+      );
+    }
+  }
+
+  private replaceRouteSnapshot(
+    routeId: string,
+    data: PositionResponse,
+    timestamp: number,
+  ): void {
+    this.clearRouteCache(routeId);
+    const cacheKey = `${routeId}:positions`;
+    this.vehiclePositionsCache.set(cacheKey, { data, timestamp });
+    this.routeToDirectionsIndex.set(routeId, new Set([cacheKey]));
+  }
+
+  private getCachedRouteLabel(routeId: string): string | undefined {
+    const keys = this.routeToDirectionsIndex.get(routeId);
+    if (!keys) return undefined;
+    for (const key of keys) {
+      const label = this.vehiclePositionsCache.get(key)?.data.routeLabel;
+      if (label) return label;
+    }
+    return undefined;
+  }
+
+  private isCurrentRouteSubscription(routeId: string, token: object): boolean {
+    return (
+      this.subscriptions.routeShortNames.has(routeId) &&
+      this.routeSubscriptionTokens.get(routeId) === token
+    );
   }
 
   /**
@@ -387,10 +529,35 @@ export class RealtimePollingService implements OnModuleDestroy {
     await this.pollingCoordinator.triggerImmediatePoll();
   }
 
+  async triggerImmediateRoutePoll(routeId: string): Promise<void> {
+    if (isArtespRouteId(routeId)) {
+      if (!this.subscriptions.routeShortNames.has(routeId)) return;
+      this.logger.debug('Immediate ARTESP route poll triggered');
+      await this.artespPollingCoordinator.triggerImmediatePoll();
+      return;
+    }
+    await this.triggerImmediatePoll();
+  }
+
   private hasActiveSubscriptions(): boolean {
     return (
       this.subscriptions.routeShortNames.size > 0 ||
       this.subscriptions.stopCodes.size > 0
+    );
+  }
+
+  private hasArtespSubscriptions(): boolean {
+    return Array.from(this.subscriptions.routeShortNames).some((routeId) =>
+      isArtespRouteId(routeId),
+    );
+  }
+
+  private hasSptransSubscriptions(): boolean {
+    return (
+      this.subscriptions.stopCodes.size > 0 ||
+      Array.from(this.subscriptions.routeShortNames).some(
+        (routeId) => !isArtespRouteId(routeId),
+      )
     );
   }
 
@@ -405,4 +572,8 @@ export class RealtimePollingService implements OnModuleDestroy {
     }
     this.routeToDirectionsIndex.delete(routeShortName);
   }
+}
+
+function isArtespRouteId(routeId: string): boolean {
+  return /^artesp:/i.test(routeId);
 }

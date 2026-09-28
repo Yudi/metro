@@ -194,12 +194,12 @@ describe('HeadwayTrackingService', () => {
     });
   });
 
-  it('clears an L4 snapshot instead of recording it in the central off-hours window', async () => {
+  it('clears an L4 snapshot when entering the central off-hours window', async () => {
     const train = {
       destinationCode: 'LUZ',
       destinationName: 'Luz',
       trainCurrentStationName: '',
-      arrivalTime: '01:00',
+      arrivalTime: '01:30',
       isAtPlatform: null,
       isTrainStopped: null,
     };
@@ -208,13 +208,13 @@ describe('HeadwayTrackingService', () => {
       'L4',
       'BUT',
       [train],
-      new Date('2026-06-12T00:59:00-03:00').getTime(),
+      new Date('2026-06-12T01:29:00-03:00').getTime(),
     );
     await service.processPollResult(
       'L4',
       'BUT',
       [],
-      new Date('2026-06-12T01:01:00-03:00').getTime(),
+      new Date('2026-06-12T01:31:00-03:00').getTime(),
     );
 
     expect(cache.recordPassage).not.toHaveBeenCalled();

@@ -1,8 +1,10 @@
 import {
+  afterNextRender,
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
   ElementRef,
+  Injector,
   inject,
   signal,
   viewChild,
@@ -41,10 +43,12 @@ import { menuDestinations } from './menu-destinations';
 export class MenuComponent {
   private readonly dialog = inject(MatDialog);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly injector = inject(Injector);
   private readonly searchInput =
     viewChild<ElementRef<HTMLInputElement>>('searchInput');
   private readonly searchQueries = new BehaviorSubject('');
   private restoringFocus = false;
+  private openingSearch = false;
   readonly authService = inject(AuthService);
   readonly cityContext = inject(CityContextService);
   readonly authReady = authReady;
@@ -72,8 +76,8 @@ export class MenuComponent {
   }
 
   async openSearch(): Promise<void> {
-    if (this.restoringFocus || this.searchOpen()) return;
-    this.searchOpen.set(true);
+    if (this.restoringFocus || this.searchOpen() || this.openingSearch) return;
+    this.openingSearch = true;
     this.searchError.set('');
     this.searchQueries.next(this.searchControl.value);
 
@@ -83,6 +87,10 @@ export class MenuComponent {
       );
       if (this.destroyRef.destroyed) return;
 
+      // Keep the trigger visible while the lazy dialog chunk loads so typing
+      // continues to reach it; replay the latest value when the dialog opens.
+      this.searchQueries.next(this.searchControl.value);
+      this.searchOpen.set(true);
       const dialogRef = this.dialog.open(OmniboxDialogComponent, {
         width: '760px',
         maxWidth: 'calc(100vw - 24px)',
@@ -103,13 +111,20 @@ export class MenuComponent {
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe(() => {
           this.searchOpen.set(false);
-          this.restoringFocus = true;
-          this.searchInput()?.nativeElement.focus({ preventScroll: true });
-          this.restoringFocus = false;
+          afterNextRender(
+            () => {
+              this.restoringFocus = true;
+              this.searchInput()?.nativeElement.focus({ preventScroll: true });
+              this.restoringFocus = false;
+            },
+            { injector: this.injector },
+          );
         });
     } catch {
       this.searchOpen.set(false);
       this.searchError.set('Não foi possível abrir a busca. Tente novamente.');
+    } finally {
+      this.openingSearch = false;
     }
   }
 

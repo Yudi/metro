@@ -65,11 +65,13 @@ describe('menu search handoff', () => {
     fixture.detectChanges();
     const component = fixture.componentInstance;
     const opening = component.openSearch();
+    expect(component.searchOpen()).toBe(false);
     component.searchControl.setValue('Pin');
     component.searchControl.setValue('Pinheiros');
     await opening;
 
     expect(open).toHaveBeenCalledTimes(1);
+    expect(component.searchOpen()).toBe(true);
     const options = open.mock.calls[0][1];
     const received: string[] = [];
     const subscription = options.data.queryChanges.subscribe((query: string) =>

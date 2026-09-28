@@ -10,7 +10,10 @@ describe('omnibox destination catalog', () => {
   const destinations = searchDestinations(SAO_PAULO_CITY);
 
   it('covers every concrete application page and uses existing routes', () => {
+    // The search-result detail route is parameterized and is only navigated to
+    // after selecting a result, so it is not a standalone page destination.
     const paths = spFeatureRoutes
+      .filter((route) => !route.path?.includes(':'))
       .map((route) => `/${route.path}`)
       .map((path) => (path === '/' ? '' : path));
     const searchablePaths = destinations.flatMap((item) =>

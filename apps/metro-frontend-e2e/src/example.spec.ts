@@ -18,12 +18,12 @@ test('renders the project information route and navigation shell', async ({
 test('opens the unified search from the menu', async ({ page }) => {
   await page.goto('/sp/menu');
 
-  await page
-    .getByRole('searchbox', {
-      name: 'Buscar linhas, paradas e páginas',
-      exact: true,
-    })
-    .focus();
+  const trigger = page.getByRole('searchbox', {
+    name: 'Buscar linhas, paradas e páginas',
+    exact: true,
+  });
+  await trigger.focus();
+  await trigger.pressSequentially('p');
 
   await expect(
     page.getByRole('dialog', { name: 'Buscar no site' }),

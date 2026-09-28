@@ -115,6 +115,13 @@ export class MapDetailsDialogService {
     }
 
     const data: BikeStationDialogData = { station };
+    const title = computed(() =>
+      this.mapState
+        .bikeStations()
+        .find((item) => item.stationId === station.stationId)?.name ||
+      station.name ||
+      'Carregando estação',
+    );
     const summary = computed(() => {
       const currentStation =
         this.mapState
@@ -128,7 +135,7 @@ export class MapDetailsDialogService {
     >({
       component: BikeStationDialogComponent,
       data,
-      title: station.name,
+      title,
       summary,
       icon: 'pedal_bike',
     });

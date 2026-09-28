@@ -48,7 +48,7 @@
       [class.has-details]="!!panel.titleLineGroups?.length || !!summary()"
     >
       <div class="map-panel__title-row">
-        <h2>{{ panel.title }}</h2>
+        <h2>{{ title() }}</h2>
         @if (favoriteContent(); as favorite) {
           <button mat-icon-button type="button" class="map-panel__favorite"
             [class.favorited]="favorite.isFavorite()"

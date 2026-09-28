@@ -82,7 +82,7 @@ export class MapPanelComponent {
   readonly showHandle = computed(() => !this.isDesktop() && this.hasPanelContent());
   readonly regionLabel = computed(() => {
     const panel = this.panelService.panel();
-    if (panel) return `Detalhes no mapa: ${panel.title}`;
+    if (panel) return `Detalhes no mapa: ${this.title()}`;
     return this.hasSelections() ? 'Seleções do mapa' : 'Ações do mapa';
   });
   readonly favoriteContent = signal<FavoritablePanelContent | null>(null);
@@ -124,6 +124,10 @@ export class MapPanelComponent {
   readonly summary = computed(() => {
     const summary = this.panelService.panel()?.summary;
     return typeof summary === 'function' ? summary() : (summary ?? '');
+  });
+  readonly title = computed(() => {
+    const title = this.panelService.panel()?.title;
+    return typeof title === 'function' ? title() : (title ?? '');
   });
 
   readonly contentPortal = computed(() => {

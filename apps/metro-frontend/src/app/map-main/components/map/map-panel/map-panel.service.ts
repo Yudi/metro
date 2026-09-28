@@ -21,7 +21,7 @@ export interface MapPanelAgencyLineGroup {
 export interface MapPanelOpenOptions<TData> {
   component: Type<unknown> | null;
   data: TData;
-  title: string;
+  title: string | Signal<string>;
   summary: string | Signal<string>;
   titleLineGroups?: MapPanelAgencyLineGroup[];
   icon?: string;
@@ -33,7 +33,7 @@ export interface MapPanelDescriptor {
   id: number;
   component: Type<unknown> | null;
   data: unknown;
-  title: string;
+  title: string | Signal<string>;
   summary: string | Signal<string>;
   titleLineGroups?: MapPanelAgencyLineGroup[];
   icon?: string;

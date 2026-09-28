@@ -163,7 +163,8 @@ describe('MapDetailsDialogService map-panel lifecycle', () => {
     const secondPanel = panelService.panel();
 
     expect(secondPanel?.id).not.toBe(firstPanelId);
-    expect(secondPanel?.title).toBe('Luz');
+    const title = secondPanel?.title;
+    expect(typeof title === 'function' ? title() : title).toBe('Luz');
 
     mapState.setBikeStations([
       firstStation,
@@ -174,5 +175,23 @@ describe('MapDetailsDialogService map-panel lifecycle', () => {
     expect(typeof summary === 'function' ? summary() : summary).toBe(
       '6 bicicletas · 3 vagas livres',
     );
+  });
+
+  it('shows the bike station name when details arrive after the first click', () => {
+    const loadingStation = createBikeStation('bike-1', '', 4, 7);
+    bikeStationRecords.set(loadingStation.stationId, loadingStation);
+    mapState.setBikeStations([loadingStation]);
+
+    service.showBikeStationDetails(loadingStation.stationId);
+    const panel = panelService.panel();
+    const title = panel?.title;
+    expect(typeof title === 'function' ? title() : title).toBe(
+      'Carregando estação',
+    );
+
+    mapState.setBikeStations([createBikeStation('bike-1', 'República', 4, 7)]);
+
+    expect(typeof title === 'function' ? title() : title).toBe('República');
+    expect(panelService.panel()?.id).toBe(panel?.id);
   });
 });

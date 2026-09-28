@@ -7,6 +7,7 @@ import { Feature } from 'ol';
 import { FeatureLike } from 'ol/Feature';
 import Overlay from 'ol/Overlay';
 import { defaults as defaultControls } from 'ol/control/defaults';
+import { defaults as defaultInteractions } from 'ol/interaction/defaults';
 import { MapLayerService, LayerType } from './layers/map-layer.service';
 import {
   VectorTileLayerService,
@@ -100,6 +101,7 @@ export class MapService {
         center: fromLonLat(center),
         zoom,
       }),
+      interactions: defaultInteractions({ onFocusOnly: false }),
       controls: showControls
         ? defaultControls({
             attributionOptions: { collapsible: false },

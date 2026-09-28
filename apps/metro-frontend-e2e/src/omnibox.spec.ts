@@ -81,47 +81,41 @@ async function installTransitGraphQL(
       return;
     }
 
-    if (query.includes('query GetBusStop')) {
+    if (query.includes('query GetStopFullData')) {
       await route.fulfill({
         json: {
           data: {
-            busStop: {
-              id: '340015325',
-              stopId: '340015325',
-              name: 'Av. Paulista, 1000',
-              description: 'Em frente ao MASP',
-              latitude: -23.5614,
-              longitude: -46.656,
-              isSubwayStation: false,
-              agencies: ['bus'],
-              routeShortNames: ['477A'],
-              sourceAgency: 'SPTRANS',
-              sourceId: '340015325',
-            },
-          },
-        },
-      });
-      return;
-    }
-
-    if (query.includes('query GetRoutesForStop')) {
-      await route.fulfill({
-        json: {
-          data: {
-            routesForStop: [
-              {
-                id: 'sptrans:477A-10',
-                routeId: '477A-10',
-                shortName: '477A',
-                longName: 'Sacomã – Pinheiros',
-                color: '0066CC',
-                textColor: 'FFFFFF',
+            stopFullData: {
+              stop: {
+                id: '340015325',
+                stopId: '340015325',
+                name: 'Av. Paulista, 1000',
+                description: 'Em frente ao MASP',
+                latitude: -23.5614,
+                longitude: -46.656,
+                isSubwayStation: false,
+                agencies: ['bus'],
+                routeShortNames: ['477A'],
                 sourceAgency: 'SPTRANS',
-                sourceId: '477A-10',
-                supportsRealtime: true,
-                fares: [{ price: 5, currency: 'BRL' }],
+                sourceId: '340015325',
               },
-            ],
+              routes: [
+                {
+                  route: {
+                    id: 'sptrans:477A-10',
+                    routeId: '477A-10',
+                    shortName: '477A',
+                    longName: 'Sacomã – Pinheiros',
+                    color: '0066CC',
+                    textColor: 'FFFFFF',
+                    sourceAgency: 'SPTRANS',
+                    sourceId: '477A-10',
+                    supportsRealtime: true,
+                    fares: [{ price: 5, currency: 'BRL' }],
+                  },
+                },
+              ],
+            },
           },
         },
       });

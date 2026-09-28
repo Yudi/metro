@@ -1,10 +1,19 @@
 import { TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
-import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
-import { of, Subject, throwError } from 'rxjs';
+import {
+  ActivatedRoute,
+  convertToParamMap,
+  ParamMap,
+  provideRouter,
+} from '@angular/router';
+import { Observable, of, Subject } from 'rxjs';
 import { CityContextService } from '../cities/city-context.service';
 import { BikeStation } from '../map-main/components/map/map.types';
 import { BikeStationsService } from '../map-main/geography/bike-stations.service';
+import type {
+  BusRouteGraphQL,
+  StopFullDataSnapshot,
+} from '../map-main/geography/geography-graphql.service';
 import { GeographyGraphQLService } from '../map-main/geography/geography-graphql.service';
 import { TypesenseSearchService } from '../search/typesense-search.service';
 import { OmniboxResultPageComponent } from './omnibox-result-page.component';
@@ -21,8 +30,7 @@ describe('OmniboxResultPageComponent', () => {
     routeShortNames: ['477A'],
   };
   const geography = {
-    getBusStop: jest.fn(),
-    getRoutesForStop: jest.fn(),
+    watchStopFullData: jest.fn(),
   };
   const search = { search: jest.fn() };
   const bikes = {
@@ -35,6 +43,7 @@ describe('OmniboxResultPageComponent', () => {
     kind: string,
     id: string,
     query: Record<string, string>,
+    paramMap: Observable<ParamMap> = of(convertToParamMap({ kind, id })),
   ) {
     const queryParamMap = convertToParamMap(query);
     TestBed.configureTestingModule({
@@ -44,7 +53,7 @@ describe('OmniboxResultPageComponent', () => {
         {
           provide: ActivatedRoute,
           useValue: {
-            paramMap: of(convertToParamMap({ kind, id })),
+            paramMap,
             queryParamMap: of(queryParamMap),
             snapshot: { queryParamMap },
           },
@@ -69,8 +78,9 @@ describe('OmniboxResultPageComponent', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    geography.getBusStop.mockReturnValue(of(stop));
-    geography.getRoutesForStop.mockReturnValue(of([]));
+    geography.watchStopFullData.mockReturnValue(
+      of({ stop, routes: [], hasNext: false }),
+    );
     search.search.mockReturnValue(of({ success: false, results: [] }));
     bikes.getStation.mockReturnValue(null);
   });
@@ -101,28 +111,98 @@ describe('OmniboxResultPageComponent', () => {
     subscription.unsubscribe();
   });
 
-  it('loads a bus stop by URL and retains arrivals when routes fail', async () => {
-    geography.getRoutesForStop.mockReturnValue(
-      throwError(() => new Error('offline')),
-    );
+  it('shows a stop before deferred routes arrive and keeps the dialog injector stable', async () => {
+    const snapshots = new Subject<StopFullDataSnapshot>();
+    geography.watchStopFullData.mockReturnValue(snapshots);
     const page = await createPage('bus-stop', stop.stopId, { q: 'paulista' });
+    snapshots.next({ stop, hasNext: true });
+
     expect(page.query()).toBe('paulista');
-    expect(page.detail()).toEqual({
+    expect(page.detail()).toMatchObject({
       kind: 'bus-stop',
       title: stop.name,
+      data: { stop, routes: [], routesLoading: true, routesError: false },
+    });
+    const dialogInjector = page.detailInjector();
+    const route: BusRouteGraphQL = {
+      id: '477A-10',
+      routeId: '477A-10',
+      shortName: '477A',
+      longName: 'Pinheiros - Ibirapuera',
+      color: '112233',
+      textColor: 'FFFFFF',
+    };
+
+    snapshots.next({
+      stop,
+      routes: [{ route }],
+      hasNext: false,
+    });
+
+    expect(page.detail()?.data).toMatchObject({
+      routes: [route],
+      routesLoading: false,
+      routesError: false,
+    });
+    expect(page.detailInjector()).toBe(dialogInjector);
+    expect(page.embeddedInputs()).toMatchObject({
+      detailsOverride: { stop, routes: [route] },
+    });
+  });
+
+  it('preserves the stop if deferred route delivery fails', async () => {
+    const snapshots = new Subject<StopFullDataSnapshot>();
+    geography.watchStopFullData.mockReturnValue(snapshots);
+    const page = await createPage('bus-stop', stop.stopId, { q: 'paulista' });
+    snapshots.next({ stop, hasNext: true });
+    snapshots.error(new Error('offline'));
+
+    expect(page.detail()).toMatchObject({
+      kind: 'bus-stop',
       data: {
         stop,
-        routes: [],
-        selectedRoutes: new Set(),
-        showMapActions: false,
-      },
-      mapParams: {
-        busStops: stop.stopId,
-        lat: String(stop.latitude),
-        lon: String(stop.longitude),
-        z: '16',
+        routesLoading: false,
+        routesError: true,
       },
     });
+  });
+
+  it('shows GraphQL route errors without losing stop details', async () => {
+    const snapshots = new Subject<StopFullDataSnapshot>();
+    geography.watchStopFullData.mockReturnValue(snapshots);
+    const page = await createPage('bus-stop', stop.stopId, { q: 'paulista' });
+    snapshots.next({ stop, hasNext: true });
+    snapshots.next({
+      stop,
+      hasNext: false,
+      errors: [{ message: 'routes unavailable', path: ['stopFullData', 'routes'] }],
+    });
+
+    expect(page.detail()).toMatchObject({
+      kind: 'bus-stop',
+      data: {
+        stop,
+        routesLoading: false,
+        routesError: true,
+      },
+    });
+  });
+
+  it('unsubscribes the stop stream when navigating to another result', async () => {
+    const routeParams = new Subject<ParamMap>();
+    const teardown = jest.fn();
+    geography.watchStopFullData.mockReturnValue(
+      new Observable<StopFullDataSnapshot>(() => teardown),
+    );
+    const page = await createPage('bus-stop', stop.stopId, {}, routeParams);
+    routeParams.next(convertToParamMap({ kind: 'bus-stop', id: stop.stopId }));
+    expect(geography.watchStopFullData).toHaveBeenCalledWith(stop.stopId);
+
+    routeParams.next(convertToParamMap({ kind: 'rail-line', id: 'L9' }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(teardown).toHaveBeenCalledTimes(1);
+    expect(page.detail()?.kind).toBe('rail-line');
   });
 
   it('restores rail station details from a shared URL if search is unavailable', async () => {

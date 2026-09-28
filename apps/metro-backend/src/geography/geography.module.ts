@@ -5,7 +5,11 @@ import { PostGISService } from './services/postgis.service';
 import { BusStopService } from './services/bus-stop.service';
 import { SubwayStationService } from './services/subway-station.service';
 import { RailStationService } from './services/rail-station.service';
-import { GeographyResolver } from './resolvers/geography.resolver';
+import {
+  GeographyResolver,
+  RouteFullDataResolver,
+  StopFullDataResolver,
+} from './resolvers/geography.resolver';
 import { PrismaService } from '../prisma/prisma.service';
 
 // Optimized services
@@ -26,6 +30,8 @@ import { VectorTilesModule } from '../vector-tiles/vector-tiles.module';
     SubwayStationService,
     RailStationService,
     GeographyResolver,
+    StopFullDataResolver,
+    RouteFullDataResolver,
     PrismaService,
     // Optimized services
     QueryOptimizationService,

@@ -22,9 +22,6 @@ import {
   withFetch,
   withInterceptors,
 } from '@angular/common/http';
-import { provideApollo } from 'apollo-angular';
-import { ApolloLink, InMemoryCache } from '@apollo/client/core';
-import { HttpLink } from 'apollo-angular/http';
 import {
   API_BASE_URL,
   ErrorTrackingService,
@@ -40,8 +37,6 @@ import {
   provideAuth,
   provideFirebase,
 } from '@metro/shared/firebase';
-import { SetContextLink } from '@apollo/client/link/context';
-import { firebaseIdToken } from '@metro/shared/firebase';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -63,39 +58,6 @@ export const appConfig: ApplicationConfig = {
         graphqlQueryTimeoutInterceptor,
       ]),
     ),
-    provideApollo(() => {
-      const httpLink = inject(HttpLink);
-
-      const basic = new SetContextLink(() => ({
-        headers: {
-          Accept: 'charset=utf-8',
-        },
-      }));
-
-      const auth = new SetContextLink(() => {
-        const token = firebaseIdToken();
-        if (!token) return {};
-
-        return {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        };
-      });
-
-      const uri = `${environment.apiUrl}/graphql`;
-      const link = httpLink.create({ uri }) as unknown as ApolloLink;
-
-      return {
-        link: ApolloLink.from([basic, auth, link]),
-        cache: new InMemoryCache(),
-        defaultOptions: {
-          query: {
-            errorPolicy: 'all',
-          },
-        },
-      };
-    }),
     { provide: API_BASE_URL, useValue: environment.apiUrl },
     {
       provide: 'ICON_FONT_SETUP',

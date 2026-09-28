@@ -99,7 +99,18 @@ function readBusVehiclePosition(value: unknown): BusVehiclePosition {
     throw new Error('Invalid vehicle position timestamp');
   }
 
-  return { plate, latitude, longitude, recordedAt };
+  const destination =
+    value.destination === undefined || value.destination === ''
+      ? undefined
+      : readText(value.destination, 120);
+
+  return {
+    plate,
+    latitude,
+    longitude,
+    recordedAt,
+    ...(destination ? { destination } : {}),
+  };
 }
 
 function readCoordinate(value: unknown, min: number, max: number): number {

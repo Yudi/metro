@@ -50,6 +50,7 @@ describe('BusVehiclePositionsClient', () => {
               latitude: -23.5,
               longitude: -46.6,
               recordedAt: '2026-09-28T12:30:00.000Z',
+              destination: 'Terminal Centro',
               providerField: 'must not escape',
             },
           ],
@@ -63,6 +64,7 @@ describe('BusVehiclePositionsClient', () => {
         latitude: -23.5,
         longitude: -46.6,
         recordedAt: '2026-09-28T12:30:00.000Z',
+        destination: 'Terminal Centro',
       },
     ]);
     expect(transport.getVehiclePositions).toHaveBeenCalledWith(

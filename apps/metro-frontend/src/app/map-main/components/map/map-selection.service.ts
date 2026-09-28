@@ -1,6 +1,6 @@
 import { Service, inject } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, Observable } from 'rxjs';
 import {
   extractTrackedRailVehicleLineCode,
   getRailLineById,
@@ -17,10 +17,15 @@ import {
   VectorTileLayerType,
 } from './vector-tiles/vector-tile-layer.service';
 import { GeographyCacheService } from '../../geography/geography-cache.service';
+import type { StopFullDataSnapshot } from '../../geography/geography-graphql.service';
 import { MapDataLoaderService } from './map-data-loader.service';
 import { MapDisplayService } from './map-display.service';
 import { MapStateService } from './map-state.service';
 import { SelectedRoute, SelectedStop } from './map.types';
+
+interface PendingStopSelection {
+  canonicalStopId?: string;
+}
 
 @Service()
 export class MapSelectionService {
@@ -34,6 +39,10 @@ export class MapSelectionService {
   private readonly realtimeService = inject(RealtimeWebsocketService);
   private readonly cptmVehicleLayer = inject(CptmVehicleLayerService);
   private readonly vectorTileService = inject(VectorTileLayerService);
+  private readonly pendingStopSelections = new Map<
+    string,
+    PendingStopSelection
+  >();
 
   async addRouteToSelection(
     routeId: string,
@@ -189,47 +198,56 @@ export class MapSelectionService {
   async addStopToSelection(
     stopId: string,
     shouldDisplaySnackbar = true,
+    stopUpdates?: Observable<StopFullDataSnapshot>,
   ): Promise<void> {
-    const stopResult = await firstValueFrom(this.cache.getStop(stopId)).then(
-      (stop) => ({ success: true as const, stop }),
-      (error: unknown) => {
-        this.logger.error('Failed to load stop selection', error);
-        if (shouldDisplaySnackbar) {
-          this.snackBar.open('Não foi possível carregar a parada', 'Fechar', {
-            duration: 3000,
+    if (this.mapState.selectedStops().has(stopId)) {
+      return;
+    }
+
+    const pendingRequest: PendingStopSelection = {};
+    this.pendingStopSelections.set(stopId, pendingRequest);
+    try {
+      const loadResult = await this.dataLoader.loadStopData(
+        stopId,
+        shouldDisplaySnackbar,
+        stopUpdates,
+        (stop) => (pendingRequest.canonicalStopId = stop.stopId),
+      );
+      if (!this.isCurrentStopSelection(stopId, pendingRequest)) {
+        return;
+      }
+      if (loadResult.status !== 'loaded') {
+        if (loadResult.status === 'not-found' && shouldDisplaySnackbar) {
+          this.snackBar.open('Parada não encontrada', 'Fechar', {
+            duration: 2000,
           });
         }
-        return { success: false as const };
-      },
-    );
-    if (!stopResult.success) {
-      return;
-    }
-
-    const { stop } = stopResult;
-    if (!stop) {
-      this.logger.warn('Stop not found', { stopId });
-      if (shouldDisplaySnackbar) {
-        this.snackBar.open('Parada não encontrada', 'Fechar', {
-          duration: 2000,
-        });
+        return;
       }
-      return;
-    }
 
-    const selectedStop: SelectedStop = {
-      id: stop.stopId,
-      name: stop.name,
-      latitude: stop.latitude,
-      longitude: stop.longitude,
-      isSubwayStation: stop.isSubwayStation,
-    };
-    this.mapState.addStopToSelection(selectedStop);
-    this.dataLoader.syncVectorTileFilters();
-    void this.dataLoader.loadStopData(stopId, shouldDisplaySnackbar);
+      const { stop } = loadResult;
+      pendingRequest.canonicalStopId = stop.stopId;
+      if (this.mapState.selectedStops().has(stop.stopId)) {
+        return;
+      }
 
-    if (shouldDisplaySnackbar) {
-      this.snackBar.open(`Parada adicionada`, 'Fechar', { duration: 2000 });
+      const selectedStop: SelectedStop = {
+        id: stop.stopId,
+        name: stop.name,
+        latitude: stop.latitude,
+        longitude: stop.longitude,
+        isSubwayStation: stop.isSubwayStation,
+      };
+      this.mapState.addStopToSelection(selectedStop);
+      this.dataLoader.syncVectorTileFilters();
+
+      if (shouldDisplaySnackbar) {
+        this.snackBar.open(`Parada adicionada`, 'Fechar', { duration: 2000 });
+      }
+    } finally {
+      if (this.pendingStopSelections.get(stopId) === pendingRequest) {
+        this.pendingStopSelections.delete(stopId);
+      }
     }
   }
 
@@ -244,6 +262,15 @@ export class MapSelectionService {
   }
 
   removeStopFromSelection(stopId: string): void {
+    for (const [requestedStopId, pendingRequest] of this.pendingStopSelections) {
+      if (
+        requestedStopId === stopId ||
+        pendingRequest.canonicalStopId === stopId
+      ) {
+        this.pendingStopSelections.delete(requestedStopId);
+        this.dataLoader.cancelStopDataLoad(requestedStopId);
+      }
+    }
     this.mapState.removeStopFromSelection(stopId);
     this.dataLoader.removeStopDisplayData(stopId);
 
@@ -286,6 +313,7 @@ export class MapSelectionService {
       this.unsubscribeFromRouteRealtime(route);
     }
 
+    this.cancelPendingStopSelections();
     this.mapState.clearAllSelections();
     this.dataLoader.syncVectorTileFilters();
     this.displayService.clearSelection();
@@ -294,6 +322,18 @@ export class MapSelectionService {
     if (shouldDisplaySnackbar) {
       this.snackBar.open(`Seleções limpas`, 'Fechar', { duration: 2000 });
     }
+  }
+
+  cancelPendingStopSelections(): void {
+    this.pendingStopSelections.clear();
+    this.dataLoader.cancelStopDataLoads();
+  }
+
+  private isCurrentStopSelection(
+    stopId: string,
+    request: PendingStopSelection,
+  ): boolean {
+    return this.pendingStopSelections.get(stopId) === request;
   }
 
   private subscribeToRouteRealtime(

@@ -12,7 +12,6 @@ import {
   Trip,
   BoundingBox,
   RouteFullData,
-  StopFullData,
   RouteRailConnection,
 } from '../entities/geography.entity';
 import { BoundingBoxInput, StopSearchInput } from '../dto/geography.input';
@@ -158,24 +157,29 @@ export class GeographyServiceOptimized {
     return this.tripService.getRoutesForStop(stopId);
   }
 
+  async getRouteShapesForRoute(routeId: string): Promise<BusShape[]> {
+    const shapes = await this.busRouteService.getRouteShapesForRoute(routeId);
+    return shapes.map((shape) => ({
+      id: shape.shape_id,
+      shapeId: shape.shape_id,
+      geometry: {
+        type: 'LineString',
+        coordinates: shape.coordinates,
+      },
+    }));
+  }
+
   async getBatchRoutesForStops(
     stopIds: string[],
   ): Promise<Map<string, string[]>> {
     return this.tripService.getBatchRoutesForStops(stopIds);
   }
 
-  async getRouteFullData(
-    routeId: string,
+  async getRouteFullDataForRoute(
+    route: BusRoute,
     options: RouteFullDataOptions = {},
-  ): Promise<RouteFullData | null> {
-    this.logger.debug(`Getting full data for route: ${routeId}`);
-
-    // Get route info first
-    const route = await this.getBusRoute(routeId);
-    if (!route) {
-      return null;
-    }
-
+  ): Promise<RouteFullData> {
+    const routeId = route.routeId;
     const includeTrips = options.includeTrips ?? true;
     const includeShapes = options.includeShapes ?? true;
     const includeStops = options.includeStops ?? true;
@@ -184,10 +188,8 @@ export class GeographyServiceOptimized {
       ? this.getTripsForRoute(routeId)
       : Promise.resolve<Trip[]>([]);
     const shapesPromise = includeShapes
-      ? this.busRouteService.getRouteShapesForRoute(route.routeId)
-      : Promise.resolve<Array<{ shape_id: string; coordinates: number[][] }>>(
-          [],
-        );
+      ? this.getRouteShapesForRoute(route.routeId)
+      : Promise.resolve<BusShape[]>([]);
     const stopsPromise = includeStops
       ? this.getStopsForRoute(routeId)
       : Promise.resolve<BusStop[]>([]);
@@ -204,34 +206,15 @@ export class GeographyServiceOptimized {
     return {
       route,
       trips,
-      shapes: shapes.map((shape) => ({
-        id: shape.shape_id,
-        shapeId: shape.shape_id,
-        geometry: {
-          type: 'LineString',
-          coordinates: shape.coordinates,
-        },
-      })),
+      shapes,
       stops,
     };
   }
 
-  /**
-   * Get complete stop data in a single request.
-   * Fetches stop info and full data for all routes passing through it.
-   */
-  async getStopFullData(
+  async getStopRoutesFullData(
     stopId: string,
-    includeRouteDetails = true,
-  ): Promise<StopFullData | null> {
-    this.logger.debug(`Getting full data for stop: ${stopId}`);
-
-    // Get stop info first
-    const stop = await this.getBusStop(stopId);
-    if (!stop) {
-      return null;
-    }
-
+    options: RouteFullDataOptions = {},
+  ): Promise<RouteFullData[]> {
     // Get routes passing through this stop
     const routesInfo = await this.getRoutesForStop(stopId);
 
@@ -241,41 +224,22 @@ export class GeographyServiceOptimized {
       );
     }
 
-    if (!includeRouteDetails) {
-      return {
-        stop,
-        routes: routesInfo.map((route) => ({
-          route,
-          trips: [],
-          shapes: [],
-          stops: [],
-        })),
-      };
-    }
-
-    const routeFullDataResults: Array<RouteFullData | null> = [];
+    const routes: RouteFullData[] = [];
     for (
       let index = 0;
       index < routesInfo.length;
       index += STOP_FULL_DATA_CONCURRENCY
     ) {
       const batch = routesInfo.slice(index, index + STOP_FULL_DATA_CONCURRENCY);
-      routeFullDataResults.push(
+      routes.push(
         ...(await Promise.all(
-          batch.map((route) => this.getRouteFullData(route.routeId)),
+          batch.map((route) => this.getRouteFullDataForRoute(route, options)),
         )),
       );
     }
-    const routes = routeFullDataResults.filter(
-      (r): r is RouteFullData => r !== null,
-    );
 
     this.logger.debug(`Stop ${stopId}: ${routes.length} routes with full data`);
-
-    return {
-      stop,
-      routes,
-    };
+    return routes;
   }
 
   async getRouteRailConnectionsForStop(

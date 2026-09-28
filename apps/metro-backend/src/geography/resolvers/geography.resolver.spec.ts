@@ -5,7 +5,11 @@ import {
   Kind,
   parse,
 } from 'graphql';
-import { GeographyResolver } from './geography.resolver';
+import {
+  GeographyResolver,
+  RouteFullDataResolver,
+  StopFullDataResolver,
+} from './geography.resolver';
 
 describe('GeographyResolver input bounds', () => {
   it('rejects oversized ID arrays before service work', async () => {
@@ -66,140 +70,127 @@ describe('GeographyResolver input bounds', () => {
 });
 
 describe('GeographyResolver full-data selections', () => {
-  it('keeps direct callers on the legacy full-data service contract', async () => {
+  it('returns stop data without waiting for its route list', async () => {
     const geographyService = {
-      getRouteFullData: jest.fn().mockResolvedValue(null),
+      getBusStop: jest.fn().mockResolvedValue({ stopId: 'stop-1' }),
+      getStopRoutesFullData: jest.fn(),
     };
     const resolver = createResolver(geographyService);
 
-    await resolver.routeFullData('route-1');
-
-    expect(geographyService.getRouteFullData).toHaveBeenCalledWith('route-1');
-  });
-
-  it('does not request related route collections when they are omitted', async () => {
-    const geographyService = {
-      getRouteFullData: jest.fn().mockResolvedValue(null),
-    };
-    const resolver = createResolver(geographyService);
-
-    await resolver.routeFullData(
-      'route-1',
-      resolveInfoFor(
-        `
-        query Route {
-          routeFullData(routeId: "route-1") {
-            route { routeId }
-          }
-        }
-      `,
-        'routeFullData',
-      ),
-    );
-
-    expect(geographyService.getRouteFullData).toHaveBeenCalledWith('route-1', {
-      includeTrips: false,
-      includeShapes: false,
-      includeStops: false,
+    await expect(resolver.stopFullData('stop-1')).resolves.toEqual({
+      stop: { stopId: 'stop-1' },
     });
+
+    expect(geographyService.getBusStop).toHaveBeenCalledWith('stop-1');
+    expect(geographyService.getStopRoutesFullData).not.toHaveBeenCalled();
   });
 
-  it('requests each related route collection selected by the operation', async () => {
+  it('loads only selected stop-route collections through fragments and directives', async () => {
     const geographyService = {
-      getRouteFullData: jest.fn().mockResolvedValue(null),
+      getStopRoutesFullData: jest.fn().mockResolvedValue([]),
     };
-    const resolver = createResolver(geographyService);
+    const resolver = new StopFullDataResolver(geographyService as never);
 
-    await resolver.routeFullData(
-      'route-1',
-      resolveInfoFor(
+    await resolver.routes(
+      { stop: { stopId: 'stop-1' } } as never,
+      resolveInfoForNestedField(
         `
-        query Route {
-          routeFullData(routeId: "route-1") {
-            route { routeId }
-            trips { tripId }
-            stops { stopId }
-          }
-        }
-      `,
-        'routeFullData',
-      ),
-    );
-
-    expect(geographyService.getRouteFullData).toHaveBeenCalledWith('route-1', {
-      includeTrips: true,
-      includeShapes: false,
-      includeStops: true,
-    });
-  });
-
-  it('finds fields through named and inline fragments', async () => {
-    const geographyService = {
-      getRouteFullData: jest.fn().mockResolvedValue(null),
-    };
-    const resolver = createResolver(geographyService);
-
-    await resolver.routeFullData(
-      'route-1',
-      resolveInfoFor(
-        `
-        query Route {
-          routeFullData(routeId: "route-1") {
-            route { routeId }
-            ...RouteCollections
-            ... on RouteFullData {
-              shapes { shapeId }
+        query Stop($includeTrips: Boolean!) {
+          stopFullData(stopId: "stop-1") {
+            routes {
+              route { routeId }
+              ...RouteCollections
             }
           }
         }
 
         fragment RouteCollections on RouteFullData {
-          trips { tripId }
-        }
-      `,
-        'routeFullData',
-      ),
-    );
-
-    expect(geographyService.getRouteFullData).toHaveBeenCalledWith('route-1', {
-      includeTrips: true,
-      includeShapes: true,
-      includeStops: false,
-    });
-  });
-
-  it('retains stop route-detail detection through fragments', async () => {
-    const geographyService = {
-      getStopFullData: jest.fn().mockResolvedValue(null),
-    };
-    const resolver = createResolver(geographyService);
-
-    await resolver.stopFullData(
-      'stop-1',
-      resolveInfoFor(
-        `
-        query Stop {
-          stopFullData(stopId: "stop-1") {
-            ...StopCollections
-          }
-        }
-
-        fragment StopCollections on StopFullData {
-          routes {
-            ... on RouteFullData {
-              trips { tripId }
-            }
+          trips @include(if: $includeTrips) { tripId }
+          shapes @skip(if: true) { shapeId }
+          ... on RouteFullData {
+            stops { stopId }
           }
         }
       `,
         'stopFullData',
+        'routes',
+        { includeTrips: false },
       ),
     );
 
-    expect(geographyService.getStopFullData).toHaveBeenCalledWith(
+    expect(geographyService.getStopRoutesFullData).toHaveBeenCalledWith(
       'stop-1',
-      true,
+      { includeTrips: false, includeShapes: false, includeStops: true },
     );
+  });
+
+  it('returns a route root without loading unselected collections', async () => {
+    const geographyService = {
+      getBusRoute: jest.fn().mockResolvedValue({
+        routeId: 'route-1',
+        id: 'route-1',
+      }),
+      getTripsForRoute: jest.fn(),
+    };
+    const resolver = createResolver(geographyService);
+
+    const result = await resolver.routeFullData('route-1');
+
+    expect(result).toEqual({ route: { routeId: 'route-1', id: 'route-1' } });
+    expect(result).not.toHaveProperty('trips');
+    expect(geographyService.getBusRoute).toHaveBeenCalledWith('route-1');
+    expect(geographyService.getTripsForRoute).not.toHaveBeenCalled();
+  });
+
+  it('loads deferred route collections independently', async () => {
+    let releaseShapes: (shapes: { shapeId: string }[]) => void = () => undefined;
+    const shapesGate = new Promise<{ shapeId: string }[]>((resolve) => {
+      releaseShapes = resolve;
+    });
+    const geographyService = {
+      getBusRoute: jest.fn().mockResolvedValue({
+        routeId: 'route-1',
+        id: 'route-1',
+      }),
+      getTripsForRoute: jest.fn().mockResolvedValue([{ tripId: 'trip-1' }]),
+      getRouteShapesForRoute: jest.fn().mockReturnValue(shapesGate),
+      getStopsForRoute: jest.fn().mockResolvedValue([{ stopId: 'stop-1' }]),
+    };
+    const rootResolver = createResolver(geographyService);
+    const fieldsResolver = new RouteFullDataResolver(geographyService as never);
+
+    const result = await rootResolver.routeFullData('route-1');
+
+    const tripsPromise = fieldsResolver.trips(result as never);
+    const shapesPromise = fieldsResolver.shapes(result as never);
+    const stopsPromise = fieldsResolver.stops(result as never);
+
+    await expect(tripsPromise).resolves.toEqual([{ tripId: 'trip-1' }]);
+    await expect(stopsPromise).resolves.toEqual([{ stopId: 'stop-1' }]);
+    expect(geographyService.getTripsForRoute).toHaveBeenCalledWith('route-1');
+    expect(geographyService.getStopsForRoute).toHaveBeenCalledWith('route-1');
+    expect(geographyService.getRouteShapesForRoute).toHaveBeenCalledWith(
+      'route-1',
+    );
+
+    releaseShapes([{ shapeId: 'shape-1' }]);
+    await expect(shapesPromise).resolves.toEqual([{ shapeId: 'shape-1' }]);
+
+    await fieldsResolver.trips(result as never);
+    expect(geographyService.getTripsForRoute).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses hydrated stop routes without loading their details again', async () => {
+    const geographyService = {
+      getRouteFullDataForRoute: jest.fn(),
+    };
+    const resolver = new RouteFullDataResolver(geographyService as never);
+
+    await expect(
+      resolver.trips({ route: { routeId: 'route-1' }, trips: [] } as never),
+    ).resolves.toEqual([]);
+
+    expect(geographyService.getRouteFullDataForRoute).not.toHaveBeenCalled();
   });
 });
 
@@ -212,7 +203,12 @@ function createResolver(geographyService: object): GeographyResolver {
   );
 }
 
-function resolveInfoFor(source: string, fieldName: string): GraphQLResolveInfo {
+function resolveInfoForNestedField(
+  source: string,
+  outerFieldName: string,
+  fieldName: string,
+  variableValues: Record<string, unknown> = {},
+): GraphQLResolveInfo {
   const document = parse(source);
   const operation = document.definitions.find(
     (definition) => definition.kind === Kind.OPERATION_DEFINITION,
@@ -222,7 +218,11 @@ function resolveInfoFor(source: string, fieldName: string): GraphQLResolveInfo {
     throw new Error('Expected an operation definition');
   }
 
-  const fieldNodes = operation.selectionSet.selections.filter(
+  const outerField = operation.selectionSet.selections.find(
+    (selection): selection is FieldNode =>
+      selection.kind === Kind.FIELD && selection.name.value === outerFieldName,
+  );
+  const fieldNodes = outerField?.selectionSet?.selections.filter(
     (selection): selection is FieldNode =>
       selection.kind === Kind.FIELD && selection.name.value === fieldName,
   );
@@ -234,5 +234,9 @@ function resolveInfoFor(source: string, fieldName: string): GraphQLResolveInfo {
     }
   }
 
-  return { fieldNodes, fragments } as unknown as GraphQLResolveInfo;
+  return {
+    fieldNodes: fieldNodes ?? [],
+    fragments,
+    variableValues,
+  } as unknown as GraphQLResolveInfo;
 }

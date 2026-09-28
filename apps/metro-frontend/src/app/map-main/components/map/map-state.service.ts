@@ -162,26 +162,56 @@ export class MapStateService {
     sourceSelectionId?: string,
     derivedFromStop = false,
   ): void {
+    this.addRoutesToDisplay([route], sourceSelectionId, derivedFromStop);
+  }
+
+  /** Add a related route batch with a single map display refresh. */
+  addRoutesToDisplay(
+    routes: readonly BusRouteGraphQL[],
+    sourceSelectionId?: string,
+    derivedFromStop = false,
+  ): void {
+    if (routes.length === 0) {
+      return;
+    }
+
     const currentRoutes = this.displayedRoutes();
-    const exists = currentRoutes.find((r) => r.id === route.id);
-    if (!exists) {
-      this.displayedRoutes.set([...currentRoutes, route]);
+    const routeIds = new Set(currentRoutes.map((route) => route.id));
+    const nextRoutes = [...currentRoutes];
+    let displayChanged = false;
+
+    const derivedRouteIds = derivedFromStop
+      ? new Set(this.routesDerivedFromStops())
+      : null;
+    let derivedRoutesChanged = false;
+
+    for (const route of routes) {
+      if (!routeIds.has(route.id)) {
+        routeIds.add(route.id);
+        nextRoutes.push(route);
+        displayChanged = true;
+      }
+
+      if (sourceSelectionId) {
+        const sources =
+          this.displayedRouteSources.get(route.routeId) ?? new Set<string>();
+        sources.add(sourceSelectionId);
+        this.displayedRouteSources.set(route.routeId, sources);
+      }
+
+      if (derivedRouteIds && !derivedRouteIds.has(route.routeId)) {
+        derivedRouteIds.add(route.routeId);
+        derivedRoutesChanged = true;
+      }
+    }
+
+    if (derivedRoutesChanged && derivedRouteIds) {
+      this.routesDerivedFromStops.set(derivedRouteIds);
+    }
+
+    if (displayChanged) {
+      this.displayedRoutes.set(nextRoutes);
       this.triggerDisplayUpdate();
-    }
-
-    // Track source if provided
-    if (sourceSelectionId) {
-      const sources =
-        this.displayedRouteSources.get(route.routeId) || new Set();
-      sources.add(sourceSelectionId);
-      this.displayedRouteSources.set(route.routeId, sources);
-    }
-
-    // Track if this route was derived from a stop selection
-    if (derivedFromStop) {
-      const derived = new Set(this.routesDerivedFromStops());
-      derived.add(route.routeId);
-      this.routesDerivedFromStops.set(derived);
     }
   }
 

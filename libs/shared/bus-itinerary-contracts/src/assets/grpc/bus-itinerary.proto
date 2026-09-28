@@ -15,6 +15,7 @@ message BusVehiclePosition {
   double latitude = 2;
   double longitude = 3;
   string recorded_at = 4;
+  string destination = 5;
 }
 message PublishedRouteInformation {
   string status = 1;

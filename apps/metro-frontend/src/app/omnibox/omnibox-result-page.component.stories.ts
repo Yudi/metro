@@ -20,7 +20,7 @@ import {
   moduleMetadata,
   StoryObj,
 } from '@storybook/angular';
-import { of } from 'rxjs';
+import { concat, map, of, timer } from 'rxjs';
 import { userEvent, within } from 'storybook/test';
 import { BikeStationsService } from '../map-main/geography/bike-stations.service';
 import { GeographyGraphQLService } from '../map-main/geography/geography-graphql.service';
@@ -157,17 +157,24 @@ export const BusStop: Story = {
         {
           provide: GeographyGraphQLService,
           useValue: {
-            getBusStop: () => of({
-              id: '340015325',
-              stopId: '340015325',
-              name: 'Av. Paulista, 1000',
-              latitude: -23.5614,
-              longitude: -46.656,
-              isSubwayStation: false,
-              agencies: ['bus'],
-              routeShortNames: ['477A'],
-            }),
-            getRoutesForStop: () => of([]),
+            watchStopFullData: () => {
+              const stop = {
+                id: '340015325',
+                stopId: '340015325',
+                name: 'Av. Paulista, 1000',
+                latitude: -23.5614,
+                longitude: -46.656,
+                isSubwayStation: false,
+                agencies: ['bus'],
+                routeShortNames: ['477A'],
+              };
+              return concat(
+                of({ stop, hasNext: true }),
+                timer(900).pipe(
+                  map(() => ({ stop, routes: [], hasNext: false })),
+                ),
+              );
+            },
             getRouteRailConnectionsForStop: () => of([]),
             getScheduledBusDepartures: () => of([]),
           },

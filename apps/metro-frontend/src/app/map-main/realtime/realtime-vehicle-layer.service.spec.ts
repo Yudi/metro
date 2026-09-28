@@ -74,6 +74,7 @@ describe('RealtimeVehicleLayerService', () => {
                 latitude: -23.55,
                 longitude: -46.63,
                 recordedAt: '2026-09-28T12:00:00.000Z',
+                destination: 'Terminal Centro',
               },
             ],
             cacheTimestamp: 1,
@@ -123,6 +124,7 @@ describe('RealtimeVehicleLayerService', () => {
     expect(artesp?.get('routeColor')).toBe('#C90C0F');
     expect(artesp?.get('latitude')).toBe(-23.55);
     expect(artesp?.get('longitude')).toBe(-46.63);
+    expect(artesp?.get('destination')).toBe('Terminal Centro');
     const geometry = artesp?.get('geometry') as Point | undefined;
     expect(geometry?.getCoordinates()).toEqual([-46.63, -23.55]);
     expect(sptrans?.getId()).toBe('vehicle-100-12345');

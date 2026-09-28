@@ -93,12 +93,6 @@ export interface ScheduledBusDepartureGraphQL {
   platformCode?: string;
 }
 
-/** Combined stop data from a single GraphQL query. */
-export interface StopFullDataGraphQL {
-  stop: BusStopGraphQL;
-  routes: RouteFullDataGraphQL[];
-}
-
 export interface StopSearchInput {
   searchTerm?: string;
   bounds?: BoundingBox;

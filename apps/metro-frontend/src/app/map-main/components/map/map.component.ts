@@ -209,6 +209,7 @@ export class MapComponent implements AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.destroyed = true;
+    this.interactionService.cancelPendingStopSelections();
     this.mapPanel.clear();
     if (this.initializationTimer) {
       clearTimeout(this.initializationTimer);

@@ -3,6 +3,7 @@ export interface BusVehiclePosition {
   latitude: number;
   longitude: number;
   recordedAt: string;
+  destination?: string;
 }
 
 export interface BusVehiclePositions {

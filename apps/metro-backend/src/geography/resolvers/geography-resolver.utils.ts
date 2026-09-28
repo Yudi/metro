@@ -3,7 +3,9 @@ import {
   FragmentDefinitionNode,
   GraphQLResolveInfo,
   Kind,
+  SelectionNode,
   SelectionSetNode,
+  valueFromASTUntyped,
 } from 'graphql';
 
 const MAX_BATCH_IDS = 500;
@@ -18,41 +20,12 @@ export interface RouteFullDataSelection {
 export function requestedRouteFullDataOptions(
   info: GraphQLResolveInfo,
 ): RouteFullDataSelection {
-  return {
-    includeTrips: info.fieldNodes.some((fieldNode) =>
-      selectionSetHasAnyField(
-        fieldNode.selectionSet,
-        new Set(['trips']),
-        info.fragments,
-      ),
+  return routeFullDataOptions(
+    info.fieldNodes.flatMap((fieldNode) =>
+      fieldNode.selectionSet ? [fieldNode.selectionSet] : [],
     ),
-    includeShapes: info.fieldNodes.some((fieldNode) =>
-      selectionSetHasAnyField(
-        fieldNode.selectionSet,
-        new Set(['shapes']),
-        info.fragments,
-      ),
-    ),
-    includeStops: info.fieldNodes.some((fieldNode) =>
-      selectionSetHasAnyField(
-        fieldNode.selectionSet,
-        new Set(['stops']),
-        info.fragments,
-      ),
-    ),
-  };
-}
-
-export function requestsRouteDetails(info: GraphQLResolveInfo): boolean {
-  const routeSelectionSets = info.fieldNodes.flatMap((fieldNode) =>
-    findFieldSelectionSets(fieldNode.selectionSet, 'routes', info.fragments),
-  );
-  return routeSelectionSets.some((selectionSet) =>
-    selectionSetHasAnyField(
-      selectionSet,
-      new Set(['trips', 'shapes', 'stops']),
-      info.fragments,
-    ),
+    info.fragments,
+    info.variableValues,
   );
 }
 
@@ -101,64 +74,11 @@ function isValidIdentifier(value: string): boolean {
   );
 }
 
-function findFieldSelectionSets(
-  selectionSet: SelectionSetNode | undefined,
-  fieldName: string,
-  fragments: Record<string, FragmentDefinitionNode>,
-  visitedFragments = new Set<string>(),
-): SelectionSetNode[] {
-  if (!selectionSet) {
-    return [];
-  }
-
-  const matches: SelectionSetNode[] = [];
-  for (const selection of selectionSet.selections) {
-    if (selection.kind === Kind.FIELD) {
-      if (selection.name.value === fieldName && selection.selectionSet) {
-        matches.push(selection.selectionSet);
-      }
-      continue;
-    }
-    if (selection.kind === Kind.FRAGMENT_SPREAD) {
-      if (visitedFragments.has(selection.name.value)) {
-        continue;
-      }
-
-      const fragment = fragments[selection.name.value];
-      if (!fragment) {
-        continue;
-      }
-
-      const fragmentVisited = new Set(visitedFragments).add(
-        selection.name.value,
-      );
-      matches.push(
-        ...findFieldSelectionSets(
-          fragment.selectionSet,
-          fieldName,
-          fragments,
-          fragmentVisited,
-        ),
-      );
-      continue;
-    }
-
-    matches.push(
-      ...findFieldSelectionSets(
-        selection.selectionSet,
-        fieldName,
-        fragments,
-        visitedFragments,
-      ),
-    );
-  }
-  return matches;
-}
-
 function selectionSetHasAnyField(
   selectionSet: SelectionSetNode | undefined,
   fieldNames: Set<string>,
   fragments: Record<string, FragmentDefinitionNode>,
+  variableValues: Record<string, unknown> = {},
   visitedFragments = new Set<string>(),
 ): boolean {
   if (!selectionSet) {
@@ -166,6 +86,10 @@ function selectionSetHasAnyField(
   }
 
   return selectionSet.selections.some((selection) => {
+    if (!selectionIsIncluded(selection, variableValues)) {
+      return false;
+    }
+
     if (selection.kind === Kind.FIELD) {
       return fieldNames.has(selection.name.value);
     }
@@ -187,6 +111,7 @@ function selectionSetHasAnyField(
         fragment.selectionSet,
         fieldNames,
         fragments,
+        variableValues,
         fragmentVisited,
       );
     }
@@ -195,7 +120,68 @@ function selectionSetHasAnyField(
       selection.selectionSet,
       fieldNames,
       fragments,
+      variableValues,
       visitedFragments,
     );
   });
+}
+
+function routeFullDataOptions(
+  selectionSets: SelectionSetNode[],
+  fragments: Record<string, FragmentDefinitionNode>,
+  variableValues: Record<string, unknown>,
+): RouteFullDataSelection {
+  return {
+    includeTrips: selectionSets.some((selectionSet) =>
+      selectionSetHasAnyField(
+        selectionSet,
+        new Set(['trips']),
+        fragments,
+        variableValues,
+      ),
+    ),
+    includeShapes: selectionSets.some((selectionSet) =>
+      selectionSetHasAnyField(
+        selectionSet,
+        new Set(['shapes']),
+        fragments,
+        variableValues,
+      ),
+    ),
+    includeStops: selectionSets.some((selectionSet) =>
+      selectionSetHasAnyField(
+        selectionSet,
+        new Set(['stops']),
+        fragments,
+        variableValues,
+      ),
+    ),
+  };
+}
+
+function selectionIsIncluded(
+  selection: SelectionNode,
+  variableValues: Record<string, unknown>,
+): boolean {
+  for (const directive of selection.directives ?? []) {
+    if (directive.name.value !== 'include' && directive.name.value !== 'skip') {
+      continue;
+    }
+
+    const ifArgument = directive.arguments?.find(
+      (argument) => argument.name.value === 'if',
+    );
+    const condition = ifArgument
+      ? valueFromASTUntyped(ifArgument.value, variableValues)
+      : undefined;
+
+    if (directive.name.value === 'include' && condition !== true) {
+      return false;
+    }
+    if (directive.name.value === 'skip' && condition === true) {
+      return false;
+    }
+  }
+
+  return true;
 }

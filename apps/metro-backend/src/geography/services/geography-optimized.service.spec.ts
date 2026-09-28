@@ -1,15 +1,21 @@
 import { GeographyServiceOptimized } from './geography-optimized.service';
 
-describe('GeographyServiceOptimized stop full data', () => {
+describe('GeographyServiceOptimized stop route data', () => {
   it('does not prefetch unrequested route details', async () => {
     const service = createService(3);
-    const getRouteFullData = jest.spyOn(service, 'getRouteFullData');
+    const getTripsForRoute = jest.spyOn(service, 'getTripsForRoute');
+    const getStopsForRoute = jest.spyOn(service, 'getStopsForRoute');
 
-    const result = await service.getStopFullData('stop-1', false);
+    const result = await service.getStopRoutesFullData('stop-1', {
+      includeTrips: false,
+      includeShapes: false,
+      includeStops: false,
+    });
 
-    expect(getRouteFullData).not.toHaveBeenCalled();
-    expect(result?.routes).toHaveLength(3);
-    expect(result?.routes[0]).toMatchObject({
+    expect(getTripsForRoute).not.toHaveBeenCalled();
+    expect(getStopsForRoute).not.toHaveBeenCalled();
+    expect(result).toHaveLength(3);
+    expect(result[0]).toMatchObject({
       trips: [],
       shapes: [],
       stops: [],
@@ -21,20 +27,20 @@ describe('GeographyServiceOptimized stop full data', () => {
     let active = 0;
     let maximumActive = 0;
     jest
-      .spyOn(service, 'getRouteFullData')
-      .mockImplementation(async (routeId) => {
+      .spyOn(service, 'getRouteFullDataForRoute')
+      .mockImplementation(async (route) => {
         active += 1;
         maximumActive = Math.max(maximumActive, active);
         await Promise.resolve();
         active -= 1;
         return {
           route: {
-            id: routeId,
-            routeId,
+            id: route.routeId,
+            routeId: route.routeId,
             sourceAgency: 'sptrans',
-            sourceId: routeId,
-            shortName: routeId,
-            longName: routeId,
+            sourceId: route.routeId,
+            shortName: route.routeId,
+            longName: route.routeId,
             routeType: 3,
             color: '',
             textColor: '',
@@ -47,16 +53,16 @@ describe('GeographyServiceOptimized stop full data', () => {
         };
       });
 
-    const result = await service.getStopFullData('stop-1', true);
+    const result = await service.getStopRoutesFullData('stop-1');
 
-    expect(result?.routes).toHaveLength(17);
+    expect(result).toHaveLength(17);
     expect(maximumActive).toBeLessThanOrEqual(2);
   });
 
   it('rejects pathological route fan-out', async () => {
     const service = createService(101);
 
-    await expect(service.getStopFullData('stop-1')).rejects.toMatchObject({
+    await expect(service.getStopRoutesFullData('stop-1')).rejects.toMatchObject({
       status: 413,
     });
   });
@@ -68,7 +74,7 @@ describe('GeographyServiceOptimized route full data', () => {
     const getTripsForRoute = jest.spyOn(service, 'getTripsForRoute');
     const getStopsForRoute = jest.spyOn(service, 'getStopsForRoute');
 
-    await service.getRouteFullData('route-1', {
+    await service.getRouteFullDataForRoute({ routeId: 'route-1' } as never, {
       includeTrips: false,
       includeShapes: false,
       includeStops: false,
@@ -85,7 +91,7 @@ describe('GeographyServiceOptimized route full data', () => {
     const getTripsForRoute = jest.spyOn(service, 'getTripsForRoute');
     const getStopsForRoute = jest.spyOn(service, 'getStopsForRoute');
 
-    await service.getRouteFullData('route-1', {
+    await service.getRouteFullDataForRoute({ routeId: 'route-1' } as never, {
       includeTrips: true,
       includeShapes: false,
       includeStops: false,
@@ -109,7 +115,7 @@ describe('GeographyServiceOptimized route full data', () => {
     ]);
 
     await expect(
-      service.getRouteFullData('route-1', {
+      service.getRouteFullDataForRoute({ routeId: 'route-1' } as never, {
         includeTrips: false,
         includeShapes: true,
         includeStops: false,
@@ -130,7 +136,7 @@ describe('GeographyServiceOptimized route full data', () => {
     const getTripsForRoute = jest.spyOn(service, 'getTripsForRoute');
     const getStopsForRoute = jest.spyOn(service, 'getStopsForRoute');
 
-    await service.getRouteFullData('route-1');
+    await service.getRouteFullDataForRoute({ routeId: 'route-1' } as never);
 
     expect(getTripsForRoute).toHaveBeenCalledWith('route-1');
     expect(getStopsForRoute).toHaveBeenCalledWith('route-1');

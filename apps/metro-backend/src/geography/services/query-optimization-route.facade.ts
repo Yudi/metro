@@ -30,51 +30,83 @@ export class QueryOptimizationRouteFacade {
         LEFT JOIN "public"."physical_stop_members" member
           ON member.source_stop_id = requested.requested_stop_id
       ),
-      expanded_stops AS (
+      -- Keep the expanded source-stop set small for indexed stop-time lookups.
+      expanded_stops AS MATERIALIZED (
         SELECT DISTINCT
           resolved.requested_stop_id,
           COALESCE(member.source_stop_id, resolved.physical_stop_id) AS source_stop_id
         FROM resolved_stops resolved
         LEFT JOIN "public"."physical_stop_members" member
           ON member.physical_stop_id = resolved.physical_stop_id
+      ),
+      route_hits AS MATERIALIZED (
+        SELECT DISTINCT ON (expanded.requested_stop_id, route.route_id)
+          expanded.requested_stop_id,
+          route.id,
+          route.route_id,
+          route.agency_id,
+          route.route_short_name,
+          route.route_long_name,
+          route.route_type,
+          route.route_color,
+          route.route_text_color,
+          route.source_agency,
+          route.source_id
+        FROM expanded_stops expanded
+        CROSS JOIN LATERAL (
+          SELECT DISTINCT stop_time.trip_id
+          FROM "public"."Gtfs_StopTime" stop_time
+          WHERE stop_time.stop_id = expanded.source_stop_id
+        ) stop_time
+        INNER JOIN "public"."Gtfs_Trip" trip
+          ON trip.trip_id = stop_time.trip_id
+        INNER JOIN "public"."Gtfs_Route" route
+          ON route.route_id = trip.route_id
+        ORDER BY
+          expanded.requested_stop_id,
+          route.route_id,
+          CASE WHEN LOWER(COALESCE(route.source_agency, '')) = 'sptrans' THEN 0 ELSE 1 END
+      ),
+      -- Calculate fares once per route across the whole batch.
+      unique_routes AS MATERIALIZED (
+        SELECT DISTINCT route_id
+        FROM route_hits
+      ),
+      route_fares AS MATERIALIZED (
+        SELECT
+          unique_routes.route_id,
+          COALESCE(fares.fares, '[]'::jsonb) AS fares
+        FROM unique_routes
+        LEFT JOIN LATERAL (
+          SELECT jsonb_agg(
+            jsonb_build_object('price', fare.price, 'currency', fare.currency_type)
+            ORDER BY fare.price, fare.currency_type
+          ) AS fares
+          FROM (
+            SELECT DISTINCT attribute.price, attribute.currency_type
+            FROM "public"."Gtfs_FareRule" rule
+            INNER JOIN "public"."Gtfs_FareAttribute" attribute
+              ON attribute.fare_id = rule.fare_id
+            WHERE rule.route_id = unique_routes.route_id
+          ) fare
+        ) fares ON TRUE
       )
-      SELECT DISTINCT ON (expanded.requested_stop_id, route.route_id)
-        expanded.requested_stop_id,
-        route.id,
-        route.route_id,
-        route.agency_id,
-        route.route_short_name,
-        route.route_long_name,
-        route.route_type,
-        route.route_color,
-        route.route_text_color,
-        route.source_agency,
-        route.source_id,
-        COALESCE(fares.fares, '[]'::jsonb) AS fares
-      FROM expanded_stops expanded
-      INNER JOIN "public"."Gtfs_StopTime" stop_time
-        ON stop_time.stop_id = expanded.source_stop_id
-      INNER JOIN "public"."Gtfs_Trip" trip
-        ON trip.trip_id = stop_time.trip_id
-      INNER JOIN "public"."Gtfs_Route" route
-        ON route.route_id = trip.route_id
-      LEFT JOIN LATERAL (
-        SELECT jsonb_agg(
-          jsonb_build_object('price', fare.price, 'currency', fare.currency_type)
-          ORDER BY fare.price, fare.currency_type
-        ) AS fares
-        FROM (
-          SELECT DISTINCT attribute.price, attribute.currency_type
-          FROM "public"."Gtfs_FareRule" rule
-          INNER JOIN "public"."Gtfs_FareAttribute" attribute
-            ON attribute.fare_id = rule.fare_id
-          WHERE rule.route_id = route.route_id
-        ) fare
-      ) fares ON TRUE
-      ORDER BY
-        expanded.requested_stop_id,
-        route.route_id,
-        CASE WHEN LOWER(COALESCE(route.source_agency, '')) = 'sptrans' THEN 0 ELSE 1 END
+      SELECT
+        route_hits.requested_stop_id,
+        route_hits.id,
+        route_hits.route_id,
+        route_hits.agency_id,
+        route_hits.route_short_name,
+        route_hits.route_long_name,
+        route_hits.route_type,
+        route_hits.route_color,
+        route_hits.route_text_color,
+        route_hits.source_agency,
+        route_hits.source_id,
+        route_fares.fares
+      FROM route_hits
+      INNER JOIN route_fares USING (route_id)
+      ORDER BY route_hits.requested_stop_id, route_hits.route_id
     `;
 
     const result = new Map<string, BusRoute[]>();

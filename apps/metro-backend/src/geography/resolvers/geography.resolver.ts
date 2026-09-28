@@ -1,4 +1,13 @@
-import { Resolver, Query, Args, ID, Info, Int } from '@nestjs/graphql';
+import {
+  Resolver,
+  Query,
+  Args,
+  ID,
+  Info,
+  Int,
+  Parent,
+  ResolveField,
+} from '@nestjs/graphql';
 import { GraphQLResolveInfo } from 'graphql';
 import { UseGuards, ValidationPipe } from '@nestjs/common';
 import { GeographyServiceOptimized } from '../services/geography-optimized.service';
@@ -25,7 +34,6 @@ import { RailStationProcessorService } from '../../vector-tiles/services/rail-st
 import { DevelopmentOnlyGuard } from '../../common/guards/development-only.guard';
 import {
   requestedRouteFullDataOptions,
-  requestsRouteDetails,
   validateIdentifier,
   validateIdentifiers,
 } from './geography-resolver.utils';
@@ -33,6 +41,13 @@ import {
 const DEFAULT_BUS_STOP_LIMIT = 50_000;
 const DEFAULT_BUS_ROUTE_LIMIT = 10_000;
 const DEFAULT_BUS_SHAPE_LIMIT = 500;
+type StopFullDataParent = Pick<StopFullData, 'stop'>;
+type RouteFullDataParent = Pick<RouteFullData, 'route'> &
+  Partial<Pick<RouteFullData, 'trips' | 'shapes' | 'stops'>>;
+
+const routeTripsLoads = new WeakMap<RouteFullDataParent, Promise<Trip[]>>();
+const routeShapesLoads = new WeakMap<RouteFullDataParent, Promise<BusShape[]>>();
+const routeStopsLoads = new WeakMap<RouteFullDataParent, Promise<BusStop[]>>();
 
 @Resolver(() => BusStop)
 export class GeographyResolver {
@@ -277,18 +292,11 @@ export class GeographyResolver {
   })
   async routeFullData(
     @Args('routeId', { type: () => String }) routeId: string,
-    @Info() info?: GraphQLResolveInfo,
-  ): Promise<RouteFullData | null> {
-    if (!info) {
-      return this.geographyService.getRouteFullData(
-        validateIdentifier(routeId, 'routeId'),
-      );
-    }
-
-    return this.geographyService.getRouteFullData(
+  ): Promise<RouteFullDataParent | null> {
+    const route = await this.geographyService.getBusRoute(
       validateIdentifier(routeId, 'routeId'),
-      requestedRouteFullDataOptions(info),
     );
+    return route ? { route } : null;
   }
 
   @Query(() => StopFullData, {
@@ -298,12 +306,11 @@ export class GeographyResolver {
   })
   async stopFullData(
     @Args('stopId', { type: () => String }) stopId: string,
-    @Info() info: GraphQLResolveInfo,
-  ): Promise<StopFullData | null> {
-    return this.geographyService.getStopFullData(
+  ): Promise<StopFullDataParent | null> {
+    const stop = await this.geographyService.getBusStop(
       validateIdentifier(stopId, 'stopId'),
-      requestsRouteDetails(info),
     );
+    return stop ? { stop } : null;
   }
 
   @Query(() => [RouteRailConnection], {
@@ -400,5 +407,70 @@ export class GeographyResolver {
       agencies: station.agencies,
       lines: station.lines,
     };
+  }
+}
+
+@Resolver(() => StopFullData)
+export class StopFullDataResolver {
+  constructor(private readonly geographyService: GeographyServiceOptimized) {}
+
+  @ResolveField(() => [RouteFullData])
+  async routes(
+    @Parent() parent: StopFullDataParent,
+    @Info() info: GraphQLResolveInfo,
+  ): Promise<RouteFullData[]> {
+    return this.geographyService.getStopRoutesFullData(
+      parent.stop.stopId,
+      requestedRouteFullDataOptions(info),
+    );
+  }
+}
+
+@Resolver(() => RouteFullData)
+export class RouteFullDataResolver {
+  constructor(private readonly geographyService: GeographyServiceOptimized) {}
+
+  @ResolveField(() => [Trip])
+  async trips(@Parent() parent: RouteFullDataParent): Promise<Trip[]> {
+    if (Array.isArray(parent.trips)) return parent.trips;
+    return this.loadCollection(
+      routeTripsLoads,
+      parent,
+      () => this.geographyService.getTripsForRoute(parent.route.routeId),
+    );
+  }
+
+  @ResolveField(() => [BusShape])
+  async shapes(@Parent() parent: RouteFullDataParent): Promise<BusShape[]> {
+    if (Array.isArray(parent.shapes)) return parent.shapes;
+    return this.loadCollection(
+      routeShapesLoads,
+      parent,
+      () => this.geographyService.getRouteShapesForRoute(parent.route.routeId),
+    );
+  }
+
+  @ResolveField(() => [BusStop])
+  async stops(@Parent() parent: RouteFullDataParent): Promise<BusStop[]> {
+    if (Array.isArray(parent.stops)) return parent.stops;
+    return this.loadCollection(
+      routeStopsLoads,
+      parent,
+      () => this.geographyService.getStopsForRoute(parent.route.routeId),
+    );
+  }
+
+  private loadCollection<T>(
+    loads: WeakMap<RouteFullDataParent, Promise<T>>,
+    parent: RouteFullDataParent,
+    loader: () => Promise<T>,
+  ): Promise<T> {
+    let load = loads.get(parent);
+    if (!load) {
+      load = loader();
+      loads.set(parent, load);
+    }
+
+    return load;
   }
 }

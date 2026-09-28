@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   input,
   signal,
@@ -65,6 +66,7 @@ export type BusStopDialogResult =
 })
 export class BusStopDialogComponent {
   readonly embedded = input(false);
+  readonly detailsOverride = input<BusStopDialogData | null>(null);
   protected readonly panelRef = inject(MAP_PANEL_REF, { optional: true });
   private readonly dialogRef = inject(
     MatDialogRef<BusStopDialogComponent, BusStopDialogResult>,
@@ -124,6 +126,12 @@ export class BusStopDialogComponent {
   });
 
   constructor() {
+    effect(() => {
+      const details = this.detailsOverride();
+      if (details) {
+        this.updateDetails(details);
+      }
+    });
     this.logger.debug('Bus stop dialog created', {
       stopId: this.data.stop.stopId,
       stopName: this.data.stop.name,

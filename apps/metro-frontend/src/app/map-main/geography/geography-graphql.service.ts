@@ -1,7 +1,9 @@
 import { Service, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, BehaviorSubject, of } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { Observable, BehaviorSubject, defer, of } from 'rxjs';
+import { finalize, map, shareReplay } from 'rxjs/operators';
+import { IncrementalGraphqlClient } from '@metro/shared/api';
+import type { GraphqlResponseError } from '@metro/shared/api';
 import type { MapFeature } from '../components/map/map-service.types';
 import type {
   BoundingBox,
@@ -11,7 +13,6 @@ import type {
   RouteFullDataGraphQL,
   RouteRailConnectionGraphQL,
   ScheduledBusDepartureGraphQL,
-  StopFullDataGraphQL,
   StopSearchInput,
   TripGraphQL,
 } from './geography-graphql.types';
@@ -32,15 +33,26 @@ export type {
   RouteRailConnectionGraphQL,
   RouteRailConnectionStationGraphQL,
   ScheduledBusDepartureGraphQL,
-  StopFullDataGraphQL,
   StopSearchInput,
   TripGraphQL,
 } from './geography-graphql.types';
 
+export interface StopFullDataSnapshot {
+  stop: BusStopGraphQL | null;
+  routes?: readonly RouteFullDataGraphQL[] | null;
+  hasNext: boolean;
+  errors?: readonly GraphqlResponseError[];
+}
+
 @Service()
 export class GeographyGraphQLService {
   private http = inject(HttpClient);
+  private incrementalGraphqlClient = inject(IncrementalGraphqlClient);
   private readonly graphqlEndpoint = '/api/graphql';
+  private readonly stopFullDataRequests = new Map<
+    string,
+    Observable<StopFullDataSnapshot>
+  >();
 
   // State management
   private busStopsSubject = new BehaviorSubject<BusStopGraphQL[]>([]);
@@ -351,30 +363,60 @@ export class GeographyGraphQLService {
     ).pipe(map((data) => data?.routeFullData || null));
   }
 
-  /**
-   * Get complete stop data with all routes passing through it in a single request.
-   * Use this instead of calling getRoutesForStop followed by multiple getRouteFullData calls.
-   */
-  getStopFullData(stopId: string): Observable<StopFullDataGraphQL | null> {
-    const query = `
-      query GetStopFullData($stopId: String!) {
-        stopFullData(stopId: $stopId) {
-          stop {
-            ${STOP_FIELDS}
-          }
-          routes {
-            route {
-              ${ROUTE_FIELDS}
+  /** Emits the stop first, then its related routes from the same query. */
+  watchStopFullData(stopId: string): Observable<StopFullDataSnapshot> {
+    return defer(() => {
+      const activeRequest = this.stopFullDataRequests.get(stopId);
+      if (activeRequest) {
+        return activeRequest;
+      }
+
+      const query = `
+        query GetStopFullData($stopId: String!) {
+          stopFullData(stopId: $stopId) {
+            stop {
+              ${STOP_FIELDS}
+            }
+            ... @defer(label: "stopRoutes") {
+              routes {
+                route {
+                  ${ROUTE_FIELDS}
+                }
+              }
             }
           }
         }
-      }
-    `;
+      `;
 
-    return this.executeGraphQL<{ stopFullData: StopFullDataGraphQL | null }>(
-      query,
-      { stopId },
-    ).pipe(map((data) => data?.stopFullData || null));
+      const sharedRequest = this.incrementalGraphqlClient
+        .query<{
+          stopFullData?: {
+            stop?: BusStopGraphQL | null;
+            routes?: RouteFullDataGraphQL[] | null;
+          } | null;
+        }>(query, { stopId })
+        .pipe(
+          map((result) => {
+            const stopFullData = result.data?.stopFullData;
+            return {
+              stop: stopFullData?.stop ?? null,
+              ...(stopFullData && 'routes' in stopFullData
+                ? { routes: stopFullData.routes ?? [] }
+                : {}),
+              hasNext: result.hasNext,
+              ...(result.errors ? { errors: result.errors } : {}),
+            };
+          }),
+          finalize(() => {
+            if (this.stopFullDataRequests.get(stopId) === sharedRequest) {
+              this.stopFullDataRequests.delete(stopId);
+            }
+          }),
+          shareReplay({ bufferSize: 1, refCount: true }),
+        );
+      this.stopFullDataRequests.set(stopId, sharedRequest);
+      return sharedRequest;
+    });
   }
 
   getRouteRailConnectionsForStop(

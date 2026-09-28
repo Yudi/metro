@@ -33,9 +33,21 @@ describe('QueryOptimizationService precomputed stop service data', () => {
     });
   });
 
-  it('queries normalized feed views and expands matched stops for routes', async () => {
+  it('uses stop-indexed normalized lookups and deduplicates routes before fares', async () => {
     const prisma = {
       $queryRaw: jest.fn().mockResolvedValue([
+        {
+          requested_stop_id: 'sptrans:1',
+          route_id: '123A-10',
+          route_short_name: '123A-10',
+          route_long_name: 'Terminal - Centro',
+          route_type: 3,
+          route_color: '#000000',
+          route_text_color: '#FFFFFF',
+          source_agency: 'sptrans',
+          source_id: '123A-10',
+          fares: [],
+        },
         {
           requested_stop_id: 'artesp:2',
           route_id: 'artesp:001',
@@ -46,16 +58,34 @@ describe('QueryOptimizationService precomputed stop service data', () => {
           route_text_color: '#FFFFFF',
           source_agency: 'artesp',
           source_id: '001',
-          fares: [{ price: 5.4, currency: 'BRL' }],
+          fares: [
+            { price: 5.4, currency: 'BRL' },
+            { price: 7.2, currency: 'BRL' },
+          ],
         },
       ]),
     };
     const service = new QueryOptimizationService(prisma as never);
 
     await expect(
-      service.getRoutesForMultipleStops(['artesp:2']),
+      service.getRoutesForMultipleStops([
+        'sptrans:1',
+        'artesp:2',
+        'sptrans:1',
+        'stop-without-routes',
+      ]),
     ).resolves.toEqual(
       new Map([
+        [
+          'sptrans:1',
+          [
+            expect.objectContaining({
+              routeId: '123A-10',
+              sourceAgency: 'sptrans',
+              fares: [],
+            }),
+          ],
+        ],
         [
           'artesp:2',
           [
@@ -64,10 +94,14 @@ describe('QueryOptimizationService precomputed stop service data', () => {
               sourceAgency: 'artesp',
               sourceId: '001',
               supportsRealtime: false,
-              fares: [{ price: 5.4, currency: 'BRL' }],
+              fares: [
+                { price: 5.4, currency: 'BRL' },
+                { price: 7.2, currency: 'BRL' },
+              ],
             }),
           ],
         ],
+        ['stop-without-routes', []],
       ]),
     );
 
@@ -78,6 +112,23 @@ describe('QueryOptimizationService precomputed stop service data', () => {
     expect(sql).toContain('Gtfs_Trip');
     expect(sql).toContain('Gtfs_Route');
     expect(sql).toContain('physical_stop_members');
+    expect(sql).toMatch(/expanded_stops AS MATERIALIZED\s*\(/);
+    expect(sql).toMatch(
+      /CROSS JOIN LATERAL\s*\(\s*SELECT DISTINCT stop_time\.trip_id/,
+    );
+    expect(sql).toContain(
+      'WHERE stop_time.stop_id = expanded.source_stop_id',
+    );
+    expect(sql).toContain(
+      'COALESCE(member.source_stop_id, resolved.physical_stop_id) AS source_stop_id',
+    );
+    expect(sql).toContain('route_hits AS MATERIALIZED');
+    expect(sql).toContain('unique_routes AS MATERIALIZED');
+    expect(sql.indexOf('unique_routes AS MATERIALIZED')).toBeLessThan(
+      sql.indexOf('LEFT JOIN LATERAL'),
+    );
+    expect(sql).toContain('WHERE rule.route_id = unique_routes.route_id');
+    expect(sql).toContain('ORDER BY fare.price, fare.currency_type');
   });
 
   it('returns correct precomputed classification from the multiple-stop path', async () => {

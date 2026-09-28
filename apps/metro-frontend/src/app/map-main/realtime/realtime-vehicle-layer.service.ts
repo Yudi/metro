@@ -275,6 +275,7 @@ export class RealtimeVehicleLayerService {
       routeShortName,
       routeCode: routeShortName,
       timestamp: vehicle.recordedAt,
+      destination: vehicle.destination,
       routeColor,
       latitude: vehicle.latitude,
       longitude: vehicle.longitude,

@@ -268,10 +268,17 @@ export class MapFeatureInteractionService {
     }
 
     const routeShortName = String(properties['routeShortName'] || '');
+    const destination = properties['destination'];
+    const routeSummary = routeShortName
+      ? `Linha ${routeShortName}`
+      : 'Linha não informada';
 
     this.panelService.openNotice({
       title: `Ônibus ${vehicleId}`,
-      summary: routeShortName ? `Linha ${routeShortName}` : 'Linha não informada',
+      summary:
+        typeof destination === 'string' && destination.trim()
+          ? `${routeSummary} · Sentido ${destination}`
+          : routeSummary,
       icon: 'directions_bus',
     });
   }

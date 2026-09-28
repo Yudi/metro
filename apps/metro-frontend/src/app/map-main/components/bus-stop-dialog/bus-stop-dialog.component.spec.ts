@@ -5,6 +5,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { FavoritesService, LoggerService } from '@metro/shared/api';
 import { GeographyGraphQLService } from '../../geography/geography-graphql.service';
+import type { BusRouteGraphQL } from '../../geography/geography-graphql.service';
 import { RealtimeWebsocketService } from '../../realtime/realtime-websocket.service';
 import {
   BusStopDialogComponent,
@@ -106,5 +107,34 @@ describe('BusStopDialogComponent', () => {
       '42',
       'busStop',
     );
+  });
+
+  it('applies streamed stop and route details through its stable component input', () => {
+    const instance = component;
+    const updatedStop = { ...stop, name: 'Av. Brigadeiro Faria Lima, 1400' };
+    const route: BusRouteGraphQL = {
+      id: '477A-10',
+      routeId: '477A-10',
+      shortName: '477A',
+      longName: 'Pinheiros - Ibirapuera',
+      color: '112233',
+      textColor: 'FFFFFF',
+    };
+
+    fixture.componentRef.setInput('detailsOverride', {
+      stop: updatedStop,
+      routes: [route],
+      selectedRoutes: new Set(),
+      routesLoading: false,
+      routesError: false,
+      showMapActions: false,
+    });
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance).toBe(instance);
+    expect(component.stop()).toBe(updatedStop);
+    expect(component.routes()).toEqual([route]);
+    expect(component.routesLoading()).toBe(false);
+    expect(component.routesError()).toBe(false);
   });
 });

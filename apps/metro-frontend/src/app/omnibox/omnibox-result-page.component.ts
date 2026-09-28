@@ -7,6 +7,7 @@ import {
   Type,
   computed,
   inject,
+  linkedSignal,
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
@@ -21,9 +22,13 @@ import {
 } from '@metro/shared/utils';
 import {
   BehaviorSubject,
+  Observable,
+  catchError,
   firstValueFrom,
   from,
   map,
+  of,
+  scan,
   startWith,
   switchMap,
 } from 'rxjs';
@@ -40,11 +45,12 @@ import {
   mergeSubwayStationResults,
 } from '../map-main/components/search-dialog/search-dialog.utils';
 import { BikeStationsService } from '../map-main/geography/bike-stations.service';
-import {
+import type {
   BusRouteGraphQL,
   BusStopGraphQL,
-  GeographyGraphQLService,
+  StopFullDataSnapshot,
 } from '../map-main/geography/geography-graphql.service';
+import { GeographyGraphQLService } from '../map-main/geography/geography-graphql.service';
 import { TypesenseSearchService } from '../search/typesense-search.service';
 import { TransitSearchFieldComponent } from '../shared/components/transit-search-field/transit-search-field.component';
 
@@ -63,6 +69,8 @@ type Detail = DetailBase & (
         routes: BusRouteGraphQL[];
         selectedRoutes: Set<string>;
         showMapActions: false;
+        routesLoading: boolean;
+        routesError: boolean;
       };
     }
   | { kind: 'rail-station'; data: { stop: BusStopGraphQL } }
@@ -113,7 +121,7 @@ export class OmniboxResultPageComponent {
   readonly state = toSignal(
     this.route.paramMap.pipe(
       switchMap((params) =>
-        from(this.loadDetail(params.get('kind'), params.get('id'))).pipe(
+        this.loadDetail(params.get('kind'), params.get('id')).pipe(
           startWith(LOADING),
         ),
       ),
@@ -140,26 +148,118 @@ export class OmniboxResultPageComponent {
         return null;
     }
   });
-  readonly detailInjector = computed(() => {
-    const detail = this.detail();
-    if (!detail || detail.kind === 'rail-line') return null;
-    return Injector.create({
-      parent: this.injector,
-      providers: [{ provide: MAT_DIALOG_DATA, useValue: detail.data }],
-    });
+  readonly detailInjector = linkedSignal<Detail | null, Injector | null>({
+    source: () => this.detail(),
+    computation: (detail, previous) => {
+      if (!detail || detail.kind === 'rail-line') return null;
+      if (
+        previous?.value &&
+        previous.source?.kind === 'bus-stop' &&
+        detail.kind === 'bus-stop' &&
+        previous.source.data.stop.stopId === detail.data.stop.stopId
+      ) {
+        return previous.value;
+      }
+      return Injector.create({
+        parent: this.injector,
+        providers: [{ provide: MAT_DIALOG_DATA, useValue: detail.data }],
+      });
+    },
   });
-  readonly embeddedInputs = computed(() => ({
-    embedded: true,
-    ...(this.detail()?.kind === 'bike-station'
-      ? { stationOverride: this.bikeStation() }
-      : {}),
-  }));
+  readonly embeddedInputs = computed(() => {
+    const detail = this.detail();
+    return {
+      embedded: true,
+      ...(detail?.kind === 'bus-stop'
+        ? { detailsOverride: detail.data }
+        : {}),
+      ...(detail?.kind === 'bike-station'
+        ? { stationOverride: this.bikeStation() }
+        : {}),
+    };
+  });
 
-  private async loadDetail(
+  private loadDetail(
     kind: string | null,
     id: string | null,
+  ): Observable<DetailState> {
+    if (!id) return of({ loading: false, detail: null });
+    if (kind === 'bus-stop') return this.loadBusStopDetail(id);
+    return from(this.loadNonStopDetail(kind, id));
+  }
+
+  private loadBusStopDetail(stopId: string): Observable<DetailState> {
+    return this.geography.watchStopFullData(stopId).pipe(
+      map((snapshot) => ({ type: 'snapshot' as const, snapshot })),
+      catchError(() => of({ type: 'error' as const })),
+      scan((state, event) => {
+        if (event.type === 'error') {
+          const current = state.detail;
+          if (current?.kind !== 'bus-stop') {
+            return { loading: false, detail: null };
+          }
+          return {
+            loading: false,
+            detail: {
+              ...current,
+              data: {
+                ...current.data,
+                routesLoading: false,
+                routesError: true,
+              },
+            },
+          };
+        }
+        return this.applyBusStopSnapshot(state, stopId, event.snapshot);
+      }, LOADING),
+    );
+  }
+
+  private applyBusStopSnapshot(
+    previous: DetailState,
+    requestedStopId: string,
+    snapshot: StopFullDataSnapshot,
+  ): DetailState {
+    const previousDetail =
+      previous.detail?.kind === 'bus-stop' ? previous.detail : null;
+    const stop = snapshot.stop ?? previousDetail?.data.stop ?? null;
+    if (!stop) {
+      return snapshot.hasNext ? previous : { loading: false, detail: null };
+    }
+
+    const routes =
+      snapshot.routes === undefined
+        ? previousDetail?.data.routes ?? []
+        : (snapshot.routes ?? []).map(({ route }) => route);
+    const routesError =
+      previousDetail?.data.routesError === true ||
+      (snapshot.errors?.length ?? 0) > 0 ||
+      (!snapshot.hasNext && snapshot.routes === undefined);
+    const detail: Detail = {
+      kind: 'bus-stop',
+      title: stop.name,
+      data: {
+        stop,
+        routes,
+        selectedRoutes: new Set<string>(),
+        showMapActions: false,
+        routesLoading: snapshot.hasNext && !routesError,
+        routesError,
+      },
+      mapParams: {
+        busStops: stop.stopId || requestedStopId,
+        lat: String(stop.latitude),
+        lon: String(stop.longitude),
+        z: '16',
+      },
+    };
+    return { loading: false, detail };
+  }
+
+  private async loadNonStopDetail(
+    kind: string | null,
+    id: string,
   ): Promise<DetailState> {
-    if (!id) return { loading: false, detail: null };
     try {
       let detail: Detail | null = null;
       switch (kind) {
@@ -183,31 +283,6 @@ export class OmniboxResultPageComponent {
                 subwayStations: '1',
                 subwayRoutes: '1',
                 focusRoute: line.lineId,
-              },
-            };
-          }
-          break;
-        }
-        case 'bus-stop': {
-          const stop = await firstValueFrom(this.geography.getBusStop(id));
-          if (stop) {
-            const routes = await firstValueFrom(
-              this.geography.getRoutesForStop(stop.stopId),
-            ).catch(() => [] as BusRouteGraphQL[]);
-            detail = {
-              kind,
-              title: stop.name,
-              data: {
-                stop,
-                routes,
-                selectedRoutes: new Set<string>(),
-                showMapActions: false,
-              },
-              mapParams: {
-                busStops: stop.stopId,
-                lat: String(stop.latitude),
-                lon: String(stop.longitude),
-                z: '16',
               },
             };
           }

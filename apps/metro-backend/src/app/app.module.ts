@@ -4,9 +4,8 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { HttpModule } from '@nestjs/axios';
 import { GraphQLModule } from '@nestjs/graphql';
-import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
-import { join } from 'node:path';
-import { Request, Response } from 'express';
+import { YogaDriver } from '@graphql-yoga/nestjs';
+import type { YogaDriverConfig } from '@graphql-yoga/nestjs';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { GqlThrottlerGuard } from '../common/guards/gql-throttler.guard';
@@ -14,17 +13,13 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { UserModule } from '../user/user.module';
 import { LoadersService } from '../common/graphql/loaders.service';
 import { LoadersModule } from '../common/graphql/loaders.module';
-import { ApolloServerPluginLandingPageLocalDefault } from '@apollo/server/plugin/landingPage/default';
-import { ApolloServerPluginLandingPageDisabled } from '@apollo/server/plugin/disabled';
-import { graphqlOperationLimitsRule } from '../common/graphql/graphql-operation-limits.rule';
 import { ObservabilityModule } from '../observability/observability.module';
 import { validatePublicEnvironment } from './public-environment.validation';
 import { RequestContextModule } from '../common/request-context/request-context.module';
-import { createGraphQLTimingPlugin } from '../observability/graphql-timing.plugin';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { SaoPauloTransitModule } from '../cities/sp/sp-transit.module';
+import { createGraphQLYogaConfig } from '../common/graphql/graphql-yoga.config';
 
-const isProduction = process.env.NODE_ENV === 'production';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -46,35 +41,11 @@ const isProduction = process.env.NODE_ENV === 'production';
         },
       ],
     }),
-    GraphQLModule.forRootAsync<ApolloDriverConfig>({
-      driver: ApolloDriver,
+    GraphQLModule.forRootAsync<YogaDriverConfig>({
+      driver: YogaDriver,
       imports: [LoadersModule],
       inject: [LoadersService],
-      useFactory: (loadersService: LoadersService) => ({
-        graphiql: false,
-        autoSchemaFile: isProduction ? true : join(__dirname, 'schema.gql'),
-        sortSchema: true,
-        path: '/api/graphql',
-        playground: false,
-        introspection: !isProduction,
-        validationRules: isProduction ? [graphqlOperationLimitsRule] : [],
-        plugins: [
-          isProduction
-            ? ApolloServerPluginLandingPageDisabled()
-            : ApolloServerPluginLandingPageLocalDefault({
-                embed: false,
-                includeCookies: true,
-              }),
-          createGraphQLTimingPlugin(),
-        ] as unknown as ApolloDriverConfig['plugins'],
-
-        context: ({ req, res }: { req: Request; res: Response }) => ({
-          req,
-          res,
-          requestId: req.headers['x-request-id'],
-          loaders: loadersService.createLoaders(), // per-request loaders
-        }),
-      }),
+      useFactory: createGraphQLYogaConfig,
     }),
     HttpModule,
     PrismaModule,

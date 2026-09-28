@@ -1,10 +1,15 @@
 import { Service, computed, effect, inject, signal } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { Subscription } from 'rxjs';
+import { shareReplay, takeWhile } from 'rxjs/operators';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { LoggerService } from '@metro/shared/api';
 import { BikeStationsService } from '../../geography/bike-stations.service';
 import { GeographyGraphQLService } from '../../geography/geography-graphql.service';
-import type { BusStopGraphQL } from '../../geography/geography-graphql.service';
+import type {
+  BusRouteGraphQL,
+  BusStopGraphQL,
+  StopFullDataSnapshot,
+} from '../../geography/geography-graphql.service';
 import {
   BikeStationDialogComponent,
   BikeStationDialogData,
@@ -160,120 +165,225 @@ export class MapDetailsDialogService {
     });
   }
 
-  async showRoutesForStop(stopId: string, initialStop?: BusStopGraphQL): Promise<void> {
+  showRoutesForStop(stopId: string, initialStop?: BusStopGraphQL): Promise<void> {
     this.logger.debug('Showing routes for stop', { stopId });
-    const knownStop = initialStop ??
+    const knownStop =
+      initialStop ??
       this.mapState.allDisplayedStops().find((stop) => stop.stopId === stopId);
     if (knownStop?.isSubwayStation) {
       this.openSubwayStationPanel({ stop: knownStop });
-      return;
+      return Promise.resolve();
     }
-    const panelTitle = signal(knownStop?.name ?? `Parada ${stopId}`);
-    const routeSummary = signal('');
-    let panelRef: MapPanelRef<BusStopDialogData, BusStopDialogResult> | null = null;
-    const currentPanelRef = () => panelRef;
-    const loadingRef = knownStop
-      ? null
-      : this.panelService.openNotice({
-          title: panelTitle(),
-          summary: '',
+
+    return new Promise<void>((resolve) => {
+      const panelTitle = signal(knownStop?.name ?? `Parada ${stopId}`);
+      const routeSummary = signal('');
+      let panelRef: MapPanelRef<BusStopDialogData, BusStopDialogResult> | null =
+        null;
+      const loadingRef = knownStop
+        ? null
+        : this.panelService.openNotice({
+            title: panelTitle(),
+            summary: '',
+            icon: 'directions_bus',
+          });
+      let requestGeneration = this.panelService.generation;
+      let openingResultPanel = false;
+      let finished = false;
+      const requestSubscription = new Subscription();
+      const finish = () => {
+        if (finished) {
+          return;
+        }
+        finished = true;
+        requestSubscription.unsubscribe();
+        resolve();
+      };
+      const isCurrentRequest = () =>
+        this.panelService.generation === requestGeneration &&
+        this.panelService.panel()?.id === (panelRef?.id ?? loadingRef?.id);
+      const stopUpdates$ = this.geographyService
+        .watchStopFullData(stopId)
+        .pipe(
+          takeWhile((snapshot) => snapshot.hasNext, true),
+          shareReplay({ bufferSize: 1, refCount: true }),
+        );
+
+      const openBusPanel = (
+        stop: BusStopGraphQL,
+        routes: BusRouteGraphQL[] = [],
+        routesLoading = true,
+        routesError = false,
+      ) => {
+        const data: BusStopDialogData = {
+          stop,
+          routes,
+          routesLoading,
+          routesError,
+          selectedRoutes: this.mapState.selectedRouteIds(),
+        };
+        panelTitle.set(stop.name);
+        openingResultPanel = true;
+        const openedPanel = this.panelService.openComponent<
+          BusStopDialogData,
+          BusStopDialogResult
+        >({
+          component: BusStopDialogComponent,
+          data,
+          title: panelTitle,
+          summary: routeSummary,
           icon: 'directions_bus',
         });
-    let requestGeneration = this.panelService.generation;
-    const isCurrentRequest = () =>
-      this.panelService.generation === requestGeneration &&
-      this.panelService.panel()?.id === (panelRef?.id ?? loadingRef?.id);
-
-    const openBusPanel = (stop: BusStopGraphQL) => {
-      const data: BusStopDialogData = {
-        stop,
-        routes: [],
-        routesLoading: true,
-        selectedRoutes: this.mapState.selectedRouteIds(),
+        panelRef = openedPanel;
+        requestGeneration = this.panelService.generation;
+        openingResultPanel = false;
+        openedPanel.setDataUpdater<BusStopDialogComponent>(
+          (component, nextData) => component.updateDetails(nextData),
+        );
+        openedPanel.afterClosed().subscribe((result) => {
+          if (result?.action === 'add') {
+            void this.selectionService.addStopToSelection(
+              result.stopId,
+              true,
+              stopUpdates$,
+            );
+          } else if (result?.action === 'selectRoute') {
+            this.selectionService.addRouteToSelection(result.routeId, true);
+          } else if (openedPanel.closeReason === 'dismissed') {
+            this.displayService.updateMapDisplay();
+          }
+          finish();
+        });
       };
-      panelTitle.set(stop.name);
-      panelRef = this.panelService.openComponent<BusStopDialogData, BusStopDialogResult>({
-        component: BusStopDialogComponent,
-        data,
-        title: panelTitle,
-        summary: routeSummary,
-        icon: 'directions_bus',
-      });
-      requestGeneration = this.panelService.generation;
-      panelRef.setDataUpdater<BusStopDialogComponent>((component, nextData) =>
-        component.updateDetails(nextData),
-      );
-      panelRef.afterClosed().subscribe((result) => {
-        if (result?.action === 'add') {
-          this.selectionService.addStopToSelection(result.stopId);
-        } else if (result?.action === 'selectRoute') {
-          this.selectionService.addRouteToSelection(result.routeId, true);
-        } else if (panelRef?.closeReason === 'dismissed') {
-          this.displayService.updateMapDisplay();
+
+      const updateBusPanel = (snapshot: StopFullDataSnapshot) => {
+        const activePanel = panelRef;
+        if (!activePanel) {
+          return;
         }
-      });
-    };
 
-    if (knownStop && !knownStop.isSubwayStation) {
-      openBusPanel(knownStop);
-    }
+        const currentData = activePanel.data;
+        const nextStop = snapshot.stop ?? currentData.stop;
+        const nextRoutes =
+          snapshot.routes === undefined
+            ? currentData.routes
+            : (snapshot.routes ?? []).map(({ route }) => route);
+        const routesError =
+          currentData.routesError === true ||
+          (snapshot.errors?.length ?? 0) > 0 ||
+          (!snapshot.hasNext && snapshot.routes === undefined);
+        routeSummary.set(
+          nextRoutes.length
+            ? `${nextRoutes.length} ${nextRoutes.length === 1 ? 'linha' : 'linhas'}`
+            : '',
+        );
+        panelTitle.set(nextStop.name);
+        activePanel.updateData({
+          ...currentData,
+          stop: nextStop,
+          routes: nextRoutes,
+          routesLoading: snapshot.hasNext,
+          routesError,
+        });
+      };
 
-    const loadRoutes = async () => {
-      try {
-        const routes = await firstValueFrom(this.geographyService.getRoutesForStop(stopId));
-        if (!isCurrentRequest() || !panelRef) return;
-        const routeList = routes ?? [];
-        routeSummary.set(routeList.length ? `${routeList.length} ${routeList.length === 1 ? 'linha' : 'linhas'}` : '');
-        panelRef.updateData({ ...panelRef.data, routes: routeList, routesLoading: false });
-      } catch (error) {
-        if (!isCurrentRequest() || !panelRef) return;
-        this.logger.error('Error loading routes for stop', error);
-        panelRef.updateData({ ...panelRef.data, routesLoading: false, routesError: true });
+      if (knownStop) {
+        openBusPanel(knownStop);
       }
-    };
 
-    if (panelRef) void loadRoutes();
+      if (loadingRef) {
+        requestSubscription.add(
+          loadingRef.afterClosed().subscribe(() => {
+            if (
+              openingResultPanel &&
+              loadingRef.closeReason === 'replaced'
+            ) {
+              return;
+            }
+            if (panelRef && this.panelService.panel()?.id === panelRef.id) {
+              return;
+            }
+            finish();
+          }),
+        );
+      }
 
-    try {
-      const stop = await firstValueFrom(
-        this.geographyService.getBusStop(stopId),
+      requestSubscription.add(
+        stopUpdates$.subscribe({
+          next: (snapshot) => {
+            if (!isCurrentRequest()) {
+              finish();
+              return;
+            }
+
+            if (snapshot.stop?.isSubwayStation) {
+              openingResultPanel = true;
+              this.openSubwayStationPanel({ stop: snapshot.stop });
+              openingResultPanel = false;
+              finish();
+              return;
+            }
+
+            if (snapshot.stop && !panelRef) {
+              const routes =
+                snapshot.routes?.map(({ route }) => route) ?? [];
+              routeSummary.set(
+                routes.length
+                  ? `${routes.length} ${routes.length === 1 ? 'linha' : 'linhas'}`
+                  : '',
+              );
+              openBusPanel(
+                snapshot.stop,
+                routes,
+                snapshot.hasNext,
+                (snapshot.errors?.length ?? 0) > 0 ||
+                  (!snapshot.hasNext && snapshot.routes === undefined),
+              );
+            } else {
+              updateBusPanel(snapshot);
+            }
+
+            if (!snapshot.stop && !panelRef && !snapshot.hasNext) {
+              this.logger.warn('No stop data found', { stopId });
+              loadingRef?.close();
+              this.snackBar.open(
+                snapshot.errors?.length
+                  ? 'Não foi possível carregar os detalhes da parada'
+                  : 'Parada não encontrada',
+                'Fechar',
+                { duration: 3000 },
+              );
+              finish();
+            }
+
+          },
+          error: (error: unknown) => {
+            if (!isCurrentRequest()) {
+              finish();
+              return;
+            }
+
+            this.logger.error('Error loading stop details', error);
+            if (panelRef) {
+              panelRef.updateData({
+                ...panelRef.data,
+                routesLoading: false,
+                routesError: true,
+              });
+            } else {
+              loadingRef?.close();
+              this.snackBar.open(
+                'Não foi possível carregar os detalhes da parada',
+                'Fechar',
+                { duration: 3000 },
+              );
+            }
+            finish();
+          },
+          complete: finish,
+        }),
       );
-      if (!isCurrentRequest()) {
-        return;
-      }
-
-      if (!stop) {
-        this.logger.warn('No stop data found', { stopId });
-        if (!panelRef) {
-          loadingRef?.close();
-          this.snackBar.open('Parada não encontrada', 'Fechar', { duration: 3000 });
-        }
-        return;
-      }
-
-      if (stop.isSubwayStation) {
-        this.openSubwayStationPanel({ stop });
-        return;
-      }
-      const activeRef = currentPanelRef();
-      if (activeRef) {
-        panelTitle.set(stop.name);
-        activeRef.updateData({ ...activeRef.data, stop });
-      } else {
-        openBusPanel(stop);
-        void loadRoutes();
-      }
-    } catch (error) {
-      if (!isCurrentRequest()) {
-        return;
-      }
-
-      this.logger.error('Error loading stop details', error);
-      if (!panelRef) {
-        loadingRef?.close();
-        this.snackBar.open('Não foi possível carregar os detalhes da parada', 'Fechar', { duration: 3000 });
-      }
-    }
+    });
   }
 
   private openSubwayStationPanel(data: SubwayStationDialogData): void {

@@ -15,12 +15,15 @@ import { MapStateService } from './map-state.service';
 describe('MapSelectionService', () => {
   let service: MapSelectionService;
   let mapState: MapStateService;
-  let cache: { getRoute: jest.Mock; getStop: jest.Mock };
+  let cache: { getRoute: jest.Mock };
   let dataLoader: {
     syncVectorTileFilters: jest.Mock;
     loadRouteData: jest.Mock;
     loadStopData: jest.Mock;
     removeRouteDisplayData: jest.Mock;
+    removeStopDisplayData: jest.Mock;
+    cancelStopDataLoad: jest.Mock;
+    cancelStopDataLoads: jest.Mock;
   };
   let logger: {
     debug: jest.Mock;
@@ -33,13 +36,17 @@ describe('MapSelectionService', () => {
   beforeEach(() => {
     cache = {
       getRoute: jest.fn(() => of(null)),
-      getStop: jest.fn(() => of(null)),
     };
     dataLoader = {
       syncVectorTileFilters: jest.fn(),
       loadRouteData: jest.fn(() => Promise.resolve()),
-      loadStopData: jest.fn(() => Promise.resolve()),
+      loadStopData: jest.fn(() =>
+        Promise.resolve({ status: 'not-found' as const }),
+      ),
       removeRouteDisplayData: jest.fn(),
+      removeStopDisplayData: jest.fn(),
+      cancelStopDataLoad: jest.fn(),
+      cancelStopDataLoads: jest.fn(),
     };
     logger = {
       debug: jest.fn(),
@@ -115,21 +122,22 @@ describe('MapSelectionService', () => {
     expect(dataLoader.loadRouteData).not.toHaveBeenCalled();
   });
 
-  it('keeps background stop lookup failures silent', async () => {
+  it('keeps background stop-data failures silent', async () => {
     const error = new Error('request timed out');
-    cache.getStop.mockReturnValue(throwError(() => error));
+    dataLoader.loadStopData.mockResolvedValue({ status: 'error', error });
 
     await expect(
       service.addStopToSelection('stop-1', false),
     ).resolves.toBeUndefined();
 
-    expect(logger.error).toHaveBeenCalledWith(
-      'Failed to load stop selection',
-      error,
-    );
     expect(snackBar.open).not.toHaveBeenCalled();
     expect(mapState.selectedStops().size).toBe(0);
-    expect(dataLoader.loadStopData).not.toHaveBeenCalled();
+    expect(dataLoader.loadStopData).toHaveBeenCalledWith(
+      'stop-1',
+      false,
+      undefined,
+      expect.any(Function),
+    );
   });
 
   it('reports missing selections in Brazilian Portuguese', async () => {
@@ -172,26 +180,84 @@ describe('MapSelectionService', () => {
     expect(snackBar.open).not.toHaveBeenCalled();
   });
 
-  it('publishes a stop tile filter before starting its full-data request', async () => {
-    cache.getStop.mockReturnValue(
-      of({
+  it('uses the full-data response to populate the selection before updating filters', async () => {
+    const stop = {
         stopId: 'stop-1',
         name: 'Stop 1',
         latitude: -23.55,
         longitude: -46.63,
         isSubwayStation: false,
-      }),
-    );
+      };
+    dataLoader.loadStopData.mockResolvedValue({ status: 'loaded', stop });
 
     await service.addStopToSelection('stop-1', false);
 
+    expect(dataLoader.loadStopData).toHaveBeenCalledWith(
+      'stop-1',
+      false,
+      undefined,
+      expect.any(Function),
+    );
     expect(dataLoader.syncVectorTileFilters).toHaveBeenCalledTimes(1);
-    expect(dataLoader.loadStopData).toHaveBeenCalledWith('stop-1', false);
     expect(
       dataLoader.syncVectorTileFilters.mock.invocationCallOrder[0],
-    ).toBeLessThan(dataLoader.loadStopData.mock.invocationCallOrder[0]);
-    expect(mapState.selectedStops().has('stop-1')).toBe(true);
+    ).toBeGreaterThan(dataLoader.loadStopData.mock.invocationCallOrder[0]);
+    expect(mapState.selectedStops().has(stop.stopId)).toBe(true);
     expect(snackBar.open).not.toHaveBeenCalled();
+  });
+
+  it('does not restore a stop after selections clear before the result continuation', async () => {
+    const stop = {
+      id: 'stop-1',
+      stopId: 'stop-1',
+      name: 'Stop 1',
+      latitude: -23.55,
+      longitude: -46.63,
+      isSubwayStation: false,
+    };
+    let resolveLoad!: (result: { status: 'loaded'; stop: typeof stop }) => void;
+    dataLoader.loadStopData.mockReturnValue(
+      new Promise((resolve) => (resolveLoad = resolve)),
+    );
+
+    const pendingSelection = service.addStopToSelection(stop.stopId, false);
+    resolveLoad({ status: 'loaded', stop });
+    service.clearAllSelections(false);
+    await pendingSelection;
+
+    expect(mapState.selectedStops().has(stop.stopId)).toBe(false);
+    expect(dataLoader.cancelStopDataLoads).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels an alias request when its canonical stop is removed', async () => {
+    const stop = {
+      id: 'canonical-stop',
+      stopId: 'canonical-stop',
+      name: 'Stop 1',
+      latitude: -23.55,
+      longitude: -46.63,
+      isSubwayStation: false,
+    };
+    let resolveLoad!: (result: { status: 'loaded'; stop: typeof stop }) => void;
+    dataLoader.loadStopData.mockImplementation(
+      (
+        _requestedId: string,
+        _showSnackbar: boolean,
+        _stopUpdates: unknown,
+        onStopReceived: (receivedStop: typeof stop) => void,
+      ) => {
+        onStopReceived(stop);
+        return new Promise((resolve) => (resolveLoad = resolve));
+      },
+    );
+
+    const pendingSelection = service.addStopToSelection('alias-stop', false);
+    service.removeStopFromSelection(stop.stopId);
+    resolveLoad({ status: 'loaded', stop });
+    await pendingSelection;
+
+    expect(dataLoader.cancelStopDataLoad).toHaveBeenCalledWith('alias-stop');
+    expect(mapState.selectedStops().has(stop.stopId)).toBe(false);
   });
 
   it('keeps rail vehicle tracking when the route disables bus realtime', async () => {

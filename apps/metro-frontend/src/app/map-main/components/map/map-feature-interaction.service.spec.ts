@@ -124,7 +124,11 @@ describe('MapFeatureInteractionService', () => {
   });
 
   it('shows the sanitized bus plate and GTFS route label in the existing popup', () => {
-    const properties = { vehicleId: 'ABC1D23', routeShortName: '001' };
+    const properties = {
+      vehicleId: 'ABC1D23',
+      routeShortName: '001',
+      destination: 'Terminal Centro',
+    };
     service.handleFeatureSelection({
       get: () => undefined,
       getProperties: () => properties,
@@ -133,7 +137,7 @@ describe('MapFeatureInteractionService', () => {
     expect(panels.panel()).toEqual(
       expect.objectContaining({
         title: 'Ônibus ABC1D23',
-        summary: 'Linha 001',
+        summary: 'Linha 001 · Sentido Terminal Centro',
       }),
     );
   });

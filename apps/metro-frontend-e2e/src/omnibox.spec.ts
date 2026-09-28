@@ -251,7 +251,10 @@ test('forwards rapid menu typing into the dialog and searches the final query', 
     exact: true,
   });
   await expect(dialogSearch).toHaveValue('paulista');
-  await expect(menuSearch.locator('xpath=ancestor::mat-form-field')).toHaveCSS('visibility', 'hidden');
+  await expect(page.locator('.menu-search .search-trigger')).toHaveCSS(
+    'visibility',
+    'hidden',
+  );
   await expect(page.locator('.result-card .result-title').first()).toHaveText(
     'Sacomã – Pinheiros',
   );

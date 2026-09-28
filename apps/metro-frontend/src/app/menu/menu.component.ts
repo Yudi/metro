@@ -90,7 +90,6 @@ export class MenuComponent {
       // Keep the trigger visible while the lazy dialog chunk loads so typing
       // continues to reach it; replay the latest value when the dialog opens.
       this.searchQueries.next(this.searchControl.value);
-      this.searchOpen.set(true);
       const dialogRef = this.dialog.open(OmniboxDialogComponent, {
         width: '760px',
         maxWidth: 'calc(100vw - 24px)',
@@ -108,6 +107,8 @@ export class MenuComponent {
           },
         },
       });
+      dialogRef.componentInstance.focusSearch();
+      this.searchOpen.set(true);
       dialogRef
         .afterClosed()
         .pipe(takeUntilDestroyed(this.destroyRef))

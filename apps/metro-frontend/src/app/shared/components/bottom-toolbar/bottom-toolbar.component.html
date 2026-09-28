@@ -1,5 +1,8 @@
 <mat-toolbar
   class="bottom-toolbar"
+  [class.is-dragging]="dragging()"
+  [style.transform]="'translateY(' + hideProgress() * 100 + '%)'"
+  [attr.inert]="hideProgress() >= 1 ? '' : null"
   role="navigation"
   aria-label="Barra de navegação inferior"
   #toolbar

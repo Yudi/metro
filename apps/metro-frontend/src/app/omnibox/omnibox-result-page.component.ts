@@ -107,6 +107,7 @@ export class OmniboxResultPageComponent {
   private readonly draftQuery = signal<string | null>(null);
   readonly query = computed(() => this.draftQuery() ?? this.urlQuery());
   private readonly searchQueries = new BehaviorSubject(this.query());
+  private openingSearch = false;
   readonly searchOpen = signal(false);
   readonly searchError = signal('');
   readonly state = toSignal(
@@ -319,12 +320,12 @@ export class OmniboxResultPageComponent {
     };
   }
 
-  openSearch(query = this.query()): void {
+  async openSearch(query = this.query()): Promise<void> {
     this.searchQueries.next(query);
-    if (this.searchOpen()) return;
-    this.searchOpen.set(true);
+    if (this.searchOpen() || this.openingSearch) return;
+    this.openingSearch = true;
     this.searchError.set('');
-    void import('./omnibox-dialog.component')
+    await import('./omnibox-dialog.component')
       .then(({ OmniboxDialogComponent }) => {
         if (this.destroyRef.destroyed) return;
         const ref = this.dialog.open(OmniboxDialogComponent, {
@@ -340,6 +341,8 @@ export class OmniboxResultPageComponent {
             onQueryChange: (next: string) => this.draftQuery.set(next),
           },
         });
+        ref.componentInstance.focusSearch();
+        this.searchOpen.set(true);
         ref.afterClosed()
           .pipe(takeUntilDestroyed(this.destroyRef))
           .subscribe(() => {
@@ -357,6 +360,9 @@ export class OmniboxResultPageComponent {
       .catch(() => {
         this.searchOpen.set(false);
         this.searchError.set('Não foi possível abrir a busca. Tente novamente.');
+      })
+      .finally(() => {
+        this.openingSearch = false;
       });
   }
 }

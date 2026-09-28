@@ -4,8 +4,8 @@
   "theme_color": "#212e84",
   "background_color": "#000000",
   "display": "standalone",
-  "scope": "/lite",
-  "start_url": "/lite",
+  "scope": "/lite/",
+  "start_url": "/lite/sp",
   "categories": ["transportation", "utilities"],
   "icons": [
     {

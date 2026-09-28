@@ -1,0 +1,8 @@
+<nav aria-label="Páginas de São Paulo">
+  <h2>São Paulo</h2>
+  <ul>
+    @for (link of links; track link.route) {
+      <li><a [routerLink]="link.route">{{ link.label }}</a></li>
+    }
+  </ul>
+</nav>

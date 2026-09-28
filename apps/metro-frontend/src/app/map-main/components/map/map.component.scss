@@ -61,26 +61,32 @@ app-map-footer {
   app-map-footer {
     right: auto;
     left: 12px;
-    bottom: calc(var(--map-sheet-height, 0px) + 28px);
+    bottom: calc(var(--map-sheet-height, 0px) + var(--app-bottom-toolbar-height, 0px) + 28px);
   }
 
   .map-diagnostics {
-    bottom: calc(var(--map-sheet-height, 0px) + 28px);
+    bottom: calc(var(--map-sheet-height, 0px) + var(--app-bottom-toolbar-height, 0px) + 28px);
   }
 
   .map-wrapper {
-    --map-attribution-offset: var(--map-sheet-height, 0px);
+    --map-attribution-offset: calc(var(--map-sheet-height, 0px) + var(--app-bottom-toolbar-height, 0px));
   }
 
+  .map-secondary-controls,
+  app-map-footer,
   :host ::ng-deep .ol-attribution {
     opacity: calc(1 - var(--map-sheet-expanded-progress, 0));
     transition: opacity 220ms linear;
   }
 
+  .is-panel-dragging .map-secondary-controls,
+  .is-panel-dragging app-map-footer,
   :host ::ng-deep .map-wrapper.is-panel-dragging .ol-attribution {
     transition: none;
   }
 
+  .is-panel-expanded .map-secondary-controls,
+  .is-panel-expanded app-map-footer,
   :host ::ng-deep .map-wrapper.is-panel-expanded .ol-attribution {
     pointer-events: none;
   }
@@ -150,6 +156,8 @@ app-map-footer {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .map-secondary-controls,
+  app-map-footer,
   :host ::ng-deep .ol-attribution {
     transition: none;
   }

@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { CityContextService } from '../cities/city-context.service';
 import { BikeStation } from '../map-main/components/map/map.types';
 import { BikeStationsService } from '../map-main/geography/bike-stations.service';
@@ -56,6 +56,7 @@ describe('OmniboxResultPageComponent', () => {
         { provide: CityContextService, useValue: { path: () => '/sp/mapa' } },
       ],
     });
+    TestBed.overrideProvider(MatDialog, { useValue: { open: jest.fn() } });
     TestBed.overrideComponent(OmniboxResultPageComponent, {
       set: { template: '' },
     });
@@ -72,6 +73,32 @@ describe('OmniboxResultPageComponent', () => {
     geography.getRoutesForStop.mockReturnValue(of([]));
     search.search.mockReturnValue(of({ success: false, results: [] }));
     bikes.getStation.mockReturnValue(null);
+  });
+
+  it('keeps the launcher available while loading and focuses before hiding it', async () => {
+    const page = await createPage('bus-stop', stop.stopId, { q: 'paulista' });
+    const closed = new Subject<void>();
+    const focusSearch = jest.fn(() => expect(page.searchOpen()).toBe(false));
+    const open = jest.mocked(TestBed.inject(MatDialog).open);
+    open.mockReturnValue({
+      componentInstance: { focusSearch },
+      afterClosed: () => closed,
+    } as unknown as ReturnType<MatDialog['open']>);
+
+    const opening = page.openSearch('p');
+    expect(page.searchOpen()).toBe(false);
+    void page.openSearch('paulista');
+    await opening;
+
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(focusSearch).toHaveBeenCalledTimes(1);
+    expect(page.searchOpen()).toBe(true);
+    const received: string[] = [];
+    const subscription = open.mock.calls[0][1]?.data.queryChanges.subscribe(
+      (query: string) => received.push(query),
+    );
+    expect(received).toEqual(['paulista']);
+    subscription.unsubscribe();
   });
 
   it('loads a bus stop by URL and retains arrivals when routes fail', async () => {

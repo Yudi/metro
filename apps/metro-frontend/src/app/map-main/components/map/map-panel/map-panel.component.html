@@ -4,7 +4,8 @@
   [class.is-dragging]="dragHeight() !== null"
   [class.is-desktop]="isDesktop()"
   [attr.data-snap]="panelService.snap()"
-  [style.height.px]="height()"
+  [style.--map-panel-height.px]="height()"
+  [style.--map-panel-progress]="toolbarProgress()"
   [attr.aria-label]="regionLabel()"
   [attr.aria-description]="summary()"
   role="region"
@@ -85,7 +86,15 @@
   <div
     #panelBody
     class="map-panel__body"
-    [attr.inert]="(!isDesktop() && panelService.snap() === 'compact') || dragHeight() !== null ? '' : null"
+    (touchstart)="onBodyTouchStart($event)"
+    (touchend)="onBodyTouchEnd($event)"
+    (touchcancel)="onBodyGestureCancel()"
+    (pointerdown)="onBodyPointerDown($event)"
+    (pointermove)="onBodyPointerMove($event)"
+    (pointerup)="onBodyPointerUp($event)"
+    (pointercancel)="onBodyPointerCancel($event)"
+    (lostpointercapture)="onBodyPointerCancel($event)"
+    [attr.inert]="!isDesktop() && panelService.snap() === 'compact' ? '' : null"
   >
     @if (panelService.panel(); as panel) {
       @if (panel.titleLineGroups?.length || summary()) {

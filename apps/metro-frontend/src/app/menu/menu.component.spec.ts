@@ -49,7 +49,13 @@ describe('menu search handoff', () => {
     const { MatDialog } = await import('@angular/material/dialog');
     const { Subject } = await import('rxjs');
     const closed = new Subject<void>();
-    const open = jest.fn().mockReturnValue({ afterClosed: () => closed });
+    const focusSearch = jest.fn(() => {
+      expect(component.searchOpen()).toBe(false);
+    });
+    const open = jest.fn().mockReturnValue({
+      componentInstance: { focusSearch },
+      afterClosed: () => closed,
+    });
     TestBed.configureTestingModule({
       imports: [MenuComponent],
       providers: [
@@ -71,6 +77,7 @@ describe('menu search handoff', () => {
     await opening;
 
     expect(open).toHaveBeenCalledTimes(1);
+    expect(focusSearch).toHaveBeenCalledTimes(1);
     expect(component.searchOpen()).toBe(true);
     const options = open.mock.calls[0][1];
     expect(options).toEqual(expect.objectContaining({

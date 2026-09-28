@@ -26,4 +26,27 @@ describe('BottomToolbarComponent', () => {
     // can be '0px' in JSDOM but must be set
     expect(val).toMatch(/^\d+px$/);
   });
+
+  it('slides without changing its reserved height and removes hidden navigation from focus', () => {
+    const toolbar: HTMLElement = fixture.nativeElement.querySelector('.bottom-toolbar');
+    const reservedHeight = document.documentElement.style.getPropertyValue('--app-bottom-toolbar-height');
+    fixture.componentRef.setInput('hideProgress', 0.5);
+    fixture.componentRef.setInput('dragging', true);
+    fixture.detectChanges();
+    expect(toolbar.style.transform).toBe('translateY(50%)');
+    expect(toolbar.classList.contains('is-dragging')).toBe(true);
+    expect(toolbar.hasAttribute('inert')).toBe(false);
+    expect(document.documentElement.style.getPropertyValue('--app-bottom-toolbar-height')).toBe(reservedHeight);
+
+    fixture.componentRef.setInput('hideProgress', 1);
+    fixture.componentRef.setInput('dragging', false);
+    fixture.detectChanges();
+    expect(toolbar.hasAttribute('inert')).toBe(true);
+    expect(toolbar.classList.contains('is-dragging')).toBe(false);
+
+    fixture.componentRef.setInput('hideProgress', 0);
+    fixture.detectChanges();
+    expect(toolbar.hasAttribute('inert')).toBe(false);
+  });
+
 });

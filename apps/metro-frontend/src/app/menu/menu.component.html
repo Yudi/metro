@@ -63,7 +63,6 @@
         [attr.aria-expanded]="searchOpen()"
         [formControl]="searchControl"
       />
-      <mat-hint>Itinerários, próximas chegadas e conteúdo do site.</mat-hint>
     </mat-form-field>
     @if (searchError()) {
       <p role="alert">{{ searchError() }}</p>

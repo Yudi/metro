@@ -229,38 +229,41 @@ test('opens arrival details from a bus stop result', async ({ page }) => {
   await expect(stopDetail.getByRole('link', { name: 'Ver no mapa' })).toHaveAttribute('href', /busStops=340015325/);
 });
 
-test('forwards rapid menu typing into the dialog and searches the final query', async ({
-  page,
-}) => {
-  const searchQueries: string[] = [];
-  await installTransitGraphQL(page, (query) => {
-    searchQueries.push(query);
-    return false;
-  });
-  await page.goto('/sp/menu');
+for (const delay of [0, 1, 20]) {
+  test(`forwards rapid menu typing (${delay}ms) into the dialog and searches the final query`, async ({
+    page,
+  }) => {
+    const searchQueries: string[] = [];
+    await installTransitGraphQL(page, (query) => {
+      searchQueries.push(query);
+      return false;
+    });
+    await page.goto('/sp/menu');
 
-  const menuSearch = page.getByRole('searchbox', {
-    name: 'Buscar linhas, paradas e páginas',
-    exact: true,
-  });
-  await menuSearch.focus();
-  // Keep sending real keystrokes across the dialog's opening animation.
-  await page.keyboard.type('paulista', { delay: 20 });
+    const menuSearch = page.getByRole('searchbox', {
+      name: 'Buscar linhas, paradas e páginas',
+      exact: true,
+    });
+    await menuSearch.focus();
+    // Keep sending real keystrokes across the dialog's opening animation.
+    await page.keyboard.type('paulista', { delay });
 
-  const dialogSearch = page.getByRole('searchbox', {
-    name: 'Linhas, paradas e páginas',
-    exact: true,
+    const dialogSearch = page.getByRole('searchbox', {
+      name: 'Linhas, paradas e páginas',
+      exact: true,
+    });
+    await expect(dialogSearch).toHaveValue('paulista');
+    await expect(page.locator('.menu-search .search-trigger')).toHaveCSS(
+      'visibility',
+      'hidden',
+    );
+    await expect(page.locator('.result-card .result-title').first()).toHaveText(
+      'Sacomã – Pinheiros',
+    );
+    expect(searchQueries.at(-1)).toBe('paulista');
   });
-  await expect(dialogSearch).toHaveValue('paulista');
-  await expect(page.locator('.menu-search .search-trigger')).toHaveCSS(
-    'visibility',
-    'hidden',
-  );
-  await expect(page.locator('.result-card .result-title').first()).toHaveText(
-    'Sacomã – Pinheiros',
-  );
-  expect(searchQueries.at(-1)).toBe('paulista');
-});
+
+}
 
 test('nearby results retain nearest first ordering', async ({
   page,

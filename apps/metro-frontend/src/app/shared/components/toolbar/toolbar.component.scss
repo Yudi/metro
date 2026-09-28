@@ -92,11 +92,4 @@
   min-height: 0;
   padding: 0;
   overflow: hidden;
-
-  @media (max-width: 767px) {
-    margin-bottom: var(
-      --app-bottom-toolbar-height,
-      calc(5rem + env(safe-area-inset-bottom, 0px))
-    );
-  }
 }

@@ -1,10 +1,12 @@
 import {
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   DestroyRef,
   computed,
   inject,
   signal,
+  viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { NavigationStart, Router, RouterLink } from '@angular/router';
@@ -97,6 +99,8 @@ export class OmniboxDialogComponent {
   readonly geolocation = inject(GeolocationService);
   private readonly search = inject(TypesenseSearchService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly changeDetector = inject(ChangeDetectorRef);
+  private readonly searchField = viewChild(TransitSearchFieldComponent);
   private readonly router = inject(Router);
   private readonly requests = new BehaviorSubject<SearchRequest>({
     query: '',
@@ -188,6 +192,13 @@ export class OmniboxDialogComponent {
       .subscribe((event) => {
         if (event instanceof NavigationStart) this.dialogRef.close();
       });
+  }
+
+  focusSearch(): void {
+    // Material autofocus waits for the next render. Render the replayed query
+    // and move focus before the launcher is hidden or another key can arrive.
+    this.changeDetector.detectChanges();
+    this.searchField()?.focus();
   }
 
   setQuery(query: string): void {

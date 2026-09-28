@@ -40,7 +40,7 @@ describe('MapPanelComponent', () => {
     mapButton.remove();
   });
 
-  function open(initialSnap: 'compact' | 'expanded' = 'compact') {
+  function open(initialSnap: 'compact' | 'half' | 'expanded' = 'compact') {
     const ref = panels.openComponent<string, string>({
       component: PanelContentStub,
       data: 'station-id',
@@ -91,7 +91,7 @@ describe('MapPanelComponent', () => {
 
     const frame: HTMLElement = fixture.nativeElement.querySelector('.map-panel');
     expect(handle()).toBeNull();
-    expect(frame.style.height).toBe('596px');
+    expect(frame.style.getPropertyValue('--map-panel-height')).toBe('596px');
     expect(frame.querySelector('.map-panel__body')?.hasAttribute('inert')).toBe(false);
 
     const favorite: HTMLButtonElement = frame.querySelector('.map-panel__favorite')!;
@@ -141,19 +141,19 @@ describe('MapPanelComponent', () => {
     await fixture.whenStable();
     const grip = handle();
     const frame: HTMLElement = fixture.nativeElement.querySelector('.map-panel');
-    const startHeight = Number.parseFloat(frame.style.height);
+    const startHeight = Number.parseFloat(frame.style.getPropertyValue('--map-panel-height'));
     grip.setPointerCapture = jest.fn();
     grip.dispatchEvent(pointer('pointerdown', 600, 0));
     grip.dispatchEvent(pointer('pointermove', 400, 400));
     fixture.detectChanges();
-    expect(Number.parseFloat(frame.style.height)).toBe(startHeight + 200);
+    expect(Number.parseFloat(frame.style.getPropertyValue('--map-panel-height'))).toBe(startHeight + 200);
     expect(frame.classList.contains('is-dragging')).toBe(true);
 
     grip.dispatchEvent(pointer('pointerup', 400, 600));
     grip.click();
     fixture.detectChanges();
     expect(panels.snap()).toBe('half');
-    expect(Number.parseFloat(frame.style.height)).toBe(350);
+    expect(Number.parseFloat(frame.style.getPropertyValue('--map-panel-height'))).toBe(350);
     expect(frame.classList.contains('is-dragging')).toBe(false);
 
     grip.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
@@ -187,7 +187,7 @@ describe('MapPanelComponent', () => {
     await fixture.whenStable();
     const grip = handle();
     const frame: HTMLElement = fixture.nativeElement.querySelector('.map-panel');
-    const endY = 600 - (350 - Number.parseFloat(frame.style.height));
+    const endY = 600 - (350 - Number.parseFloat(frame.style.getPropertyValue('--map-panel-height')));
     grip.setPointerCapture = jest.fn();
     grip.dispatchEvent(pointer('pointerdown', 600, 0));
     grip.dispatchEvent(pointer('pointermove', endY, 16));
@@ -195,7 +195,7 @@ describe('MapPanelComponent', () => {
     grip.click();
     fixture.detectChanges();
     expect(panels.snap()).toBe('half');
-    expect(Number.parseFloat(frame.style.height)).toBe(350);
+    expect(Number.parseFloat(frame.style.getPropertyValue('--map-panel-height'))).toBe(350);
   });
 
   it('does not change the snap after a cancelled pointer gesture', () => {
@@ -207,4 +207,190 @@ describe('MapPanelComponent', () => {
     grip.dispatchEvent(pointer('pointerup', 240));
     expect(panels.snap()).toBe('compact');
   });
+
+  it('keeps visible half-height controls clickable without starting a drag', async () => {
+    const ref = open('half');
+    await fixture.whenStable();
+    const result = jest.fn();
+    ref.afterClosed().subscribe(result);
+    const body: HTMLElement = fixture.nativeElement.querySelector('.map-panel__body');
+    const button = (body.querySelector('button') as HTMLButtonElement);
+    button.dispatchEvent(pointer('pointerdown', 400));
+    button.dispatchEvent(pointer('pointerup', 400));
+    expect(body.hasAttribute('inert')).toBe(false);
+    expect(fixture.componentInstance.dragHeight()).toBeNull();
+    button.click();
+    expect(result).toHaveBeenCalledWith('station-id');
+  });
+
+  function touch(type: string, y: number, time: number): Event {
+    const event = Object.assign(new Event(type, { bubbles: true, cancelable: true }), {
+      touches: type === 'touchend' ? [] : [{ clientX: 100, clientY: y }],
+      changedTouches: [{ clientX: 100, clientY: y }],
+    });
+    Object.defineProperty(event, 'timeStamp', { value: time });
+    return event;
+  }
+
+  it('resizes in both directions from content, suppressing only the drag click', async () => {
+    open('half');
+    await fixture.whenStable();
+    const body: HTMLElement = fixture.nativeElement.querySelector('.map-panel__body');
+    body.dispatchEvent(touch('touchstart', 500, 0));
+    const move = touch('touchmove', 170, 400);
+    body.dispatchEvent(move);
+    fixture.detectChanges();
+    expect(move.defaultPrevented).toBe(true);
+    expect(fixture.componentInstance.height()).toBe(680);
+    expect(body.scrollTop).toBe(0);
+    body.dispatchEvent(touch('touchend', 170, 600));
+    fixture.detectChanges();
+    expect(panels.snap()).toBe('expanded');
+    (body.querySelector('button') as HTMLButtonElement).click();
+    expect(panels.panel()).not.toBeNull();
+
+    panels.setSnap('half');
+    fixture.detectChanges();
+    body.dispatchEvent(touch('touchstart', 400, 700));
+    body.dispatchEvent(touch('touchmove', 650, 1100));
+    body.dispatchEvent(touch('touchend', 650, 1300));
+    expect(panels.snap()).toBe('compact');
+  });
+
+  it('leaves expanded content scrolling native, collapsing only from its top', async () => {
+    open('expanded');
+    await fixture.whenStable();
+    const body: HTMLElement = fixture.nativeElement.querySelector('.map-panel__body');
+    body.scrollTop = 80;
+    body.dispatchEvent(touch('touchstart', 300, 0));
+    const move = touch('touchmove', 400, 100);
+    body.dispatchEvent(move);
+    expect(move.defaultPrevented).toBe(false);
+    expect(fixture.componentInstance.dragHeight()).toBeNull();
+    body.dispatchEvent(touch('touchend', 400, 150));
+    body.scrollTop = 0;
+    body.dispatchEvent(touch('touchstart', 300, 200));
+    body.dispatchEvent(touch('touchmove', 630, 600));
+    body.dispatchEvent(touch('touchend', 630, 800));
+    expect(panels.snap()).toBe('half');
+  });
+
+  it('uses wheel direction at half height and preserves native scrolling when expanded', async () => {
+    open('half');
+    await fixture.whenStable();
+    const body: HTMLElement = fixture.nativeElement.querySelector('.map-panel__body');
+    jest.useFakeTimers();
+    try {
+      const down = new WheelEvent('wheel', { deltaY: 30, bubbles: true, cancelable: true });
+      body.dispatchEvent(down);
+      expect(down.defaultPrevented).toBe(true);
+      jest.advanceTimersByTime(170);
+      expect(panels.snap()).toBe('expanded');
+      const scroll = new WheelEvent('wheel', { deltaY: 50, bubbles: true, cancelable: true });
+      body.dispatchEvent(scroll);
+      expect(scroll.defaultPrevented).toBe(false);
+      panels.setSnap('half');
+      body.dispatchEvent(new WheelEvent('wheel', { deltaY: -30, bubbles: true, cancelable: true }));
+      jest.advanceTimersByTime(170);
+      expect(panels.snap()).toBe('compact');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('requires a pause after scrolling to the top before a wheel gesture collapses the panel', async () => {
+    open('expanded');
+    await fixture.whenStable();
+    const body: HTMLElement = fixture.nativeElement.querySelector('.map-panel__body');
+    const scroll = (time: number) => {
+      const event = new WheelEvent('wheel', { deltaY: -100, cancelable: true });
+      Object.defineProperty(event, 'timeStamp', { value: time });
+      body.dispatchEvent(event);
+      return event;
+    };
+    jest.useFakeTimers();
+    try {
+      body.scrollTop = 300;
+      expect(scroll(100).defaultPrevented).toBe(false);
+      // Simulate native scrolling reaching the top, followed by momentum events.
+      body.scrollTop = 0;
+      for (const time of [140, 300, 500, 740]) {
+        expect(scroll(time).defaultPrevented).toBe(false);
+        expect(fixture.componentInstance.dragHeight()).toBeNull();
+        expect(panels.snap()).toBe('expanded');
+      }
+      expect(scroll(991).defaultPrevented).toBe(true);
+      jest.advanceTimersByTime(170);
+      expect(panels.snap()).toBe('half');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('does not apply the wheel pause boundary to touch gestures', async () => {
+    open('expanded');
+    await fixture.whenStable();
+    const body: HTMLElement = fixture.nativeElement.querySelector('.map-panel__body');
+    body.scrollTop = 100;
+    body.dispatchEvent(new WheelEvent('wheel', { deltaY: -100, cancelable: true }));
+    body.scrollTop = 0;
+    body.dispatchEvent(touch('touchstart', 300, 0));
+    const move = touch('touchmove', 630, 400);
+    body.dispatchEvent(move);
+    expect(move.defaultPrevented).toBe(true);
+    body.dispatchEvent(touch('touchend', 630, 600));
+    expect(panels.snap()).toBe('half');
+  });
+
+  it('uses the fixed top-edge baseline when the toolbar space changes the rendered height', async () => {
+    open('half');
+    await fixture.whenStable();
+    const component = fixture.componentInstance;
+    const frame: HTMLElement = fixture.nativeElement.querySelector('.map-panel');
+    jest.spyOn(fixture.nativeElement, 'getBoundingClientRect').mockReturnValue({ bottom: 700 });
+    jest.spyOn(frame, 'getBoundingClientRect').mockReturnValue({ top: 350, height: 390 } as DOMRect);
+    const grip = handle();
+    grip.setPointerCapture = jest.fn();
+    grip.dispatchEvent(pointer('pointerdown', 370, 0));
+    grip.dispatchEvent(pointer('pointermove', 270, 100));
+    expect(component.height()).toBe(450);
+    expect(component.anchors().expanded).toBe(688);
+    expect(component.toolbarProgress()).toBeCloseTo(100 / 338);
+    expect(component.toolbarProgress()).toBeGreaterThan(0);
+    grip.dispatchEvent(pointer('pointercancel', 270, 110));
+    fixture.detectChanges();
+    expect(panels.dragging()).toBe(false);
+  });
+
+
+  it('keeps navigation fully visible through half height and restores it on destruction', async () => {
+    open('half');
+    await fixture.whenStable();
+    expect(fixture.componentInstance.toolbarProgress()).toBe(0);
+    expect(panels.toolbarHideProgress()).toBe(0);
+    panels.setSnap('expanded');
+    fixture.detectChanges();
+    expect(fixture.componentInstance.toolbarProgress()).toBe(1);
+    expect(panels.toolbarHideProgress()).toBe(1);
+    fixture.destroy();
+    expect(panels.toolbarHideProgress()).toBe(0);
+    expect(panels.dragging()).toBe(false);
+  });
+
+  it('cancels a multi-touch gesture and leaves pinch-wheel gestures native', async () => {
+    open('half');
+    await fixture.whenStable();
+    const body: HTMLElement = fixture.nativeElement.querySelector('.map-panel__body');
+    body.dispatchEvent(touch('touchstart', 500, 0));
+    body.dispatchEvent(touch('touchmove', 400, 100));
+    body.dispatchEvent(Object.assign(new Event('touchstart', { bubbles: true }), {
+      touches: [{ clientX: 100, clientY: 400 }, { clientX: 200, clientY: 400 }],
+    }));
+    expect(fixture.componentInstance.dragHeight()).toBeNull();
+    expect(panels.snap()).toBe('half');
+    const wheel = new WheelEvent('wheel', { deltaY: 50, ctrlKey: true, cancelable: true });
+    body.dispatchEvent(wheel);
+    expect(wheel.defaultPrevented).toBe(false);
+  });
+
 });

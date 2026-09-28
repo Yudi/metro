@@ -27,6 +27,7 @@ import { filter, map } from 'rxjs';
 import { isPlatformBrowser } from '@angular/common';
 import { MapViewStateStorageService } from '../../../map-main/components/map/map-view-state-storage.service';
 import { CityContextService } from '../../../cities/city-context.service';
+import { MapPanelService } from '../../../map-main/components/map/map-panel/map-panel.service';
 import { getCity } from '@metro/shared/cities';
 
 @Component({
@@ -46,6 +47,7 @@ import { getCity } from '@metro/shared/cities';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ToolbarComponent {
+  readonly mapPanel = inject(MapPanelService);
   readonly footerLinks = footerLinks;
   private readonly safeBackPaths = new Set([
     '/',

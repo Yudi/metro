@@ -60,5 +60,7 @@
 </main>
 <app-bottom-toolbar
   [items]="items"
+  [hideProgress]="viewportLayout() ? mapPanel.toolbarHideProgress() : 0"
+  [dragging]="viewportLayout() && mapPanel.dragging()"
   (navigateClick)="navigateToItem($event.event, $event.item)"
 ></app-bottom-toolbar>

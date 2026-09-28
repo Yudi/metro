@@ -55,6 +55,9 @@ export class MapPanelService {
   private nextPanelId = 1;
   private lifecycleGeneration = 0;
 
+  readonly toolbarHideProgress = signal(0);
+  readonly dragging = signal(false);
+
   readonly panel = this.panelState.asReadonly();
   readonly snap = this.snapState.asReadonly();
 

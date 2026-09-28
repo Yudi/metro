@@ -137,9 +137,15 @@ async function verifyMapShell(canvasElement: HTMLElement): Promise<void> {
     if (window.getComputedStyle(tabs).display === 'none') {
       throw new Error('The mobile city tabs should remain visible');
     }
-    if (map.getBoundingClientRect().bottom > tabs.getBoundingClientRect().top + 1) {
-      throw new Error('The map extends underneath the mobile city tabs');
-    }
+    const panel = document.querySelector<HTMLElement>('.map-panel');
+    await waitFor(() => {
+      if (!panel || Math.abs(panel.getBoundingClientRect().bottom - tabs.getBoundingClientRect().top) > 1) {
+        throw new Error('The panel and mobile city tabs do not share a moving edge');
+      }
+      if (Math.abs(map.getBoundingClientRect().bottom - window.innerHeight) > 1) {
+        throw new Error('The map viewport should remain stable behind the sliding tabs');
+      }
+    });
   }
 
   if (document.documentElement.scrollHeight > window.innerHeight + 1) {
@@ -205,7 +211,7 @@ export const CityOverview: Story = {
     }) as HTMLInputElement;
     await userEvent.click(stations);
     await userEvent.click(stations);
-    await userEvent.click(canvas.getByRole('button', { name: 'Camadas' }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Fechar detalhes' }));
     await waitFor(() => {
       if (page.queryByRole('region', { name: /Detalhes no mapa/ })) {
         throw new Error('The layer panel is still open');
@@ -497,5 +503,25 @@ export const LocationRequesting: Story = {
     if (!locationButton.disabled) {
       throw new Error('The location action should be disabled while pending');
     }
+  },
+};
+
+export const StationDetailsHalf: Story = {
+  decorators: withMapState({
+    stationDetail: {
+      stop: PARAISO,
+      summary: 'Linhas 1-Azul e 2-Verde',
+      initialSnap: 'half',
+    },
+  }),
+  parameters: {
+    docs: {
+      description: {
+        story: 'On mobile, scroll or swipe the visible content to resize the sheet. Taps remain available at half height; expanded content scrolls normally. The city tabs follow expansion without resizing the map.',
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    await verifyMapShell(canvasElement);
   },
 };

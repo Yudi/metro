@@ -43,6 +43,8 @@ import { CityContextService } from '../../../cities/city-context.service';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BottomToolbarComponent implements AfterViewInit {
+  readonly hideProgress = input(0);
+  readonly dragging = input(false);
   public readonly items = input.required<ToolbarItem[]>();
   readonly navigateClick = output<{
     event: MouseEvent;

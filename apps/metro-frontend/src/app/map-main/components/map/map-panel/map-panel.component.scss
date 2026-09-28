@@ -24,19 +24,19 @@
   border-radius: 16px;
   box-shadow: var(--mat-sys-level2);
   outline: none;
-  transition: height 220ms cubic-bezier(0.2, 0, 0, 1);
+  transition: height 220ms cubic-bezier(0.2, 0, 0, 1), bottom 220ms cubic-bezier(0.2, 0, 0, 1);
 }
 
 .map-panel[data-snap='compact'] {
-  height: 152px;
+  height: var(--map-panel-height, 152px);
 }
 
 .map-panel[data-snap='half'] {
-  height: 50%;
+  height: var(--map-panel-height, 50%);
 }
 
 .map-panel[data-snap='expanded'] {
-  height: calc(100% - 104px);
+  height: var(--map-panel-height, calc(100% - 104px));
 }
 
 .map-panel.is-dragging {
@@ -180,6 +180,7 @@
   overflow: auto;
 }
 
+.map-panel:not(.is-desktop)[data-snap='half'] .map-panel__body,
 .map-panel[data-snap='compact'] .map-panel__body,
 .map-panel.is-dragging .map-panel__body {
   overflow: hidden;
@@ -230,13 +231,25 @@
 }
 
 @media (max-width: 767px) {
+  :host {
+    bottom: var(--app-bottom-toolbar-height, 0px);
+  }
+
+  .map-panel[data-snap] {
+    height: calc(var(--map-panel-height, 152px) + var(--app-bottom-toolbar-height, 0px) * var(--map-panel-progress, 0));
+  }
+
   .map-panel {
     right: 0;
-    bottom: 0;
+    bottom: calc(-1 * var(--app-bottom-toolbar-height, 0px) * var(--map-panel-progress, 0));
     left: 0;
     width: 100%;
-    max-height: calc(100% - 80px);
+    max-height: none;
     border-radius: 16px 16px 0 0;
+  }
+
+  .map-panel__footer {
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
   }
 }
 

@@ -38,8 +38,19 @@ function isFavoritable(value: unknown): value is FavoritablePanelContent {
 }
 
 const SNAP_POINTS: MapPanelSnap[] = ['compact', 'half', 'expanded'];
+const CONTENT_SCROLL_PAUSE_MS = 250;
+
+type DragSample = Pick<PointerEvent, 'pointerId' | 'clientY' | 'timeStamp'>;
+
+interface BodyGesture {
+  startX: number;
+  startY: number;
+  scrollTop: number;
+  dragging: boolean;
+}
 
 interface PanelDrag {
+  source: 'handle' | 'body';
   id: number;
   startY: number;
   startHeight: number;
@@ -90,7 +101,7 @@ export class MapPanelComponent {
   readonly dragHeight = signal<number | null>(null);
 
   readonly anchors = computed<Record<MapPanelSnap, number>>(() => {
-    const topGap = this.isDesktop() ? 104 : 80;
+    const topGap = this.isDesktop() ? 104 : 12;
     const full = Math.max(0, this.viewportHeight() - topGap);
     const compact = Math.min(full, this.compactHeight());
     return {
@@ -118,6 +129,13 @@ export class MapPanelComponent {
       ? (this.dragHeight() ?? anchors[this.panelService.snap()])
       : anchors.compact;
     return Math.max(0, Math.min(1, (height - anchors.compact) / range));
+  });
+  readonly toolbarProgress = computed(() => {
+    if (this.isDesktop() || !this.hasPanelContent()) return 0;
+    const anchors = this.anchors();
+    const range = anchors.expanded - anchors.half;
+    const height = this.dragHeight() ?? anchors[this.panelService.snap()];
+    return range > 0 ? Math.max(0, Math.min(1, (height - anchors.half) / range)) : 0;
   });
   readonly snapIndex = computed(() => SNAP_POINTS.indexOf(this.panelService.snap()));
   readonly snapLabel = computed(() => ['Compacto', 'Meia altura', 'Expandido'][this.snapIndex()]);
@@ -154,6 +172,11 @@ export class MapPanelComponent {
   private activePanelId: number | null = null;
   private activePointer: PanelDrag | null = null;
   private suppressHandleClick = false;
+  private bodyGesture: BodyGesture | null = null;
+  private suppressBodyClick = false;
+  private wheelTimer: ReturnType<typeof setTimeout> | undefined;
+  private wheelDirection = 0;
+  private lastContentWheelTime = Number.NEGATIVE_INFINITY;
 
   constructor() {
     afterNextRender(() => {
@@ -172,8 +195,32 @@ export class MapPanelComponent {
       }
       this.observeContentHeader();
       this.measure();
+      const body = this.panelBody()?.nativeElement;
+      if (body) {
+        const move = (event: TouchEvent) => this.onBodyTouchMove(event);
+        const wheel = (event: WheelEvent) => this.onBodyWheel(event);
+        const click = (event: MouseEvent) => {
+          if (!this.suppressBodyClick) return;
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          this.suppressBodyClick = false;
+        };
+        body.addEventListener('touchmove', move, { passive: false });
+        body.addEventListener('wheel', wheel, { passive: false });
+        body.addEventListener('click', click, true);
+        this.destroyRef.onDestroy(() => {
+          body.removeEventListener('touchmove', move);
+          body.removeEventListener('wheel', wheel);
+          body.removeEventListener('click', click, true);
+        });
+      }
     });
-    this.destroyRef.onDestroy(() => this.resizeObserver?.disconnect());
+    this.destroyRef.onDestroy(() => {
+      this.resizeObserver?.disconnect();
+      clearTimeout(this.wheelTimer);
+      this.panelService.toolbarHideProgress.set(0);
+      this.panelService.dragging.set(false);
+    });
 
     effect(() => {
       const panelId = this.panelService.panel()?.id ?? null;
@@ -183,6 +230,11 @@ export class MapPanelComponent {
       const shouldRestoreFocus = !isOpen && this.wasOpen;
       this.wasOpen = isOpen;
       this.activePointer = null;
+      this.bodyGesture = null;
+      this.lastContentWheelTime = Number.NEGATIVE_INFINITY;
+      clearTimeout(this.wheelTimer);
+      this.wheelTimer = undefined;
+      this.draggingChange.emit(false);
       this.dragHeight.set(null);
       if (panelId !== this.activePanelId) {
         this.activePanelId = panelId;
@@ -203,7 +255,12 @@ export class MapPanelComponent {
       }
     });
 
-    effect(() => this.expandedProgressChange.emit(this.expandedProgress()));
+    effect(() => {
+      const progress = this.isDesktop() ? 0 : this.expandedProgress();
+      this.expandedProgressChange.emit(progress);
+      this.panelService.toolbarHideProgress.set(this.toolbarProgress());
+      this.panelService.dragging.set(this.dragHeight() !== null);
+    });
   }
 
   onAttached(attachedRef: unknown): void {
@@ -217,11 +274,157 @@ export class MapPanelComponent {
     }
   }
 
+  // Measure the top edge against a fixed baseline. The bottom edge moves into
+  // the toolbar's space independently, so it must not enter pointer deltas.
+  private renderedHeight(): number {
+    const frame = this.panelFrame()?.nativeElement;
+    const rect = frame?.getBoundingClientRect();
+    return rect?.height
+      ? this.host.nativeElement.getBoundingClientRect().bottom - rect.top
+      : this.height() ?? 0;
+  }
+
+  onBodyTouchStart(event: TouchEvent): void {
+    this.suppressBodyClick = false;
+    if (!this.showHandle() || event.touches.length !== 1) {
+      this.onBodyGestureCancel();
+      return;
+    }
+    const touch = event.touches[0];
+    this.bodyGesture = {
+      startX: touch.clientX, startY: touch.clientY,
+      scrollTop: this.panelBody()?.nativeElement.scrollTop ?? 0, dragging: false,
+    };
+  }
+
+  private onBodyTouchMove(event: TouchEvent): void {
+    const gesture = this.bodyGesture;
+    if (!gesture || event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    const delta = gesture.startY - touch.clientY;
+    if (!gesture.dragging) {
+      if (Math.abs(delta) < 6) return;
+      if (Math.abs(touch.clientX - gesture.startX) > Math.abs(delta) ||
+          (this.panelService.snap() === 'expanded' && (delta > 0 || gesture.scrollTop > 0))) {
+        this.bodyGesture = null;
+        return;
+      }
+      if (!event.cancelable) return;
+      this.startBodyDrag(gesture.startY, event.timeStamp);
+      gesture.dragging = true;
+    }
+    event.preventDefault();
+    this.onHandlePointerMove({ pointerId: -1, clientY: touch.clientY, timeStamp: event.timeStamp });
+  }
+
+  onBodyTouchEnd(event: TouchEvent): void {
+    if (this.bodyGesture?.dragging) {
+      const touch = event.changedTouches[0];
+      this.suppressBodyClick = true;
+      this.onHandlePointerUp({ pointerId: -1, clientY: touch.clientY, timeStamp: event.timeStamp });
+    }
+    this.bodyGesture = null;
+  }
+
+  onBodyPointerDown(event: PointerEvent): void {
+    if (event.pointerType === 'touch' || !this.showHandle() || event.button !== 0 || event.isPrimary === false) return;
+    this.suppressBodyClick = false;
+    this.bodyGesture = {
+      startX: event.clientX, startY: event.clientY,
+      scrollTop: this.panelBody()?.nativeElement.scrollTop ?? 0, dragging: false,
+    };
+  }
+
+  onBodyPointerMove(event: PointerEvent): void {
+    if (event.pointerType === 'touch') return;
+    const gesture = this.bodyGesture;
+    if (!gesture) return;
+    const delta = gesture.startY - event.clientY;
+    if (!gesture.dragging) {
+      if (Math.abs(delta) < 6) return;
+      if (Math.abs(event.clientX - gesture.startX) > Math.abs(delta) ||
+          (this.panelService.snap() === 'expanded' && (delta > 0 || gesture.scrollTop > 0))) {
+        this.bodyGesture = null;
+        return;
+      }
+      this.startBodyDrag(gesture.startY, event.timeStamp, event.pointerId);
+      gesture.dragging = true;
+      (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    }
+    event.preventDefault();
+    this.onHandlePointerMove(event);
+  }
+
+  onBodyPointerUp(event: PointerEvent): void {
+    if (event.pointerType === 'touch') return;
+    if (this.bodyGesture?.dragging) {
+      this.suppressBodyClick = true;
+      this.onHandlePointerUp(event);
+    }
+    this.bodyGesture = null;
+  }
+
+  onBodyPointerCancel(event: PointerEvent): void {
+    if (event.pointerType !== 'touch') this.onBodyGestureCancel();
+  }
+
+  onBodyGestureCancel(): void {
+    this.bodyGesture = null;
+    this.onHandlePointerCancel();
+  }
+
+  private startBodyDrag(y: number, time: number, id = -1): void {
+    clearTimeout(this.wheelTimer);
+    this.wheelTimer = undefined;
+    const startHeight = this.renderedHeight();
+    this.activePointer = {
+      source: 'body', id, startY: y, startHeight, lastY: y, lastTime: time, velocity: 0, moved: false,
+    };
+    this.draggingChange.emit(true);
+    this.dragHeight.set(startHeight);
+  }
+
+  private onBodyWheel(event: WheelEvent): void {
+    if (!this.showHandle() || this.activePointer || event.ctrlKey || Math.abs(event.deltaX) > Math.abs(event.deltaY) || !event.deltaY) return;
+    const body = this.panelBody()?.nativeElement;
+    if (!this.wheelTimer && this.panelService.snap() === 'expanded') {
+      // Keep the entire content-scroll burst, including its momentum at the top,
+      // native. Only a new burst after a pause can start collapsing the sheet.
+      const continuingContentScroll = event.timeStamp - this.lastContentWheelTime < CONTENT_SCROLL_PAUSE_MS;
+      if (event.deltaY > 0 || (body?.scrollTop ?? 0) > 0 || continuingContentScroll) {
+        this.lastContentWheelTime = event.timeStamp;
+        return;
+      }
+    }
+    event.preventDefault();
+    const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? this.viewportHeight() : 1;
+    const anchors = this.anchors();
+    this.draggingChange.emit(true);
+    this.dragHeight.set(Math.max(anchors.compact, Math.min(anchors.expanded,
+      (this.dragHeight() ?? this.renderedHeight()) + event.deltaY * scale)));
+    this.wheelDirection = Math.sign(event.deltaY);
+    clearTimeout(this.wheelTimer);
+    this.wheelTimer = setTimeout(() => {
+      const height = this.dragHeight() ?? this.height() ?? 0;
+      const nearest = this.nearestSnap(height);
+      const current = this.panelService.snap();
+      this.panelService.setSnap(nearest === current
+        ? SNAP_POINTS[Math.max(0, Math.min(2, SNAP_POINTS.indexOf(current) + this.wheelDirection))]
+        : nearest);
+      this.wheelTimer = undefined;
+      this.dragHeight.set(null);
+      this.draggingChange.emit(false);
+    }, 160);
+  }
+
   onHandlePointerDown(event: PointerEvent): void {
     if (!this.showHandle()) return;
     if (event.isPrimary === false || (event.pointerType === 'mouse' && event.button !== 0)) return;
-    const startHeight = this.panelFrame()?.nativeElement.getBoundingClientRect().height || this.height() || 0;
+    clearTimeout(this.wheelTimer);
+    this.wheelTimer = undefined;
+    const startHeight = this.renderedHeight();
     this.activePointer = {
+      source: 'handle',
       id: event.pointerId,
       startY: event.clientY,
       startHeight,
@@ -236,7 +439,7 @@ export class MapPanelComponent {
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   }
 
-  onHandlePointerMove(event: PointerEvent): void {
+  onHandlePointerMove(event: DragSample): void {
     const pointer = this.activePointer;
     if (!pointer || pointer.id !== event.pointerId) return;
     const delta = pointer.startY - event.clientY;
@@ -251,7 +454,7 @@ export class MapPanelComponent {
     this.dragHeight.set(Math.max(anchors.compact, Math.min(anchors.expanded, pointer.startHeight + delta)));
   }
 
-  onHandlePointerUp(event: PointerEvent): void {
+  onHandlePointerUp(event: DragSample): void {
     const pointer = this.activePointer;
     if (!pointer || pointer.id !== event.pointerId) return;
     this.onHandlePointerMove(event);
@@ -267,7 +470,7 @@ export class MapPanelComponent {
         ? nearest
         : this.nearestSnap(releasedHeight + projection);
       this.panelService.setSnap(snap);
-      this.suppressHandleClick = true;
+      this.suppressHandleClick = pointer.source === 'handle';
     }
     this.dragHeight.set(null);
     this.draggingChange.emit(false);
@@ -344,7 +547,7 @@ export class MapPanelComponent {
     }
     const minimumHeight = this.hasPanelContent() ? 96 : 0;
     this.compactHeight.set(Math.max(minimumHeight, handleHeight + footerHeight + headerHeight));
-    this.heightChange.emit(Math.round(this.panelFrame()?.nativeElement.getBoundingClientRect().height ?? 0));
+    this.heightChange.emit(Math.round(this.renderedHeight()));
   }
 
   private resetContentScroll(): void {

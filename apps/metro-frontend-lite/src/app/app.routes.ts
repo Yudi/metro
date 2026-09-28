@@ -16,8 +16,7 @@ export const routes: Route[] = [
       {
         path: '',
         pathMatch: 'full',
-        loadComponent: () =>
-          import('./sp/dashboard/dashboard').then((m) => m.Dashboard),
+        redirectTo: 'sp',
       },
       {
         path: SAO_PAULO_CITY.id,

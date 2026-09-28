@@ -1,6 +1,6 @@
 <div
   class="map-wrapper"
-  [class.is-panel-expanded]="mapPanel.snap() === 'expanded'"
+  [class.is-panel-expanded]="sheetExpandedProgress() >= 1"
   [class.is-panel-dragging]="sheetDragging()"
   [style.--map-sheet-height.px]="sheetHeight()"
   [style.--map-sheet-expanded-progress]="sheetExpandedProgress()"
@@ -23,6 +23,7 @@
 
   <app-map-header
     class="map-secondary-controls"
+    [attr.inert]="sheetExpandedProgress() >= 1 ? '' : null"
     controls="secondary"
     [displayMode]="displayMode()"
     [hasSelections]="hasSelections()"
@@ -39,12 +40,15 @@
     (clearClick)="clearAllSelections()"
   />
 
-  @if (!mapPanel.panel()) {
+  @if (!mapPanel.panel() || !selectedFeature()) {
     <app-map-footer
+      [attr.inert]="sheetExpandedProgress() >= 1 ? '' : null"
       [hasSelectedFeature]="!!selectedFeature()"
       (featureInfoClick)="onFeatureInfoClick()"
     />
+  }
 
+  @if (!mapPanel.panel()) {
     @if (isDevMode) {
       <details class="map-diagnostics">
         <summary>Diagnóstico</summary>

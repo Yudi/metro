@@ -66,6 +66,23 @@ describe('OmniboxDialogComponent', () => {
     fixture.detectChanges();
   }
 
+  it('renders the latest buffered query and focuses synchronously before more typing', () => {
+    component.setQuery('pa');
+    component.setQuery('paulis');
+    component.focusSearch();
+
+    const input = fixture.nativeElement.querySelector('input') as HTMLInputElement;
+    expect(document.activeElement).toBe(input);
+    expect(input.value).toBe('paulis');
+    input.value += 'ta';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    fixture.detectChanges();
+    expect(input.value).toBe('paulista');
+    expect(component.query()).toBe('paulista');
+    jest.advanceTimersByTime(250);
+    expect(search.search).toHaveBeenLastCalledWith('paulista', expect.any(Array));
+  });
+
   it('keeps one visible filter selected when the active option is clicked again', async () => {
     await jest.advanceTimersByTimeAsync(0);
     fixture.detectChanges();

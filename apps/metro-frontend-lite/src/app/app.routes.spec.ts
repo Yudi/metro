@@ -17,7 +17,7 @@ function flattenRoutes(routeList: readonly Route[]): Route[] {
 }
 
 describe('lite application routes', () => {
-  it('renders the dashboard directly at the root and city root', () => {
+  it('redirects root to the navigation page and keeps the dashboard nested', () => {
     const children = layoutChildren();
     const rootRoute = children.find(
       (route) => route.path === '' && route.pathMatch === 'full',
@@ -29,7 +29,7 @@ describe('lite application routes', () => {
       (route) => route.path === '' && route.pathMatch === 'full',
     );
 
-    expect(rootRoute?.loadComponent).toEqual(expect.any(Function));
+    expect(rootRoute?.redirectTo).toBe(SAO_PAULO_CITY.id);
     expect(cityRoute?.children).toBe(spRoutes);
     expect(cityRootRoute?.loadComponent).toEqual(expect.any(Function));
   });
@@ -38,9 +38,15 @@ describe('lite application routes', () => {
     const routeList = flattenRoutes(routes);
     const topLevelPaths = layoutChildren().map((route) => route.path);
 
-    expect(routeList.some((route) => route.redirectTo !== undefined)).toBe(
-      false,
+    const redirects = routeList.filter(
+      (route) => route.redirectTo !== undefined,
     );
+    expect(redirects).toHaveLength(1);
+    expect(redirects[0]).toMatchObject({
+      path: '',
+      pathMatch: 'full',
+      redirectTo: SAO_PAULO_CITY.id,
+    });
     expect(topLevelPaths).not.toEqual(
       expect.arrayContaining([
         'sao-paulo',

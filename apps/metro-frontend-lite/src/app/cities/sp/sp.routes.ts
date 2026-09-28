@@ -5,7 +5,7 @@ export const routes: Route[] = [
     path: '',
     pathMatch: 'full',
     loadComponent: () =>
-      import('../../sp/dashboard/dashboard').then((m) => m.Dashboard),
+      import('../../home/home').then((m) => m.Home),
   },
   {
     path: 'painel',

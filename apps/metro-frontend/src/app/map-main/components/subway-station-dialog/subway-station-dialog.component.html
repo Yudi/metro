@@ -27,11 +27,6 @@
     </div>
   }
 
-  @if (data.stop.description) {
-    <p class="station-description">{{ data.stop.description }}</p>
-    <mat-divider></mat-divider>
-  }
-
   <div class="subway-lines-section">
     <!-- <h3>
       <mat-icon inline>train</mat-icon>
@@ -108,66 +103,173 @@
     }
   </div>
 
-  @if (trainLines().length > 0) {
-    <mat-divider></mat-divider>
-    <div class="next-train-section">
-      <h3>Trens nesta estação</h3>
-      <div class="train-line-chips" role="group" aria-label="Selecionar linha">
-        @for (line of trainLines(); track line.lineCode) {
-          <button
-            type="button"
-            class="train-line-chip"
-            [class.train-line-chip--selected]="selectedTrainLine()?.lineCode === line.lineCode"
-            [attr.aria-pressed]="selectedTrainLine()?.lineCode === line.lineCode"
-            (click)="selectTrainLine(line.lineCode)"
-          >
-            <span
-              class="train-line-chip__badge"
-              [style.background-color]="line.colorHex"
-              [style.color]="getContrastColor(line.colorHex)"
-            >{{ line.badge }}</span>
-            <span>{{ line.name }}</span>
-          </button>
-        }
-      </div>
-
+  <ng-template #trainLineSelector>
+    <div class="train-line-chips" role="group" aria-label="Selecionar linha">
       @for (line of trainLines(); track line.lineCode) {
-        @if (selectedTrainLine()?.lineCode === line.lineCode) {
-          <div
-            class="train-line-content"
-            role="region"
-            [attr.aria-label]="'Trens da linha ' + line.badge + ' ' + line.name"
-          >
-            @if (line.station; as station) {
-              <app-next-train-card
-                [lineCode]="station.lineCode"
-                [stationCode]="station.stationCode"
-                [stationName]="displayName"
-              />
-            } @else if (line.compositions; as compositions) {
-              <div class="static-composition-line__directions">
-                @for (
-                  composition of compositions;
-                  track composition.directionName
-                ) {
-                  <div class="static-composition-line__direction">
-                    <div class="static-composition-line__direction-header">
-                      <mat-icon>arrow_forward</mat-icon>
-                      <span>{{ composition.directionName }}</span>
-                    </div>
-                    <lib-train-composition
-                      [composition]="composition"
-                      [compactContext]="true"
-                    />
+        <button
+          type="button"
+          class="train-line-chip"
+          [class.train-line-chip--selected]="selectedTrainLine()?.lineCode === line.lineCode"
+          [attr.aria-pressed]="selectedTrainLine()?.lineCode === line.lineCode"
+          (click)="selectTrainLine(line.lineCode)"
+        >
+          <span
+            class="train-line-chip__badge"
+            [style.background-color]="line.colorHex"
+            [style.color]="getContrastColor(line.colorHex)"
+          >{{ line.badge }}</span>
+          <span>{{ line.name }}</span>
+        </button>
+      }
+    </div>
+  </ng-template>
+
+  <mat-tab-group
+    class="station-tabs"
+    mat-stretch-tabs="true"
+    animationDuration="100ms"
+    [attr.aria-label]="'Detalhes de ' + displayName"
+  >
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <span class="station-tab-label">
+          <mat-icon aria-hidden="true">schedule</mat-icon>
+          <span class="station-tab-label__text">Próximos trens</span>
+        </span>
+      </ng-template>
+      <ng-template matTabContent>
+        <div class="station-tab-panel">
+          @if (trainLines().length > 0) {
+            <ng-container [ngTemplateOutlet]="trainLineSelector"></ng-container>
+            @if (selectedTrainLine(); as line) {
+              <div
+                class="train-line-content"
+                role="region"
+                [attr.aria-label]="'Trens da linha ' + line.badge + ' ' + line.name"
+              >
+                @if (line.station; as station) {
+                  <app-next-train-card
+                    [lineCode]="station.lineCode"
+                    [stationCode]="station.stationCode"
+                    [stationName]="displayName"
+                    [displayMode]="'schedule'"
+                  />
+                } @else {
+                  <div class="station-tab-empty" role="status">
+                    <mat-icon aria-hidden="true">schedule</mat-icon>
+                    <span>Horários não disponíveis para esta linha</span>
                   </div>
                 }
               </div>
             }
-          </div>
-        }
-      }
-    </div>
-  }
+          } @else {
+            <div class="station-tab-empty" role="status">
+              <mat-icon aria-hidden="true">schedule</mat-icon>
+              <span>Horários não disponíveis para esta estação</span>
+            </div>
+          }
+        </div>
+      </ng-template>
+    </mat-tab>
+
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <span class="station-tab-label">
+          <mat-icon aria-hidden="true">train</mat-icon>
+          <span class="station-tab-label__text">Composição</span>
+        </span>
+      </ng-template>
+      <ng-template matTabContent>
+        <div class="station-tab-panel">
+          @if (trainLines().length > 0) {
+            <ng-container [ngTemplateOutlet]="trainLineSelector"></ng-container>
+            @if (selectedTrainLine(); as line) {
+              <div
+                class="train-line-content"
+                role="region"
+                [attr.aria-label]="'Composição da linha ' + line.badge + ' ' + line.name"
+              >
+                @if (line.station; as station) {
+                  <app-next-train-card
+                    [lineCode]="station.lineCode"
+                    [stationCode]="station.stationCode"
+                    [stationName]="displayName"
+                    [displayMode]="'composition'"
+                  />
+                } @else if (line.compositions; as compositions) {
+                  <div class="static-composition-line__directions">
+                    @for (
+                      composition of compositions;
+                      track composition.directionName
+                    ) {
+                      <div class="static-composition-line__direction">
+                        <div class="static-composition-line__direction-header">
+                          <mat-icon>arrow_forward</mat-icon>
+                          <span>{{ composition.directionName }}</span>
+                        </div>
+                        <lib-train-composition
+                          [composition]="composition"
+                          [compactContext]="true"
+                        />
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          } @else {
+            <div class="station-tab-empty" role="status">
+              <mat-icon aria-hidden="true">train</mat-icon>
+              <span>Composição não disponível para esta estação</span>
+            </div>
+          }
+        </div>
+      </ng-template>
+    </mat-tab>
+
+    <mat-tab>
+      <ng-template mat-tab-label>
+        <span class="station-tab-label">
+          <mat-icon aria-hidden="true">info</mat-icon>
+          <span class="station-tab-label__text">Informações</span>
+        </span>
+      </ng-template>
+      <ng-template matTabContent>
+        <div class="station-tab-panel station-information">
+          <header class="station-information__header">
+            @if (stationHealthServiceInfo().length > 0) {
+              <div class="station-health-services" role="group" aria-label="Serviços de prevenção">
+                <mat-icon aria-hidden="true">medical_services</mat-icon>
+                <div class="station-health-services__items">
+                  @for (service of stationHealthServiceInfo(); track service.id) {
+                    <p class="station-health-services__item">
+                      <span class="station-health-services__label">{{ service.label }}</span>
+                      @for (detail of service.details; track detail) {
+                        <span class="station-restrooms__spoken-separator">. </span>
+                        <span class="station-health-services__separator" aria-hidden="true">·</span>
+                        <span>{{ detail }}</span>
+                      }
+                    </p>
+                  }
+                </div>
+              </div>
+            }
+          </header>
+
+          @if (data.stop.description) {
+            <div class="station-information__body">
+              <p class="station-description">{{ data.stop.description }}</p>
+            </div>
+          } @else if (stationHealthServiceInfo().length === 0) {
+            <div class="station-tab-empty" role="status">
+              <mat-icon aria-hidden="true">info</mat-icon>
+              <span>Informações adicionais não disponíveis</span>
+            </div>
+          }
+        </div>
+      </ng-template>
+    </mat-tab>
+  </mat-tab-group>
 
   @if (headerImage(); as image) {
     <footer class="station-photo-credit">

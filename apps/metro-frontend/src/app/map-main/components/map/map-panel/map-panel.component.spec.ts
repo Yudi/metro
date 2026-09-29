@@ -141,7 +141,7 @@ describe('MapPanelComponent', () => {
 
     const frame: HTMLElement = fixture.nativeElement.querySelector('.map-panel');
     expect(handle()).toBeNull();
-    expect(frame.style.getPropertyValue('--map-panel-height')).toBe('596px');
+    expect(frame.style.getPropertyValue('--map-panel-height')).toBe('652px');
     expect(frame.querySelector('.map-panel__body')?.hasAttribute('inert')).toBe(false);
 
     const favorite: HTMLButtonElement = frame.querySelector('.map-panel__favorite')!;

@@ -7,6 +7,7 @@ export * from './lib/rail/rail-line.utils';
 export { getStaticRailStationsByLine } from './lib/cities/sp/rail/stations/rail-stations.entity';
 export type { StaticRailStation } from './lib/cities/sp/rail/stations/rail-stations.entity';
 export * from './lib/cities/sp/rail/stations/rail-station-bathrooms';
+export * from './lib/cities/sp/rail/stations/rail-station-health-services';
 export * from './lib/rail/rail-station-favorite.utils';
 export * from './lib/rail/rail-favorite-view.utils';
 export * from './lib/cities/sp/rail/rail-special-lines.config';

@@ -132,7 +132,7 @@ export class MapPanelComponent {
   readonly dragHeight = signal<number | null>(null);
 
   readonly anchors = computed<Record<MapPanelSnap, number>>(() => {
-    const topGap = this.isDesktop() ? 104 : 12;
+    const topGap = this.isDesktop() ? 48 : 12;
     const full = Math.max(0, this.viewportHeight() - topGap);
     const compact = Math.min(full, this.compactHeight());
     return {

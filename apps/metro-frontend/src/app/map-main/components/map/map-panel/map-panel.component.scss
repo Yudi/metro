@@ -16,7 +16,7 @@
   display: flex;
   flex-direction: column;
   width: min(400px, calc(100% - 24px));
-  max-height: calc(100% - 104px);
+  max-height: calc(100% - 48px);
   min-width: 0;
   overflow: hidden;
   pointer-events: auto;
@@ -39,7 +39,7 @@
 }
 
 .map-panel[data-snap="expanded"] {
-  height: var(--map-panel-height, calc(100% - 104px));
+  height: var(--map-panel-height, calc(100% - 48px));
 }
 
 .map-panel.is-dragging {

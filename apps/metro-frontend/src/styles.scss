@@ -70,3 +70,27 @@ body {
 .map-realtime-tooltip .mdc-tooltip__surface {
   white-space: pre-line;
 }
+
+.station-tabs .mat-mdc-tab-labels {
+  display: flex;
+  width: 100%;
+}
+
+.station-tabs .mat-mdc-tab {
+  flex: 1 1 calc(100% / 3);
+  min-width: 72px;
+  max-width: calc(100% / 3);
+  padding-inline: 4px;
+}
+
+.station-tabs .mat-mdc-tab .mdc-tab__content {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.station-tabs .mat-mdc-tab .mdc-tab__text-label {
+  max-width: 100%;
+  min-width: 0;
+  white-space: normal;
+  text-align: center;
+}

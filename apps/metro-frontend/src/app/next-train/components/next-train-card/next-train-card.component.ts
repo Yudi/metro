@@ -98,6 +98,10 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
   /** Whether to show the line name in the header (for multi-line stations) */
   readonly showLineName = input(false);
 
+  readonly displayMode = input<'combined' | 'schedule' | 'composition'>(
+    'combined',
+  );
+
   /** Connected to WebSocket */
   readonly connected = this.nextTrainService.connected;
 
@@ -326,6 +330,16 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
     return sortDirections(directions, this.lineCode());
   });
 
+  readonly hasComposition = computed(() =>
+    this.directionViews().some((direction) => direction.composition),
+  );
+
+  readonly hasLiveOccupancy = computed(() =>
+    this.directionViews().some(
+      (direction) => direction.composition?.hasLiveOccupancy,
+    ),
+  );
+
   readonly viewModel = computed<NextTrainCardViewModel>(() => {
     const data = this.stationData();
 
@@ -340,6 +354,15 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
       showSchedule:
         this.canShowSchedule() && this.scheduledDirections().length > 0,
     };
+  });
+
+  readonly loadingText = computed(() => {
+    const state = this.viewModel();
+    if (this.displayMode() === 'composition') {
+      return state.processing ? 'Atualizando ocupação' : 'Carregando ocupação...';
+    }
+
+    return state.processing ? 'Em processamento' : 'Carregando horários...';
   });
 
   ngOnInit(): void {

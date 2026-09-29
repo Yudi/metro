@@ -1,8 +1,17 @@
 <div class="next-train-card">
   @let state = viewModel();
 
-  <div class="card-header">
-    @if (showLineName() && lineInfo(); as info) {
+  <div
+    class="card-header"
+    [class.card-header--status-only]="displayMode() === 'schedule'"
+  >
+    @if (displayMode() === 'composition') {
+      <mat-icon>train</mat-icon>
+      <span class="header-title">Composição e ocupação</span>
+    } @else if (
+      displayMode() === 'combined' && showLineName() && lineInfo();
+      as info
+    ) {
       <div class="line-badge" [style.background-color]="info.colorHex">
         {{ info.code }}
       </div>
@@ -10,12 +19,20 @@
       <span class="header-title">
         {{ info.fullName }}
       </span>
-    } @else {
+    } @else if (displayMode() === 'combined') {
       <mat-icon>schedule</mat-icon>
       <span class="header-title"> Próximos trens </span>
     }
 
-    @if (state.showSchedule) {
+    @if (displayMode() === 'composition' && hasLiveOccupancy()) {
+      <span class="live-indicator">
+        <span
+          class="live-dot"
+          [style.opacity]="breathingBrightness() / 100"
+        ></span>
+        Ocupação em tempo real
+      </span>
+    } @else if (displayMode() !== 'composition' && state.showSchedule) {
       <span
         class="schedule-indicator"
         aria-label="Programação, sem dados em tempo real"
@@ -24,7 +41,12 @@
         <mat-icon>event</mat-icon>
         Programação
       </span>
-    } @else if (state.hasLiveTrains && connected() && !state.operationClosed) {
+    } @else if (
+      displayMode() !== 'composition' &&
+      state.hasLiveTrains &&
+      connected() &&
+      !state.operationClosed
+    ) {
       <span
         class="live-indicator"
         [matTooltip]="'Última mudança às ' + getLastUpdateDisplay(lastUpdate())"
@@ -80,7 +102,44 @@
             }
           </div>
 
-          @if (direction.nextDisplay; as next) {
+          @if (displayMode() === 'schedule') {
+            @if (
+              direction.nextDisplay ||
+              (direction.followingDisplays?.length ?? 0) > 0
+            ) {
+              <table class="train-schedule-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Horário</th>
+                    <th scope="col">Informação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @if (direction.nextDisplay; as next) {
+                    <tr
+                      class="train-schedule-table__next"
+                      [class.scheduled-train]="next.scheduled"
+                      [class.at-platform]="next.isAtPlatform"
+                    >
+                      <th scope="row">{{ next.time }}</th>
+                      <td>{{ next.location || "—" }}</td>
+                    </tr>
+                  }
+                  @if (direction.followingDisplays; as following) {
+                    @for (train of following; track train.key) {
+                      <tr [class.scheduled-train]="train.scheduled">
+                        <th scope="row">{{ train.label }}</th>
+                        <td>{{ train.tooltip || "—" }}</td>
+                      </tr>
+                    }
+                  }
+                </tbody>
+              </table>
+            }
+          } @else if (
+            displayMode() !== 'composition' && direction.nextDisplay;
+            as next
+          ) {
             <div
               class="next-train-prominent"
               [class.at-platform]="next.isAtPlatform"
@@ -131,7 +190,10 @@
             }
           }
 
-          @if (direction.composition; as composition) {
+          @if (
+            displayMode() !== 'schedule' && direction.composition;
+            as composition
+          ) {
             <lib-train-composition
               [composition]="composition"
               [compactContext]="true"
@@ -142,16 +204,27 @@
     </div>
   }
 
+  @if (
+    displayMode() === 'composition' &&
+    !hasComposition() &&
+    !state.processing &&
+    !state.loading
+  ) {
+    <div class="empty-state">
+      <mat-icon>train</mat-icon>
+      <span>Composição indisponível para esta estação</span>
+    </div>
+  }
+
   @if (state.processing || state.loading) {
     <div class="loading-state" role="status">
       <mat-spinner diameter="24"></mat-spinner>
-      <span>
-        {{ state.processing ? "Em processamento" : "Carregando horários..." }}
-      </span>
+      <span>{{ loadingText() }}</span>
     </div>
   }
 
   @if (
+    displayMode() !== 'composition' &&
     !state.hasLiveTrains &&
     !state.showSchedule &&
     !state.processing &&

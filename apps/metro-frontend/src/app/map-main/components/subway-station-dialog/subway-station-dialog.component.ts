@@ -16,7 +16,7 @@ import {
 } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatDividerModule } from '@angular/material/divider';
+import { MatTabsModule } from '@angular/material/tabs';
 import { BusStopGraphQL } from '../../geography/geography-graphql.service';
 import { StationNameService } from '../../geography/station-name.service';
 import {
@@ -39,14 +39,21 @@ import {
   ExtendedNextTrainLineCode,
   hardNormalizeString,
   resolveStationBathroomInfo,
+  resolveStationHealthServices,
   StationBathroomStatus,
+  StationHealthServiceArea,
+  StationHealthServiceType,
   SpecialRailLineStatus,
   SPECIAL_RAIL_LINE_CODES,
 } from '@metro/shared/utils';
 import { DialogHeaderComponent } from '../../../shared/components/dialog-header/dialog-header.component';
 import { NextTrainCardComponent } from '../../../next-train/components/next-train-card/next-train-card.component';
 import { NextTrainWebsocketService } from '../../../next-train/next-train-websocket.service';
-import { DatePipe, NgOptimizedImage } from '@angular/common';
+import {
+  DatePipe,
+  NgOptimizedImage,
+  NgTemplateOutlet,
+} from '@angular/common';
 import {
   resolveStationTrainCompositionViews,
   TRAIN_PLATFORM_CONFIGS,
@@ -81,12 +88,13 @@ interface TrainLineOption {
     MatDialogModule,
     MatButtonModule,
     MatIconModule,
-    MatDividerModule,
+    MatTabsModule,
     DialogHeaderComponent,
     NextTrainCardComponent,
     TrainCompositionComponent,
     DatePipe,
     NgOptimizedImage,
+    NgTemplateOutlet,
   ],
   templateUrl: './subway-station-dialog.component.html',
   styleUrls: [
@@ -94,6 +102,7 @@ interface TrainLineOption {
     './_subway-station-dialog-line-cards.scss',
     './_subway-station-dialog-line-status.scss',
     './_subway-station-dialog-trains.scss',
+    './_subway-station-dialog-tabs.scss',
     './_subway-station-dialog-actions.scss',
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -255,6 +264,37 @@ export class SubwayStationDialogComponent implements OnInit, OnDestroy {
     return { detail, note };
   });
 
+  readonly stationHealthServiceInfo = computed(() =>
+    resolveStationHealthServices(this.data.stop.name, this.lineCodes()).map(
+      (service) => {
+        const labels = {
+          [StationHealthServiceType.PrepPepMachine]: 'PrEP/PEP',
+          [StationHealthServiceType.Condoms]: 'Preservativos',
+          [StationHealthServiceType.PreventionCenter]:
+            'Estação Prevenção Jorge Beloqui',
+        } satisfies Record<StationHealthServiceType, string>;
+
+        const details = [
+          ...(service.type === StationHealthServiceType.PrepPepMachine
+            ? ['máquina automática']
+            : []),
+          ...(service.details ?? []),
+          ...(service.area === StationHealthServiceArea.Paid
+            ? ['área paga']
+            : service.area === StationHealthServiceArea.Free
+              ? ['área livre']
+              : []),
+        ];
+
+        return {
+          id: `${service.type}-${service.stationName}`,
+          label: labels[service.type],
+          details,
+        };
+      },
+    ),
+  );
+
   // Next train stations detection (L4/L8/L9 have codes, CPTM lines have empty codes)
   readonly pendingNextTrainStations = computed(() => {
     const codes = this.lineCodes();
@@ -350,6 +390,8 @@ export class SubwayStationDialogComponent implements OnInit, OnDestroy {
     });
   });
 
+  // Shared by the schedule and composition tab selectors, so the current line
+  // follows the user when they switch between those views.
   readonly selectedTrainLineCode = signal<string | null>(null);
   readonly selectedTrainLine = computed<TrainLineOption | undefined>(() => {
     const lines = this.trainLines();

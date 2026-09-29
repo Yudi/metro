@@ -17,6 +17,10 @@
   align-items: center;
   gap: 8px;
 
+  &--status-only {
+    justify-content: flex-end;
+  }
+
   mat-icon {
     color: var(--mat-sys-primary, #0b71d0);
     font-size: 20px;

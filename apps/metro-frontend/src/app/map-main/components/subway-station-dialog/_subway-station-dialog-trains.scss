@@ -1,0 +1,93 @@
+@use "../../../../../../../libs/shared/styles/rail-line-badge" as lineBadge;
+
+// Next train section
+.next-train-section {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+
+  h3 {
+    margin: 0;
+    color: var(--mat-sys-on-surface);
+    font-size: 1rem;
+    font-weight: 600;
+  }
+}
+
+.train-line-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.train-line-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 4px 12px 4px 6px;
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 999px;
+  background: var(--mat-sys-surface-container-low);
+  color: var(--mat-sys-on-surface);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--mat-sys-surface-container-high);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--mat-sys-primary);
+    outline-offset: 2px;
+  }
+
+  &--selected,
+  &--selected:hover {
+    border-color: var(--mat-sys-primary);
+    background: var(--mat-sys-secondary-container);
+    color: var(--mat-sys-on-secondary-container);
+  }
+}
+
+.train-line-chip__badge {
+  @include lineBadge.circle(32px, 0.75rem);
+}
+
+.train-line-content {
+  min-width: 0;
+}
+
+.static-composition-line__directions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+}
+
+.static-composition-line__direction {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.static-composition-line__direction-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--mat-sys-on-surface-variant, #666);
+  font-size: 0.82rem;
+  font-weight: 650;
+
+  mat-icon {
+    width: 1rem;
+    height: 1rem;
+    font-size: 1rem;
+  }
+}
+

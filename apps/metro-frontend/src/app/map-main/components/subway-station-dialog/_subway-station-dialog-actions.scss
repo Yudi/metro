@@ -1,0 +1,16 @@
+.favorite-button {
+  color: rgba(0, 0, 0, 0.6);
+  transition: color 0.2s ease;
+}
+
+.favorite-button:hover {
+  color: rgba(0, 0, 0, 0.87);
+}
+
+.favorite-button.favorited {
+  color: #d32f2f;
+}
+
+.favorite-button.favorited:hover {
+  color: #b71c1c;
+}

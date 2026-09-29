@@ -1,0 +1,101 @@
+@use "../../../shared/styles/rail-status" as rail;
+
+// Subway lines section
+.subway-lines-section {
+  margin: 16px 0;
+
+  h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 16px 0;
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--mat-sys-on-surface, #333);
+
+    mat-icon {
+      color: var(--mat-sys-primary, rgb(11, 113, 208));
+    }
+  }
+}
+
+// Shared warning banner
+@include rail.status-warning-banner;
+
+.loading-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  color: #666;
+}
+
+.no-lines-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background-color: rgba(0, 0, 0, 0.04);
+  border-radius: 8px;
+  color: #3e3e3e;
+
+  mat-icon {
+    color: #999;
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.9rem;
+  }
+}
+
+.subway-lines-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.subway-line-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--mat-sys-surface-container-low, #f5f5f5);
+  border-radius: 12px;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+
+  /*&.has-issue {
+    border-color: rgba(255, 152, 0, 0.4);
+    background: rgba(255, 152, 0, 0.08);
+  }*/
+}
+
+.line-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  color: #fff;
+}
+
+.line-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 120px;
+}
+
+.line-name {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--mat-sys-on-surface, #333);
+}

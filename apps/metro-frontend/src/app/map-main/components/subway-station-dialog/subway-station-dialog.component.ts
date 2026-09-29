@@ -89,7 +89,13 @@ interface TrainLineOption {
     NgOptimizedImage,
   ],
   templateUrl: './subway-station-dialog.component.html',
-  styleUrls: ['./subway-station-dialog.component.scss'],
+  styleUrls: [
+    './_subway-station-dialog-shell.scss',
+    './_subway-station-dialog-line-cards.scss',
+    './_subway-station-dialog-line-status.scss',
+    './_subway-station-dialog-trains.scss',
+    './_subway-station-dialog-actions.scss',
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '[class.embedded]': 'embedded()' },
 })

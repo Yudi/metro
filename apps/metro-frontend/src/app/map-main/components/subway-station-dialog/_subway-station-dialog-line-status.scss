@@ -1,0 +1,43 @@
+@use "../../../shared/styles/rail-status" as rail;
+
+// Shared status badge styles (uses line-status-grid colors as source of truth)
+@include rail.status-badge;
+
+// Override dot size for horizontal layout
+.status-badge .status-dot {
+  width: 8px;
+  height: 8px;
+}
+
+// Shared skeleton loading
+@include rail.skeleton-loading;
+
+// Shared line description (issue details)
+@include rail.line-description;
+
+.last-updated {
+  margin: 12px 0 0;
+  font-size: 0.75rem;
+  color: #999;
+  text-align: right;
+}
+
+.error-message {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 0 0;
+  font-size: 0.8rem;
+  color: #d32f2f;
+
+  mat-icon {
+    font-size: 1rem;
+    width: 1rem;
+    height: 1rem;
+  }
+}
+
+mat-divider {
+  margin: 16px 0;
+}
+

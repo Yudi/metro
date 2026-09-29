@@ -207,7 +207,7 @@ export class MapPanelComponent {
   private suppressBodyClick = false;
   private wheelTimer: ReturnType<typeof setTimeout> | undefined;
   private wheelDirection = 0;
-  private lastContentWheelTime = Number.NEGATIVE_INFINITY;
+  private lastUpwardContentWheelTime = Number.NEGATIVE_INFINITY;
 
   constructor() {
     afterRenderEffect({ read: () => {
@@ -273,7 +273,7 @@ export class MapPanelComponent {
       this.wasOpen = isOpen;
       this.activePointer = null;
       this.bodyGesture = null;
-      this.lastContentWheelTime = Number.NEGATIVE_INFINITY;
+      this.lastUpwardContentWheelTime = Number.NEGATIVE_INFINITY;
       clearTimeout(this.wheelTimer);
       this.wheelTimer = undefined;
       this.draggingChange.emit(false);
@@ -432,11 +432,15 @@ export class MapPanelComponent {
     if (!this.showHandle() || this.activePointer || event.ctrlKey || Math.abs(event.deltaX) > Math.abs(event.deltaY) || !event.deltaY) return;
     const body = this.panelBody()?.nativeElement;
     if (!this.wheelTimer && this.panelService.snap() === 'expanded') {
-      // Keep the entire content-scroll burst, including its momentum at the top,
-      // native. Only a new burst after a pause can start collapsing the sheet.
-      const continuingContentScroll = event.timeStamp - this.lastContentWheelTime < CONTENT_SCROLL_PAUSE_MS;
-      if (event.deltaY > 0 || (body?.scrollTop ?? 0) > 0 || continuingContentScroll) {
-        this.lastContentWheelTime = event.timeStamp;
+      // Keep upward content scrolling and its momentum at the top native. A
+      // downward scroll must not extend the pause before the sheet collapses.
+      const scrollingUp = event.deltaY < 0;
+      const continuingUpwardScroll = scrollingUp &&
+        event.timeStamp - this.lastUpwardContentWheelTime < CONTENT_SCROLL_PAUSE_MS;
+      if (event.deltaY > 0 || (body?.scrollTop ?? 0) > 0 || continuingUpwardScroll) {
+        this.lastUpwardContentWheelTime = scrollingUp
+          ? event.timeStamp
+          : Number.NEGATIVE_INFINITY;
         return;
       }
     }

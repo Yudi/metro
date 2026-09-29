@@ -1,3 +1,4 @@
+import { StationImagesService } from './station-images.service';
 import { signal } from '@angular/core';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { StationNameService } from '../../geography/station-name.service';
@@ -228,6 +229,7 @@ export function createSubwayStationDialogProviders(
   nextTrainData: MockNextTrainEntry[] = [],
 ) {
   return [
+    { provide: StationImagesService, useValue: { load: () => undefined, image: () => undefined } },
     {
       provide: MatDialogRef,
       useValue: { close: () => console.log('dialog closed') },

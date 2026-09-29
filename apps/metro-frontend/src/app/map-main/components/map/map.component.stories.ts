@@ -525,3 +525,24 @@ export const StationDetailsHalf: Story = {
     await verifyMapShell(canvasElement);
   },
 };
+
+/** Integration story: all transit state is mocked; photos use the production API. */
+export const StationPhotoHeader: Story = {
+  decorators: withMapState({
+    stationPhotos: true,
+    stationDetail: { stop: PARAISO, initialSnap: 'expanded' },
+  }),
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Uses the production station image API. On mobile, drag between half and expanded to reveal the header image; compact mode shows text only.',
+      },
+    },
+  },
+};
+
+export const StationPhotoHeaderDark: Story = {
+  ...StationPhotoHeader,
+  render: () => renderMapStoryHost(true),
+};

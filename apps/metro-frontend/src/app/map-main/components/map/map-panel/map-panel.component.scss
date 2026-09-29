@@ -1,4 +1,5 @@
-@use "../../../../../../../../libs/shared/styles/rail-line-badge" as railLineBadge;
+@use "../../../../../../../../libs/shared/styles/rail-line-badge" as
+  railLineBadge;
 
 :host {
   position: absolute;
@@ -24,18 +25,20 @@
   border-radius: 16px;
   box-shadow: var(--mat-sys-level2);
   outline: none;
-  transition: height 220ms cubic-bezier(0.2, 0, 0, 1), bottom 220ms cubic-bezier(0.2, 0, 0, 1);
+  transition:
+    height 220ms cubic-bezier(0.2, 0, 0, 1),
+    bottom 220ms cubic-bezier(0.2, 0, 0, 1);
 }
 
-.map-panel[data-snap='compact'] {
+.map-panel[data-snap="compact"] {
   height: var(--map-panel-height, 152px);
 }
 
-.map-panel[data-snap='half'] {
+.map-panel[data-snap="half"] {
   height: var(--map-panel-height, 50%);
 }
 
-.map-panel[data-snap='expanded'] {
+.map-panel[data-snap="expanded"] {
   height: var(--map-panel-height, calc(100% - 104px));
 }
 
@@ -45,14 +48,21 @@
 }
 
 .map-panel__handle {
+  position: relative;
+  z-index: 2;
   display: grid;
   place-items: center;
-  flex: 0 0 48px;
+  flex: 0 0 36px;
   width: 100%;
-  height: 48px;
+  height: 36px;
   padding: 0;
   border: 0;
-  background: transparent;
+  background: color-mix(
+    in srgb,
+    var(--mat-sys-surface-container-low)
+      calc((1 - var(--station-photo-handle-visible, 0)) * 100%),
+    transparent
+  );
   color: inherit;
   cursor: ns-resize;
   touch-action: none;
@@ -65,10 +75,40 @@
 }
 
 .map-panel__grabber {
+  --grabber-light: light-dark(
+    var(--mat-sys-inverse-on-surface),
+    var(--mat-sys-on-surface)
+  );
+  --grabber-dark: light-dark(
+    var(--mat-sys-on-surface),
+    var(--mat-sys-inverse-on-surface)
+  );
+  position: relative;
   width: 36px;
   height: 4px;
   border-radius: 4px;
-  background: var(--mat-sys-outline);
+  background: var(--mat-sys-on-surface);
+  outline: none;
+}
+
+.map-panel__grabber--light {
+  background: var(--grabber-light);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--grabber-dark) 45%, transparent);
+}
+
+.map-panel__grabber--dark {
+  background: var(--grabber-dark);
+  box-shadow: 0 1px 3px
+    color-mix(in srgb, var(--grabber-light) 45%, transparent);
+}
+
+.map-panel:not(.is-desktop).has-photo {
+  --station-photo-overlap: 48px;
+}
+
+// Overlap the scrolling photo beneath the handle without moving its hitbox.
+.map-panel.has-photo .map-panel__body {
+  margin-top: calc(-1 * var(--station-photo-overlap, 0px));
 }
 
 .map-panel__body {
@@ -80,8 +120,11 @@
 }
 
 .map-panel__title-block {
-  flex: 0 0 auto;
+  position: sticky;
+  top: var(--station-photo-overlap, 0px);
+  z-index: 1;
   padding: 0 16px;
+  background: var(--mat-sys-surface-container-low);
 
   &:not(.has-details) {
     padding-bottom: 12px;
@@ -100,7 +143,35 @@
   }
 }
 
+.map-panel__photo-space {
+  height: calc(
+    var(--station-photo-overlap, 0px) + 168px * var(--station-photo-progress, 0)
+  );
+  overflow: hidden;
+  transition: height 220ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.map-panel__photo-frame {
+  position: relative;
+  height: 100%;
+  min-height: 1px;
+}
+
+.map-panel__header-image {
+  object-fit: cover;
+  object-position: center 45%;
+  opacity: var(--station-photo-progress, 0);
+  mask-image: linear-gradient(to bottom, #000 40%, transparent 100%);
+  transition: opacity 220ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.map-panel.is-dragging .map-panel__photo-space,
+.map-panel.is-dragging .map-panel__header-image {
+  transition: none;
+}
+
 .map-panel__title-row {
+  position: relative;
   display: flex;
   align-items: flex-start;
   gap: 8px;
@@ -180,8 +251,8 @@
   overflow: auto;
 }
 
-.map-panel:not(.is-desktop)[data-snap='half'] .map-panel__body,
-.map-panel[data-snap='compact'] .map-panel__body,
+.map-panel:not(.is-desktop)[data-snap="half"] .map-panel__body,
+.map-panel[data-snap="compact"] .map-panel__body,
 .map-panel.is-dragging .map-panel__body {
   overflow: hidden;
 }
@@ -236,12 +307,17 @@
   }
 
   .map-panel[data-snap] {
-    height: calc(var(--map-panel-height, 152px) + var(--app-bottom-toolbar-height, 0px) * var(--map-panel-progress, 0));
+    height: calc(
+      var(--map-panel-height, 152px) + var(--app-bottom-toolbar-height, 0px) *
+        var(--map-panel-progress, 0)
+    );
   }
 
   .map-panel {
     right: 0;
-    bottom: calc(-1 * var(--app-bottom-toolbar-height, 0px) * var(--map-panel-progress, 0));
+    bottom: calc(
+      -1 * var(--app-bottom-toolbar-height, 0px) * var(--map-panel-progress, 0)
+    );
     left: 0;
     width: 100%;
     max-height: none;
@@ -254,7 +330,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .map-panel {
+  .map-panel,
+  .map-panel__photo-space,
+  .map-panel__header-image {
     transition: none;
   }
 }

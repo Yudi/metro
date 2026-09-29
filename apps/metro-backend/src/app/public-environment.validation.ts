@@ -8,6 +8,11 @@ export interface PublicEnvironment {
   TYPESENSE_PROTOCOL?: 'http' | 'https';
   RAIL_INTEGRATION_GRPC_URL?: string;
   ALLOWED_ORIGINS?: string;
+  S3_ENDPOINT?: string;
+  S3_BUCKET?: string;
+  S3_REGION?: string;
+  S3_ACCESS_KEY_ID?: string;
+  S3_SECRET_ACCESS_KEY?: string;
   [key: string]: unknown;
 }
 
@@ -55,6 +60,52 @@ export function validatePublicEnvironment(
     throw new Error('RAIL_INTEGRATION_GRPC_URL must use host:port format');
   }
   environment.RAIL_INTEGRATION_GRPC_URL = grpcTarget;
+
+  const s3Configuration = {
+    endpoint: optionalString(input['S3_ENDPOINT']),
+    bucket: optionalString(input['S3_BUCKET']),
+    region: optionalString(input['S3_REGION']),
+    accessKeyId: optionalString(input['S3_ACCESS_KEY_ID']),
+    secretAccessKey: optionalString(
+      input['S3_SECRET_ACCESS_KEY'],
+    ),
+  };
+  const s3Configured = Object.values(s3Configuration).some(Boolean);
+  if (s3Configured) {
+    if (
+      !s3Configuration.endpoint ||
+      !s3Configuration.bucket ||
+      !s3Configuration.accessKeyId ||
+      !s3Configuration.secretAccessKey
+    ) {
+      throw new Error(
+        'Configure S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY together.',
+      );
+    }
+
+    const endpoint = parseS3Endpoint(s3Configuration.endpoint);
+    if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(s3Configuration.bucket)) {
+      throw new Error('S3_BUCKET must be a valid S3 bucket name');
+    }
+    if (
+      s3Configuration.region &&
+      !/^[a-z0-9-]{2,32}$/.test(s3Configuration.region)
+    ) {
+      throw new Error('S3_REGION must be a valid region name');
+    }
+    if (
+      hasWhitespaceOrControl(s3Configuration.accessKeyId) ||
+      hasWhitespaceOrControl(s3Configuration.secretAccessKey)
+    ) {
+      throw new Error('S3 credentials must not contain whitespace');
+    }
+
+    environment.S3_ENDPOINT = endpoint;
+    environment.S3_BUCKET = s3Configuration.bucket;
+    environment.S3_REGION = s3Configuration.region ?? 'us-east-1';
+    environment.S3_ACCESS_KEY_ID = s3Configuration.accessKeyId;
+    environment.S3_SECRET_ACCESS_KEY = s3Configuration.secretAccessKey;
+  }
 
   const vapidPublic = optionalString(input['VAPID_PUBLIC_KEY']);
   const vapidPrivate = optionalString(input['VAPID_PRIVATE_KEY']);
@@ -131,6 +182,15 @@ function optionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
+function hasWhitespaceOrControl(value: string): boolean {
+  return Array.from(value).some((character) => {
+    const characterCode = character.charCodeAt(0);
+    return (
+      /\s/.test(character) || characterCode < 32 || characterCode === 127
+    );
+  });
+}
+
 function optionalPort(
   value: unknown,
   name: string,
@@ -164,4 +224,28 @@ function requiredUrl(
     throw new Error(`${name} must use ${protocols.join(' or ')}`);
   }
   return normalized;
+}
+
+function parseS3Endpoint(value: string): string {
+  let endpoint: URL;
+  try {
+    endpoint = new URL(value);
+  } catch {
+    throw new Error('S3_ENDPOINT must be a valid URL');
+  }
+
+  if (
+    !['http:', 'https:'].includes(endpoint.protocol) ||
+    endpoint.username ||
+    endpoint.password ||
+    endpoint.search ||
+    endpoint.hash ||
+    (endpoint.pathname !== '' && endpoint.pathname !== '/')
+  ) {
+    throw new Error(
+      'S3_ENDPOINT must be an HTTP(S) origin without credentials, a path, query, or fragment',
+    );
+  }
+
+  return endpoint.origin;
 }

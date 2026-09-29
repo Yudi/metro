@@ -60,6 +60,7 @@ COPY --from=prisma-deps --chown=app:app /workspace/apps/metro-backend/generated 
 COPY --from=prisma-deps --chown=app:app /workspace/apps/metro-backend/prisma.config.ts ./prisma.config.ts
 COPY --from=prisma-deps --chown=app:app /workspace/apps/metro-backend/prisma ./prisma
 COPY --from=builder --chown=app:app /workspace/dist/apps/metro-backend ./
+COPY --from=builder --chown=app:app /workspace/apps/metro-backend/tools ./tools
 
 USER app
 EXPOSE 3000

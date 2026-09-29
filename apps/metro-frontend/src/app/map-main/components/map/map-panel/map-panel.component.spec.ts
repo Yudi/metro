@@ -1,3 +1,4 @@
+import type { StationHeaderImage } from '../../subway-station-dialog/station-images';
 import { Component, inject, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA } from '@angular/material/dialog';
@@ -9,6 +10,8 @@ import { MapPanelService } from './map-panel.service';
   template: `<button type="button" (click)="panel.close(data)">Selecionar</button>`,
 })
 class PanelContentStub {
+  readonly headerImage = signal<StationHeaderImage | undefined>(undefined);
+  readonly onHeaderImageError = () => this.headerImage.set(undefined);
   readonly panel = inject(MAP_PANEL_REF);
   readonly data = inject<string>(MAT_DIALOG_DATA);
   private readonly favorite = signal(false);
@@ -66,6 +69,53 @@ describe('MapPanelComponent', () => {
     Object.defineProperty(event, 'timeStamp', { value: time });
     return event;
   }
+
+  it('interpolates the photo continuously above half height and hides it when compact', () => {
+    open('half');
+    const component = fixture.componentInstance;
+    const { half, expanded } = component.anchors();
+    expect(component.photoProgress()).toBe(0);
+    component.dragHeight.set(half + (expanded - half) / 2);
+    expect(component.photoProgress()).toBeCloseTo(0.5);
+    component.dragHeight.set(expanded);
+    expect(component.photoProgress()).toBe(1);
+    component.dragHeight.set(null);
+    panels.setSnap('compact');
+    expect(component.photoProgress()).toBe(0);
+    component.isDesktop.set(true);
+    expect(component.photoProgress()).toBe(1);
+  });
+
+  it('keeps the title interactive while compact content is inert', () => {
+    open('compact');
+    const body: HTMLElement = fixture.nativeElement.querySelector('.map-panel__body');
+    const title: HTMLElement = body.querySelector('.map-panel__title-block') as HTMLElement;
+    const content: HTMLElement = body.querySelector('.map-panel__content') as HTMLElement;
+    expect(title.closest('[inert]')).toBeNull();
+    expect(content.hasAttribute('inert')).toBe(true);
+    panels.setSnap('expanded');
+    fixture.detectChanges();
+    expect(content.hasAttribute('inert')).toBe(false);
+  });
+
+  it('clears the header image when replacing illustrated content', () => {
+    open('expanded');
+    const image: StationHeaderImage = {
+      key: 'station-images/metro/luz.avif', src: '/api/media/station-images/files/metro/luz.avif',
+      author: 'Autor', title: 'Luz', sourceUrl: 'https://commons.wikimedia.org/', license: 'CC0',
+    };
+    const illustrated = { headerImage: signal<StationHeaderImage | undefined>(image), onHeaderImageError: jest.fn() };
+    fixture.componentInstance.onAttached({ instance: illustrated });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.map-panel__header-image')).toBeTruthy();
+    const body: HTMLElement = fixture.nativeElement.querySelector('.map-panel__body');
+    body.scrollTop = 84;
+    body.dispatchEvent(new Event('scroll'));
+    expect(fixture.componentInstance.handlePhotoVisibility()).toBe(0.5);
+    expect(fixture.componentInstance.photoProgress()).toBe(1);
+    open('compact');
+    expect(fixture.nativeElement.querySelector('.map-panel__header-image')).toBeNull();
+  });
 
   it('reuses the actual detail component across snaps and returns its result', () => {
     const ref = open();
@@ -214,7 +264,7 @@ describe('MapPanelComponent', () => {
     const result = jest.fn();
     ref.afterClosed().subscribe(result);
     const body: HTMLElement = fixture.nativeElement.querySelector('.map-panel__body');
-    const button = (body.querySelector('button') as HTMLButtonElement);
+    const button = (body.querySelector('ng-component button') as HTMLButtonElement);
     button.dispatchEvent(pointer('pointerdown', 400));
     button.dispatchEvent(pointer('pointerup', 400));
     expect(body.hasAttribute('inert')).toBe(false);
@@ -246,7 +296,7 @@ describe('MapPanelComponent', () => {
     body.dispatchEvent(touch('touchend', 170, 600));
     fixture.detectChanges();
     expect(panels.snap()).toBe('expanded');
-    (body.querySelector('button') as HTMLButtonElement).click();
+    (body.querySelector('ng-component button') as HTMLButtonElement).click();
     expect(panels.panel()).not.toBeNull();
 
     panels.setSnap('half');

@@ -1,3 +1,6 @@
+import { API_BASE_URL } from '@metro/shared/api';
+import { sharedProdEnvironment } from '@metro/shared/environment';
+import { StationImagesService } from './station-images.service';
 import {
   Meta,
   StoryObj,
@@ -502,4 +505,30 @@ export const MultiLineStationOsasco: Story = {
       ),
     }),
   ],
+};
+
+/** Integration story: uses the production photo proxy and attribution manifest. */
+export const StationPhotoHeader: Story = {
+  args: { embedded: true },
+  decorators: [
+    applicationConfig({
+      providers: [
+        ...createSubwayStationDialogProviders(
+          { ...PINHEIROS, routeShortNames: ['L4', 'L9'] },
+          { cached: null, isFresh: true, fetchKind: 'normal', fetchDelayMs: 0 },
+          [{ lineCode: 'L9', stationCode: 'PIN', trains: PINHEIROS_TRAINS }],
+        ),
+        { provide: API_BASE_URL, useValue: sharedProdEnvironment.apiUrl },
+        { provide: StationImagesService, useClass: StationImagesService },
+      ],
+    }),
+  ],
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Uses the production station image API. Switch between lines 4 and 9 to verify their assigned photographs and attribution.',
+      },
+    },
+  },
 };

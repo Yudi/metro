@@ -1,8 +1,13 @@
-<app-dialog-header
-  icon="train"
-  [title]="displayName"
-  description="Estação de metrô/trem"
-/>
+@if (!panelRef) {
+  <header class="station-heading" [class.has-photo]="!!headerImage()">
+    @if (headerImage(); as image) {
+      <img class="station-heading__image" [ngSrc]="image.src" fill
+        sizes="100vw" alt="" priority
+        (error)="onHeaderImageError()" />
+    }
+    <app-dialog-header icon="train" [title]="displayName" description="Estação de metrô/trem" />
+  </header>
+}
 
 <mat-dialog-content class="station-content">
   @if (bathroomInfo(); as bathroom) {
@@ -162,6 +167,17 @@
         }
       }
     </div>
+  }
+
+  @if (headerImage(); as image) {
+    <footer class="station-photo-credit">
+      @if (image.label) { {{ image.label }} · }
+      Foto: <a [href]="image.sourceUrl" target="_blank" rel="noopener noreferrer"
+        [attr.title]="image.title">{{ image.author }}</a> ·
+      @if (image.licenseUrl; as licenseUrl) {
+        <a [href]="licenseUrl" target="_blank" rel="noopener noreferrer">{{ image.license }}</a>
+      } @else { {{ image.license }} }
+    </footer>
   }
 </mat-dialog-content>
 

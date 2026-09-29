@@ -19,11 +19,13 @@ import { RequestContextModule } from '../common/request-context/request-context.
 import { NotificationsModule } from '../notifications/notifications.module';
 import { SaoPauloTransitModule } from '../cities/sp/sp-transit.module';
 import { createGraphQLYogaConfig } from '../common/graphql/graphql-yoga.config';
+import { StationImagesModule } from '../station-images/station-images.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: ['apps/metro-backend/.env', '.env'],
       validate: validatePublicEnvironment,
     }),
     RequestContextModule,
@@ -53,6 +55,7 @@ import { createGraphQLYogaConfig } from '../common/graphql/graphql-yoga.config';
     UserModule,
     NotificationsModule,
     ObservabilityModule,
+    StationImagesModule,
     LoadersModule,
   ],
   controllers: [AppController],

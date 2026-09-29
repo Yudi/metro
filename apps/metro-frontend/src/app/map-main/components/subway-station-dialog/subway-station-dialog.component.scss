@@ -18,6 +18,42 @@
   overflow-x: hidden;
 }
 
+.station-heading {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+
+  &.has-photo {
+    padding-top: clamp(144px, 24vw, 260px);
+  }
+
+  app-dialog-header {
+    position: relative;
+    display: block;
+  }
+}
+
+.station-heading__image {
+  object-fit: cover;
+  object-position: center 45%;
+  mask-image: linear-gradient(to bottom, #000 35%, transparent 94%);
+}
+
+.station-photo-credit {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--mat-sys-outline-variant);
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+
+  a {
+    color: inherit;
+    text-underline-offset: 2px;
+  }
+}
+
 .station-restrooms {
   display: flex;
   align-items: flex-start;

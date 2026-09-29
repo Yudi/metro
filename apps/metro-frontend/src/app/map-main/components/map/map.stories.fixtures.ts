@@ -1,3 +1,5 @@
+import { StationImagesService } from '../subway-station-dialog/station-images.service';
+import { sharedProdEnvironment } from '@metro/shared/environment';
 import {
   computed,
   inject,
@@ -432,6 +434,7 @@ export interface MapStoryScenario {
   vehiclePositions?: Map<string, VehiclePositionUpdate>;
   locationPermission?: LocationPermissionState;
   isRequestingLocation?: boolean;
+  stationPhotos?: boolean;
   stationDetail?: {
     stop: BusStopGraphQL;
     summary?: string;
@@ -500,10 +503,15 @@ export function createMapStoryProviders(scenario: MapStoryScenario = {}) {
         tooltip: signal('Acompanhamento em tempo real conectado'),
       },
     },
+    ...(scenario.stationPhotos
+      ? [{ provide: StationImagesService, useClass: StationImagesService }]
+      : []),
     { provide: LoggerService, useValue: createMockLoggerService() },
     {
       provide: API_BASE_URL,
-      useValue: 'http://storybook.invalid',
+      useValue: scenario.stationPhotos
+        ? sharedProdEnvironment.apiUrl
+        : 'http://storybook.invalid',
     },
     {
       provide: FavoritesService,

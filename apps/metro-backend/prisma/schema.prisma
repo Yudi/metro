@@ -104,6 +104,24 @@ model MergedRailStation {
   @@map("merged_rail_stations")
 }
 
+// Curated image assignments remain stable when imported station rows change.
+model StationImage {
+  key             String   @id @db.Text
+  stationIdentity String   @db.Text
+  position        Int
+  label           String?  @db.Text
+  lineIds         String[] @default([])
+  service         String?  @db.Text
+  author          String   @db.Text
+  title           String   @db.Text
+  sourceUrl       String   @db.Text
+  license         String   @db.Text
+  licenseUrl      String?  @db.Text
+
+  @@unique([stationIdentity, position])
+  @@map("station_images")
+}
+
 // ============================================
 // Train Passage Tracking (Headway Calculation)
 // ============================================

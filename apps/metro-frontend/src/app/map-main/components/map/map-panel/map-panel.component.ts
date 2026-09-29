@@ -7,6 +7,7 @@ import {
   Injector,
   ViewContainerRef,
   afterNextRender,
+  afterRenderEffect,
   computed,
   effect,
   inject,
@@ -21,6 +22,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MapPanelService, MapPanelSnap } from './map-panel.service';
 import { MAP_PANEL_REF } from './map-panel-ref';
+import { PhotoHandleTone, samplePhotoHandleTone } from './map-panel-photo-contrast';
+import type { StationHeaderImage } from '../../subway-station-dialog/station-images';
 
 interface FavoritablePanelContent {
   isFavorite(): boolean;
@@ -35,6 +38,17 @@ function isFavoritable(value: unknown): value is FavoritablePanelContent {
     'isFavorite' in value && typeof value.isFavorite === 'function' &&
     'favoriteIcon' in value && typeof value.favoriteIcon === 'function' &&
     'toggleFavorite' in value && typeof value.toggleFavorite === 'function';
+}
+
+interface IllustratedPanelContent {
+  headerImage(): StationHeaderImage | undefined;
+  onHeaderImageError(): void;
+}
+
+function isIllustrated(value: unknown): value is IllustratedPanelContent {
+  return !!value && typeof value === 'object' &&
+    'headerImage' in value && typeof value.headerImage === 'function' &&
+    'onHeaderImageError' in value && typeof value.onHeaderImageError === 'function';
 }
 
 const SNAP_POINTS: MapPanelSnap[] = ['compact', 'half', 'expanded'];
@@ -83,8 +97,15 @@ export class MapPanelComponent {
   private readonly panelFrame = viewChild<ElementRef<HTMLElement>>('panelFrame');
   private readonly panelBody = viewChild<ElementRef<HTMLElement>>('panelBody');
   private readonly panelTitleBlock = viewChild<ElementRef<HTMLElement>>('panelTitleBlock');
+  private readonly panelTitleRow = viewChild<ElementRef<HTMLElement>>('panelTitleRow');
   private readonly panelFooter = viewChild<ElementRef<HTMLElement>>('panelFooter');
   private readonly handle = viewChild<ElementRef<HTMLElement>>('handle');
+  private readonly grabber = viewChild<ElementRef<HTMLElement>>('grabber');
+  private readonly headerPhoto = viewChild<ElementRef<HTMLImageElement>>('headerPhoto');
+  private readonly photoSampleRevision = signal(0);
+  private photoContrastContext?: CanvasRenderingContext2D | null;
+  private photoSampleFrame?: number;
+  readonly grabberTone = signal<PhotoHandleTone | null>(null);
   private readonly viewportHeight = signal(0);
   readonly isDesktop = signal(false);
   readonly hasPanelContent = computed(() =>
@@ -97,6 +118,16 @@ export class MapPanelComponent {
     return this.hasSelections() ? 'Seleções do mapa' : 'Ações do mapa';
   });
   readonly favoriteContent = signal<FavoritablePanelContent | null>(null);
+  readonly illustratedContent = signal<IllustratedPanelContent | null>(null);
+  readonly headerImage = computed(() => this.illustratedContent()?.headerImage());
+  readonly photoProgress = computed(() => this.isDesktop() ? 1 : this.toolbarProgress());
+  private readonly bodyScrollTop = signal(0);
+  // Only the handle's paint reacts to scroll; native sticky positioning owns
+  // the header collapse, without changing the scroll area's geometry.
+  readonly handlePhotoVisibility = computed(() => this.headerImage()
+    ? this.photoProgress() * Math.max(0, 1 - this.bodyScrollTop() / 168)
+    : 0,
+  );
   private readonly compactHeight = signal(152);
   readonly dragHeight = signal<number | null>(null);
 
@@ -179,6 +210,14 @@ export class MapPanelComponent {
   private lastContentWheelTime = Number.NEGATIVE_INFINITY;
 
   constructor() {
+    afterRenderEffect({ read: () => {
+      this.photoSampleRevision();
+      this.handlePhotoVisibility();
+      this.headerPhoto();
+      this.grabber();
+      this.handle();
+      this.schedulePhotoContrastSample();
+    } });
     afterNextRender(() => {
       const media = this.document.defaultView?.matchMedia('(min-width: 768px)');
       if (media) {
@@ -217,6 +256,9 @@ export class MapPanelComponent {
     });
     this.destroyRef.onDestroy(() => {
       this.resizeObserver?.disconnect();
+      if (this.photoSampleFrame !== undefined) {
+        this.document.defaultView?.cancelAnimationFrame(this.photoSampleFrame);
+      }
       clearTimeout(this.wheelTimer);
       this.panelService.toolbarHideProgress.set(0);
       this.panelService.dragging.set(false);
@@ -239,6 +281,7 @@ export class MapPanelComponent {
       if (panelId !== this.activePanelId) {
         this.activePanelId = panelId;
         this.favoriteContent.set(null);
+        this.illustratedContent.set(null);
       }
       afterNextRender(() => {
         this.resetContentScroll();
@@ -267,6 +310,7 @@ export class MapPanelComponent {
     if (attachedRef && typeof attachedRef === 'object' && 'instance' in attachedRef) {
       this.panelService.panel()?.ref.attachComponentInstance(attachedRef.instance);
       this.favoriteContent.set(isFavoritable(attachedRef.instance) ? attachedRef.instance : null);
+      this.illustratedContent.set(isIllustrated(attachedRef.instance) ? attachedRef.instance : null);
       afterNextRender(() => {
         this.observeContentHeader();
         this.measure();
@@ -537,11 +581,19 @@ export class MapPanelComponent {
   }
 
   private measure(): void {
+    this.photoSampleRevision.update((revision) => revision + 1);
     this.viewportHeight.set(this.host.nativeElement.clientHeight);
     const body = this.panelBody()?.nativeElement;
     const handleHeight = this.handle()?.nativeElement.getBoundingClientRect().height ?? 0;
     const footerHeight = this.panelFooter()?.nativeElement.getBoundingClientRect().height ?? 0;
-    let headerHeight = this.panelTitleBlock()?.nativeElement.getBoundingClientRect().height ?? 0;
+    // The photo is part of the scrollable content; only the sticky title
+    // belongs in the compact anchor.
+    const titleBlock = this.panelTitleBlock()?.nativeElement;
+    const titleRow = this.panelTitleRow()?.nativeElement;
+    const titleStyles = titleBlock ? this.document.defaultView?.getComputedStyle(titleBlock) : null;
+    let headerHeight = titleRow
+      ? titleRow.getBoundingClientRect().height + parseFloat(titleStyles?.paddingBottom || '0')
+      : 0;
     if (!this.panelService.panel() && this.hasSelections() && body && this.observedHeader) {
       headerHeight = this.observedHeader.getBoundingClientRect().bottom - body.getBoundingClientRect().top + 8;
     }
@@ -550,7 +602,50 @@ export class MapPanelComponent {
     this.heightChange.emit(Math.round(this.renderedHeight()));
   }
 
+  private schedulePhotoContrastSample(): void {
+    const view = this.document.defaultView;
+    if (!view || this.photoSampleFrame !== undefined) return;
+    this.photoSampleFrame = view.requestAnimationFrame(() => {
+      this.photoSampleFrame = undefined;
+      this.updatePhotoContrast();
+    });
+  }
+
+  private updatePhotoContrast(): void {
+    const image = this.headerPhoto()?.nativeElement;
+    const grabber = this.grabber()?.nativeElement;
+    const handle = this.handle()?.nativeElement;
+    const frame = this.panelFrame()?.nativeElement;
+    if (!this.handlePhotoVisibility() || !image?.complete || !image.naturalWidth ||
+      !grabber || !handle || !frame) {
+      this.grabberTone.set(null);
+      return;
+    }
+    if (this.photoContrastContext === undefined) {
+      const canvas = this.document.createElement('canvas');
+      canvas.width = 16;
+      canvas.height = 4;
+      this.photoContrastContext = canvas.getContext('2d', { willReadFrequently: true });
+    }
+    const view = this.document.defaultView;
+    this.grabberTone.set(this.photoContrastContext && view
+      ? samplePhotoHandleTone(image, grabber.getBoundingClientRect(), this.photoContrastContext,
+        view.getComputedStyle(frame).backgroundColor, view.getComputedStyle(handle).backgroundColor,
+        this.grabberTone())
+      : null);
+  }
+
+  onHeaderPhotoLoad(): void {
+    this.grabberTone.set(null);
+    this.photoSampleRevision.update((revision) => revision + 1);
+  }
+
+  onBodyScroll(): void {
+    this.bodyScrollTop.set(Math.max(0, this.panelBody()?.nativeElement.scrollTop ?? 0));
+  }
+
   private resetContentScroll(): void {
+    this.bodyScrollTop.set(0);
     const body = this.panelBody()?.nativeElement;
     if (body) body.scrollTop = 0;
   }

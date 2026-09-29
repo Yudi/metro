@@ -1,3 +1,4 @@
+import { StationImagesService } from './station-images.service';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA } from '@angular/material/dialog';
@@ -45,6 +46,7 @@ describe('SubwayStationDialogComponent train lines', () => {
     TestBed.configureTestingModule({
       imports: [SubwayStationDialogComponent],
       providers: [
+        { provide: StationImagesService, useValue: { load: jest.fn(), image: () => undefined } },
         { provide: MAT_DIALOG_DATA, useFactory: () => ({ stop: currentStop }) },
         {
           provide: StationNameService,

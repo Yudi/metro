@@ -46,7 +46,7 @@ import {
 import { DialogHeaderComponent } from '../../../shared/components/dialog-header/dialog-header.component';
 import { NextTrainCardComponent } from '../../../next-train/components/next-train-card/next-train-card.component';
 import { NextTrainWebsocketService } from '../../../next-train/next-train-websocket.service';
-import { DatePipe } from '@angular/common';
+import { DatePipe, NgOptimizedImage } from '@angular/common';
 import {
   resolveStationTrainCompositionViews,
   TRAIN_PLATFORM_CONFIGS,
@@ -57,6 +57,7 @@ import {
   closeMapPanelOrDialog,
   MAP_PANEL_REF,
 } from '../map/map-panel/map-panel-ref';
+import { StationImagesService } from './station-images.service';
 
 export interface SubwayStationDialogData {
   stop: BusStopGraphQL;
@@ -85,6 +86,7 @@ interface TrainLineOption {
     NextTrainCardComponent,
     TrainCompositionComponent,
     DatePipe,
+    NgOptimizedImage,
   ],
   templateUrl: './subway-station-dialog.component.html',
   styleUrls: ['./subway-station-dialog.component.scss'],
@@ -104,6 +106,16 @@ export class SubwayStationDialogComponent implements OnInit, OnDestroy {
   private railService = inject(RailGraphqlService);
   private nextTrainService = inject(NextTrainWebsocketService);
   private favoritesService = inject(FavoritesService);
+  protected readonly stationImages = inject(StationImagesService);
+  readonly headerImage = computed(() => this.stationImages.image(
+    this.displayName,
+    this.selectedTrainLineCode() ?? this.selectedTrainLine()?.lineCode ?? this.lineCodes()[0],
+  ));
+
+  onHeaderImageError(): void {
+    const image = this.headerImage();
+    if (image) this.stationImages.markUnavailable(image.key);
+  }
   private readonly nextTrainSubscriptions = new Map<string, () => void>();
 
   // State signals
@@ -395,6 +407,7 @@ export class SubwayStationDialogComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.stationImages.load();
     this.logger.debug('Subway station dialog ngOnInit', {
       stopId: this.data.stop.stopId,
       agencies: this.data.stop.agencies,

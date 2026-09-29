@@ -3,6 +3,9 @@
   class="map-panel"
   [class.is-dragging]="dragHeight() !== null"
   [class.is-desktop]="isDesktop()"
+  [class.has-photo]="!!headerImage()"
+  [style.--station-photo-progress]="headerImage() ? photoProgress() : 0"
+  [style.--station-photo-handle-visible]="handlePhotoVisibility()"
   [attr.data-snap]="panelService.snap()"
   [style.--map-panel-height.px]="height()"
   [style.--map-panel-progress]="toolbarProgress()"
@@ -33,7 +36,9 @@
       (click)="onHandleClick($event)"
       (keydown)="onHandleKeydown($event)"
     >
-      <span class="map-panel__grabber" aria-hidden="true"></span>
+      <span #grabber class="map-panel__grabber" aria-hidden="true"
+        [class.map-panel__grabber--light]="grabberTone() === 'light'"
+        [class.map-panel__grabber--dark]="grabberTone() === 'dark'"></span>
     </button>
     <span id="map-panel-instructions" class="cdk-visually-hidden">
       Arraste para ajustar a altura ou toque para alternar entre compacto, meio e expandido.
@@ -42,39 +47,7 @@
     </span>
   }
 
-  @if (panelService.panel(); as panel) {
-    <header
-      #panelTitleBlock
-      class="map-panel__title-block"
-      [class.has-details]="!!panel.titleLineGroups?.length || !!summary()"
-    >
-      <div class="map-panel__title-row">
-        <h2>{{ title() }}</h2>
-        @if (favoriteContent(); as favorite) {
-          <button mat-icon-button type="button" class="map-panel__favorite"
-            [class.favorited]="favorite.isFavorite()"
-            [disabled]="favorite.canFavorite && !favorite.canFavorite()"
-            [attr.aria-label]="favorite.isFavorite() ? 'Remover dos favoritos' : 'Adicionar aos favoritos'"
-            (click)="favorite.toggleFavorite()"
-            (mouseenter)="favorite.setFavoriteHover?.(true)"
-            (mouseleave)="favorite.setFavoriteHover?.(false)">
-            <mat-icon>{{ favorite.favoriteIcon() }}</mat-icon>
-          </button>
-        }
-        @if (panel.showDismiss) {
-        <button
-          mat-icon-button
-          type="button"
-          class="map-panel__dismiss"
-          aria-label="Fechar detalhes"
-          (click)="panelService.close()"
-        >
-          <mat-icon>close</mat-icon>
-          </button>
-        }
-      </div>
-    </header>
-  } @else if (hasSelections()) {
+  @if (!panelService.panel() && hasSelections()) {
     <div class="map-panel__selection-actions">
       <button mat-icon-button type="button" class="map-panel__dismiss"
         aria-label="Fechar seleções" (click)="closeContent()">
@@ -86,6 +59,7 @@
   <div
     #panelBody
     class="map-panel__body"
+    (scroll)="onBodyScroll()"
     (touchstart)="onBodyTouchStart($event)"
     (touchend)="onBodyTouchEnd($event)"
     (touchcancel)="onBodyGestureCancel()"
@@ -94,54 +68,97 @@
     (pointerup)="onBodyPointerUp($event)"
     (pointercancel)="onBodyPointerCancel($event)"
     (lostpointercapture)="onBodyPointerCancel($event)"
-    [attr.inert]="!isDesktop() && panelService.snap() === 'compact' ? '' : null"
   >
     @if (panelService.panel(); as panel) {
-      @if (panel.titleLineGroups?.length || summary()) {
-        <div class="map-panel__details">
-          @if (panel.titleLineGroups?.length) {
-            <div
-              class="map-panel__title-lines"
-              role="group"
-              aria-label="Linhas da estação"
-            >
-              @for (group of panel.titleLineGroups; track group.agency) {
-                <div
-                  class="map-panel__agency-lines"
-                  role="group"
-                  [attr.aria-label]="group.ariaLabel"
-                >
-                  <img
-                    [ngSrc]="group.iconPath"
-                    width="20"
-                    height="20"
-                    alt=""
-                    aria-hidden="true"
-                  />
-                  @for (line of group.lines; track line.code) {
-                    <span
-                      class="map-panel__line-badge"
-                      [style.background-color]="line.backgroundColor"
-                      [style.color]="line.textColor"
-                      aria-hidden="true"
-                      >{{ line.code }}</span
-                    >
-                  }
-                </div>
-              }
-            </div>
-          }
-          @if (summary()) {
-            <p>{{ summary() }}</p>
-          }
+      @if (headerImage(); as image) {
+        <div class="map-panel__photo-space">
+          <div class="map-panel__photo-frame">
+            <img #headerPhoto class="map-panel__header-image" crossorigin="anonymous" (load)="onHeaderPhotoLoad()" [ngSrc]="image.src" fill sizes="100vw"
+              alt="" (error)="illustratedContent()?.onHeaderImageError()" />
+          </div>
         </div>
       }
+      <header
+        #panelTitleBlock
+        class="map-panel__title-block"
+        [class.has-details]="!!panel.titleLineGroups?.length || !!summary()"
+      >
+        <div #panelTitleRow class="map-panel__title-row">
+          <h2>{{ title() }}</h2>
+          @if (favoriteContent(); as favorite) {
+            <button mat-icon-button type="button" class="map-panel__favorite"
+              [class.favorited]="favorite.isFavorite()"
+              [disabled]="favorite.canFavorite && !favorite.canFavorite()"
+              [attr.aria-label]="favorite.isFavorite() ? 'Remover dos favoritos' : 'Adicionar aos favoritos'"
+              (click)="favorite.toggleFavorite()"
+              (mouseenter)="favorite.setFavoriteHover?.(true)"
+              (mouseleave)="favorite.setFavoriteHover?.(false)">
+              <mat-icon>{{ favorite.favoriteIcon() }}</mat-icon>
+            </button>
+          }
+          @if (panel.showDismiss) {
+          <button
+            mat-icon-button
+            type="button"
+            class="map-panel__dismiss"
+            aria-label="Fechar detalhes"
+            (click)="panelService.close()"
+          >
+            <mat-icon>close</mat-icon>
+            </button>
+          }
+        </div>
+      </header>
     }
-    @if (panelService.panel()?.component) {
-      <ng-template [cdkPortalOutlet]="contentPortal()" (attached)="onAttached($event)" />
-    } @else if (!panelService.panel() && hasSelections()) {
-      <ng-content select="[mapSelectionControls]" />
-    }
+    <div class="map-panel__content"
+      [attr.inert]="!isDesktop() && panelService.snap() === 'compact' ? '' : null">
+      @if (panelService.panel(); as panel) {
+        @if (panel.titleLineGroups?.length || summary()) {
+          <div class="map-panel__details">
+            @if (panel.titleLineGroups?.length) {
+              <div
+                class="map-panel__title-lines"
+                role="group"
+                aria-label="Linhas da estação"
+              >
+                @for (group of panel.titleLineGroups; track group.agency) {
+                  <div
+                    class="map-panel__agency-lines"
+                    role="group"
+                    [attr.aria-label]="group.ariaLabel"
+                  >
+                    <img
+                      [ngSrc]="group.iconPath"
+                      width="20"
+                      height="20"
+                      alt=""
+                      aria-hidden="true"
+                    />
+                    @for (line of group.lines; track line.code) {
+                      <span
+                        class="map-panel__line-badge"
+                        [style.background-color]="line.backgroundColor"
+                        [style.color]="line.textColor"
+                        aria-hidden="true"
+                        >{{ line.code }}</span
+                      >
+                    }
+                  </div>
+                }
+              </div>
+            }
+            @if (summary()) {
+              <p>{{ summary() }}</p>
+            }
+          </div>
+        }
+      }
+      @if (panelService.panel()?.component) {
+        <ng-template [cdkPortalOutlet]="contentPortal()" (attached)="onAttached($event)" />
+      } @else if (!panelService.panel() && hasSelections()) {
+        <ng-content select="[mapSelectionControls]" />
+      }
+    </div>
   </div>
 
   <div #panelFooter class="map-panel__footer">

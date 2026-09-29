@@ -1,0 +1,9 @@
+{
+  "name": "shared-station-image-contracts",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/shared/station-image-contracts/src",
+  "projectType": "library",
+  "tags": [],
+  "// targets": "to see all targets run: nx show project shared-station-image-contracts --web",
+  "targets": {}
+}

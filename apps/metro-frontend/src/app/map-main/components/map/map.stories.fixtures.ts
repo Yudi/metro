@@ -1,5 +1,4 @@
 import { StationImagesService } from '../subway-station-dialog/station-images.service';
-import { sharedProdEnvironment } from '@metro/shared/environment';
 import {
   computed,
   inject,
@@ -510,7 +509,7 @@ export function createMapStoryProviders(scenario: MapStoryScenario = {}) {
     {
       provide: API_BASE_URL,
       useValue: scenario.stationPhotos
-        ? sharedProdEnvironment.apiUrl
+        ? '/api'
         : 'http://storybook.invalid',
     },
     {

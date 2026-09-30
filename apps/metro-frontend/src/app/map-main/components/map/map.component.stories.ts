@@ -567,7 +567,7 @@ export const StationDetailsHalf: Story = {
   },
 };
 
-/** Integration story: all transit state is mocked; photos use the production API. */
+/** Integration story: all transit state is mocked; photos use the local proxy to production. */
 export const StationPhotoHeader: Story = {
   decorators: withMapState({
     stationPhotos: true,
@@ -577,7 +577,7 @@ export const StationPhotoHeader: Story = {
     docs: {
       description: {
         story:
-          'Uses the production station image API. On mobile, drag between half and expanded to reveal the header image; compact mode shows text only.',
+          'Uses Storybook’s local proxy to load the production station image API. On mobile, drag between half and expanded to reveal the header image; compact mode shows text only.',
       },
     },
   },

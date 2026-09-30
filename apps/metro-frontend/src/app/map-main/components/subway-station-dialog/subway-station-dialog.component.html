@@ -16,17 +16,19 @@
 </ng-template>
 
 @if (!panelRef) {
-  <header class="station-heading" [class.has-photo]="!!headerImage()">
+  <header class="station-heading">
     @if (headerImage(); as image) {
-      <img
-        class="station-heading__image"
-        [ngSrc]="image.src"
-        fill
-        sizes="100vw"
-        alt=""
-        priority
-        (error)="onHeaderImageError()"
-      />
+      <div class="station-heading__photo">
+        <img
+          class="station-heading__image"
+          [ngSrc]="image.src"
+          fill
+          sizes="100vw"
+          alt=""
+          priority
+          (error)="onHeaderImageError()"
+        />
+      </div>
     }
     <app-dialog-header
       icon="train"

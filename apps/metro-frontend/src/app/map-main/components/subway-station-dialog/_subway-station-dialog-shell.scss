@@ -27,18 +27,15 @@
 }
 
 .station-heading {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-
-  &.has-photo {
-    padding-top: clamp(144px, 24vw, 260px);
-  }
-
   app-dialog-header {
-    position: relative;
     display: block;
   }
+}
+
+.station-heading__photo {
+  position: relative;
+  height: clamp(144px, 24vw, 260px);
+  overflow: hidden;
 }
 
 .station-heading__image {

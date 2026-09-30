@@ -173,8 +173,9 @@
     color: var(--mat-sys-on-primary-container, #173b73);
   }
 
+  &__next.scheduled-train,
   .scheduled-train:not(&__next) {
-    background: var(--mat-sys-secondary-container, #f5e9bf);
-    color: var(--mat-sys-on-secondary-container, #5d4100);
+    background: var(--mat-sys-surface, #fff);
+    color: var(--mat-sys-on-surface, #333);
   }
 }

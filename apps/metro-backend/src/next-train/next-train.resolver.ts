@@ -11,6 +11,10 @@ import {
 } from './services/next-train-polling.service';
 import type { NextTrainFetchResult } from './dto/next-train.dto';
 import { HeadwayTrackingService } from './headway/headway-tracking.service';
+import {
+  scheduledFallbackForSnapshot,
+  shouldFetchScheduledFallback,
+} from './services/next-train-fallback.utils';
 import { NextTrainScheduleService } from './services/next-train-schedule.service';
 import { RailRealtimeSourcePort } from '@metro/rail-integration-contracts';
 import {
@@ -207,7 +211,7 @@ export class NextTrainResolver {
           updatedAt: new Date().toISOString(),
         })),
         scheduledServices: this.toScheduledServiceEntities(
-          cached.scheduledServices ?? [],
+          scheduledFallbackForSnapshot(cached.trains, cached.scheduledServices),
         ),
         operationClosed: cached.operationClosed,
         outOfSchedule: cached.outOfSchedule,
@@ -221,10 +225,9 @@ export class NextTrainResolver {
       typedLineCode,
       stationCode,
     );
-    const scheduledServices =
-      result.trains.length === 0
-        ? await this.fetchScheduledServices(typedLineCode, stationCode)
-        : [];
+    const scheduledServices = shouldFetchScheduledFallback(result.trains)
+      ? await this.fetchScheduledServices(typedLineCode, stationCode)
+      : [];
 
     const headway = await this.getHeadway(typedLineCode, stationCode);
 
@@ -243,7 +246,9 @@ export class NextTrainResolver {
         isAtPlatform: t.isAtPlatform,
         updatedAt: new Date().toISOString(),
       })),
-      scheduledServices: this.toScheduledServiceEntities(scheduledServices),
+      scheduledServices: this.toScheduledServiceEntities(
+        scheduledFallbackForSnapshot(result.trains, scheduledServices),
+      ),
       operationClosed: false,
       outOfSchedule,
       fetchedAt: new Date(),

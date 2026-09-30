@@ -108,7 +108,10 @@ export interface BusItineraryDialogData {
 export class BusItineraryDialogComponent {
   readonly embedded = input(false);
   private readonly dialogData = inject<BusItineraryDialogData>(MAT_DIALOG_DATA);
-  private readonly dialogRef = inject(MatDialogRef<BusItineraryDialogComponent>, { optional: true });
+  private readonly dialogRef = inject(
+    MatDialogRef<BusItineraryDialogComponent>,
+    { optional: true },
+  );
   readonly cityContext = inject(CityContextService);
   private readonly itineraries = inject(BusItineraryService);
   private readonly information = inject(BusInformationService);
@@ -206,7 +209,7 @@ export class BusItineraryDialogComponent {
   readonly patternOptions = computed(() =>
     this.patterns().map((pattern, index) => ({
       value: pattern.id,
-      label: `${pattern.headsign || (pattern.directionId === 0 ? 'Ida' : pattern.directionId === 1 ? 'Volta' : 'Sentido não informado')}${this.patterns().some((other) => other.id !== pattern.id && other.headsign === pattern.headsign) ? ` · percurso ${index + 1}` : ''}`,
+      label: `${pattern.headsign || (pattern.directionId === 0 ? 'Ida' : pattern.directionId === 1 ? 'Volta' : 'Sentido não informado')}${this.patterns().some((other) => other.id !== pattern.id && other.headsign === pattern.headsign) ? ` (percurso ${index + 1})` : ''}`,
     })),
   );
   // Municipal Sunday gratuity applies to the calendar day, not GTFS hours >=24.
@@ -221,7 +224,7 @@ export class BusItineraryDialogComponent {
   readonly fares = computed(() =>
     this.sundayFree()
       ? 'Gratuita no domingo'
-      : this.route()?.fares.map(formatBusFare).join(' · ') || 'Não informada',
+      : this.route()?.fares.map(formatBusFare).join(', ') || 'Não informada',
   );
   readonly routeColor = computed(() =>
     normalizeHexColor(this.route()?.color, '5f6368'),

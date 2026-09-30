@@ -43,22 +43,18 @@
 }
 
 .next-train-prominent.scheduled-train {
-  background: var(--mat-sys-secondary-container, #ffecb5);
+  background: var(--mat-sys-surface, #fff);
 
   .train-icon-large {
-    background: color-mix(
-      in srgb,
-      var(--mat-sys-secondary, #8a6100) 14%,
-      var(--mat-sys-surface, #fff)
-    );
+    background: var(--mat-sys-surface-container, #f0f0f0);
 
     mat-icon {
-      color: var(--mat-sys-on-secondary-container, #5d4100);
+      color: var(--mat-sys-primary, #0b71d0);
     }
   }
 
   .arrival-time-large {
-    color: var(--mat-sys-on-secondary-container, #5d4100);
+    color: var(--mat-sys-on-surface, #333);
   }
 }
 

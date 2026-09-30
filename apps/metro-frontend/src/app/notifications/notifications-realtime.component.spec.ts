@@ -67,7 +67,7 @@ describe('notification page realtime consistency', () => {
     devices: [
       {
         id: 'device-one',
-        label: 'Chrome · Windows',
+        label: 'Chrome (Windows)',
         createdAt: '2026-09-08T12:00:00Z',
       },
     ],
@@ -295,7 +295,7 @@ describe('notification page realtime consistency', () => {
     );
     existing.mockResolvedValue({
       endpoint: 'https://push.example/device',
-      label: 'Safari · iOS',
+      label: 'Safari (iOS)',
       keys: { p256dh: 'key', auth: 'key' },
     });
     api.registerDevice.mockReturnValue(of('device-one'));
@@ -309,7 +309,7 @@ describe('notification page realtime consistency', () => {
     await Promise.resolve();
     expect(existing).toHaveBeenCalledTimes(1);
     expect(api.registerDevice).toHaveBeenCalledTimes(1);
-    expect(page.currentDevice()?.label).toBe('Safari · iOS');
+    expect(page.currentDevice()?.label).toBe('Safari (iOS)');
     events.next({ type: 'snapshot', configuration: genericConfiguration });
     await fixture.whenStable();
     expect(api.registerDevice).toHaveBeenCalledTimes(1);

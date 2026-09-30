@@ -182,12 +182,12 @@ describe('MapSelectionService', () => {
 
   it('uses the full-data response to populate the selection before updating filters', async () => {
     const stop = {
-        stopId: 'stop-1',
-        name: 'Stop 1',
-        latitude: -23.55,
-        longitude: -46.63,
-        isSubwayStation: false,
-      };
+      stopId: 'stop-1',
+      name: 'Stop 1',
+      latitude: -23.55,
+      longitude: -46.63,
+      isSubwayStation: false,
+    };
     dataLoader.loadStopData.mockResolvedValue({ status: 'loaded', stop });
 
     await service.addStopToSelection('stop-1', false);

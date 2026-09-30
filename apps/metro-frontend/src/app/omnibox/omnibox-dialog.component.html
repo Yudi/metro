@@ -81,7 +81,7 @@
     </p>
   }
   @if (state().results.length) {
-    <h3>{{ nearby() ? "Perto de você · até 1 km" : "Transporte" }}</h3>
+    <h3>{{ nearby() ? "Perto de você (até 1 km)" : "Transporte" }}</h3>
     <div class="transit-results">
       @for (result of state().results; track result.type + ":" + result.id) {
         <app-search-result-card

@@ -1,8 +1,6 @@
 import { test, expect, type Locator } from '@playwright/test';
 
-test('renders the Lite navigation page at the root', async ({
-  page,
-}) => {
+test('renders the Lite navigation page at the root', async ({ page }) => {
   await page.goto('/');
   await expect(page).toHaveURL(/\/sp$/);
 

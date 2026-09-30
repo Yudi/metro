@@ -65,7 +65,7 @@ const busStoryTrigger: NotificationTrigger & { arrivalLeadMinutes: number } = {
     {
       id: 'route-702p-10',
       kind: 'bus_route',
-      label: '702P-10 · Metrô Belém - Vila Industrial',
+      label: '702P-10 (Metrô Belém - Vila Industrial)',
       available: true,
       busRouteShortName: '702P-10',
       busRouteColor: '#0066cc',
@@ -170,7 +170,7 @@ function storyProviders(
             ...state.devices,
             {
               id,
-              label: 'Chrome · Windows',
+              label: 'Chrome (Windows)',
               createdAt: '2026-09-08T10:00:00.000Z',
             },
           ],
@@ -252,7 +252,7 @@ export const PushAtivo: Story = {
       devices: [
         {
           id: 'story-device',
-          label: 'Chrome · Windows',
+          label: 'Chrome (Windows)',
           createdAt: '2026-09-08T10:00:00.000Z',
         },
       ],

@@ -51,7 +51,9 @@ export function parseStationImageManifest(value: string): StationImageManifest {
   return parsed as unknown as StationImageManifest;
 }
 
-function isStationImageMetadataEntry(value: unknown): value is StationImageMetadataEntry {
+function isStationImageMetadataEntry(
+  value: unknown,
+): value is StationImageMetadataEntry {
   if (!isRecord(value)) {
     return false;
   }

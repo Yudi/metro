@@ -64,9 +64,7 @@ describe('GeographyGraphQLService incremental stop query', () => {
     expect(query.mock.calls[0][0]).not.toContain('@stream');
 
     updates.next({ data: { stopFullData: { stop } }, hasNext: true });
-    expect(firstValues).toEqual([
-      { stop, hasNext: true },
-    ]);
+    expect(firstValues).toEqual([{ stop, hasNext: true }]);
     expect(secondValues).toEqual(firstValues);
 
     const errors = [
@@ -87,7 +85,9 @@ describe('GeographyGraphQLService incremental stop query', () => {
     secondSubscription.unsubscribe();
 
     query.mockReturnValue(new Subject<RawStopFullDataResult>().asObservable());
-    const freshSubscription = service.watchStopFullData(stop.stopId).subscribe();
+    const freshSubscription = service
+      .watchStopFullData(stop.stopId)
+      .subscribe();
     expect(query).toHaveBeenCalledTimes(2);
     freshSubscription.unsubscribe();
   });
@@ -98,13 +98,17 @@ describe('GeographyGraphQLService incremental stop query', () => {
       new Observable<RawStopFullDataResult>(() => teardown),
     );
 
-    const firstSubscription = service.watchStopFullData(stop.stopId).subscribe();
+    const firstSubscription = service
+      .watchStopFullData(stop.stopId)
+      .subscribe();
     firstSubscription.unsubscribe();
 
     expect(teardown).toHaveBeenCalledTimes(1);
 
     query.mockReturnValue(new Subject<RawStopFullDataResult>().asObservable());
-    const retrySubscription = service.watchStopFullData(stop.stopId).subscribe();
+    const retrySubscription = service
+      .watchStopFullData(stop.stopId)
+      .subscribe();
 
     expect(query).toHaveBeenCalledTimes(2);
     retrySubscription.unsubscribe();

@@ -91,7 +91,10 @@ export const RailLine: Story = {
   decorators: [
     applicationConfig({
       providers: [
-        { provide: ActivatedRoute, useValue: detailRoute('rail-line', 'L9', 'linha 9') },
+        {
+          provide: ActivatedRoute,
+          useValue: detailRoute('rail-line', 'L9', 'linha 9'),
+        },
       ],
     }),
   ],
@@ -101,7 +104,10 @@ export const Unavailable: Story = {
   decorators: [
     applicationConfig({
       providers: [
-        { provide: ActivatedRoute, useValue: detailRoute('rail-line', 'unknown', 'linha 9') },
+        {
+          provide: ActivatedRoute,
+          useValue: detailRoute('rail-line', 'unknown', 'linha 9'),
+        },
       ],
     }),
   ],

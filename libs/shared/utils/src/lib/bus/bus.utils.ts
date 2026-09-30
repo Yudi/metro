@@ -217,7 +217,7 @@ export function formatScheduledBusDepartureTime(
 
     const tomorrow = new Date(now.getTime() + 86_400_000);
     if (departureDate === dateFormatter.format(tomorrow)) {
-      return `${timeFormatter.format(parsed)} · amanhã`;
+      return `${timeFormatter.format(parsed)}, amanhã`;
     }
 
     const weekday = new Intl.DateTimeFormat('pt-BR', {
@@ -226,7 +226,7 @@ export function formatScheduledBusDepartureTime(
     })
       .format(parsed)
       .replace('.', '');
-    return `${timeFormatter.format(parsed)} · ${weekday}`;
+    return `${timeFormatter.format(parsed)}, ${weekday}`;
   }
 
   const isoTime = /T(\d{1,2}:\d{2})/.exec(departureTime);

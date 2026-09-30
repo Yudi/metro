@@ -16,7 +16,9 @@ export function notificationDeviceLabel(
     /Macintosh/u.test(userAgent) && maxTouchPoints > 1
       ? 'iPadOS'
       : parsed.os.name;
-  return (
-    [browser, os].filter(Boolean).join(' · ').slice(0, 120) || 'Dispositivo'
-  );
+  if (browser && os) {
+    return `${browser} (${os})`.slice(0, 120);
+  }
+
+  return (browser || os || 'Dispositivo').slice(0, 120);
 }

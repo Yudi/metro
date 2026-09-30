@@ -1,7 +1,10 @@
 import { signal } from '@angular/core';
 import { Meta, StoryObj, applicationConfig } from '@storybook/angular';
 import { OLHOVIVO_POLL_INTERVAL_MS } from '@metro/shared/utils';
-import { MapRealtimeStatusService, MapRealtimeState } from '../../../realtime/map-realtime-status.service';
+import {
+  MapRealtimeStatusService,
+  MapRealtimeState,
+} from '../../../realtime/map-realtime-status.service';
 import { RealtimeWebsocketService } from '../../../realtime/realtime-websocket.service';
 import { MapFooterComponent } from './map-footer.component';
 
@@ -66,10 +69,12 @@ export const SelectedFeatureHighTraffic: Story = footerStory(
 
 Default.play = async ({ canvasElement }) => {
   const button = canvasElement.querySelector('button');
-  if (button) throw new Error('Details button should not appear without a selection');
+  if (button)
+    throw new Error('Details button should not appear without a selection');
 };
 
 WithSelectedFeature.play = async ({ canvasElement }) => {
   const button = canvasElement.querySelector('button');
-  if (!button || button.disabled) throw new Error('Details button should be enabled');
+  if (!button || button.disabled)
+    throw new Error('Details button should be enabled');
 };

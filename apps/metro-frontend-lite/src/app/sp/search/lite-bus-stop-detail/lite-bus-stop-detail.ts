@@ -67,7 +67,7 @@ export class LiteBusStopDetail {
       const timeLabel = this.formatScheduledDepartureTime(
         departure.departureTime,
       );
-      const separatorIndex = timeLabel.indexOf(' · ');
+      const separatorIndex = timeLabel.indexOf(', ');
       return {
         ...departure,
         color: route?.color ? `#${route.color}` : null,
@@ -75,7 +75,7 @@ export class LiteBusStopDetail {
         timeLabel:
           separatorIndex >= 0 ? timeLabel.slice(0, separatorIndex) : timeLabel,
         dayLabel:
-          separatorIndex >= 0 ? timeLabel.slice(separatorIndex + 3) : null,
+          separatorIndex >= 0 ? timeLabel.slice(separatorIndex + 2) : null,
       };
     }),
   );
@@ -213,7 +213,7 @@ export class LiteBusStopDetail {
 
   getRouteFareLabel(route: LiteBusRoute): string | null {
     if (route.fares && route.fares.length > 0) {
-      return route.fares.map((fare) => formatBusFare(fare)).join(' · ');
+      return route.fares.map((fare) => formatBusFare(fare)).join(', ');
     }
 
     return isArtespRoute(route) ? 'Tarifa não informada' : null;

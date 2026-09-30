@@ -27,7 +27,9 @@ export class MapRealtimeStatusService {
     const bikeActive = this.bikeStationsActive();
     const active = Number(busActive) + Number(railActive) + Number(bikeActive);
     if (active === 0) {
-      return this.buses.connected() || this.trains.connected() || this.bikes.connected()
+      return this.buses.connected() ||
+        this.trains.connected() ||
+        this.bikes.connected()
         ? 'connected'
         : 'idle';
     }
@@ -56,19 +58,27 @@ export class MapRealtimeStatusService {
       );
     }
     if (this.busStops().length) {
-      lines.push(`Paradas: ${describeSubscriptions(this.busStops(), 'parada', 'paradas')}`);
+      lines.push(
+        `Paradas: ${describeSubscriptions(this.busStops(), 'parada', 'paradas')}`,
+      );
     }
     if (this.railLines().length) {
-      lines.push(`Trens: ${describeSubscriptions(this.railLines(), 'linha', 'linhas')}`);
+      lines.push(
+        `Trens: ${describeSubscriptions(this.railLines(), 'linha', 'linhas')}`,
+      );
     }
     if (this.railStations().length) {
-      lines.push(`Estações: ${describeSubscriptions(this.railStations(), 'estação', 'estações')}`);
+      lines.push(
+        `Estações: ${describeSubscriptions(this.railStations(), 'estação', 'estações')}`,
+      );
     }
     if (this.bikeStationsActive()) {
       lines.push('Bicicletas: estações do mapa');
     }
     if (this.pendingBikeDetails()) {
-      lines.push(`Detalhes de bicicletas em consulta: ${this.pendingBikeDetails()}`);
+      lines.push(
+        `Detalhes de bicicletas em consulta: ${this.pendingBikeDetails()}`,
+      );
     }
 
     const heading = {

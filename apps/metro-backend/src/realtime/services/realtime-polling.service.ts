@@ -283,10 +283,10 @@ export class RealtimePollingService implements OnModuleDestroy {
     const subscribedRoutes = new Map(
       Array.from(this.subscriptions.routeShortNames)
         .filter((routeId) => !isArtespRouteId(routeId))
-        .map((routeId) => [
-          routeId,
-          this.routeSubscriptionTokens.get(routeId),
-        ] as const),
+        .map(
+          (routeId) =>
+            [routeId, this.routeSubscriptionTokens.get(routeId)] as const,
+        ),
     );
     if (subscribedRoutes.size === 0) {
       return;
@@ -307,10 +307,7 @@ export class RealtimePollingService implements OnModuleDestroy {
       // We must cache separately for each direction to avoid overwriting
       for (const line of allData.l || []) {
         const token = subscribedRoutes.get(line.c);
-        if (
-          !token ||
-          !this.isCurrentRouteSubscription(line.c, token)
-        ) {
+        if (!token || !this.isCurrentRouteSubscription(line.c, token)) {
           continue;
         }
 

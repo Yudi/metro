@@ -14,4 +14,3 @@ export interface StationImageManifest {
   readonly version: 1;
   readonly stations: Readonly<Record<string, readonly StationImage[]>>;
 }
-

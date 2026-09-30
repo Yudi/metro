@@ -167,7 +167,7 @@ export class LiteRailNextTrains {
         candidate.direction === service.destinationName,
     )
       ? 'Intervalo médio observado'
-      : 'Intervalo programado · sem dados em tempo real';
+      : 'Horários programados (sem dados em tempo real)';
   }
 
   private hasTerminalDirections(

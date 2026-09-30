@@ -36,7 +36,7 @@ describe('NotificationTargetIdentityComponent', () => {
     fixture.componentRef.setInput('target', {
       id: 'station-9',
       kind: 'rail_station',
-      label: 'Pinheiros · Linha 9 - Esmeralda',
+      label: 'Pinheiros (Linha 9 - Esmeralda)',
       available: true,
       railLineCode: 9,
     } satisfies NotificationTarget);
@@ -52,7 +52,7 @@ describe('NotificationTargetIdentityComponent', () => {
     fixture.componentRef.setInput('target', {
       id: 'route-702p-10',
       kind: 'bus_route',
-      label: '702P-10 · Metrô Belém - Vila Industrial',
+      label: '702P-10 (Metrô Belém - Vila Industrial)',
       available: true,
     } satisfies NotificationTarget);
     fixture.detectChanges();
@@ -65,6 +65,6 @@ describe('NotificationTargetIdentityComponent', () => {
     expect(element.textContent).not.toContain('Vila Industrial');
     expect(
       element.querySelector('.target-identity')?.getAttribute('aria-label'),
-    ).toBe('702P-10 · Metrô Belém - Vila Industrial');
+    ).toBe('702P-10 (Metrô Belém - Vila Industrial)');
   });
 });

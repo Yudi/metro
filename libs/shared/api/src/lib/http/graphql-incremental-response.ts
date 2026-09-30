@@ -18,7 +18,9 @@ function responseErrors(value: unknown): GraphqlResponseError[] {
   if (value === undefined) return [];
   if (
     !Array.isArray(value) ||
-    value.some((error) => !isRecord(error) || typeof error['message'] !== 'string')
+    value.some(
+      (error) => !isRecord(error) || typeof error['message'] !== 'string',
+    )
   ) {
     throw new Error('Invalid GraphQL errors');
   }
@@ -46,7 +48,11 @@ function updateAtPath(
 ): unknown {
   if (path.length === 0) return update(current);
   const [key, ...rest] = path;
-  if (Array.isArray(current) && typeof key === 'number' && key < current.length) {
+  if (
+    Array.isArray(current) &&
+    typeof key === 'number' &&
+    key < current.length
+  ) {
     const copy = [...current];
     copy[key] = updateAtPath(copy[key], rest, update);
     return copy;
@@ -72,7 +78,10 @@ export class GraphqlResultAccumulator<T> {
     if (!isRecord(value) || this.finished) {
       throw new Error('Invalid GraphQL response');
     }
-    if (value['hasNext'] !== undefined && typeof value['hasNext'] !== 'boolean') {
+    if (
+      value['hasNext'] !== undefined &&
+      typeof value['hasNext'] !== 'boolean'
+    ) {
       throw new Error('Invalid GraphQL hasNext');
     }
     if (
@@ -180,7 +189,11 @@ export class GraphqlMultipartParser {
       if (this.phase === 'headers') {
         const end = this.buffer.indexOf('\r\n\r\n');
         if (end < 0) break;
-        if (!/^content-type:\s*application\/json\b/im.test(this.buffer.slice(0, end))) {
+        if (
+          !/^content-type:\s*application\/json\b/im.test(
+            this.buffer.slice(0, end),
+          )
+        ) {
           throw new Error('Invalid GraphQL multipart content type');
         }
         this.buffer = this.buffer.slice(end + 4);

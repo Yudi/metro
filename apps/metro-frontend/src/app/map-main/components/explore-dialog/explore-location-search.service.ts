@@ -142,7 +142,7 @@ export class ExploreLocationSearchService {
       properties.postcode,
     ]
       .filter(Boolean)
-      .join(' · ');
+      .join(', ');
   }
 
   private getPriority(city: string | undefined, state: string | undefined) {

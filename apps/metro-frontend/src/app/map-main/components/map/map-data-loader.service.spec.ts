@@ -123,7 +123,9 @@ describe('MapDataLoaderService', () => {
     ];
     updates.next({ stop, routes: routeData, hasNext: true });
 
-    expect(mapState.displayedRoutes()).toEqual(routeData.map(({ route }) => route));
+    expect(mapState.displayedRoutes()).toEqual(
+      routeData.map(({ route }) => route),
+    );
     expect(mapState.routesDerivedFromStops()).toEqual(
       new Set(['100', '101', '102']),
     );
@@ -133,7 +135,9 @@ describe('MapDataLoaderService', () => {
 
     updates.next({ stop, routes: routeData, hasNext: false });
 
-    expect(mapState.displayedRoutes()).toEqual(routeData.map(({ route }) => route));
+    expect(mapState.displayedRoutes()).toEqual(
+      routeData.map(({ route }) => route),
+    );
     expect(displayUpdates).toHaveBeenCalledTimes(2);
     expect(vectorTileLayer.setBusRouteIds).toHaveBeenCalledTimes(1);
     expect(mapState.isLoading()).toBe(false);
@@ -165,7 +169,11 @@ describe('MapDataLoaderService', () => {
 
   it('cancels a stop stream on deselection and ignores late route data', async () => {
     const updates = new Subject<StopFullDataSnapshot>();
-    const canonicalStop = { ...stop, id: 'canonical-stop', stopId: 'canonical-stop' };
+    const canonicalStop = {
+      ...stop,
+      id: 'canonical-stop',
+      stopId: 'canonical-stop',
+    };
     const teardown = jest.fn();
     const source = new Observable<StopFullDataSnapshot>((subscriber) => {
       const inner = updates.subscribe(subscriber);

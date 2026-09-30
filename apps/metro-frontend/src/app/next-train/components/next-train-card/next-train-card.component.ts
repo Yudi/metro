@@ -141,7 +141,7 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
     () => this.stationData()?.scheduledServices ?? [],
   );
 
-  /** Show schedules only after a completed snapshot has no live arrivals. */
+  /** Show schedule fallback only after a completed snapshot has no live trains. */
   readonly canShowSchedule = computed(() => {
     const data = this.stationData();
     return Boolean(
@@ -227,9 +227,17 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
       // keys headway by destinationName (e.g. "Vila Olímpia") while the
       // frontend groups by terminal (e.g. "Varginha").
       const destinationNames = new Set(dirTrains.map((t) => t.destinationName));
-      const sortedTrains = [...dirTrains].sort((a, b) =>
-        compareArrivalTimes(a, b),
-      );
+      const sortedTrains = [...dirTrains].sort((a, b) => {
+        if (this.displayMode() === 'schedule') {
+          const platformPriority =
+            Number(b.isAtPlatform === true) - Number(a.isAtPlatform === true);
+          if (platformPriority !== 0) {
+            return platformPriority;
+          }
+        }
+
+        return compareArrivalTimes(a, b);
+      });
       directions.push({
         terminal,
         nextTrain: sortedTrains[0],
@@ -359,7 +367,9 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
   readonly loadingText = computed(() => {
     const state = this.viewModel();
     if (this.displayMode() === 'composition') {
-      return state.processing ? 'Atualizando ocupação' : 'Carregando ocupação...';
+      return state.processing
+        ? 'Atualizando ocupação'
+        : 'Carregando ocupação...';
     }
 
     return state.processing ? 'Em processamento' : 'Carregando horários...';
@@ -506,10 +516,19 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
     direction: TrainDirectionView,
   ): NextTrainDisplay | undefined {
     if (direction.nextTrain) {
+      const isAtPlatform = direction.nextTrain.isAtPlatform === true;
+      const isScheduleView = this.displayMode() === 'schedule';
+
       return {
-        time: this.getArrivalDisplay(direction.nextTrain),
-        location: this.getTrainLocation(direction.nextTrain),
-        isAtPlatform: direction.nextTrain.isAtPlatform === true,
+        time:
+          isScheduleView && isAtPlatform
+            ? 'Agora'
+            : this.getArrivalDisplay(direction.nextTrain),
+        location:
+          isScheduleView && isAtPlatform
+            ? 'Na plataforma'
+            : this.getTrainLocation(direction.nextTrain),
+        isAtPlatform,
         statusClass: this.getPositionStatusClass(direction.nextTrain),
         scheduled: false,
       };
@@ -532,13 +551,24 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
     direction: TrainDirectionView,
   ): FollowingTrainDisplay[] {
     const liveDisplays = direction.followingTrains.map(
-      (train, index): FollowingTrainDisplay => ({
-        key: `live-${index}-${train.arrivalTime}`,
-        label: this.getChipArrivalText(train),
-        tooltip: this.getTrainLocation(train),
-        isAtPlatform: train.isAtPlatform === true,
-        scheduled: false,
-      }),
+      (train, index): FollowingTrainDisplay => {
+        const isAtPlatform = train.isAtPlatform === true;
+        const isScheduleView = this.displayMode() === 'schedule';
+
+        return {
+          key: `live-${index}-${train.arrivalTime}`,
+          label:
+            isScheduleView && isAtPlatform
+              ? 'Agora'
+              : this.getChipArrivalText(train),
+          tooltip:
+            isScheduleView && isAtPlatform
+              ? 'Na plataforma'
+              : this.getTrainLocation(train),
+          isAtPlatform,
+          scheduled: false,
+        };
+      },
     );
     const scheduledDisplays = (direction.followingScheduledDepartures ?? [])
       .slice(0, 3)
@@ -574,6 +604,14 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
   }
 
   getScheduledLocation(service: ScheduledServiceForDisplay): string {
+    if (
+      this.displayMode() === 'schedule' &&
+      service.nextArrivalAt &&
+      service.arrivalEstimated !== false
+    ) {
+      return 'Programado';
+    }
+
     return getScheduledServiceLocation(service);
   }
 
@@ -586,7 +624,11 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
   getScheduledDepartureTooltip(
     departure: ScheduledDepartureForDisplay,
   ): string {
-    return `${getScheduledDepartureLocation(departure)} · sem dados em tempo real`;
+    if (this.displayMode() === 'schedule') {
+      return departure.arrivalAt ? 'Programado' : 'Saída programada';
+    }
+
+    return `${getScheduledDepartureLocation(departure)}. Sem dados em tempo real`;
   }
 
   private getStationName(name: string | null | undefined): string | null {
@@ -677,15 +719,15 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
   getHeadwayTooltip(hw: DirectionHeadway): string {
     const samples = `${hw.sampleCount} amostras`;
     if (hw.isFallback && hw.bucketLabel) {
-      return `Intervalo médio estimado · ${hw.bucketLabel} (${samples}) · último período com dados`;
+      return `Intervalo médio estimado: ${hw.bucketLabel} (${samples}), no período mais recente com dados`;
     }
     if (hw.bucketLabel) {
-      return `Intervalo médio estimado · ${hw.bucketLabel} (${samples})`;
+      return `Intervalo médio estimado: ${hw.bucketLabel} (${samples})`;
     }
     return `Intervalo médio estimado (${samples})`;
   }
 
   getScheduledHeadwayTooltip(intervalLabel: string): string {
-    return `Intervalo programado de ${intervalLabel} · sem dados em tempo real`;
+    return `Intervalo programado de ${intervalLabel}. Sem dados em tempo real`;
   }
 }

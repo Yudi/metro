@@ -20,7 +20,9 @@
       <span class="label">Bicicletas disponíveis</span>
     </div>
     <div class="summary-item">
-      <span class="value">{{ availabilityUnknown() ? "—" : station().numDocksAvailable }}</span>
+      <span class="value">{{
+        availabilityUnknown() ? "—" : station().numDocksAvailable
+      }}</span>
       <span class="label">Docks livres</span>
     </div>
     <!-- <div class="summary-item">
@@ -72,7 +74,7 @@
               <div class="vehicle-heading">
                 <h4>{{ formatVehicleName(vehicle.name) }}</h4>
                 <span class="vehicle-meta">
-                  {{ formatFormFactor(vehicle.formFactor) | titlecase }} ·
+                  {{ formatFormFactor(vehicle.formFactor) | titlecase }},
                   {{ formatPropulsionType(vehicle.propulsionType) | titlecase }}
                 </span>
               </div>
@@ -131,7 +133,7 @@
               <div class="vehicle-heading">
                 <h4>{{ formatVehicleName(vehicle.name) }}</h4>
                 <span class="vehicle-meta">
-                  {{ formatFormFactor(vehicle.formFactor) | titlecase }} ·
+                  {{ formatFormFactor(vehicle.formFactor) | titlecase }},
                   {{ formatPropulsionType(vehicle.propulsionType) | titlecase }}
                 </span>
               </div>

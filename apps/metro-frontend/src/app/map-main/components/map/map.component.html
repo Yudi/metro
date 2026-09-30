@@ -65,10 +65,13 @@
     }
   }
 
-  <app-map-panel [hasSelections]="hasSelections()" (heightChange)="sheetHeight.set($event)"
+  <app-map-panel
+    [hasSelections]="hasSelections()"
+    (heightChange)="sheetHeight.set($event)"
     (expandedProgressChange)="sheetExpandedProgress.set($event)"
     (draggingChange)="sheetDragging.set($event)"
-    (clearSelections)="clearAllSelections()">
+    (clearSelections)="clearAllSelections()"
+  >
     <app-map-header
       mapPrimaryControls
       controls="primary"

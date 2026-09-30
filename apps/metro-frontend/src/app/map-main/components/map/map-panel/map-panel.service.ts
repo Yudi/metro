@@ -121,9 +121,8 @@ export class MapPanelService {
   }
 
   compactOnMobile(): void {
-    const isDesktop = this.document.defaultView
-      ?.matchMedia?.('(min-width: 768px)')
-      ?.matches;
+    const isDesktop =
+      this.document.defaultView?.matchMedia?.('(min-width: 768px)')?.matches;
     if (!isDesktop) this.setSnap('compact');
   }
 
@@ -185,8 +184,7 @@ export class MapPanelService {
   }
 
   private defaultSnap(): MapPanelSnap {
-    return this.document.defaultView
-      ?.matchMedia?.('(min-width: 768px)')
+    return this.document.defaultView?.matchMedia?.('(min-width: 768px)')
       ?.matches
       ? 'expanded'
       : 'half';

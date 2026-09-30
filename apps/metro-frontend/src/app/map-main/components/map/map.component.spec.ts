@@ -55,7 +55,13 @@ describe('MapComponent', () => {
     await TestBed.configureTestingModule({
       imports: [MapComponent],
       providers: [
-        { provide: MapRealtimeStatusService, useValue: { state: signal('idle'), tooltip: signal('Aguardando conexão em tempo real') } },
+        {
+          provide: MapRealtimeStatusService,
+          useValue: {
+            state: signal('idle'),
+            tooltip: signal('Aguardando conexão em tempo real'),
+          },
+        },
         { provide: ActivatedRoute, useValue: activatedRouteStub },
         { provide: BikeStationsService, useValue: mockBikeStationsService },
         {
@@ -208,7 +214,13 @@ describe('MapComponent', () => {
       await TestBed.configureTestingModule({
         imports: [MapComponent],
         providers: [
-          { provide: MapRealtimeStatusService, useValue: { state: signal('idle'), tooltip: signal('Aguardando conexão em tempo real') } },
+          {
+            provide: MapRealtimeStatusService,
+            useValue: {
+              state: signal('idle'),
+              tooltip: signal('Aguardando conexão em tempo real'),
+            },
+          },
           { provide: ActivatedRoute, useValue: activatedRouteStub },
           { provide: BikeStationsService, useValue: mockBikeStationsService },
           {

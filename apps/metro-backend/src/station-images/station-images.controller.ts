@@ -1,16 +1,5 @@
-import {
-  Controller,
-  Get,
-  Param,
-  Req,
-  Res,
-} from '@nestjs/common';
-import {
-  ApiOkResponse,
-  ApiParam,
-  ApiProduces,
-  ApiTags,
-} from '@nestjs/swagger';
+import { Controller, Get, Param, Req, Res } from '@nestjs/common';
+import { ApiOkResponse, ApiParam, ApiProduces, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { StationImagesService } from './station-images.service';
 

@@ -42,8 +42,12 @@
   }
 
   &.scheduled-chip {
-    background: var(--mat-sys-secondary-container, #ffecb5);
-    color: var(--mat-sys-on-secondary-container, #5d4100);
+    background: var(--mat-sys-surface-container, #f0f0f0);
+    color: var(--mat-sys-on-surface, #333);
+
+    &:hover {
+      background: var(--mat-sys-surface-container-high, #e0e0e0);
+    }
   }
 }
 

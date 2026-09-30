@@ -7,7 +7,10 @@ import { FooterComponent } from '../../components/footer/footer.component';
   imports: [ToolbarComponent, RouterOutlet, FooterComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="layout-container" [class.viewport-layout]="toolbar.viewportLayout()">
+    <div
+      class="layout-container"
+      [class.viewport-layout]="toolbar.viewportLayout()"
+    >
       <app-material-toolbar #toolbar>
         <router-outlet></router-outlet>
       </app-material-toolbar>

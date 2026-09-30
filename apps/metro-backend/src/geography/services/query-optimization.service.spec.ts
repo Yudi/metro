@@ -116,9 +116,7 @@ describe('QueryOptimizationService precomputed stop service data', () => {
     expect(sql).toMatch(
       /CROSS JOIN LATERAL\s*\(\s*SELECT DISTINCT stop_time\.trip_id/,
     );
-    expect(sql).toContain(
-      'WHERE stop_time.stop_id = expanded.source_stop_id',
-    );
+    expect(sql).toContain('WHERE stop_time.stop_id = expanded.source_stop_id');
     expect(sql).toContain(
       'COALESCE(member.source_stop_id, resolved.physical_stop_id) AS source_stop_id',
     );

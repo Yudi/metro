@@ -536,8 +536,8 @@ export class NotificationsComponent {
         : trigger.days.map((day) => DAY_LABELS[day] ?? '').join(', ');
     const windows = trigger.windows
       .map((window) => `${window.start}–${window.end}`)
-      .join(' · ');
-    return `${days} · ${windows}`;
+      .join(', ');
+    return `${days}: ${windows}`;
   }
 
   deviceDate(device: NotificationDevice): string {

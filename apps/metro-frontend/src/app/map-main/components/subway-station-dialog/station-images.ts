@@ -1,5 +1,8 @@
 import type { StationImage } from '@metro/shared/station-image-contracts';
-export type { StationImage, StationImageManifest } from '@metro/shared/station-image-contracts';
+export type {
+  StationImage,
+  StationImageManifest,
+} from '@metro/shared/station-image-contracts';
 
 export interface StationHeaderImage extends StationImage {
   readonly src: string;
@@ -14,6 +17,8 @@ export function selectStationImage(
   const specific = images.find((image) => image.lineIds?.includes(code));
   if (specific) return specific;
   const isTrain = /^(?:[7-9]|1[0-4]|10X|EA|EJ)$/.test(code);
-  return (isTrain ? images.find((image) => image.service === 'train') : undefined)
-    ?? images[0];
+  return (
+    (isTrain ? images.find((image) => image.service === 'train') : undefined) ??
+    images[0]
+  );
 }

@@ -21,11 +21,11 @@ type GraphQLTimingState = {
   logged: boolean;
 };
 
-function isAsyncIterable(value: unknown): value is AsyncIterable<ExecutionResult> {
+function isAsyncIterable(
+  value: unknown,
+): value is AsyncIterable<ExecutionResult> {
   return (
-    typeof value === 'object' &&
-    value !== null &&
-    Symbol.asyncIterator in value
+    typeof value === 'object' && value !== null && Symbol.asyncIterator in value
   );
 }
 
@@ -60,9 +60,7 @@ async function* trackIncrementalResults(
  * incremental payload. Wrapping the body also forwards cancellation to Yoga's
  * underlying result stream when the HTTP client disconnects.
  */
-export function createGraphQLTimingPlugin(
-  options: TimingOptions = {},
-): Plugin {
+export function createGraphQLTimingPlugin(options: TimingOptions = {}): Plugin {
   const logger = options.logger ?? createTimingLogger('GraphQLTiming');
   const thresholdMs = options.thresholdMs ?? getSlowRequestThresholdMs();
   const now =

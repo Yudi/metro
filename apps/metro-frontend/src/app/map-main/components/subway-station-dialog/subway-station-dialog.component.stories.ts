@@ -1,5 +1,4 @@
 import { API_BASE_URL } from '@metro/shared/api';
-import { sharedProdEnvironment } from '@metro/shared/environment';
 import { StationImagesService } from './station-images.service';
 import {
   Meta,
@@ -507,7 +506,7 @@ export const MultiLineStationOsasco: Story = {
   ],
 };
 
-/** Integration story: uses the production photo proxy and attribution manifest. */
+/** Integration story: uses production station photos through Storybook's local proxy. */
 export const StationPhotoHeader: Story = {
   args: { embedded: true },
   decorators: [
@@ -518,7 +517,7 @@ export const StationPhotoHeader: Story = {
           { cached: null, isFresh: true, fetchKind: 'normal', fetchDelayMs: 0 },
           [{ lineCode: 'L9', stationCode: 'PIN', trains: PINHEIROS_TRAINS }],
         ),
-        { provide: API_BASE_URL, useValue: sharedProdEnvironment.apiUrl },
+        { provide: API_BASE_URL, useValue: '/api' },
         { provide: StationImagesService, useClass: StationImagesService },
       ],
     }),
@@ -527,7 +526,7 @@ export const StationPhotoHeader: Story = {
     docs: {
       description: {
         story:
-          'Uses the production station image API. Switch between lines 4 and 9 to verify their assigned photographs and attribution.',
+          'Uses Storybook’s local proxy to load the production station image API. Switch between lines 4 and 9 to verify their assigned photographs and attribution.',
       },
     },
   },

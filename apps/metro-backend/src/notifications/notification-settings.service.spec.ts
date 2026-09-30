@@ -358,7 +358,7 @@ describe('NotificationSettingsService', () => {
       {
         id: targetId,
         kind: 'bus_route',
-        label: '702P-10 · Metrô Belém - Vila Industrial',
+        label: '702P-10 (Metrô Belém - Vila Industrial)',
         available: true,
         busRouteShortName: '702P-10',
         busRouteColor: '0066CC',
@@ -370,7 +370,7 @@ describe('NotificationSettingsService', () => {
       {
         id: targetId,
         kind: 'bus_route',
-        label: '702P-10 · Metrô Belém - Vila Industrial',
+        label: '702P-10 (Metrô Belém - Vila Industrial)',
         available: true,
         busRouteShortName: '702P-10',
         busRouteColor: '#0066CC',
@@ -394,7 +394,7 @@ describe('NotificationSettingsService', () => {
             target: {
               id: targetId,
               kind: 'bus_route',
-              label: '702P-10 · Metrô Belém - Vila Industrial',
+              label: '702P-10 (Metrô Belém - Vila Industrial)',
               available: true,
               descriptor: {
                 routeName: '702P-10',

@@ -3,7 +3,11 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { of } from 'rxjs';
-import { FavoritesService, LoggerService, RailGraphqlService } from '@metro/shared/api';
+import {
+  FavoritesService,
+  LoggerService,
+  RailGraphqlService,
+} from '@metro/shared/api';
 import { StationNameService } from '../../geography/station-name.service';
 import type { BusStopGraphQL } from '../../geography/geography-graphql.service';
 import { NextTrainWebsocketService } from '../../../next-train/next-train-websocket.service';
@@ -46,7 +50,10 @@ describe('SubwayStationDialogComponent train lines', () => {
     TestBed.configureTestingModule({
       imports: [SubwayStationDialogComponent],
       providers: [
-        { provide: StationImagesService, useValue: { load: jest.fn(), image: () => undefined } },
+        {
+          provide: StationImagesService,
+          useValue: { load: jest.fn(), image: () => undefined },
+        },
         { provide: MAT_DIALOG_DATA, useFactory: () => ({ stop: currentStop }) },
         {
           provide: StationNameService,
@@ -125,7 +132,9 @@ describe('SubwayStationDialogComponent train lines', () => {
     expect(releases[2]).toHaveBeenCalledTimes(1);
 
     fixture.destroy();
-    expect(releases.every((release) => release.mock.calls.length === 1)).toBe(true);
+    expect(releases.every((release) => release.mock.calls.length === 1)).toBe(
+      true,
+    );
   });
 
   it('sorts and switches other numbered lines through the same selector', () => {

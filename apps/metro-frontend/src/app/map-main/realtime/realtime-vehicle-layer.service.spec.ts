@@ -4,9 +4,7 @@ import { LoggerService } from '@metro/shared/api';
 import { Point } from 'ol/geom';
 import { MapStateService } from '../components/map/map-state.service';
 import { RealtimeVehicleLayerService } from './realtime-vehicle-layer.service';
-import type {
-  VehiclePositionUpdate,
-} from './realtime-websocket.service';
+import type { VehiclePositionUpdate } from './realtime-websocket.service';
 import { RealtimeWebsocketService } from './realtime-websocket.service';
 
 describe('RealtimeVehicleLayerService', () => {
@@ -23,7 +21,12 @@ describe('RealtimeVehicleLayerService', () => {
         { provide: RealtimeWebsocketService, useValue: realtime },
         {
           provide: LoggerService,
-          useValue: { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+          useValue: {
+            debug: jest.fn(),
+            info: jest.fn(),
+            warn: jest.fn(),
+            error: jest.fn(),
+          },
         },
       ],
     });

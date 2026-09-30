@@ -27,6 +27,10 @@ import {
   computeStationCacheHash,
   getLineNumber,
 } from './next-train-polling.utils';
+import {
+  scheduledFallbackForSnapshot,
+  shouldFetchScheduledFallback,
+} from './next-train-fallback.utils';
 
 export type {
   LineCode,
@@ -410,15 +414,19 @@ export class NextTrainPollingService implements OnModuleDestroy {
     const operationClosed = outOfSchedule
       ? false
       : await this.shouldCloseOperation(lineCode, initialCached, timestamp);
-    const { trains, isApiError } =
+    const liveResult =
       operationClosed || outOfSchedule
-        ? { trains: [], isApiError: false }
+        ? { success: true, trains: [], isApiError: false }
         : await this.fetchTrains(lineCode, stationCode);
+    const { trains, isApiError } = liveResult;
     const scheduleResult =
-      trains.length === 0 && !operationClosed && !outOfSchedule
+      !operationClosed && !outOfSchedule && shouldFetchScheduledFallback(trains)
         ? await this.fetchScheduledServices(lineCode, stationCode)
         : { services: [], hasError: false };
-    const scheduledServices = scheduleResult.services;
+    const scheduledServices = scheduledFallbackForSnapshot(
+      trains,
+      scheduleResult.services,
+    );
     const hasError = isApiError || scheduleResult.hasError;
     const newHash = computeStationCacheHash(
       trains,

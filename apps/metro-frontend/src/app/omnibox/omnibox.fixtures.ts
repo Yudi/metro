@@ -55,7 +55,7 @@ export const OMNIBOX_SEARCH_RESULTS: SearchGraphQLResult[] = [
   {
     __typename: 'SearchBikeStation',
     station_id: 'bike-35',
-    station_name: 'Estação 35 · Jardim Europa',
+    station_name: 'Estação 35 (Jardim Europa)',
     bikeLatitude: -23.5731,
     bikeLongitude: -46.6822,
   },
@@ -137,7 +137,7 @@ export function createOmniboxSearchResponse(
         document: {
           id: 'bike-35',
           stop_id: 'bike-35',
-          stop_name: 'Estação 35 · Jardim Europa',
+          stop_name: 'Estação 35 (Jardim Europa)',
           stop_lat: -23.5731,
           stop_lon: -46.6822,
           source: 'bike',

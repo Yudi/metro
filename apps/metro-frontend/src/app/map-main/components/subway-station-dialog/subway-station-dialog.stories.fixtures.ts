@@ -229,7 +229,10 @@ export function createSubwayStationDialogProviders(
   nextTrainData: MockNextTrainEntry[] = [],
 ) {
   return [
-    { provide: StationImagesService, useValue: { load: () => undefined, image: () => undefined } },
+    {
+      provide: StationImagesService,
+      useValue: { load: () => undefined, image: () => undefined },
+    },
     {
       provide: MatDialogRef,
       useValue: { close: () => console.log('dialog closed') },

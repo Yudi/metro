@@ -377,7 +377,7 @@ export class Search {
     if (stop.kind === 'railStation') {
       const nextTrainStations = this.searchService.getNextTrainStations(stop);
       if (nextTrainStations.length > 0) {
-        return 'Estação de metrô/trem · Próximo trem disponível';
+        return 'Estação de metrô/trem (próximo trem disponível)';
       }
       return 'Estação de metrô/trem';
     }
@@ -443,7 +443,7 @@ export class Search {
 
     const electric =
       availability.electricBikesAvailable > 0
-        ? ` · ${availability.electricBikesAvailable} elétricas`
+        ? ` (${availability.electricBikesAvailable} elétricas)`
         : '';
     return `${availability.numBikesAvailable} bicicletas${electric}`;
   }

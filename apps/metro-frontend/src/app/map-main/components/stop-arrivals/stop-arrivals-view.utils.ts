@@ -66,7 +66,7 @@ export function getHiddenVehiclesLabel(line: LineWithVehicles): string {
 export function getRouteFareLabel(route: BusRouteGraphQL): string | null {
   const fares = route.fares ?? [];
   if (fares.length > 0) {
-    return fares.map((fare) => formatBusFare(fare)).join(' · ');
+    return fares.map((fare) => formatBusFare(fare)).join(', ');
   }
 
   return supportsSptransRealtime(route) ? null : 'Tarifa não informada';

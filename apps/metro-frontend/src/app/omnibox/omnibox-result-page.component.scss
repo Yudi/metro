@@ -5,9 +5,9 @@
 
 .result-page {
   box-sizing: border-box;
-  width: min(100%, 900px);
+  width: min(1120px, 100%);
   margin-inline: auto;
-  padding: 16px 16px 64px;
+  padding: 16px clamp(16px, 2vw, 32px) 64px;
 }
 
 .search-area {

@@ -23,8 +23,7 @@
   }
 
   .schedule-indicator,
-  .schedule-headway-badge,
-  .next-train-prominent.scheduled-train {
+  .schedule-headway-badge {
     background: color-mix(
       in srgb,
       var(--mat-sys-secondary-container, #6b5100) 35%,

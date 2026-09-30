@@ -47,7 +47,9 @@ describe('BusVectorTileService', () => {
     // summary instead of joining every timetable once per physical stop.
     expect(sql.match(/"Gtfs_StopTime"/g)).toHaveLength(1);
     expect(sql).toContain('selected_route_stops AS MATERIALIZED');
-    expect(sql).toContain('trip_id = ANY(ARRAY(SELECT trip_id FROM selected_bus_trips))');
+    expect(sql).toContain(
+      'trip_id = ANY(ARRAY(SELECT trip_id FROM selected_bus_trips))',
+    );
   });
 
   it.each(['routes', 'stops'] as const)(
@@ -55,9 +57,13 @@ describe('BusVectorTileService', () => {
     async (layer) => {
       const { service, query, execute, transaction } = createService();
       if (layer === 'routes') {
-        await service.generateBusRoutesTile(12, 1000, 1000, { routeIds: ['route-1'] });
+        await service.generateBusRoutesTile(12, 1000, 1000, {
+          routeIds: ['route-1'],
+        });
       } else {
-        await service.generateBusStopsTile(12, 1000, 1000, { stopIds: ['stop-1'] });
+        await service.generateBusStopsTile(12, 1000, 1000, {
+          stopIds: ['stop-1'],
+        });
       }
 
       expect(execute.mock.calls[0][0].join('')).toBe(

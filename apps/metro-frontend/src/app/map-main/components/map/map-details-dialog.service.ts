@@ -121,19 +121,20 @@ export class MapDetailsDialogService {
     }
 
     const data: BikeStationDialogData = { station };
-    const title = computed(() =>
-      this.mapState
-        .bikeStations()
-        .find((item) => item.stationId === station.stationId)?.name ||
-      station.name ||
-      'Carregando estação',
+    const title = computed(
+      () =>
+        this.mapState
+          .bikeStations()
+          .find((item) => item.stationId === station.stationId)?.name ||
+        station.name ||
+        'Carregando estação',
     );
     const summary = computed(() => {
       const currentStation =
         this.mapState
           .bikeStations()
           .find((item) => item.stationId === station.stationId) ?? station;
-      return `${currentStation.numBikesAvailable} bicicletas · ${currentStation.numDocksAvailable} vagas livres`;
+      return `${currentStation.numBikesAvailable} bicicletas, ${currentStation.numDocksAvailable} vagas livres`;
     });
     const panelRef = this.panelService.openComponent<
       BikeStationDialogData,
@@ -165,7 +166,10 @@ export class MapDetailsDialogService {
     });
   }
 
-  showRoutesForStop(stopId: string, initialStop?: BusStopGraphQL): Promise<void> {
+  showRoutesForStop(
+    stopId: string,
+    initialStop?: BusStopGraphQL,
+  ): Promise<void> {
     this.logger.debug('Showing routes for stop', { stopId });
     const knownStop =
       initialStop ??
@@ -202,12 +206,10 @@ export class MapDetailsDialogService {
       const isCurrentRequest = () =>
         this.panelService.generation === requestGeneration &&
         this.panelService.panel()?.id === (panelRef?.id ?? loadingRef?.id);
-      const stopUpdates$ = this.geographyService
-        .watchStopFullData(stopId)
-        .pipe(
-          takeWhile((snapshot) => snapshot.hasNext, true),
-          shareReplay({ bufferSize: 1, refCount: true }),
-        );
+      const stopUpdates$ = this.geographyService.watchStopFullData(stopId).pipe(
+        takeWhile((snapshot) => snapshot.hasNext, true),
+        shareReplay({ bufferSize: 1, refCount: true }),
+      );
 
       const openBusPanel = (
         stop: BusStopGraphQL,
@@ -294,10 +296,7 @@ export class MapDetailsDialogService {
       if (loadingRef) {
         requestSubscription.add(
           loadingRef.afterClosed().subscribe(() => {
-            if (
-              openingResultPanel &&
-              loadingRef.closeReason === 'replaced'
-            ) {
+            if (openingResultPanel && loadingRef.closeReason === 'replaced') {
               return;
             }
             if (panelRef && this.panelService.panel()?.id === panelRef.id) {
@@ -325,8 +324,7 @@ export class MapDetailsDialogService {
             }
 
             if (snapshot.stop && !panelRef) {
-              const routes =
-                snapshot.routes?.map(({ route }) => route) ?? [];
+              const routes = snapshot.routes?.map(({ route }) => route) ?? [];
               routeSummary.set(
                 routes.length
                   ? `${routes.length} ${routes.length === 1 ? 'linha' : 'linhas'}`
@@ -355,7 +353,6 @@ export class MapDetailsDialogService {
               );
               finish();
             }
-
           },
           error: (error: unknown) => {
             if (!isCurrentRequest()) {
@@ -392,7 +389,7 @@ export class MapDetailsDialogService {
     const summary = titleLineGroups.length
       ? ''
       : lines.length
-        ? `Linhas ${lines.join(' · ')}`
+        ? `Linhas ${lines.join(', ')}`
         : '';
     const panelRef = this.panelService.openComponent<
       SubwayStationDialogData,

@@ -277,7 +277,7 @@ export class MapFeatureInteractionService {
       title: `Ônibus ${vehicleId}`,
       summary:
         typeof destination === 'string' && destination.trim()
-          ? `${routeSummary} · Sentido ${destination}`
+          ? `${routeSummary}, sentido ${destination}`
           : routeSummary,
       icon: 'directions_bus',
     });
@@ -313,7 +313,7 @@ export class MapFeatureInteractionService {
       ? `${properties['shortName']} - ${properties['longName']}`
       : properties['longName'] || routeId;
     const fareLabel = this.getFareLabel(properties['fares']);
-    const fareSuffix = fareLabel ? ` · ${fareLabel}` : '';
+    const fareSuffix = fareLabel ? ` (tarifa ${fareLabel})` : '';
 
     this.snackBar
       .open(`Rota: ${routeName}${fareSuffix}`, 'Adicionar', { duration: 5000 })
@@ -341,7 +341,7 @@ export class MapFeatureInteractionService {
     });
 
     return fares.length > 0
-      ? fares.map((fare) => formatBusFare(fare)).join(' · ')
+      ? fares.map((fare) => formatBusFare(fare)).join(', ')
       : null;
   }
 

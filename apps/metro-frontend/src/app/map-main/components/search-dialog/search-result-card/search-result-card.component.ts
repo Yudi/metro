@@ -100,7 +100,7 @@ export class SearchResultCardComponent {
 
     const fares = route.fares ?? [];
     if (fares.length > 0) {
-      return fares.map((fare) => formatBusFare(fare)).join(' · ');
+      return fares.map((fare) => formatBusFare(fare)).join(', ');
     }
 
     return isArtespRoute({
@@ -151,7 +151,7 @@ export class SearchResultCardComponent {
     switch (result.type) {
       case 'subway_station':
         if (result.liveTrainTrackingApiIds?.length) {
-          return 'Estação de metrô/trem · Próximo trem disponível';
+          return 'Estação de metrô/trem (próximo trem disponível)';
         }
         return 'Estação de metrô/trem';
       case 'bus_stop':

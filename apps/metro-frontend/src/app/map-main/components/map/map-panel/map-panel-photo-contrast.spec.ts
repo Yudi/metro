@@ -1,12 +1,20 @@
-import { PhotoHandleTone, samplePhotoHandleTone } from './map-panel-photo-contrast';
+import {
+  PhotoHandleTone,
+  samplePhotoHandleTone,
+} from './map-panel-photo-contrast';
 
 describe('photo handle contrast', () => {
-  function sample(pixels: number[], blocked = false, previousTone: PhotoHandleTone | null = null) {
+  function sample(
+    pixels: number[],
+    blocked = false,
+    previousTone: PhotoHandleTone | null = null,
+  ) {
     const image = document.createElement('img');
     image.style.objectPosition = '50% 45%';
     image.style.opacity = '1';
     Object.defineProperties(image, {
-      naturalWidth: { value: 400 }, naturalHeight: { value: 200 },
+      naturalWidth: { value: 400 },
+      naturalHeight: { value: 200 },
     });
     image.getBoundingClientRect = () => new DOMRect(0, 0, 200, 100);
     const context = {
@@ -20,8 +28,14 @@ describe('photo handle contrast', () => {
         return { data: new Uint8ClampedArray(pixels) };
       },
     } as unknown as CanvasRenderingContext2D;
-    return samplePhotoHandleTone(image, new DOMRect(82, 20, 36, 4), context,
-      'rgb(244, 243, 246)', 'rgba(244, 243, 246, 0)', previousTone);
+    return samplePhotoHandleTone(
+      image,
+      new DOMRect(82, 20, 36, 4),
+      context,
+      'rgb(244, 243, 246)',
+      'rgba(244, 243, 246, 0)',
+      previousTone,
+    );
   }
 
   it('chooses a light solid tone over a dark photo', () => {
@@ -37,7 +51,11 @@ describe('photo handle contrast', () => {
   });
 
   it('does not let a bright reflection outweigh the dark region beneath the handle', () => {
-    expect(sample([30, 30, 30, 255, 35, 35, 35, 255, 40, 40, 40, 255, 250, 250, 250, 255])).toBe('light');
+    expect(
+      sample([
+        30, 30, 30, 255, 35, 35, 35, 255, 40, 40, 40, 255, 250, 250, 250, 255,
+      ]),
+    ).toBe('light');
   });
 
   it('keeps the selected tone stable near the crossover while resizing', () => {

@@ -124,6 +124,39 @@ describe('NextTrainResolver', () => {
     expect(externalRailProvider.fetchScheduledService).not.toHaveBeenCalled();
   });
 
+  it('does not return cached schedules alongside cached live trains', async () => {
+    polling.getCached.mockReturnValue({
+      lineCode: 'L9',
+      stationCode: 'HBR',
+      stationName: 'Hebraica-Rebouças',
+      trains: [
+        {
+          destinationCode: 'TUC',
+          destinationName: 'Tucuruvi',
+          trainCurrentStationName: 'Pinheiros',
+          arrivalTime: '12:10',
+          isAtPlatform: false,
+          isTrainStopped: false,
+        },
+      ],
+      scheduledServices,
+      hash: 'hash',
+      fetchedAt: 100,
+      hasError: false,
+      operationClosed: false,
+      outOfSchedule: false,
+    });
+
+    const result = await createResolver().getNextTrains('L9', 'HBR');
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        trains: [expect.objectContaining({ destinationCode: 'TUC' })],
+        scheduledServices: [],
+      }),
+    );
+  });
+
   it('does not request schedule fallback when the special service is out of schedule', async () => {
     schedule.isOperating.mockResolvedValue(false);
 
@@ -141,7 +174,7 @@ describe('NextTrainResolver', () => {
     expect(externalRailProvider.fetchScheduledService).not.toHaveBeenCalled();
   });
 
-  it('keeps scheduled data available when supplementary headway retrieval fails', async () => {
+  it('uses schedule fallback when a successful live snapshot has no arrivals', async () => {
     externalRailProvider.fetchNextTrains.mockResolvedValue({
       success: true,
       trains: [],
@@ -160,6 +193,62 @@ describe('NextTrainResolver', () => {
         trains: [],
         headway: undefined,
       }),
+    );
+    expect(externalRailProvider.fetchScheduledService).toHaveBeenCalledWith(
+      'L9',
+      'HBR',
+    );
+  });
+
+  it('replaces schedule fallback with live arrivals when entries are available', async () => {
+    externalRailProvider.fetchNextTrains.mockResolvedValue({
+      success: true,
+      trains: [
+        {
+          destinationCode: 'TUC',
+          destinationName: 'Tucuruvi',
+          trainCurrentStationName: 'Pinheiros',
+          arrivalTime: '12:10',
+          isAtPlatform: false,
+          isTrainStopped: false,
+        },
+      ],
+      isApiError: false,
+    });
+    externalRailProvider.fetchScheduledService.mockResolvedValue(
+      scheduledServices,
+    );
+
+    const result = await createResolver().getNextTrains('L9', 'HBR');
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        trains: [expect.objectContaining({ destinationCode: 'TUC' })],
+        scheduledServices: [],
+      }),
+    );
+    expect(externalRailProvider.fetchScheduledService).not.toHaveBeenCalled();
+  });
+
+  it('uses scheduled fallback when the live request fails', async () => {
+    externalRailProvider.fetchNextTrains.mockRejectedValue(
+      new Error('live source unavailable'),
+    );
+    externalRailProvider.fetchScheduledService.mockResolvedValue(
+      scheduledServices,
+    );
+
+    const result = await createResolver().getNextTrains('L9', 'HBR');
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        scheduledServices: scheduledServiceEntities,
+        trains: [],
+      }),
+    );
+    expect(externalRailProvider.fetchScheduledService).toHaveBeenCalledWith(
+      'L9',
+      'HBR',
     );
   });
 });

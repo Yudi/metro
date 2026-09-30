@@ -47,7 +47,7 @@ describe('NotificationTargetsService', () => {
       expect.arrayContaining([
         expect.objectContaining({
           kind: 'rail_station',
-          label: 'Pinheiros · Linha 9 - Esmeralda',
+          label: 'Pinheiros (Linha 9 - Esmeralda)',
           railLineCode: 9,
         }),
       ]),
@@ -108,7 +108,7 @@ describe('NotificationTargetsService', () => {
     await expect(service.search('bus_route', '702P')).resolves.toEqual([
       expect.objectContaining({
         kind: 'bus_route',
-        label: '702P-10 · Metrô Belém - Vila Industrial',
+        label: '702P-10 (Metrô Belém - Vila Industrial)',
         busRouteShortName: '702P-10',
         busRouteColor: '0066CC',
         busRouteTextColor: 'FFFFFF',

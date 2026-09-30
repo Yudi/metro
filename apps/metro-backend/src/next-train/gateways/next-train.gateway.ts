@@ -20,6 +20,7 @@ import {
 } from '../services/cptm-vehicle-polling.service';
 import { HeadwayTrackingService } from '../headway/headway-tracking.service';
 import { SubscribeStationDto, NextTrainUpdateDto } from '../dto/next-train.dto';
+import { scheduledFallbackForSnapshot } from '../services/next-train-fallback.utils';
 import {
   hasExternalRailVehicles,
   hasNextTrainInformation,
@@ -159,7 +160,10 @@ export class NextTrainGateway
         lineCode,
         stationCode,
         trains: cached.trains,
-        scheduledServices: cached.scheduledServices ?? [],
+        scheduledServices: scheduledFallbackForSnapshot(
+          cached.trains,
+          cached.scheduledServices,
+        ),
         timestamp: cached.fetchedAt,
         hasError: cached.hasError,
         processing: false,
@@ -289,7 +293,10 @@ export class NextTrainGateway
             lineCode: delta.lineCode,
             stationCode: delta.stationCode,
             trains: delta.trains,
-            scheduledServices: delta.scheduledServices ?? [],
+            scheduledServices: scheduledFallbackForSnapshot(
+              delta.trains,
+              delta.scheduledServices,
+            ),
             timestamp: delta.timestamp,
             hasError: delta.hasError,
             processing: false,
@@ -310,7 +317,10 @@ export class NextTrainGateway
             lineCode: delta.lineCode,
             stationCode: delta.stationCode,
             trains: delta.trains,
-            scheduledServices: delta.scheduledServices ?? [],
+            scheduledServices: scheduledFallbackForSnapshot(
+              delta.trains,
+              delta.scheduledServices,
+            ),
             timestamp: delta.timestamp,
             hasError: delta.hasError,
             processing: false,

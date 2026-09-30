@@ -136,7 +136,8 @@ describeDatabase('bus vector tile SQL feature parity', () => {
   }
 
   const nearby = { latitude: -23.575, longitude: -46.64, radiusMeters: 100 };
-  const ids = (rows: TileRow[]) => rows.map((row) => row.physical_stop_id).sort();
+  const ids = (rows: TileRow[]) =>
+    rows.map((row) => row.physical_stop_id).sort();
 
   it('retains bus and mixed stops while excluding rail-only and unserved stops', async () => {
     expect(ids(await tileRows('stops', { nearby }))).toEqual(['bus', 'mixed']);
@@ -149,38 +150,65 @@ describeDatabase('bus vector tile SQL feature parity', () => {
   });
 
   it('keeps the serves-bus requirement for explicitly selected stops', async () => {
-    expect(ids(await tileRows('stops', {
-      stopIds: ['bus', 'rail', 'metro', 'train', 'unknown'],
-    }))).toEqual(['bus']);
+    expect(
+      ids(
+        await tileRows('stops', {
+          stopIds: ['bus', 'rail', 'metro', 'train', 'unknown'],
+        }),
+      ),
+    ).toEqual(['bus']);
   });
 
   it('matches routes through merged members from either feed', async () => {
-    expect(ids(await tileRows('stops', {
-      routeIds: ['artesp:bus-route'],
-    }))).toEqual(['mixed']);
-    expect(ids(await tileRows('stops', {
-      routeIds: ['bus-route'],
-    }))).toEqual(['bus', 'far']);
+    expect(
+      ids(
+        await tileRows('stops', {
+          routeIds: ['artesp:bus-route'],
+        }),
+      ),
+    ).toEqual(['mixed']);
+    expect(
+      ids(
+        await tileRows('stops', {
+          routeIds: ['bus-route'],
+        }),
+      ),
+    ).toEqual(['bus', 'far']);
   });
 
   it('combines route, stop, and nearby selections with OR semantics', async () => {
-    expect(ids(await tileRows('stops', {
-      routeIds: ['artesp:bus-route'], stopIds: ['far'], nearby,
-    }))).toEqual(['bus', 'far', 'mixed']);
+    expect(
+      ids(
+        await tileRows('stops', {
+          routeIds: ['artesp:bus-route'],
+          stopIds: ['far'],
+          nearby,
+        }),
+      ),
+    ).toEqual(['bus', 'far', 'mixed']);
   });
 
   it('does not treat rail routes as selected bus routes', async () => {
-    expect(await tileRows('stops', {
-      routeIds: ['rail-route', 'METRÔ1', 'CPTM1'],
-    })).toEqual([]);
+    expect(
+      await tileRows('stops', {
+        routeIds: ['rail-route', 'METRÔ1', 'CPTM1'],
+      }),
+    ).toEqual([]);
   });
 
   it('keeps one shape per selected bus route and excludes rail shapes', async () => {
     const rows = await tileRows('routes', {
-      routeIds: ['bus-route', 'artesp:bus-route', 'rail-route', 'METRÔ1', 'CPTM1'],
+      routeIds: [
+        'bus-route',
+        'artesp:bus-route',
+        'rail-route',
+        'METRÔ1',
+        'CPTM1',
+      ],
     });
     expect(rows.map((row) => [row.route_id, row.shape_id]).sort()).toEqual([
-      ['artesp:bus-route', 'artesp:shape'], ['bus-route', 'shape'],
+      ['artesp:bus-route', 'artesp:shape'],
+      ['bus-route', 'shape'],
     ]);
   });
 });

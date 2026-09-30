@@ -65,7 +65,9 @@ export class BikeStationDialogComponent {
   private readonly favoritesService = inject(FavoritesService);
 
   private readonly stationSignal = signal(this.dialogData.station);
-  readonly station = computed(() => this.stationOverride() ?? this.stationSignal());
+  readonly station = computed(
+    () => this.stationOverride() ?? this.stationSignal(),
+  );
 
   readonly favoriteId = computed(() => this.station().stationId);
 

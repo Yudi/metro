@@ -15,11 +15,7 @@ type VehiclePositionsCallback = (
 class FakeBusItineraryClient {
   readonly getVehiclePositions = jest.fn<
     void,
-    [
-      { routeCode: string },
-      { deadline: Date },
-      VehiclePositionsCallback,
-    ]
+    [{ routeCode: string }, { deadline: Date }, VehiclePositionsCallback]
   >();
   readonly close = jest.fn();
 }

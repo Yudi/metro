@@ -133,7 +133,7 @@ function searchResponse(
         document: {
           ...route,
           route_long_name:
-            'Terminal Sacomã · Avenida do Cursino · Avenida Paulista · Consolação · Terminal Pinheiros',
+            'Terminal Sacomã, Avenida do Cursino, Avenida Paulista, Consolação, Terminal Pinheiros',
         },
       };
     }),

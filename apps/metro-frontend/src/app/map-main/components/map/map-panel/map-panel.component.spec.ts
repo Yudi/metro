@@ -7,7 +7,9 @@ import { MAP_PANEL_REF } from './map-panel-ref';
 import { MapPanelService } from './map-panel.service';
 
 @Component({
-  template: `<button type="button" (click)="panel.close(data)">Selecionar</button>`,
+  template: `<button type="button" (click)="panel.close(data)">
+    Selecionar
+  </button>`,
 })
 class PanelContentStub {
   readonly headerImage = signal<StationHeaderImage | undefined>(undefined);
@@ -16,8 +18,11 @@ class PanelContentStub {
   readonly data = inject<string>(MAT_DIALOG_DATA);
   private readonly favorite = signal(false);
   readonly isFavorite = () => this.favorite();
-  readonly favoriteIcon = () => this.favorite() ? 'favorite' : 'favorite_border';
-  readonly toggleFavorite = jest.fn(() => this.favorite.update(value => !value));
+  readonly favoriteIcon = () =>
+    this.favorite() ? 'favorite' : 'favorite_border';
+  readonly toggleFavorite = jest.fn(() =>
+    this.favorite.update((value) => !value),
+  );
 }
 
 describe('MapPanelComponent', () => {
@@ -29,7 +34,9 @@ describe('MapPanelComponent', () => {
     TestBed.configureTestingModule({ imports: [MapPanelComponent] });
     fixture = TestBed.createComponent(MapPanelComponent);
     panels = TestBed.inject(MapPanelService);
-    Object.defineProperty(fixture.nativeElement, 'clientHeight', { value: 700 });
+    Object.defineProperty(fixture.nativeElement, 'clientHeight', {
+      value: 700,
+    });
     mapButton = document.createElement('button');
     document.body.appendChild(mapButton);
     mapButton.focus();
@@ -88,9 +95,14 @@ describe('MapPanelComponent', () => {
 
   it('keeps the title interactive while compact content is inert', () => {
     open('compact');
-    const body: HTMLElement = fixture.nativeElement.querySelector('.map-panel__body');
-    const title: HTMLElement = body.querySelector('.map-panel__title-block') as HTMLElement;
-    const content: HTMLElement = body.querySelector('.map-panel__content') as HTMLElement;
+    const body: HTMLElement =
+      fixture.nativeElement.querySelector('.map-panel__body');
+    const title: HTMLElement = body.querySelector(
+      '.map-panel__title-block',
+    ) as HTMLElement;
+    const content: HTMLElement = body.querySelector(
+      '.map-panel__content',
+    ) as HTMLElement;
     expect(title.closest('[inert]')).toBeNull();
     expect(content.hasAttribute('inert')).toBe(true);
     panels.setSnap('expanded');
@@ -101,20 +113,32 @@ describe('MapPanelComponent', () => {
   it('clears the header image when replacing illustrated content', () => {
     open('expanded');
     const image: StationHeaderImage = {
-      key: 'station-images/metro/luz.avif', src: '/api/media/station-images/files/metro/luz.avif',
-      author: 'Autor', title: 'Luz', sourceUrl: 'https://commons.wikimedia.org/', license: 'CC0',
+      key: 'station-images/metro/luz.avif',
+      src: '/api/media/station-images/files/metro/luz.avif',
+      author: 'Autor',
+      title: 'Luz',
+      sourceUrl: 'https://commons.wikimedia.org/',
+      license: 'CC0',
     };
-    const illustrated = { headerImage: signal<StationHeaderImage | undefined>(image), onHeaderImageError: jest.fn() };
+    const illustrated = {
+      headerImage: signal<StationHeaderImage | undefined>(image),
+      onHeaderImageError: jest.fn(),
+    };
     fixture.componentInstance.onAttached({ instance: illustrated });
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.map-panel__header-image')).toBeTruthy();
-    const body: HTMLElement = fixture.nativeElement.querySelector('.map-panel__body');
+    expect(
+      fixture.nativeElement.querySelector('.map-panel__header-image'),
+    ).toBeTruthy();
+    const body: HTMLElement =
+      fixture.nativeElement.querySelector('.map-panel__body');
     body.scrollTop = 84;
     body.dispatchEvent(new Event('scroll'));
     expect(fixture.componentInstance.handlePhotoVisibility()).toBe(0.5);
     expect(fixture.componentInstance.photoProgress()).toBe(1);
     open('compact');
-    expect(fixture.nativeElement.querySelector('.map-panel__header-image')).toBeNull();
+    expect(
+      fixture.nativeElement.querySelector('.map-panel__header-image'),
+    ).toBeNull();
   });
 
   it('reuses the actual detail component across snaps and returns its result', () => {
@@ -131,7 +155,11 @@ describe('MapPanelComponent', () => {
 
     expect(results).toHaveBeenCalledWith('station-id');
     expect(panels.panel()).toBeNull();
-    expect(fixture.nativeElement.querySelector('[role="region"]').getAttribute('aria-label')).toBe('Ações do mapa');
+    expect(
+      fixture.nativeElement
+        .querySelector('[role="region"]')
+        .getAttribute('aria-label'),
+    ).toBe('Ações do mapa');
   });
 
   it('keeps the desktop panel expanded without a drag handle and places favorite beside close', () => {
@@ -139,30 +167,47 @@ describe('MapPanelComponent', () => {
     fixture.componentInstance.isDesktop.set(true);
     fixture.detectChanges();
 
-    const frame: HTMLElement = fixture.nativeElement.querySelector('.map-panel');
+    const frame: HTMLElement =
+      fixture.nativeElement.querySelector('.map-panel');
     expect(handle()).toBeNull();
     expect(frame.style.getPropertyValue('--map-panel-height')).toBe('652px');
-    expect(frame.querySelector('.map-panel__body')?.hasAttribute('inert')).toBe(false);
+    expect(frame.querySelector('.map-panel__body')?.hasAttribute('inert')).toBe(
+      false,
+    );
 
-    const favorite: HTMLButtonElement = frame.querySelector('.map-panel__favorite')!;
-    const dismiss: HTMLButtonElement = frame.querySelector('.map-panel__dismiss')!;
+    const favorite: HTMLButtonElement = frame.querySelector(
+      '.map-panel__favorite',
+    )!;
+    const dismiss: HTMLButtonElement = frame.querySelector(
+      '.map-panel__dismiss',
+    )!;
     expect(favorite).toBeTruthy();
     expect(dismiss).toBeTruthy();
-    expect(favorite.compareDocumentPosition(dismiss) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(
+      favorite.compareDocumentPosition(dismiss) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     favorite.click();
-    expect((fixture.componentInstance.favoriteContent() as PanelContentStub).toggleFavorite).toHaveBeenCalled();
+    expect(
+      (fixture.componentInstance.favoriteContent() as PanelContentStub)
+        .toggleFavorite,
+    ).toHaveBeenCalled();
     dismiss.click();
     expect(panels.panel()).toBeNull();
   });
 
   it('keeps the favorite action when favoriting changes map selections', () => {
     open();
-    const favorite: HTMLButtonElement = fixture.nativeElement.querySelector('.map-panel__favorite');
+    const favorite: HTMLButtonElement = fixture.nativeElement.querySelector(
+      '.map-panel__favorite',
+    );
     favorite.click();
     fixture.componentRef.setInput('hasSelections', true);
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('.map-panel__favorite')).toBe(favorite);
+    expect(fixture.nativeElement.querySelector('.map-panel__favorite')).toBe(
+      favorite,
+    );
     expect(favorite.getAttribute('aria-label')).toBe('Remover dos favoritos');
     expect(favorite.querySelector('mat-icon')?.textContent).toBe('favorite');
   });
@@ -171,14 +216,19 @@ describe('MapPanelComponent', () => {
     open('expanded');
     await fixture.whenStable();
     mapButton.focus();
-    mapButton.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    mapButton.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    );
     fixture.detectChanges();
 
     expect(document.activeElement).toBe(mapButton);
     expect(panels.panel()).not.toBeNull();
 
-    const panel: HTMLElement = fixture.nativeElement.querySelector('[role="region"]');
-    panel.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    const panel: HTMLElement =
+      fixture.nativeElement.querySelector('[role="region"]');
+    panel.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    );
     fixture.detectChanges();
     await fixture.whenStable();
 
@@ -190,23 +240,32 @@ describe('MapPanelComponent', () => {
     open();
     await fixture.whenStable();
     const grip = handle();
-    const frame: HTMLElement = fixture.nativeElement.querySelector('.map-panel');
-    const startHeight = Number.parseFloat(frame.style.getPropertyValue('--map-panel-height'));
+    const frame: HTMLElement =
+      fixture.nativeElement.querySelector('.map-panel');
+    const startHeight = Number.parseFloat(
+      frame.style.getPropertyValue('--map-panel-height'),
+    );
     grip.setPointerCapture = jest.fn();
     grip.dispatchEvent(pointer('pointerdown', 600, 0));
     grip.dispatchEvent(pointer('pointermove', 400, 400));
     fixture.detectChanges();
-    expect(Number.parseFloat(frame.style.getPropertyValue('--map-panel-height'))).toBe(startHeight + 200);
+    expect(
+      Number.parseFloat(frame.style.getPropertyValue('--map-panel-height')),
+    ).toBe(startHeight + 200);
     expect(frame.classList.contains('is-dragging')).toBe(true);
 
     grip.dispatchEvent(pointer('pointerup', 400, 600));
     grip.click();
     fixture.detectChanges();
     expect(panels.snap()).toBe('half');
-    expect(Number.parseFloat(frame.style.getPropertyValue('--map-panel-height'))).toBe(350);
+    expect(
+      Number.parseFloat(frame.style.getPropertyValue('--map-panel-height')),
+    ).toBe(350);
     expect(frame.classList.contains('is-dragging')).toBe(false);
 
-    grip.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true }));
+    grip.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'End', bubbles: true }),
+    );
     fixture.detectChanges();
     expect(panels.snap()).toBe('expanded');
     expect(grip.getAttribute('aria-valuenow')).toBe('2');
@@ -225,19 +284,27 @@ describe('MapPanelComponent', () => {
     expect(panels.snap()).toBe('compact');
     expect(panels.panel()?.id).toBe(id);
 
-    const dismiss: HTMLButtonElement = fixture.nativeElement.querySelector('.map-panel__title-row .map-panel__dismiss');
+    const dismiss: HTMLButtonElement = fixture.nativeElement.querySelector(
+      '.map-panel__title-row .map-panel__dismiss',
+    );
     dismiss.click();
     fixture.detectChanges();
     expect(panels.panel()).toBeNull();
-    expect(fixture.nativeElement.querySelector('.map-panel__dismiss')).toBeNull();
+    expect(
+      fixture.nativeElement.querySelector('.map-panel__dismiss'),
+    ).toBeNull();
   });
 
   it('captures a fast release near the middle anchor instead of overshooting it', async () => {
     open();
     await fixture.whenStable();
     const grip = handle();
-    const frame: HTMLElement = fixture.nativeElement.querySelector('.map-panel');
-    const endY = 600 - (350 - Number.parseFloat(frame.style.getPropertyValue('--map-panel-height')));
+    const frame: HTMLElement =
+      fixture.nativeElement.querySelector('.map-panel');
+    const endY =
+      600 -
+      (350 -
+        Number.parseFloat(frame.style.getPropertyValue('--map-panel-height')));
     grip.setPointerCapture = jest.fn();
     grip.dispatchEvent(pointer('pointerdown', 600, 0));
     grip.dispatchEvent(pointer('pointermove', endY, 16));
@@ -245,7 +312,9 @@ describe('MapPanelComponent', () => {
     grip.click();
     fixture.detectChanges();
     expect(panels.snap()).toBe('half');
-    expect(Number.parseFloat(frame.style.getPropertyValue('--map-panel-height'))).toBe(350);
+    expect(
+      Number.parseFloat(frame.style.getPropertyValue('--map-panel-height')),
+    ).toBe(350);
   });
 
   it('does not change the snap after a cancelled pointer gesture', () => {
@@ -263,8 +332,11 @@ describe('MapPanelComponent', () => {
     await fixture.whenStable();
     const result = jest.fn();
     ref.afterClosed().subscribe(result);
-    const body: HTMLElement = fixture.nativeElement.querySelector('.map-panel__body');
-    const button = (body.querySelector('ng-component button') as HTMLButtonElement);
+    const body: HTMLElement =
+      fixture.nativeElement.querySelector('.map-panel__body');
+    const button = body.querySelector(
+      'ng-component button',
+    ) as HTMLButtonElement;
     button.dispatchEvent(pointer('pointerdown', 400));
     button.dispatchEvent(pointer('pointerup', 400));
     expect(body.hasAttribute('inert')).toBe(false);
@@ -274,10 +346,13 @@ describe('MapPanelComponent', () => {
   });
 
   function touch(type: string, y: number, time: number): Event {
-    const event = Object.assign(new Event(type, { bubbles: true, cancelable: true }), {
-      touches: type === 'touchend' ? [] : [{ clientX: 100, clientY: y }],
-      changedTouches: [{ clientX: 100, clientY: y }],
-    });
+    const event = Object.assign(
+      new Event(type, { bubbles: true, cancelable: true }),
+      {
+        touches: type === 'touchend' ? [] : [{ clientX: 100, clientY: y }],
+        changedTouches: [{ clientX: 100, clientY: y }],
+      },
+    );
     Object.defineProperty(event, 'timeStamp', { value: time });
     return event;
   }
@@ -285,7 +360,8 @@ describe('MapPanelComponent', () => {
   it('resizes in both directions from content, suppressing only the drag click', async () => {
     open('half');
     await fixture.whenStable();
-    const body: HTMLElement = fixture.nativeElement.querySelector('.map-panel__body');
+    const body: HTMLElement =
+      fixture.nativeElement.querySelector('.map-panel__body');
     body.dispatchEvent(touch('touchstart', 500, 0));
     const move = touch('touchmove', 170, 400);
     body.dispatchEvent(move);
@@ -310,7 +386,8 @@ describe('MapPanelComponent', () => {
   it('leaves expanded content scrolling native, collapsing only from its top', async () => {
     open('expanded');
     await fixture.whenStable();
-    const body: HTMLElement = fixture.nativeElement.querySelector('.map-panel__body');
+    const body: HTMLElement =
+      fixture.nativeElement.querySelector('.map-panel__body');
     body.scrollTop = 80;
     body.dispatchEvent(touch('touchstart', 300, 0));
     const move = touch('touchmove', 400, 100);
@@ -328,19 +405,34 @@ describe('MapPanelComponent', () => {
   it('uses wheel direction at half height and preserves native scrolling when expanded', async () => {
     open('half');
     await fixture.whenStable();
-    const body: HTMLElement = fixture.nativeElement.querySelector('.map-panel__body');
+    const body: HTMLElement =
+      fixture.nativeElement.querySelector('.map-panel__body');
     jest.useFakeTimers();
     try {
-      const down = new WheelEvent('wheel', { deltaY: 30, bubbles: true, cancelable: true });
+      const down = new WheelEvent('wheel', {
+        deltaY: 30,
+        bubbles: true,
+        cancelable: true,
+      });
       body.dispatchEvent(down);
       expect(down.defaultPrevented).toBe(true);
       jest.advanceTimersByTime(170);
       expect(panels.snap()).toBe('expanded');
-      const scroll = new WheelEvent('wheel', { deltaY: 50, bubbles: true, cancelable: true });
+      const scroll = new WheelEvent('wheel', {
+        deltaY: 50,
+        bubbles: true,
+        cancelable: true,
+      });
       body.dispatchEvent(scroll);
       expect(scroll.defaultPrevented).toBe(false);
       panels.setSnap('half');
-      body.dispatchEvent(new WheelEvent('wheel', { deltaY: -30, bubbles: true, cancelable: true }));
+      body.dispatchEvent(
+        new WheelEvent('wheel', {
+          deltaY: -30,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
       jest.advanceTimersByTime(170);
       expect(panels.snap()).toBe('compact');
     } finally {
@@ -351,7 +443,8 @@ describe('MapPanelComponent', () => {
   it('requires a pause after scrolling to the top before a wheel gesture collapses the panel', async () => {
     open('expanded');
     await fixture.whenStable();
-    const body: HTMLElement = fixture.nativeElement.querySelector('.map-panel__body');
+    const body: HTMLElement =
+      fixture.nativeElement.querySelector('.map-panel__body');
     const scroll = (time: number) => {
       const event = new WheelEvent('wheel', { deltaY: -100, cancelable: true });
       Object.defineProperty(event, 'timeStamp', { value: time });
@@ -380,9 +473,12 @@ describe('MapPanelComponent', () => {
   it('does not apply the wheel pause boundary to touch gestures', async () => {
     open('expanded');
     await fixture.whenStable();
-    const body: HTMLElement = fixture.nativeElement.querySelector('.map-panel__body');
+    const body: HTMLElement =
+      fixture.nativeElement.querySelector('.map-panel__body');
     body.scrollTop = 100;
-    body.dispatchEvent(new WheelEvent('wheel', { deltaY: -100, cancelable: true }));
+    body.dispatchEvent(
+      new WheelEvent('wheel', { deltaY: -100, cancelable: true }),
+    );
     body.scrollTop = 0;
     body.dispatchEvent(touch('touchstart', 300, 0));
     const move = touch('touchmove', 630, 400);
@@ -396,9 +492,14 @@ describe('MapPanelComponent', () => {
     open('half');
     await fixture.whenStable();
     const component = fixture.componentInstance;
-    const frame: HTMLElement = fixture.nativeElement.querySelector('.map-panel');
-    jest.spyOn(fixture.nativeElement, 'getBoundingClientRect').mockReturnValue({ bottom: 700 });
-    jest.spyOn(frame, 'getBoundingClientRect').mockReturnValue({ top: 350, height: 390 } as DOMRect);
+    const frame: HTMLElement =
+      fixture.nativeElement.querySelector('.map-panel');
+    jest
+      .spyOn(fixture.nativeElement, 'getBoundingClientRect')
+      .mockReturnValue({ bottom: 700 });
+    jest
+      .spyOn(frame, 'getBoundingClientRect')
+      .mockReturnValue({ top: 350, height: 390 } as DOMRect);
     const grip = handle();
     grip.setPointerCapture = jest.fn();
     grip.dispatchEvent(pointer('pointerdown', 370, 0));
@@ -411,7 +512,6 @@ describe('MapPanelComponent', () => {
     fixture.detectChanges();
     expect(panels.dragging()).toBe(false);
   });
-
 
   it('keeps navigation fully visible through half height and restores it on destruction', async () => {
     open('half');
@@ -430,17 +530,26 @@ describe('MapPanelComponent', () => {
   it('cancels a multi-touch gesture and leaves pinch-wheel gestures native', async () => {
     open('half');
     await fixture.whenStable();
-    const body: HTMLElement = fixture.nativeElement.querySelector('.map-panel__body');
+    const body: HTMLElement =
+      fixture.nativeElement.querySelector('.map-panel__body');
     body.dispatchEvent(touch('touchstart', 500, 0));
     body.dispatchEvent(touch('touchmove', 400, 100));
-    body.dispatchEvent(Object.assign(new Event('touchstart', { bubbles: true }), {
-      touches: [{ clientX: 100, clientY: 400 }, { clientX: 200, clientY: 400 }],
-    }));
+    body.dispatchEvent(
+      Object.assign(new Event('touchstart', { bubbles: true }), {
+        touches: [
+          { clientX: 100, clientY: 400 },
+          { clientX: 200, clientY: 400 },
+        ],
+      }),
+    );
     expect(fixture.componentInstance.dragHeight()).toBeNull();
     expect(panels.snap()).toBe('half');
-    const wheel = new WheelEvent('wheel', { deltaY: 50, ctrlKey: true, cancelable: true });
+    const wheel = new WheelEvent('wheel', {
+      deltaY: 50,
+      ctrlKey: true,
+      cancelable: true,
+    });
     body.dispatchEvent(wheel);
     expect(wheel.defaultPrevented).toBe(false);
   });
-
 });

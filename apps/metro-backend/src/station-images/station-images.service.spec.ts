@@ -20,7 +20,9 @@ const imageRow = {
 
 describe('StationImagesService', () => {
   it('builds the public manifest from database fields without reading S3', async () => {
-    const { service, send, findMany } = createService({}, undefined, [imageRow]);
+    const { service, send, findMany } = createService({}, undefined, [
+      imageRow,
+    ]);
 
     const result = await service.getManifest();
 
@@ -30,14 +32,16 @@ describe('StationImagesService', () => {
     expect(JSON.parse(result.body.toString())).toEqual({
       version: 1,
       stations: {
-        luz: [{
-          key: imageRow.key,
-          lineIds: ['1', '4'],
-          author: imageRow.author,
-          title: imageRow.title,
-          sourceUrl: imageRow.sourceUrl,
-          license: imageRow.license,
-        }],
+        luz: [
+          {
+            key: imageRow.key,
+            lineIds: ['1', '4'],
+            author: imageRow.author,
+            title: imageRow.title,
+            sourceUrl: imageRow.sourceUrl,
+            license: imageRow.license,
+          },
+        ],
       },
     });
     expect(result.etag).toMatch(/^"[a-f0-9]{64}"$/);
@@ -59,9 +63,9 @@ describe('StationImagesService', () => {
     });
     const { service } = createService({}, missingError);
 
-    await expect(service.getImage('metro', 'missing.avif')).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.getImage('metro', 'missing.avif'),
+    ).rejects.toBeInstanceOf(NotFoundException);
     await expect(
       Promise.resolve().then(() => service.getImage('metro', '../secret.avif')),
     ).rejects.toBeInstanceOf(NotFoundException);
@@ -85,11 +89,13 @@ describe('StationImagesService', () => {
 function createService(
   result: Record<string, unknown>,
   error?: Error,
-  rows: readonly typeof imageRow[] = [imageRow],
+  rows: readonly (typeof imageRow)[] = [imageRow],
 ): { service: StationImagesService; send: jest.Mock; findMany: jest.Mock } {
-  const send = jest.fn().mockImplementation(() =>
-    error ? Promise.reject(error) : Promise.resolve(result),
-  );
+  const send = jest
+    .fn()
+    .mockImplementation(() =>
+      error ? Promise.reject(error) : Promise.resolve(result),
+    );
   const findMany = jest.fn().mockResolvedValue(rows);
   const s3Client = { send, destroy: jest.fn() } as unknown as S3Client;
   const prisma = { stationImage: { findMany } } as unknown as PrismaService;

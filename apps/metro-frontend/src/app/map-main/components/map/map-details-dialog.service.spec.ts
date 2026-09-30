@@ -98,7 +98,10 @@ describe('MapDetailsDialogService map-panel lifecycle', () => {
           },
         },
         { provide: MapSelectionService, useValue: selectionService },
-        { provide: MapDisplayService, useValue: { updateMapDisplay: jest.fn() } },
+        {
+          provide: MapDisplayService,
+          useValue: { updateMapDisplay: jest.fn() },
+        },
         { provide: MatSnackBar, useValue: { open: jest.fn() } },
         {
           provide: LoggerService,
@@ -144,12 +147,16 @@ describe('MapDetailsDialogService map-panel lifecycle', () => {
 
     expect(panelService.panel()).toBeNull();
     expect(teardown).toHaveBeenCalledTimes(1);
-    expect(geographyService.watchStopFullData).toHaveBeenCalledWith(stop.stopId);
+    expect(geographyService.watchStopFullData).toHaveBeenCalledWith(
+      stop.stopId,
+    );
   });
 
   it('does not replace a newer vehicle panel when deferred stop data resolves late', async () => {
     const stopRequest = new Subject<StopFullDataSnapshot>();
-    geographyService.watchStopFullData.mockReturnValue(stopRequest.asObservable());
+    geographyService.watchStopFullData.mockReturnValue(
+      stopRequest.asObservable(),
+    );
 
     const pendingDetails = service.showRoutesForStop(stop.stopId);
     stopRequest.next({ stop, hasNext: true });
@@ -167,13 +174,17 @@ describe('MapDetailsDialogService map-panel lifecycle', () => {
 
   it('shows known stop details immediately and fills routes when the patch arrives', async () => {
     const stopRequest = new Subject<StopFullDataSnapshot>();
-    geographyService.watchStopFullData.mockReturnValue(stopRequest.asObservable());
+    geographyService.watchStopFullData.mockReturnValue(
+      stopRequest.asObservable(),
+    );
 
     const pendingDetails = service.showRoutesForStop(stop.stopId, stop);
     const firstPanel = panelService.panel();
     expect(firstPanel?.title).toBeDefined();
     expect(firstPanel?.component).toBeTruthy();
-    expect((firstPanel?.ref.data as { routesLoading: boolean }).routesLoading).toBe(true);
+    expect(
+      (firstPanel?.ref.data as { routesLoading: boolean }).routesLoading,
+    ).toBe(true);
 
     const updatedStop = { ...stop, name: 'Praça da Sé - atualizado' };
     stopRequest.next({ stop: updatedStop, hasNext: true });
@@ -185,21 +196,33 @@ describe('MapDetailsDialogService map-panel lifecycle', () => {
       color: '112233',
       textColor: 'FFFFFF',
     };
-    stopRequest.next({ stop: updatedStop, routes: [{ route }], hasNext: false });
+    stopRequest.next({
+      stop: updatedStop,
+      routes: [{ route }],
+      hasNext: false,
+    });
     stopRequest.complete();
     await pendingDetails;
 
     expect(panelService.panel()?.id).toBe(firstPanel?.id);
-    expect((firstPanel?.ref.data as { routesLoading: boolean }).routesLoading).toBe(false);
-    expect((firstPanel?.ref.data as { routes: BusRouteGraphQL[] }).routes).toEqual([route]);
+    expect(
+      (firstPanel?.ref.data as { routesLoading: boolean }).routesLoading,
+    ).toBe(false);
+    expect(
+      (firstPanel?.ref.data as { routes: BusRouteGraphQL[] }).routes,
+    ).toEqual([route]);
     const title = panelService.panel()?.title;
-    expect(typeof title === 'function' ? title() : title).toBe(updatedStop.name);
+    expect(typeof title === 'function' ? title() : title).toBe(
+      updatedStop.name,
+    );
     expect(panelService.panel()?.id).toBe(firstPanel?.id);
   });
 
   it('shows a route error when the stop arrives but the deferred patch fails', async () => {
     const stopRequest = new Subject<StopFullDataSnapshot>();
-    geographyService.watchStopFullData.mockReturnValue(stopRequest.asObservable());
+    geographyService.watchStopFullData.mockReturnValue(
+      stopRequest.asObservable(),
+    );
 
     const pendingDetails = service.showRoutesForStop(stop.stopId, stop);
     const firstPanel = panelService.panel();
@@ -207,97 +230,116 @@ describe('MapDetailsDialogService map-panel lifecycle', () => {
     stopRequest.next({
       stop,
       hasNext: false,
-      errors: [{ message: 'route resolver failed', path: ['stopFullData', 'routes'] }],
+      errors: [
+        { message: 'route resolver failed', path: ['stopFullData', 'routes'] },
+      ],
     });
     stopRequest.complete();
     await pendingDetails;
 
-    expect((firstPanel?.ref.data as { routesLoading: boolean }).routesLoading).toBe(false);
-    expect((firstPanel?.ref.data as { routesError: boolean }).routesError).toBe(true);
+    expect(
+      (firstPanel?.ref.data as { routesLoading: boolean }).routesLoading,
+    ).toBe(false);
+    expect((firstPanel?.ref.data as { routesError: boolean }).routesError).toBe(
+      true,
+    );
   });
 
   it.each([
     { action: 'add', stopId: stop.stopId },
     { action: 'selectRoute', routeId: 'route-100' },
-  ])('keeps stop-panel actions active after the incremental query completes', async (result) => {
-    const stopRequest = new Subject<StopFullDataSnapshot>();
-    geographyService.watchStopFullData.mockReturnValue(stopRequest.asObservable());
+  ])(
+    'keeps stop-panel actions active after the incremental query completes',
+    async (result) => {
+      const stopRequest = new Subject<StopFullDataSnapshot>();
+      geographyService.watchStopFullData.mockReturnValue(
+        stopRequest.asObservable(),
+      );
 
-    const pendingDetails = service.showRoutesForStop(stop.stopId, stop);
-    stopRequest.next({ stop, routes: [], hasNext: false });
-    stopRequest.complete();
-    await pendingDetails;
+      const pendingDetails = service.showRoutesForStop(stop.stopId, stop);
+      stopRequest.next({ stop, routes: [], hasNext: false });
+      stopRequest.complete();
+      await pendingDetails;
 
-    panelService.panel()?.ref.close(result);
+      panelService.panel()?.ref.close(result);
 
-    if (result.action === 'add') {
+      if (result.action === 'add') {
+        expect(selectionService.addStopToSelection).toHaveBeenCalledWith(
+          stop.stopId,
+          true,
+          expect.any(Observable),
+        );
+      } else {
+        expect(selectionService.addRouteToSelection).toHaveBeenCalledWith(
+          'route-100',
+          true,
+        );
+      }
+    },
+  );
+
+  it.each([
+    { name: 'while routes are pending', completeBeforeAdd: false },
+    { name: 'after routes complete', completeBeforeAdd: true },
+  ])(
+    'reuses the stop stream when adding from the panel $name',
+    async ({ completeBeforeAdd }) => {
+      const stopRequest = new Subject<StopFullDataSnapshot>();
+      geographyService.watchStopFullData.mockReturnValue(
+        stopRequest.asObservable(),
+      );
+      const route: BusRouteGraphQL = {
+        id: 'route-100',
+        routeId: 'route-100',
+        shortName: '100',
+        longName: 'Centro - Praça da Sé',
+        color: '112233',
+        textColor: 'FFFFFF',
+      };
+      const routePatch: StopFullDataSnapshot = {
+        stop,
+        routes: [{ route }],
+        hasNext: false,
+      };
+      const selectedUpdates: StopFullDataSnapshot[][] = [];
+      selectionService.addStopToSelection.mockImplementation(
+        (
+          _stopId: string,
+          _shouldDisplaySnackbar: boolean,
+          updates: Observable<StopFullDataSnapshot>,
+        ) => {
+          const received: StopFullDataSnapshot[] = [];
+          selectedUpdates.push(received);
+          updates.subscribe((snapshot) => received.push(snapshot));
+        },
+      );
+
+      const pendingDetails = service.showRoutesForStop(stop.stopId, stop);
+      if (completeBeforeAdd) {
+        stopRequest.next(routePatch);
+        stopRequest.complete();
+        await pendingDetails;
+      } else {
+        stopRequest.next({ stop, hasNext: true });
+      }
+
+      panelService.panel()?.ref.close({ action: 'add', stopId: stop.stopId });
+      await pendingDetails;
+
+      if (!completeBeforeAdd) {
+        stopRequest.next(routePatch);
+        stopRequest.complete();
+      }
+
+      expect(geographyService.watchStopFullData).toHaveBeenCalledTimes(1);
       expect(selectionService.addStopToSelection).toHaveBeenCalledWith(
         stop.stopId,
         true,
         expect.any(Observable),
       );
-    } else {
-      expect(selectionService.addRouteToSelection).toHaveBeenCalledWith('route-100', true);
-    }
-  });
-
-  it.each([
-    { name: 'while routes are pending', completeBeforeAdd: false },
-    { name: 'after routes complete', completeBeforeAdd: true },
-  ])('reuses the stop stream when adding from the panel $name', async ({ completeBeforeAdd }) => {
-    const stopRequest = new Subject<StopFullDataSnapshot>();
-    geographyService.watchStopFullData.mockReturnValue(stopRequest.asObservable());
-    const route: BusRouteGraphQL = {
-      id: 'route-100',
-      routeId: 'route-100',
-      shortName: '100',
-      longName: 'Centro - Praça da Sé',
-      color: '112233',
-      textColor: 'FFFFFF',
-    };
-    const routePatch: StopFullDataSnapshot = {
-      stop,
-      routes: [{ route }],
-      hasNext: false,
-    };
-    const selectedUpdates: StopFullDataSnapshot[][] = [];
-    selectionService.addStopToSelection.mockImplementation(
-      (
-        _stopId: string,
-        _shouldDisplaySnackbar: boolean,
-        updates: Observable<StopFullDataSnapshot>,
-      ) => {
-        const received: StopFullDataSnapshot[] = [];
-        selectedUpdates.push(received);
-        updates.subscribe((snapshot) => received.push(snapshot));
-      },
-    );
-
-    const pendingDetails = service.showRoutesForStop(stop.stopId, stop);
-    if (completeBeforeAdd) {
-      stopRequest.next(routePatch);
-      stopRequest.complete();
-      await pendingDetails;
-    } else {
-      stopRequest.next({ stop, hasNext: true });
-    }
-
-    panelService.panel()?.ref.close({ action: 'add', stopId: stop.stopId });
-    await pendingDetails;
-
-    if (!completeBeforeAdd) {
-      stopRequest.next(routePatch);
-      stopRequest.complete();
-    }
-
-    expect(geographyService.watchStopFullData).toHaveBeenCalledTimes(1);
-    expect(selectionService.addStopToSelection).toHaveBeenCalledWith(
-      stop.stopId,
-      true,
-      expect.any(Observable),
-    );
-    expect(selectedUpdates[0]).toContainEqual(routePatch);
-  });
+      expect(selectedUpdates[0]).toContainEqual(routePatch);
+    },
+  );
 
   it('switches bike details to the newly selected station and keeps its summary live', () => {
     const firstStation = createBikeStation('bike-1', 'República', 4, 7);
@@ -323,7 +365,7 @@ describe('MapDetailsDialogService map-panel lifecycle', () => {
     const summary = secondPanel?.summary;
 
     expect(typeof summary === 'function' ? summary() : summary).toBe(
-      '6 bicicletas · 3 vagas livres',
+      '6 bicicletas, 3 vagas livres',
     );
   });
 

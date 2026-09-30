@@ -157,7 +157,7 @@ test('preserves Typesense order and opens itinerary day and direction details', 
     'Sacomã – Pinheiros',
     'Av. Paulista, 1000',
     'Consolação',
-    'Estação 35 · Jardim Europa',
+    'Estação 35 (Jardim Europa)',
   ]);
 
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -180,7 +180,9 @@ test('preserves Typesense order and opens itinerary day and direction details', 
     .click();
   await expect(page).toHaveURL(/\/sp\/busca\/bus-route\/477A-10\?q=paulista/);
   const itinerary = page.locator('.detail');
-  await expect(page.getByRole('searchbox', { name: 'Linhas, paradas e páginas' })).toHaveValue('paulista');
+  await expect(
+    page.getByRole('searchbox', { name: 'Linhas, paradas e páginas' }),
+  ).toHaveValue('paulista');
   await expect(itinerary.locator('.route-heading')).toContainText('477A-10');
 
   await itinerary.getByRole('combobox', { name: 'Dia de operação' }).click();
@@ -220,7 +222,9 @@ test('opens arrival details from a bus stop result', async ({ page }) => {
   await expect(stopDetail.getByText('Ponto de ônibus')).toBeVisible();
   await page.reload();
   await expect(stopDetail.getByText('Previsão de chegada')).toBeVisible();
-  await expect(stopDetail.getByRole('link', { name: 'Ver no mapa' })).toHaveAttribute('href', /busStops=340015325/);
+  await expect(
+    stopDetail.getByRole('link', { name: 'Ver no mapa' }),
+  ).toHaveAttribute('href', /busStops=340015325/);
 });
 
 for (const delay of [0, 1, 20]) {
@@ -256,7 +260,6 @@ for (const delay of [0, 1, 20]) {
     );
     expect(searchQueries.at(-1)).toBe('paulista');
   });
-
 }
 
 test('nearby results retain nearest first ordering', async ({

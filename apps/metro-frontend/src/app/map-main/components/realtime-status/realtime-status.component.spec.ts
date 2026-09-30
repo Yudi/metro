@@ -1,7 +1,10 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { BreathingAnimationService } from '../../../shared/services/breathing-animation.service';
-import { MapRealtimeStatusService, MapRealtimeState } from '../../realtime/map-realtime-status.service';
+import {
+  MapRealtimeStatusService,
+  MapRealtimeState,
+} from '../../realtime/map-realtime-status.service';
 import { RealtimeWebsocketService } from '../../realtime/realtime-websocket.service';
 import { RealtimeStatusComponent } from './realtime-status.component';
 
@@ -20,11 +23,17 @@ describe('RealtimeStatusComponent', () => {
       providers: [
         {
           provide: MapRealtimeStatusService,
-          useValue: { state, tooltip: signal('Acompanhamento em tempo real conectado') },
+          useValue: {
+            state,
+            tooltip: signal('Acompanhamento em tempo real conectado'),
+          },
         },
         {
           provide: RealtimeWebsocketService,
-          useValue: { lastUpdateTimestamp: signal(null), POLL_INTERVAL_MS: 15_000 },
+          useValue: {
+            lastUpdateTimestamp: signal(null),
+            POLL_INTERVAL_MS: 15_000,
+          },
         },
         {
           provide: BreathingAnimationService,
@@ -33,7 +42,8 @@ describe('RealtimeStatusComponent', () => {
             breathingBrightness: signal(75),
             currentTime: breathingTime,
             periodMs: breathing.periodMs,
-            brightnessAt: (timestampMs: number) => breathing.brightnessAt(timestampMs),
+            brightnessAt: (timestampMs: number) =>
+              breathing.brightnessAt(timestampMs),
           },
         },
       ],
@@ -44,10 +54,14 @@ describe('RealtimeStatusComponent', () => {
     const fixture = TestBed.createComponent(RealtimeStatusComponent);
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('.breathing-dot')).not.toBeNull();
+    expect(
+      fixture.nativeElement.querySelector('.breathing-dot'),
+    ).not.toBeNull();
     fixture.componentInstance.onMouseEnter();
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.status-text').textContent).toContain('Tempo real');
+    expect(
+      fixture.nativeElement.querySelector('.status-text').textContent,
+    ).toContain('Tempo real');
     expect(fixture.nativeElement.querySelector('.border-progress')).toBeNull();
     expect(subscribe).toHaveBeenCalledTimes(1);
   });
@@ -68,12 +82,19 @@ describe('RealtimeStatusComponent', () => {
     const fixture = TestBed.createComponent(RealtimeStatusComponent);
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('.realtime-chip').classList).toContain('idle');
-    expect(fixture.nativeElement.querySelector('.status-text').textContent).toBe('');
-    expect(fixture.nativeElement.querySelectorAll('.connecting-dots span')).toHaveLength(3);
+    expect(
+      fixture.nativeElement.querySelector('.realtime-chip').classList,
+    ).toContain('idle');
+    expect(
+      fixture.nativeElement.querySelector('.status-text').textContent,
+    ).toBe('');
+    expect(
+      fixture.nativeElement.querySelectorAll('.connecting-dots span'),
+    ).toHaveLength(3);
     expect(fixture.nativeElement.querySelector('.offline-dot')).toBeNull();
     expect(subscribe).toHaveBeenCalledTimes(1);
-    const [first, second, third] = fixture.componentInstance.waitingBrightness();
+    const [first, second, third] =
+      fixture.componentInstance.waitingBrightness();
     expect(first).toBeGreaterThan(second);
     expect(first).toBeGreaterThan(third);
   });

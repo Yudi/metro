@@ -66,7 +66,7 @@ export class NotificationTargetsService {
       ).flatMap((line) =>
         line.stations.map((station) => ({
           kind,
-          label: `${station.name} · ${line.fullName}`,
+          label: `${station.name} (${line.fullName})`,
           descriptor: { lineCode: line.lineId, stationCode: station.code },
         })),
       );
@@ -101,7 +101,7 @@ export class NotificationTargetsService {
       `;
       candidates = rows.map((row) => ({
         kind,
-        label: `${row.name} · ${row.label}`,
+        label: `${row.name} (${row.label})`,
         descriptor: { routeName: row.name, agency: 'sptrans' },
         storedDescriptor: {
           routeName: row.name,
@@ -137,7 +137,7 @@ export class NotificationTargetsService {
       `;
       candidates = rows.map((row) => ({
         kind,
-        label: `${row.name} · ${row.latitude.toFixed(5)}, ${row.longitude.toFixed(5)}`,
+        label: `${row.name} (${row.latitude.toFixed(5)}, ${row.longitude.toFixed(5)})`,
         descriptor: {
           name: row.name,
           description: row.description ?? '',

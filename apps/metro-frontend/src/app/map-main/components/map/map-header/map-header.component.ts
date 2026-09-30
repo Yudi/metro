@@ -53,8 +53,12 @@ export class MapHeaderComponent {
   readonly clearClick = output<void>();
   readonly fitClick = output<void>();
 
-  readonly showPrimaryControls = computed(() => this.controls() !== 'secondary');
-  readonly showSecondaryControls = computed(() => this.controls() !== 'primary');
+  readonly showPrimaryControls = computed(
+    () => this.controls() !== 'secondary',
+  );
+  readonly showSecondaryControls = computed(
+    () => this.controls() !== 'primary',
+  );
 
   readonly isNearbyDisabled = computed(() => {
     const permission = this.locationPermission();
@@ -113,9 +117,7 @@ export class MapHeaderComponent {
   );
 
   readonly optionsAriaLabel = computed(() =>
-    this.displayMode() === 'nearby'
-      ? 'Opções; modo Próximos ativo'
-      : 'Opções',
+    this.displayMode() === 'nearby' ? 'Opções; modo Próximos ativo' : 'Opções',
   );
 
   onDisplayModeChange(value: DisplayMode): void {

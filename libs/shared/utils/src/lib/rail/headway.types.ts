@@ -128,10 +128,8 @@ export function isHeadwayOffHoursSuppressionWindow(
 ): boolean {
   const minutes = getSaoPauloMinutesFromMidnight(timestamp);
   return (
-    minutes >=
-      OFF_HOURS_START_MINUTES + OFF_HOURS_CLOSING_TOLERANCE_MINUTES &&
-    minutes <
-      OFF_HOURS_END_MINUTES - OFF_HOURS_OPENING_TOLERANCE_MINUTES
+    minutes >= OFF_HOURS_START_MINUTES + OFF_HOURS_CLOSING_TOLERANCE_MINUTES &&
+    minutes < OFF_HOURS_END_MINUTES - OFF_HOURS_OPENING_TOLERANCE_MINUTES
   );
 }
 

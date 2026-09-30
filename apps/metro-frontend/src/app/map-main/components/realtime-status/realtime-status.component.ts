@@ -29,7 +29,10 @@ import { BreathingAnimationService } from '../../../shared/services/breathing-an
       [class.connected]="status.state() === 'connected'"
       [class.partial]="status.state() === 'partial'"
       [class.idle]="status.state() === 'idle'"
-      [class.expanded]="status.state() !== 'idle' && (isExpanded() || status.state() !== 'connected')"
+      [class.expanded]="
+        status.state() !== 'idle' &&
+        (isExpanded() || status.state() !== 'connected')
+      "
       [class.offline]="status.state() === 'offline'"
       [matTooltip]="tooltipText()"
       matTooltipClass="map-realtime-tooltip"
@@ -59,7 +62,9 @@ import { BreathingAnimationService } from '../../../shared/services/breathing-an
           <span [style.--brightness]="waitingBrightness()[1]"></span>
           <span [style.--brightness]="waitingBrightness()[2]"></span>
         </span>
-      } @else if (status.state() === 'connected' || status.state() === 'partial') {
+      } @else if (
+        status.state() === 'connected' || status.state() === 'partial'
+      ) {
         <div
           class="breathing-dot"
           [style.--brightness]="breathingBrightness()"
@@ -384,12 +389,15 @@ export class RealtimeStatusComponent implements OnDestroy {
   }
 
   /** Status text label */
-  readonly statusText = computed(() => ({
-    idle: '',
-    connected: 'Tempo real',
-    partial: 'Conexão parcial',
-    offline: 'Offline',
-  })[this.status.state()]);
+  readonly statusText = computed(
+    () =>
+      ({
+        idle: '',
+        connected: 'Tempo real',
+        partial: 'Conexão parcial',
+        offline: 'Offline',
+      })[this.status.state()],
+  );
 
   /** Tooltip with detailed information */
   readonly tooltipText = this.status.tooltip;

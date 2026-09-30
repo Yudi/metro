@@ -429,6 +429,42 @@ describe('NextTrainCardComponent', () => {
     );
   });
 
+  it('keeps static schedule times separate from live platform status', () => {
+    fixture.componentRef.setInput('displayMode', 'schedule');
+    setSnapshot('L9', 'HBR', {
+      trains: [],
+      scheduledServices: [createScheduledService()],
+    });
+
+    const table = fixture.nativeElement.querySelector(
+      '.train-schedule-table',
+    ) as HTMLTableElement;
+
+    expect(table.textContent).toContain('Programado');
+    expect(table.textContent).not.toContain('Agora');
+    expect(table.textContent).not.toContain('Na plataforma');
+    expect(table.textContent).not.toContain('Trem na plataforma');
+  });
+
+  it('shows live platform status instead of static schedules when live trains exist', () => {
+    fixture.componentRef.setInput('displayMode', 'schedule');
+    setSnapshot('L9', 'HBR', {
+      trains: [createArrival({ isAtPlatform: true })],
+      scheduledServices: [createScheduledService()],
+    });
+
+    const table = fixture.nativeElement.querySelector(
+      '.train-schedule-table',
+    ) as HTMLTableElement;
+
+    expect(table.textContent).toContain('Agora');
+    expect(table.textContent).toContain('Na plataforma');
+    expect(table.querySelectorAll('.scheduled-train')).toHaveLength(0);
+    expect(
+      fixture.nativeElement.querySelector('.schedule-indicator'),
+    ).toBeNull();
+  });
+
   it('prefers a measured direction headway over the scheduled interval', () => {
     setSnapshot('L9', 'HBR', {
       trains: [],

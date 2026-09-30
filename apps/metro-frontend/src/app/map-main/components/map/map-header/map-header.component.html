@@ -18,9 +18,7 @@
         class="nearby-button-container"
         [matTooltip]="locationMessage()"
         matTooltipPosition="above"
-        [attr.title]="
-          isLocationActionDisabled() ? locationMessage() : null
-        "
+        [attr.title]="isLocationActionDisabled() ? locationMessage() : null"
       >
         <button
           matButton="tonal"

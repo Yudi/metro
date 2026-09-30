@@ -254,9 +254,9 @@ export class RealtimeVehicleLayerService {
           sourceAgency: route.sourceAgency,
           supportsRealtime: route.supportsRealtime,
         }) &&
-        (route.shortName === routeShortName ||
-          route.shortName === routeCode ||
-          route.id === routeCode)),
+          (route.shortName === routeShortName ||
+            route.shortName === routeCode ||
+            route.id === routeCode)),
     );
 
     return this.normalizeHexColor(matchingRoute?.color);

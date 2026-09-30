@@ -46,7 +46,10 @@ type RouteFullDataParent = Pick<RouteFullData, 'route'> &
   Partial<Pick<RouteFullData, 'trips' | 'shapes' | 'stops'>>;
 
 const routeTripsLoads = new WeakMap<RouteFullDataParent, Promise<Trip[]>>();
-const routeShapesLoads = new WeakMap<RouteFullDataParent, Promise<BusShape[]>>();
+const routeShapesLoads = new WeakMap<
+  RouteFullDataParent,
+  Promise<BusShape[]>
+>();
 const routeStopsLoads = new WeakMap<RouteFullDataParent, Promise<BusStop[]>>();
 
 @Resolver(() => BusStop)
@@ -433,30 +436,24 @@ export class RouteFullDataResolver {
   @ResolveField(() => [Trip])
   async trips(@Parent() parent: RouteFullDataParent): Promise<Trip[]> {
     if (Array.isArray(parent.trips)) return parent.trips;
-    return this.loadCollection(
-      routeTripsLoads,
-      parent,
-      () => this.geographyService.getTripsForRoute(parent.route.routeId),
+    return this.loadCollection(routeTripsLoads, parent, () =>
+      this.geographyService.getTripsForRoute(parent.route.routeId),
     );
   }
 
   @ResolveField(() => [BusShape])
   async shapes(@Parent() parent: RouteFullDataParent): Promise<BusShape[]> {
     if (Array.isArray(parent.shapes)) return parent.shapes;
-    return this.loadCollection(
-      routeShapesLoads,
-      parent,
-      () => this.geographyService.getRouteShapesForRoute(parent.route.routeId),
+    return this.loadCollection(routeShapesLoads, parent, () =>
+      this.geographyService.getRouteShapesForRoute(parent.route.routeId),
     );
   }
 
   @ResolveField(() => [BusStop])
   async stops(@Parent() parent: RouteFullDataParent): Promise<BusStop[]> {
     if (Array.isArray(parent.stops)) return parent.stops;
-    return this.loadCollection(
-      routeStopsLoads,
-      parent,
-      () => this.geographyService.getStopsForRoute(parent.route.routeId),
+    return this.loadCollection(routeStopsLoads, parent, () =>
+      this.geographyService.getStopsForRoute(parent.route.routeId),
     );
   }
 

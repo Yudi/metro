@@ -66,9 +66,7 @@ export function validatePublicEnvironment(
     bucket: optionalString(input['S3_BUCKET']),
     region: optionalString(input['S3_REGION']),
     accessKeyId: optionalString(input['S3_ACCESS_KEY_ID']),
-    secretAccessKey: optionalString(
-      input['S3_SECRET_ACCESS_KEY'],
-    ),
+    secretAccessKey: optionalString(input['S3_SECRET_ACCESS_KEY']),
   };
   const s3Configured = Object.values(s3Configuration).some(Boolean);
   if (s3Configured) {
@@ -185,9 +183,7 @@ function optionalString(value: unknown): string | undefined {
 function hasWhitespaceOrControl(value: string): boolean {
   return Array.from(value).some((character) => {
     const characterCode = character.charCodeAt(0);
-    return (
-      /\s/.test(character) || characterCode < 32 || characterCode === 127
-    );
+    return /\s/.test(character) || characterCode < 32 || characterCode === 127;
   });
 }
 

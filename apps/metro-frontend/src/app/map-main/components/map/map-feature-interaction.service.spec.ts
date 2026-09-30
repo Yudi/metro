@@ -137,7 +137,7 @@ describe('MapFeatureInteractionService', () => {
     expect(panels.panel()).toEqual(
       expect.objectContaining({
         title: 'Ônibus ABC1D23',
-        summary: 'Linha 001 · Sentido Terminal Centro',
+        summary: 'Linha 001, sentido Terminal Centro',
       }),
     );
   });

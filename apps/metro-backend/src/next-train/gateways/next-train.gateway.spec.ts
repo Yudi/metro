@@ -104,6 +104,58 @@ describe('NextTrainGateway', () => {
     );
   });
 
+  it('omits cached schedules whenever the full snapshot contains live trains', async () => {
+    const liveTrain = {
+      destinationCode: 'VAG',
+      destinationName: 'Varginha',
+      trainCurrentStationName: 'Osasco',
+      arrivalTime: '12:04',
+      isAtPlatform: false,
+      isTrainStopped: false,
+    };
+    const polling = {
+      onPollComplete: jest.fn(),
+      offPollComplete: jest.fn(),
+      subscribe: jest.fn(() => ({
+        lineCode: 'L9',
+        stationCode: 'HBR',
+        stationName: 'Hebraica-Rebouças',
+        trains: [liveTrain],
+        scheduledServices: [
+          {
+            destinationCode: 'VAG',
+            destinationName: 'Varginha',
+            originStationCode: 'OSA',
+            originStationName: 'Osasco',
+            nextDepartureAt: '2026-09-09T12:04:00.000Z',
+          },
+        ],
+        hash: 'hash',
+        fetchedAt: 100,
+        hasError: false,
+        operationClosed: false,
+        outOfSchedule: false,
+      })),
+    };
+    const gateway = new NextTrainGateway(
+      polling as never,
+      { onPollComplete: jest.fn(), offPollComplete: jest.fn() } as never,
+      { getHeadway: jest.fn().mockResolvedValue(null) } as never,
+    );
+    const client = { id: 'client-id', emit: jest.fn() };
+    gateway.handleConnection(client as never);
+
+    await gateway.handleSubscribe(client as never, {
+      lineCode: 'L9',
+      stationCode: 'HBR',
+    });
+
+    expect(client.emit).toHaveBeenCalledWith(
+      'next_train_update',
+      expect.objectContaining({ trains: [liveTrain], scheduledServices: [] }),
+    );
+  });
+
   it('keeps scheduled services when headway retrieval fails for a delta', async () => {
     const scheduledServices = [
       {
@@ -158,6 +210,64 @@ describe('NextTrainGateway', () => {
     expect(emit).toHaveBeenCalledWith(
       'next_train_update',
       expect.objectContaining({ scheduledServices, trains: [] }),
+    );
+  });
+
+  it('omits stale schedules from a delta that contains live trains', async () => {
+    const liveTrain = {
+      destinationCode: 'VAG',
+      destinationName: 'Varginha',
+      trainCurrentStationName: 'Osasco',
+      arrivalTime: '12:04',
+      isAtPlatform: false,
+      isTrainStopped: false,
+    };
+    const polling = {
+      onPollComplete: jest.fn(),
+      offPollComplete: jest.fn(),
+      getSubscribers: jest.fn(() => new Set(['client-id'])),
+    };
+    const gateway = new NextTrainGateway(
+      polling as never,
+      { onPollComplete: jest.fn(), offPollComplete: jest.fn() } as never,
+      { getHeadway: jest.fn().mockResolvedValue(null) } as never,
+    );
+    const emit = jest.fn();
+    Object.defineProperty(gateway, 'server', {
+      value: { to: jest.fn(() => ({ emit })) },
+    });
+
+    (
+      gateway as unknown as {
+        handleDeltas(deltas: unknown[]): void;
+      }
+    ).handleDeltas([
+      {
+        lineCode: 'L9',
+        stationCode: 'HBR',
+        trains: [liveTrain],
+        scheduledServices: [
+          {
+            destinationCode: 'VAG',
+            destinationName: 'Varginha',
+            originStationCode: 'OSA',
+            originStationName: 'Osasco',
+            nextDepartureAt: '2026-09-09T12:04:00.000Z',
+          },
+        ],
+        timestamp: 200,
+        hasError: false,
+        operationClosed: false,
+        outOfSchedule: false,
+      },
+    ]);
+    for (let i = 0; i < 5; i++) {
+      await Promise.resolve();
+    }
+
+    expect(emit).toHaveBeenCalledWith(
+      'next_train_update',
+      expect.objectContaining({ trains: [liveTrain], scheduledServices: [] }),
     );
   });
 

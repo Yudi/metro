@@ -7,7 +7,7 @@ import { NotificationTriggerEditorComponent } from './notification-trigger-edito
 const destination = {
   id: 'station-opaque',
   kind: 'rail_station' as const,
-  label: 'Pinheiros · Linha 9 - Esmeralda',
+  label: 'Pinheiros (Linha 9 - Esmeralda)',
   available: true,
   railLineCode: 9,
 };
@@ -15,7 +15,7 @@ const destination = {
 const busDestination = {
   id: 'route-702p-10',
   kind: 'bus_route' as const,
-  label: '702P-10 · Metrô Belém - Vila Industrial',
+  label: '702P-10 (Metrô Belém - Vila Industrial)',
   available: true,
   busRouteShortName: '702P-10',
   busRouteColor: '#0066cc',

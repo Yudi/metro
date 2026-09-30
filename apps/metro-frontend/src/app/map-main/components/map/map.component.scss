@@ -61,15 +61,23 @@ app-map-footer {
   app-map-footer {
     right: auto;
     left: 12px;
-    bottom: calc(var(--map-sheet-height, 0px) + var(--app-bottom-toolbar-height, 0px) + 28px);
+    bottom: calc(
+      var(--map-sheet-height, 0px) + var(--app-bottom-toolbar-height, 0px) +
+        28px
+    );
   }
 
   .map-diagnostics {
-    bottom: calc(var(--map-sheet-height, 0px) + var(--app-bottom-toolbar-height, 0px) + 28px);
+    bottom: calc(
+      var(--map-sheet-height, 0px) + var(--app-bottom-toolbar-height, 0px) +
+        28px
+    );
   }
 
   .map-wrapper {
-    --map-attribution-offset: calc(var(--map-sheet-height, 0px) + var(--app-bottom-toolbar-height, 0px));
+    --map-attribution-offset: calc(
+      var(--map-sheet-height, 0px) + var(--app-bottom-toolbar-height, 0px)
+    );
   }
 
   .map-secondary-controls,

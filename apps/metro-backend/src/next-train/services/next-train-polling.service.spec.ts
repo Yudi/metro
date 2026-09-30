@@ -180,7 +180,7 @@ describe('NextTrainPollingService', () => {
     );
   });
 
-  it('refreshes and clears schedule fallback as the dated service list changes', async () => {
+  it('refreshes and clears schedule fallback for a schedule-only line', async () => {
     const firstService = {
       destinationCode: 'VAG',
       destinationName: 'Varginha',
@@ -189,11 +189,6 @@ describe('NextTrainPollingService', () => {
       nextDepartureAt: '2026-09-09T12:04:00.000Z',
       intervalLabel: '3 min',
     };
-    externalRailProvider.fetchNextTrains.mockResolvedValue({
-      success: true,
-      trains: [],
-      isApiError: false,
-    });
     externalRailProvider.fetchScheduledService
       .mockResolvedValueOnce([firstService])
       .mockResolvedValueOnce([]);
@@ -203,13 +198,107 @@ describe('NextTrainPollingService', () => {
         fetchAndCacheKey(key: string, timestamp: number): Promise<unknown>;
       }
     ).fetchAndCacheKey.bind(service);
-    const first = await poll('L9:HBR', 100);
-    const second = await poll('L9:HBR', 200);
+    const first = await poll('L1:LUZ', 100);
+    const second = await poll('L1:LUZ', 200);
 
     expect(first).toEqual({ delta: expect.anything(), hasError: false });
     expect(second).toEqual({ delta: expect.anything(), hasError: false });
-    expect(service.getCached('L9', 'HBR')).toEqual(
+    expect(externalRailProvider.fetchNextTrains).not.toHaveBeenCalled();
+    expect(service.getCached('L1', 'LUZ')).toEqual(
       expect.objectContaining({ trains: [], scheduledServices: [] }),
+    );
+  });
+
+  it('uses static schedules when a live snapshot has no arrivals', async () => {
+    externalRailProvider.fetchNextTrains.mockResolvedValue({
+      success: true,
+      trains: [],
+      isApiError: false,
+    });
+    externalRailProvider.fetchScheduledService.mockResolvedValue([
+      {
+        destinationCode: 'VAG',
+        destinationName: 'Varginha',
+        originStationCode: 'OSA',
+        originStationName: 'Osasco',
+        nextDepartureAt: '2026-09-09T12:04:00.000Z',
+      },
+    ]);
+
+    await (
+      service as unknown as {
+        fetchAndCacheKey(key: string, timestamp: number): Promise<unknown>;
+      }
+    ).fetchAndCacheKey('L9:HBR', 100);
+
+    expect(externalRailProvider.fetchScheduledService).toHaveBeenCalledWith(
+      'L9',
+      'HBR',
+    );
+    expect(service.getCached('L9', 'HBR')).toEqual(
+      expect.objectContaining({
+        trains: [],
+        scheduledServices: [
+          expect.objectContaining({ destinationCode: 'VAG' }),
+        ],
+        hasError: false,
+      }),
+    );
+  });
+
+  it('replaces scheduled fallback when a refresh returns live arrivals', async () => {
+    const scheduledService = {
+      destinationCode: 'VAG',
+      destinationName: 'Varginha',
+      originStationCode: 'OSA',
+      originStationName: 'Osasco',
+      nextDepartureAt: '2026-09-09T12:04:00.000Z',
+    };
+    const liveTrain = createTrain('VAG');
+    externalRailProvider.fetchNextTrains
+      .mockResolvedValueOnce({
+        success: true,
+        trains: [],
+        isApiError: false,
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        trains: [liveTrain],
+        isApiError: false,
+      });
+    externalRailProvider.fetchScheduledService.mockResolvedValue([
+      scheduledService,
+    ]);
+
+    const poll = (
+      service as unknown as {
+        fetchAndCacheKey(key: string, timestamp: number): Promise<unknown>;
+      }
+    ).fetchAndCacheKey.bind(service);
+    const fallback = await poll('L9:HBR', 100);
+    const refreshed = await poll('L9:HBR', 200);
+
+    expect(fallback).toEqual(
+      expect.objectContaining({
+        delta: expect.objectContaining({
+          scheduledServices: [scheduledService],
+        }),
+      }),
+    );
+    expect(refreshed).toEqual(
+      expect.objectContaining({
+        delta: expect.objectContaining({
+          trains: [liveTrain],
+          scheduledServices: [],
+        }),
+      }),
+    );
+    expect(externalRailProvider.fetchScheduledService).toHaveBeenCalledTimes(1);
+    expect(service.getCached('L9', 'HBR')).toEqual(
+      expect.objectContaining({
+        trains: [liveTrain],
+        scheduledServices: [],
+      }),
     );
   });
 

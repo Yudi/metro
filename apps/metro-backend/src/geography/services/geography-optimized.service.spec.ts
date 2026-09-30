@@ -62,9 +62,11 @@ describe('GeographyServiceOptimized stop route data', () => {
   it('rejects pathological route fan-out', async () => {
     const service = createService(101);
 
-    await expect(service.getStopRoutesFullData('stop-1')).rejects.toMatchObject({
-      status: 413,
-    });
+    await expect(service.getStopRoutesFullData('stop-1')).rejects.toMatchObject(
+      {
+        status: 413,
+      },
+    );
   });
 });
 

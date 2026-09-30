@@ -20,21 +20,31 @@ export class StationImagesService {
   load(): void {
     if (this.loading || this.manifest()) return;
     this.loading = true;
-    this.http.get<StationImageManifest>(`${this.apiUrl}/media/station-images`, { timeout: 15_000 })
+    this.http
+      .get<StationImageManifest>(`${this.apiUrl}/media/station-images`, {
+        timeout: 15_000,
+      })
       .pipe(take(1))
       .subscribe({
         next: (manifest) => {
-          if (manifest.version === 1 && manifest.stations) this.manifest.set(manifest);
+          if (manifest.version === 1 && manifest.stations)
+            this.manifest.set(manifest);
           this.loading = false;
         },
-        error: () => { this.loading = false; },
+        error: () => {
+          this.loading = false;
+        },
       });
   }
 
-  image(stationName: string, lineId?: string | number | null): StationHeaderImage | undefined {
+  image(
+    stationName: string,
+    lineId?: string | number | null,
+  ): StationHeaderImage | undefined {
     const stations = this.manifest()?.stations;
     const identity = getRailStationIdentityKey(stationName);
-    if (!stations || !Object.prototype.hasOwnProperty.call(stations, identity)) return undefined;
+    if (!stations || !Object.prototype.hasOwnProperty.call(stations, identity))
+      return undefined;
     const images = stations[identity];
     const image = selectStationImage(images, lineId);
     // A failed image must not replace a line-specific view with an unrelated photo.

@@ -30,7 +30,10 @@ export class MapDataLoaderService {
   private mapState = inject(MapStateService);
   private logger = inject(LoggerService);
   private vectorTileLayerService = inject(VectorTileLayerService);
-  private readonly activeStopRequests = new Map<string, ActiveStopDataRequest>();
+  private readonly activeStopRequests = new Map<
+    string,
+    ActiveStopDataRequest
+  >();
   private activeLoadCount = 0;
 
   // Callback to update display - will be set by the component
@@ -137,10 +140,7 @@ export class MapDataLoaderService {
       request.subscription.unsubscribe();
       finishLoading();
 
-      if (
-        !receivedStop &&
-        (!result || result.status === 'not-found')
-      ) {
+      if (!receivedStop && (!result || result.status === 'not-found')) {
         this.logger.warn('Stop not found', { stopId });
       }
       settleInitialResult(
@@ -148,7 +148,10 @@ export class MapDataLoaderService {
           (receivedStop
             ? { status: 'loaded', stop: receivedStop }
             : hasGraphqlErrors
-              ? { status: 'error', error: new Error('GraphQL stop query failed') }
+              ? {
+                  status: 'error',
+                  error: new Error('GraphQL stop query failed'),
+                }
               : { status: 'not-found' }),
       );
     };
@@ -169,99 +172,98 @@ export class MapDataLoaderService {
       }
     };
 
-    const subscription = (stopUpdates ??
-      this.geographyService.watchStopFullData(stopId)).subscribe({
-        next: (snapshot) => {
-          if (this.activeStopRequests.get(stopId) !== request) {
-            return;
-          }
+    const subscription = (
+      stopUpdates ?? this.geographyService.watchStopFullData(stopId)
+    ).subscribe({
+      next: (snapshot) => {
+        if (this.activeStopRequests.get(stopId) !== request) {
+          return;
+        }
 
-          if (snapshot.errors?.length) {
-            reportGraphqlErrors(snapshot.errors);
-          }
+        if (snapshot.errors?.length) {
+          reportGraphqlErrors(snapshot.errors);
+        }
 
-          if (snapshot.stop && !receivedStop) {
-            receivedStop = snapshot.stop;
-            request.canonicalStopId = snapshot.stop.stopId;
-            this.mapState.addStopToDisplay(
-              snapshot.stop,
-              request.canonicalStopId,
+        if (snapshot.stop && !receivedStop) {
+          receivedStop = snapshot.stop;
+          request.canonicalStopId = snapshot.stop.stopId;
+          this.mapState.addStopToDisplay(
+            snapshot.stop,
+            request.canonicalStopId,
+          );
+          onStopReceived?.(snapshot.stop);
+          this.logger.debug('Stop data loaded before related routes', {
+            stopId: snapshot.stop.stopId,
+            name: snapshot.stop.name,
+          });
+          settleInitialResult({ status: 'loaded', stop: snapshot.stop });
+        }
+
+        if (snapshot.routes !== undefined) {
+          const routeSnapshot = snapshot.routes ?? [];
+          const newRouteData = routeSnapshot.filter(({ route }) => {
+            if (processedRouteIds.has(route.routeId)) {
+              return false;
+            }
+            processedRouteIds.add(route.routeId);
+            return true;
+          });
+          const newRoutes = newRouteData.map(({ route }) => route);
+
+          if (newRoutes.length > 0) {
+            this.mapState.addRoutesToDisplay(
+              newRoutes,
+              request.canonicalStopId ?? stopId,
+              true,
             );
-            onStopReceived?.(snapshot.stop);
-            this.logger.debug('Stop data loaded before related routes', {
-              stopId: snapshot.stop.stopId,
-              name: snapshot.stop.name,
-            });
-            settleInitialResult({ status: 'loaded', stop: snapshot.stop });
-          }
 
-          if (snapshot.routes !== undefined) {
-            const routeSnapshot = snapshot.routes ?? [];
-            const newRouteData = routeSnapshot.filter(({ route }) => {
-              if (processedRouteIds.has(route.routeId)) {
-                return false;
+            for (const route of newRoutes) {
+              if (isSubwayRoute(route)) {
+                this.logger.debug(
+                  'Skipping stop loading for subway route derived from stop',
+                  { routeId: route.routeId, shortName: route.shortName },
+                );
+              } else {
+                this.logger.debug('Registered route derived from stop', {
+                  routeId: route.routeId,
+                });
               }
-              processedRouteIds.add(route.routeId);
-              return true;
-            });
-            const newRoutes = newRouteData.map(({ route }) => route);
-
-            if (newRoutes.length > 0) {
-              this.mapState.addRoutesToDisplay(
-                newRoutes,
-                request.canonicalStopId ?? stopId,
-                true,
-              );
-
-              for (const route of newRoutes) {
-                if (isSubwayRoute(route)) {
-                  this.logger.debug(
-                    'Skipping stop loading for subway route derived from stop',
-                    { routeId: route.routeId, shortName: route.shortName },
-                  );
-                } else {
-                  this.logger.debug('Registered route derived from stop', {
-                    routeId: route.routeId,
-                  });
-                }
-              }
-
-              this.syncVectorTileFilters();
             }
 
-            this.logger.debug('Stop routes loaded', {
-              stopId,
-              routesCount: routeSnapshot.length,
-            });
+            this.syncVectorTileFilters();
           }
 
-          if (!snapshot.hasNext) {
-            completeRequest();
-          }
-        },
-        error: (error: unknown) => {
-          if (this.activeStopRequests.get(stopId) !== request) {
-            return;
-          }
-          this.logger.error('Error loading stop data', error);
-          if (shouldDisplaySnackbar) {
-            this.snackBar.open(
-              'Não foi possível carregar os dados da parada',
-              'Fechar',
-              { duration: 3000 },
-            );
-          }
-          completeRequest(
-            receivedStop ? undefined : { status: 'error', error },
-          );
-        },
-        complete: () => {
-          if (this.activeStopRequests.get(stopId) !== request) {
-            return;
-          }
+          this.logger.debug('Stop routes loaded', {
+            stopId,
+            routesCount: routeSnapshot.length,
+          });
+        }
+
+        if (!snapshot.hasNext) {
           completeRequest();
-        },
-      });
+        }
+      },
+      error: (error: unknown) => {
+        if (this.activeStopRequests.get(stopId) !== request) {
+          return;
+        }
+        this.logger.error('Error loading stop data', error);
+        if (shouldDisplaySnackbar) {
+          this.snackBar.open(
+            'Não foi possível carregar os dados da parada',
+            'Fechar',
+            { duration: 3000 },
+          );
+        }
+        completeRequest(receivedStop ? undefined : { status: 'error', error });
+      },
+      complete: () => {
+        if (this.activeStopRequests.get(stopId) !== request) {
+          return;
+        }
+        completeRequest();
+      },
+    });
 
     request.subscription.add(subscription);
     return initialResult;

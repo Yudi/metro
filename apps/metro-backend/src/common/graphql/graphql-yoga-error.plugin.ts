@@ -46,9 +46,7 @@ export function maskGraphQLError(
         source: graphQLError?.source,
         positions: graphQLError?.positions,
         path: graphQLError?.path,
-        extensions: code
-          ? { code }
-          : { code: 'INTERNAL_SERVER_ERROR', status },
+        extensions: code ? { code } : { code: 'INTERNAL_SERVER_ERROR', status },
       });
     }
   }
@@ -63,15 +61,11 @@ export function maskGraphQLError(
 
 function hasAsyncIterator(value: unknown): value is AsyncIterable<unknown> {
   return (
-    typeof value === 'object' &&
-    value !== null &&
-    Symbol.asyncIterator in value
+    typeof value === 'object' && value !== null && Symbol.asyncIterator in value
   );
 }
 
-function sanitizeResult(
-  result: ExecutionResult,
-): SanitizedExecutionResult {
+function sanitizeResult(result: ExecutionResult): SanitizedExecutionResult {
   const incrementalResult = result as IncrementalExecutionResult;
   const { errors, incremental, ...resultFields } = incrementalResult;
   const sanitized: SanitizedExecutionResult = { ...resultFields };
@@ -111,7 +105,9 @@ export function createGraphQLYogaErrorPlugin(): Plugin {
       }
 
       if (hasAsyncIterator(result)) {
-        setResult(sanitizeResultStream(result as AsyncIterable<ExecutionResult>));
+        setResult(
+          sanitizeResultStream(result as AsyncIterable<ExecutionResult>),
+        );
         return;
       }
 

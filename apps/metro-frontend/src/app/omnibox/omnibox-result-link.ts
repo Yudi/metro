@@ -28,8 +28,7 @@ export function resultQueryParams(result: SearchResult, query: string) {
     name: hasCoordinates ? result.name : undefined,
     lat: hasCoordinates ? result.latitude : undefined,
     lon: hasCoordinates ? result.longitude : undefined,
-    lines: result.type === 'subway_station'
-      ? result.routes?.join(',')
-      : undefined,
+    lines:
+      result.type === 'subway_station' ? result.routes?.join(',') : undefined,
   };
 }

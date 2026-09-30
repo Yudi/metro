@@ -65,9 +65,10 @@ describe('vehicle position websocket messages', () => {
       ],
       routeLabel: '125',
     });
-    expect(countVehicles([[
-      'artesp:route-2148:positions',
-      { timestamp: 200, data: message.data },
-    ]])).toBe(1);
+    expect(
+      countVehicles([
+        ['artesp:route-2148:positions', { timestamp: 200, data: message.data }],
+      ]),
+    ).toBe(1);
   });
 });

@@ -175,7 +175,9 @@ describe('OmniboxResultPageComponent', () => {
     snapshots.next({
       stop,
       hasNext: false,
-      errors: [{ message: 'routes unavailable', path: ['stopFullData', 'routes'] }],
+      errors: [
+        { message: 'routes unavailable', path: ['stopFullData', 'routes'] },
+      ],
     });
 
     expect(page.detail()).toMatchObject({

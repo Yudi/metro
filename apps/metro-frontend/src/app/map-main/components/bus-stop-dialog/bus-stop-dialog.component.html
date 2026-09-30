@@ -2,9 +2,9 @@
   icon="directions_bus"
   [title]="stop().name"
   [description]="
-    'Ponto de ônibus · ID: ' +
+    'ID: ' +
     stopDisplayId +
-    (stop().platformCode ? ' · Plataforma: ' + stop().platformCode : '')
+    (stop().platformCode ? ' (plataforma ' + stop().platformCode + ')' : '')
   "
 />
 
@@ -15,9 +15,13 @@
   }
 
   @if (routesLoading()) {
-    <p class="routes-state" role="status" aria-live="polite">Consultando linhas do ponto…</p>
+    <p class="routes-state" role="status" aria-live="polite">
+      Consultando linhas do ponto…
+    </p>
   } @else if (routesError()) {
-    <p class="routes-state" role="status">Não foi possível consultar as linhas deste ponto.</p>
+    <p class="routes-state" role="status">
+      Não foi possível consultar as linhas deste ponto.
+    </p>
   }
 
   <!-- Real-time arrivals -->

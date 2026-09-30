@@ -1,12 +1,51 @@
+<ng-template #favoriteButton>
+  <button
+    mat-icon-button
+    class="favorite-button"
+    [class.favorited]="isFavorite()"
+    (click)="toggleFavorite()"
+    (mouseenter)="setFavoriteHover(true)"
+    (mouseleave)="setFavoriteHover(false)"
+    [disabled]="!canFavorite()"
+    [attr.aria-label]="
+      isFavorite() ? 'Remover dos favoritos' : 'Adicionar aos favoritos'
+    "
+  >
+    <mat-icon>{{ favoriteIcon() }}</mat-icon>
+  </button>
+</ng-template>
+
 @if (!panelRef) {
   <header class="station-heading" [class.has-photo]="!!headerImage()">
     @if (headerImage(); as image) {
-      <img class="station-heading__image" [ngSrc]="image.src" fill
-        sizes="100vw" alt="" priority
-        (error)="onHeaderImageError()" />
+      <img
+        class="station-heading__image"
+        [ngSrc]="image.src"
+        fill
+        sizes="100vw"
+        alt=""
+        priority
+        (error)="onHeaderImageError()"
+      />
     }
-    <app-dialog-header icon="train" [title]="displayName" description="Estação de metrô/trem" />
+    <app-dialog-header
+      icon="train"
+      [title]="displayName"
+      description="Estação de metrô/trem"
+    />
   </header>
+}
+
+@if (embedded()) {
+  <div class="station-header-actions">
+    @if (mapLink(); as mapTarget) {
+      <a mat-flat-button [routerLink]="mapTarget">
+        <mat-icon aria-hidden="true">map</mat-icon>
+        Ver no mapa
+      </a>
+    }
+    <ng-container [ngTemplateOutlet]="favoriteButton"></ng-container>
+  </div>
 }
 
 <mat-dialog-content class="station-content">
@@ -14,15 +53,10 @@
     <div class="station-restrooms">
       <mat-icon aria-hidden="true">wc</mat-icon>
       <p class="station-restrooms__copy">
-        <span class="station-restrooms__label">Sanitários</span>
-        <span class="station-restrooms__spoken-separator">: </span>
-        <span class="station-restrooms__separator" aria-hidden="true">·</span>
-        <span>{{ bathroom.detail }}</span>
-        @if (bathroom.note) {
-          <span class="station-restrooms__spoken-separator">. </span>
-          <span class="station-restrooms__separator" aria-hidden="true">·</span>
-          <span>{{ bathroom.note }}</span>
-        }
+        <span class="station-restrooms__label">Sanitários</span
+        >{{
+          " - " + bathroom.detail + (bathroom.note ? ", " + bathroom.note : "")
+        }}
       </p>
     </div>
   }
@@ -109,7 +143,9 @@
         <button
           type="button"
           class="train-line-chip"
-          [class.train-line-chip--selected]="selectedTrainLine()?.lineCode === line.lineCode"
+          [class.train-line-chip--selected]="
+            selectedTrainLine()?.lineCode === line.lineCode
+          "
           [attr.aria-pressed]="selectedTrainLine()?.lineCode === line.lineCode"
           (click)="selectTrainLine(line.lineCode)"
         >
@@ -117,7 +153,8 @@
             class="train-line-chip__badge"
             [style.background-color]="line.colorHex"
             [style.color]="getContrastColor(line.colorHex)"
-          >{{ line.badge }}</span>
+            >{{ line.badge }}</span
+          >
           <span>{{ line.name }}</span>
         </button>
       }
@@ -145,7 +182,9 @@
               <div
                 class="train-line-content"
                 role="region"
-                [attr.aria-label]="'Trens da linha ' + line.badge + ' ' + line.name"
+                [attr.aria-label]="
+                  'Trens da linha ' + line.badge + ' ' + line.name
+                "
               >
                 @if (line.station; as station) {
                   <app-next-train-card
@@ -187,7 +226,9 @@
               <div
                 class="train-line-content"
                 role="region"
-                [attr.aria-label]="'Composição da linha ' + line.badge + ' ' + line.name"
+                [attr.aria-label]="
+                  'Composição da linha ' + line.badge + ' ' + line.name
+                "
               >
                 @if (line.station; as station) {
                   <app-next-train-card
@@ -227,78 +268,94 @@
       </ng-template>
     </mat-tab>
 
-    <mat-tab>
-      <ng-template mat-tab-label>
-        <span class="station-tab-label">
-          <mat-icon aria-hidden="true">info</mat-icon>
-          <span class="station-tab-label__text">Informações</span>
-        </span>
-      </ng-template>
-      <ng-template matTabContent>
-        <div class="station-tab-panel station-information">
-          <header class="station-information__header">
-            @if (stationHealthServiceInfo().length > 0) {
-              <div class="station-health-services" role="group" aria-label="Serviços de prevenção">
-                <mat-icon aria-hidden="true">medical_services</mat-icon>
-                <div class="station-health-services__items">
-                  @for (service of stationHealthServiceInfo(); track service.id) {
-                    <p class="station-health-services__item">
-                      <span class="station-health-services__label">{{ service.label }}</span>
-                      @for (detail of service.details; track detail) {
-                        <span class="station-restrooms__spoken-separator">. </span>
-                        <span class="station-health-services__separator" aria-hidden="true">·</span>
-                        <span>{{ detail }}</span>
-                      }
-                    </p>
-                  }
+    @if (hasInformation()) {
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <span class="station-tab-label">
+            <mat-icon aria-hidden="true">info</mat-icon>
+            <span class="station-tab-label__text">Informações</span>
+          </span>
+        </ng-template>
+        <ng-template matTabContent>
+          <div class="station-tab-panel station-information">
+            <header class="station-information__header">
+              @if (stationHealthServiceInfo().length > 0) {
+                <div
+                  class="station-health-services"
+                  role="group"
+                  aria-label="Serviços de prevenção"
+                >
+                  <ul class="station-health-services__items">
+                    @for (
+                      service of stationHealthServiceInfo();
+                      track service.id
+                    ) {
+                      <li class="station-health-services__item">
+                        <mat-icon aria-hidden="true">{{
+                          service.icon
+                        }}</mat-icon>
+                        <div class="station-health-services__content">
+                          <span class="station-health-services__label">{{
+                            service.label
+                          }}</span>
+                          @if (service.details.length > 0) {
+                            <ul class="station-health-services__details">
+                              @for (detail of service.details; track detail) {
+                                <li>{{ detail }}</li>
+                              }
+                            </ul>
+                          }
+                        </div>
+                      </li>
+                    }
+                  </ul>
                 </div>
+              }
+            </header>
+
+            @if (data.stop.description?.trim()) {
+              <div class="station-information__body">
+                <p class="station-description">{{ data.stop.description }}</p>
               </div>
             }
-          </header>
 
-          @if (data.stop.description) {
-            <div class="station-information__body">
-              <p class="station-description">{{ data.stop.description }}</p>
-            </div>
-          } @else if (stationHealthServiceInfo().length === 0) {
-            <div class="station-tab-empty" role="status">
-              <mat-icon aria-hidden="true">info</mat-icon>
-              <span>Informações adicionais não disponíveis</span>
-            </div>
-          }
-        </div>
-      </ng-template>
-    </mat-tab>
+            @if (headerImage(); as image) {
+              <footer class="station-photo-credit">
+                Foto:
+                <a
+                  [href]="image.sourceUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  [attr.title]="image.title"
+                  >{{ image.author }}</a
+                >.&#32;
+                <span
+                  >Licença:&#32;
+                  @if (image.licenseUrl; as licenseUrl) {
+                    <a
+                      [href]="licenseUrl"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      >{{ image.license }}</a
+                    >
+                  } @else {
+                    {{ image.license }}
+                  }
+                </span>
+              </footer>
+            }
+          </div>
+        </ng-template>
+      </mat-tab>
+    }
   </mat-tab-group>
-
-  @if (headerImage(); as image) {
-    <footer class="station-photo-credit">
-      @if (image.label) { {{ image.label }} · }
-      Foto: <a [href]="image.sourceUrl" target="_blank" rel="noopener noreferrer"
-        [attr.title]="image.title">{{ image.author }}</a> ·
-      @if (image.licenseUrl; as licenseUrl) {
-        <a [href]="licenseUrl" target="_blank" rel="noopener noreferrer">{{ image.license }}</a>
-      } @else { {{ image.license }} }
-    </footer>
-  }
 </mat-dialog-content>
 
-<mat-dialog-actions align="end">
-  <button
-    mat-icon-button
-    class="favorite-button"
-    [class.favorited]="isFavorite()"
-    (click)="toggleFavorite()"
-    (mouseenter)="setFavoriteHover(true)"
-    (mouseleave)="setFavoriteHover(false)"
-    [disabled]="!canFavorite()"
-    [attr.aria-label]="
-      isFavorite() ? 'Remover dos favoritos' : 'Adicionar aos favoritos'
-    "
-  >
-    <mat-icon>{{ favoriteIcon() }}</mat-icon>
-  </button>
-  @if (!panelRef && !embedded()) {
-    <button mat-button (click)="close()">Fechar</button>
-  }
-</mat-dialog-actions>
+@if (!embedded()) {
+  <mat-dialog-actions align="end">
+    <ng-container [ngTemplateOutlet]="favoriteButton"></ng-container>
+    @if (!panelRef && !embedded()) {
+      <button mat-button (click)="close()">Fechar</button>
+    }
+  </mat-dialog-actions>
+}

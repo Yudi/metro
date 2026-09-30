@@ -92,7 +92,9 @@ export class BusVehiclePositionDto implements BusVehiclePositionContract {
   @ApiProperty({ description: 'Longitude' })
   longitude!: number;
 
-  @ApiProperty({ description: 'Timestamp when location was captured (ISO 8601)' })
+  @ApiProperty({
+    description: 'Timestamp when location was captured (ISO 8601)',
+  })
   recordedAt!: string;
 }
 

@@ -51,14 +51,14 @@
             </p>
           </div>
           @if (!embedded()) {
-          <a
-            mat-stroked-button
-            [routerLink]="cityPath('/mapa')"
-            [queryParams]="mapParams()"
-            (click)="close()"
-          >
-            <mat-icon>map</mat-icon>Ver no mapa
-          </a>
+            <a
+              mat-stroked-button
+              [routerLink]="cityPath('/mapa')"
+              [queryParams]="mapParams()"
+              (click)="close()"
+            >
+              <mat-icon>map</mat-icon>Ver no mapa
+            </a>
           }
         </header>
 
@@ -103,10 +103,9 @@
                 (selectionChange)="selectDate($event.value)"
               >
                 @for (day of days; track day.value) {
-                  <mat-option [value]="day.value"
-                    >{{ day.label }} ·
-                    {{ day.value | date: "dd/MM" : "UTC" }}</mat-option
-                  >
+                  <mat-option [value]="day.value">
+                    {{ day.label }} ({{ day.value | date: "dd/MM" : "UTC" }})
+                  </mat-option>
                 }
               </mat-select>
             </mat-form-field>
@@ -131,7 +130,7 @@
         <dl class="route-facts">
           <div>
             <dt>
-              Funcionamento ·
+              Funcionamento:
               {{
                 published()
                   ? dayLabels[publishedDayKind()]

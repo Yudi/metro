@@ -644,7 +644,7 @@ export function createMapStoryProviders(scenario: MapStoryScenario = {}) {
           component: BikeStationDialogComponent,
           data: { station: BIKE_STATION_FULL },
           title: BIKE_STATION_FULL.name,
-          summary: `${BIKE_STATION_FULL.numBikesAvailable} bicicletas · ${BIKE_STATION_FULL.numDocksAvailable} vagas livres`,
+          summary: `${BIKE_STATION_FULL.numBikesAvailable} bicicletas, ${BIKE_STATION_FULL.numDocksAvailable} vagas livres`,
           icon: 'pedal_bike',
           initialSnap: 'expanded',
         });

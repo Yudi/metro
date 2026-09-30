@@ -32,8 +32,9 @@ export class MapPanelRef<TData, TResult = unknown> {
   private currentCloseReason: MapPanelCloseReason | null = null;
   private currentData: TData;
   private componentInstance: unknown | null = null;
-  private updateInstanceData: ((instance: unknown, data: TData) => void) | null =
-    null;
+  private updateInstanceData:
+    | ((instance: unknown, data: TData) => void)
+    | null = null;
 
   readonly closeHandle: MapPanelCloseHandle = {
     close: (result) => this.close(result as TResult | undefined),
@@ -101,10 +102,7 @@ export class MapPanelRef<TData, TResult = unknown> {
   }
 
   /** @internal Completes the result stream when the panel is dismissed. */
-  complete(
-    result: TResult | undefined,
-    reason: MapPanelCloseReason,
-  ): void {
+  complete(result: TResult | undefined, reason: MapPanelCloseReason): void {
     if (this.closed) {
       return;
     }

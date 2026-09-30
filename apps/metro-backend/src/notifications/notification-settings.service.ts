@@ -668,7 +668,7 @@ export class NotificationSettingsService {
     const shortName =
       readNonEmptyString(candidate.busRouteShortName) ??
       readNonEmptyString(descriptorPresentation?.['busRouteShortName']) ??
-      target.label.split('·', 1)[0]?.trim();
+      target.label.split(' (', 1)[0]?.trim();
     const color =
       publicHexColor(candidate.busRouteColor) ??
       publicHexColor(descriptorPresentation?.['busRouteColor']);

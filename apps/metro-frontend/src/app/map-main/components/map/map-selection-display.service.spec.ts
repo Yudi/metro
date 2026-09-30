@@ -12,15 +12,20 @@ describe('MapSelectionDisplayService', () => {
   it('draws a selected rail station supplied by a deep link', () => {
     const addFeature = jest.fn();
     const createStopFeature = jest.fn(() => ({ getId: () => 'CONS' }));
-    const selectedStops = signal(new Map([
-      ['CONS', {
-        id: 'CONS',
-        name: 'Consolação',
-        latitude: -23.5571,
-        longitude: -46.6606,
-        isSubwayStation: true,
-      }],
-    ]));
+    const selectedStops = signal(
+      new Map([
+        [
+          'CONS',
+          {
+            id: 'CONS',
+            name: 'Consolação',
+            latitude: -23.5571,
+            longitude: -46.6606,
+            isSubwayStation: true,
+          },
+        ],
+      ]),
+    );
     TestBed.configureTestingModule({
       providers: [
         MapSelectionDisplayService,

@@ -59,7 +59,8 @@ export function countVehicles(cacheEntries: PositionCacheEntry[]): number {
       (entry.data.l?.reduce(
         (lineSum, line) => lineSum + (line.vs?.length ?? 0),
         0,
-      ) ?? 0) + (entry.data.positions?.length ?? 0),
+      ) ?? 0) +
+      (entry.data.positions?.length ?? 0),
     0,
   );
 }

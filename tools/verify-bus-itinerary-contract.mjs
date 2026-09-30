@@ -71,17 +71,21 @@ assert.deepEqual(Object.keys(position.fields), [
   "recordedAt",
 ]);
 const positionsExample = {
-  positions: [{
-    plate: "ABC1D23",
-    latitude: -23.55,
-    longitude: -46.63,
-    recordedAt: "2026-09-28T03:00:00.000Z",
-  }],
+  positions: [
+    {
+      plate: "ABC1D23",
+      latitude: -23.55,
+      longitude: -46.63,
+      recordedAt: "2026-09-28T03:00:00.000Z",
+    },
+  ],
 };
 assert.equal(positionsResponse.verify(positionsExample), null);
 assert.deepEqual(
   positionsResponse.toObject(
-    positionsResponse.decode(positionsResponse.encode(positionsExample).finish()),
+    positionsResponse.decode(
+      positionsResponse.encode(positionsExample).finish(),
+    ),
   ),
   positionsExample,
 );

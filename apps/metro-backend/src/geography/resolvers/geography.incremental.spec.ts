@@ -150,9 +150,9 @@ describe('geography incremental GraphQL delivery', () => {
         id: 'route-1',
         routeId: 'route-1',
       }),
-      getStopsForRoute: jest.fn().mockResolvedValue([
-        { id: 'stop-1', stopId: 'stop-1' },
-      ]),
+      getStopsForRoute: jest
+        .fn()
+        .mockResolvedValue([{ id: 'stop-1', stopId: 'stop-1' }]),
       getRouteShapesForRoute: jest.fn(() => shapesGate),
     };
     const geographyResolver = new GeographyResolver(
@@ -261,7 +261,10 @@ function attachGeographyResolvers(
     routeFullDataResolver.stops(parent as never);
 }
 
-function objectType(schema: GraphQLSchema, typeName: string): GraphQLObjectType {
+function objectType(
+  schema: GraphQLSchema,
+  typeName: string,
+): GraphQLObjectType {
   const type = schema.getType(typeName);
   if (!(type instanceof GraphQLObjectType)) {
     throw new Error(`Code-first schema is missing object type ${typeName}`);

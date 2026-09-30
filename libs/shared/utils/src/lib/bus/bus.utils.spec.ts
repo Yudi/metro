@@ -117,7 +117,7 @@ describe('bus identity and feed helpers', () => {
     const now = new Date('2026-09-05T12:00:00-03:00');
     expect(
       formatScheduledBusDepartureTime('2026-09-06T04:00:00-03:00', now),
-    ).toBe('04:00 · amanhã');
+    ).toBe('04:00, amanhã');
   });
 
   it('compares departure dates in America/Sao_Paulo across UTC midnight', () => {
@@ -127,7 +127,7 @@ describe('bus identity and feed helpers', () => {
       '23:00',
     );
     expect(formatScheduledBusDepartureTime('2026-09-08T03:00:00Z', now)).toBe(
-      '00:00 · amanhã',
+      '00:00, amanhã',
     );
   });
   it('does not add a weekday to today and identifies later service days', () => {
@@ -137,7 +137,7 @@ describe('bus identity and feed helpers', () => {
     ).toBe('14:30');
     expect(
       formatScheduledBusDepartureTime('2026-09-09T04:00:00-03:00', now),
-    ).toBe('04:00 · qua');
+    ).toBe('04:00, qua');
   });
 
   it('groups each route independently, sorts its departures and caps each group at five', () => {

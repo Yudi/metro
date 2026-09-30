@@ -57,9 +57,8 @@ class FixtureStop {
 @Injectable()
 class FixtureAuthGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
-    const gqlContext = GqlExecutionContext.create(context).getContext<
-      FixtureGraphQLContext
-    >();
+    const gqlContext =
+      GqlExecutionContext.create(context).getContext<FixtureGraphQLContext>();
     if (gqlContext.req.headers.authorization !== 'Bearer integration-token') {
       throw new UnauthorizedException('Authentication required');
     }
@@ -105,7 +104,9 @@ class FixtureResolver {
   }
 
   @Query(() => Int)
-  loaderInstanceIdForRequest(@Context() context: FixtureGraphQLContext): number {
+  loaderInstanceIdForRequest(
+    @Context() context: FixtureGraphQLContext,
+  ): number {
     return context.loaders.instanceId;
   }
 
@@ -390,7 +391,8 @@ describe('GraphQL Yoga NestJS integration', () => {
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
-        accept: 'multipart/mixed, application/graphql-response+json, application/json',
+        accept:
+          'multipart/mixed, application/graphql-response+json, application/json',
         'content-type': 'application/json',
         'x-request-id': 'yoga-integration-0001',
       },
@@ -422,9 +424,7 @@ describe('GraphQL Yoga NestJS integration', () => {
     const introspection = await executeJson(
       'query InspectSchema { __schema { queryType { name } } }',
     );
-    expect(introspection.body.errors?.[0]?.message).toContain(
-      'introspection',
-    );
+    expect(introspection.body.errors?.[0]?.message).toContain('introspection');
 
     const aliases = Array.from(
       { length: 51 },
@@ -501,9 +501,11 @@ describe('GraphQL Yoga NestJS integration', () => {
     const payloads = await parts.readAll();
     const patches = payloads.flatMap((payload) => payload.incremental ?? []);
     expect(patches.some((part) => part.items === null)).toBe(true);
-    expect(incrementalErrors(payloads).some(
-      (error) => error.message === 'Unexpected error.',
-    )).toBe(true);
+    expect(
+      incrementalErrors(payloads).some(
+        (error) => error.message === 'Unexpected error.',
+      ),
+    ).toBe(true);
     expect(JSON.stringify(payloads)).not.toContain('fixture-secret');
   });
 

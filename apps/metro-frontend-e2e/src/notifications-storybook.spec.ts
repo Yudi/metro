@@ -236,7 +236,7 @@ test('identifies an authorized device by browser and operating system', async ({
     '/iframe.html?id=pages-notifications--push-ativo&viewMode=story',
   );
   await expect(
-    page.getByText('Chrome · Windows', { exact: true }),
+    page.getByText('Chrome (Windows)', { exact: true }),
   ).toBeVisible();
 });
 

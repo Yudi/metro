@@ -15,6 +15,17 @@
   overflow-x: hidden;
 }
 
+:host.embedded .station-content > .station-restrooms,
+:host.embedded .station-content > .subway-lines-section {
+  margin-inline: 24px;
+}
+
+:host.embedded .station-content > .station-tabs {
+  box-sizing: border-box;
+  width: calc(100% - 48px);
+  margin-inline: 24px;
+}
+
 .station-heading {
   position: relative;
   isolation: isolate;
@@ -33,7 +44,15 @@
 .station-heading__image {
   object-fit: cover;
   object-position: center 45%;
-  mask-image: linear-gradient(to bottom, #000 35%, transparent 94%);
+  mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+}
+
+.station-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 24px 0;
 }
 
 .station-photo-credit {
@@ -81,40 +100,13 @@
   font-weight: 500;
 }
 
-.station-restrooms__separator {
-  margin: 0 4px;
-}
-
-.station-restrooms__spoken-separator {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
 .station-health-services {
-  display: grid;
-  grid-template-columns: 1.125rem minmax(0, 1fr);
-  align-items: start;
-  column-gap: 6px;
   min-width: 0;
   margin-top: 4px;
   color: var(--mat-sys-on-surface-variant, #666);
   font-size: 0.8125rem;
   font-weight: 400;
   line-height: 1.35;
-
-  mat-icon {
-    width: 1.125rem;
-    height: 1.125rem;
-    margin-top: 1px;
-    font-size: 1.125rem;
-  }
 }
 
 .station-health-services__items {
@@ -122,19 +114,86 @@
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .station-health-services__item {
+  display: grid;
+  grid-template-columns: 1.125rem minmax(0, 1fr);
+  align-items: start;
+  column-gap: 6px;
   min-width: 0;
   margin: 0;
   overflow-wrap: anywhere;
+
+  mat-icon {
+    width: 1.125rem;
+    height: 1.125rem;
+    margin-top: 1px;
+    color: var(--mat-sys-on-surface-variant);
+    font-size: 1.125rem;
+  }
+}
+
+.station-health-services__content {
+  min-width: 0;
 }
 
 .station-health-services__label {
+  display: block;
   color: var(--mat-sys-on-surface, #333);
   font-weight: 500;
 }
 
-.station-health-services__separator {
-  margin: 0 4px;
+.station-health-services__details {
+  margin: 0;
+  padding-inline-start: 1.25rem;
+}
+
+:host.embedded .station-health-services__items {
+  gap: 16px;
+}
+
+:host.embedded .station-health-services__item {
+  column-gap: 8px;
+}
+
+:host.embedded .station-health-services__content {
+  display: grid;
+  grid-template-columns: minmax(11rem, min(32%, 16rem)) minmax(0, 1fr);
+  align-items: start;
+  gap: 8px 24px;
+}
+
+:host.embedded .station-health-services__details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: 6px 24px;
+}
+
+@media (max-width: 600px) {
+  .station-header-actions {
+    padding-inline: 16px;
+  }
+
+  :host.embedded .station-content > .station-restrooms,
+  :host.embedded .station-content > .subway-lines-section {
+    margin-inline: 16px;
+  }
+
+  :host.embedded .station-content > .station-tabs {
+    width: calc(100% - 32px);
+    margin-inline: 16px;
+  }
+
+  :host.embedded .station-health-services__content {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+
+  :host.embedded .station-health-services__details {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

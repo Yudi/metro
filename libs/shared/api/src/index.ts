@@ -6,6 +6,9 @@ export * from './lib/logging/error-tracking.service';
 export * from './lib/rail/incident-history.service';
 export * from './lib/http/graphql-query-timeout.interceptor';
 export * from './lib/http/incremental-graphql.client';
-export type { IncrementalGraphqlResult, GraphqlResponseError } from './lib/http/graphql-incremental-response';
+export type {
+  IncrementalGraphqlResult,
+  GraphqlResponseError,
+} from './lib/http/graphql-incremental-response';
 export * from './lib/favorites/favorites.service';
 export * from './lib/notifications/notification-api.service';

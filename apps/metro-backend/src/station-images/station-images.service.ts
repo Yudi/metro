@@ -76,7 +76,9 @@ export class StationImagesService implements OnModuleDestroy {
     };
     const body = Buffer.from(JSON.stringify(manifest));
     if (body.byteLength > MAX_MANIFEST_BYTES) {
-      throw new BadGatewayException('Station image metadata exceeds the allowed size');
+      throw new BadGatewayException(
+        'Station image metadata exceeds the allowed size',
+      );
     }
     try {
       parseStationImageManifest(body.toString('utf8'));

@@ -78,7 +78,7 @@ describe('NotificationTriggerEditorComponent', () => {
     component.selectedTargets.set([
       {
         ...station,
-        label: 'Pinheiros · Linha 9 - Esmeralda',
+        label: 'Pinheiros (Linha 9 - Esmeralda)',
         railLineCode: 9,
       },
       {

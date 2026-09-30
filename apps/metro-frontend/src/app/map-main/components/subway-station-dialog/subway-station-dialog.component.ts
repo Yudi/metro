@@ -17,6 +17,7 @@ import {
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTabsModule } from '@angular/material/tabs';
+import { RouterLink, UrlTree } from '@angular/router';
 import { BusStopGraphQL } from '../../geography/geography-graphql.service';
 import { StationNameService } from '../../geography/station-name.service';
 import {
@@ -49,11 +50,7 @@ import {
 import { DialogHeaderComponent } from '../../../shared/components/dialog-header/dialog-header.component';
 import { NextTrainCardComponent } from '../../../next-train/components/next-train-card/next-train-card.component';
 import { NextTrainWebsocketService } from '../../../next-train/next-train-websocket.service';
-import {
-  DatePipe,
-  NgOptimizedImage,
-  NgTemplateOutlet,
-} from '@angular/common';
+import { DatePipe, NgOptimizedImage, NgTemplateOutlet } from '@angular/common';
 import {
   resolveStationTrainCompositionViews,
   TRAIN_PLATFORM_CONFIGS,
@@ -89,6 +86,7 @@ interface TrainLineOption {
     MatButtonModule,
     MatIconModule,
     MatTabsModule,
+    RouterLink,
     DialogHeaderComponent,
     NextTrainCardComponent,
     TrainCompositionComponent,
@@ -110,6 +108,7 @@ interface TrainLineOption {
 })
 export class SubwayStationDialogComponent implements OnInit, OnDestroy {
   readonly embedded = input(false);
+  readonly mapLink = input<UrlTree | null>(null);
   protected readonly panelRef = inject(MAP_PANEL_REF, { optional: true });
   private readonly dialogRef = inject(
     MatDialogRef<SubwayStationDialogComponent>,
@@ -122,10 +121,20 @@ export class SubwayStationDialogComponent implements OnInit, OnDestroy {
   private nextTrainService = inject(NextTrainWebsocketService);
   private favoritesService = inject(FavoritesService);
   protected readonly stationImages = inject(StationImagesService);
-  readonly headerImage = computed(() => this.stationImages.image(
-    this.displayName,
-    this.selectedTrainLineCode() ?? this.selectedTrainLine()?.lineCode ?? this.lineCodes()[0],
-  ));
+  readonly headerImage = computed(() =>
+    this.stationImages.image(
+      this.displayName,
+      this.selectedTrainLineCode() ??
+        this.selectedTrainLine()?.lineCode ??
+        this.lineCodes()[0],
+    ),
+  );
+  readonly hasInformation = computed(
+    () =>
+      Boolean(this.data.stop.description?.trim()) ||
+      this.stationHealthServiceInfo().length > 0 ||
+      this.headerImage() !== undefined,
+  );
 
   onHeaderImageError(): void {
     const image = this.headerImage();
@@ -273,6 +282,11 @@ export class SubwayStationDialogComponent implements OnInit, OnDestroy {
           [StationHealthServiceType.PreventionCenter]:
             'Estação Prevenção Jorge Beloqui',
         } satisfies Record<StationHealthServiceType, string>;
+        const icons = {
+          [StationHealthServiceType.PrepPepMachine]: 'pill',
+          [StationHealthServiceType.Condoms]: 'heart_smile',
+          [StationHealthServiceType.PreventionCenter]: 'medical_services',
+        } satisfies Record<StationHealthServiceType, string>;
 
         const details = [
           ...(service.type === StationHealthServiceType.PrepPepMachine
@@ -289,6 +303,7 @@ export class SubwayStationDialogComponent implements OnInit, OnDestroy {
         return {
           id: `${service.type}-${service.stationName}`,
           label: labels[service.type],
+          icon: icons[service.type],
           details,
         };
       },

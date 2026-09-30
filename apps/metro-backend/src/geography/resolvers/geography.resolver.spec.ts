@@ -143,7 +143,8 @@ describe('GeographyResolver full-data selections', () => {
   });
 
   it('loads deferred route collections independently', async () => {
-    let releaseShapes: (shapes: { shapeId: string }[]) => void = () => undefined;
+    let releaseShapes: (shapes: { shapeId: string }[]) => void = () =>
+      undefined;
     const shapesGate = new Promise<{ shapeId: string }[]>((resolve) => {
       releaseShapes = resolve;
     });

@@ -1,9 +1,5 @@
 import { provideRouter } from '@angular/router';
-import {
-  applicationConfig,
-  Meta,
-  StoryObj,
-} from '@storybook/angular';
+import { applicationConfig, Meta, StoryObj } from '@storybook/angular';
 import { userEvent, within } from 'storybook/test';
 import { MapHeaderComponent } from './map-header.component';
 

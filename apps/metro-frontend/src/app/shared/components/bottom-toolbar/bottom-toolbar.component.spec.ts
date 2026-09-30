@@ -28,15 +28,22 @@ describe('BottomToolbarComponent', () => {
   });
 
   it('slides without changing its reserved height and removes hidden navigation from focus', () => {
-    const toolbar: HTMLElement = fixture.nativeElement.querySelector('.bottom-toolbar');
-    const reservedHeight = document.documentElement.style.getPropertyValue('--app-bottom-toolbar-height');
+    const toolbar: HTMLElement =
+      fixture.nativeElement.querySelector('.bottom-toolbar');
+    const reservedHeight = document.documentElement.style.getPropertyValue(
+      '--app-bottom-toolbar-height',
+    );
     fixture.componentRef.setInput('hideProgress', 0.5);
     fixture.componentRef.setInput('dragging', true);
     fixture.detectChanges();
     expect(toolbar.style.transform).toBe('translateY(50%)');
     expect(toolbar.classList.contains('is-dragging')).toBe(true);
     expect(toolbar.hasAttribute('inert')).toBe(false);
-    expect(document.documentElement.style.getPropertyValue('--app-bottom-toolbar-height')).toBe(reservedHeight);
+    expect(
+      document.documentElement.style.getPropertyValue(
+        '--app-bottom-toolbar-height',
+      ),
+    ).toBe(reservedHeight);
 
     fixture.componentRef.setInput('hideProgress', 1);
     fixture.componentRef.setInput('dragging', false);
@@ -48,5 +55,4 @@ describe('BottomToolbarComponent', () => {
     fixture.detectChanges();
     expect(toolbar.hasAttribute('inert')).toBe(false);
   });
-
 });

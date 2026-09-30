@@ -388,11 +388,13 @@
           @for (group of nextTrainGroups(); track group.key) { @if
           (group.stationName === station.name) {
           <div class="train-box">
-            <strong>{{ formatLineLabel(group.line) }} · próximos trens</strong>
+            <strong
+              >Próximos trens da linha {{ formatLineLabel(group.line) }}</strong
+            >
             @if (group.trains.length === 0) { @if ( !group.operationClosed &&
             !group.outOfSchedule && group.scheduledServices?.length ) {
             <small class="rail-schedule-note">
-              Programação · sem dados em tempo real
+              Horários programados (sem dados em tempo real)
             </small>
             @for (service of group.scheduledServices; track
             service.destinationCode) {

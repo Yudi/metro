@@ -5,11 +5,11 @@
     class="card-header"
     [class.card-header--status-only]="displayMode() === 'schedule'"
   >
-    @if (displayMode() === 'composition') {
+    @if (displayMode() === "composition") {
       <mat-icon>train</mat-icon>
       <span class="header-title">Composição e ocupação</span>
     } @else if (
-      displayMode() === 'combined' && showLineName() && lineInfo();
+      displayMode() === "combined" && showLineName() && lineInfo();
       as info
     ) {
       <div class="line-badge" [style.background-color]="info.colorHex">
@@ -19,12 +19,12 @@
       <span class="header-title">
         {{ info.fullName }}
       </span>
-    } @else if (displayMode() === 'combined') {
+    } @else if (displayMode() === "combined") {
       <mat-icon>schedule</mat-icon>
       <span class="header-title"> Próximos trens </span>
     }
 
-    @if (displayMode() === 'composition' && hasLiveOccupancy()) {
+    @if (displayMode() === "composition" && hasLiveOccupancy()) {
       <span class="live-indicator">
         <span
           class="live-dot"
@@ -32,17 +32,25 @@
         ></span>
         Ocupação em tempo real
       </span>
-    } @else if (displayMode() !== 'composition' && state.showSchedule) {
+    } @else if (displayMode() !== "composition" && state.showSchedule) {
       <span
         class="schedule-indicator"
-        aria-label="Programação, sem dados em tempo real"
-        matTooltip="Horários previstos pela programação, sem dados em tempo real"
+        [attr.aria-label]="
+          displayMode() === 'schedule'
+            ? 'Programado'
+            : 'Programação, sem dados em tempo real'
+        "
+        [matTooltip]="
+          displayMode() === 'schedule'
+            ? 'Programado'
+            : 'Horários previstos pela programação, sem dados em tempo real'
+        "
       >
         <mat-icon>event</mat-icon>
-        Programação
+        {{ displayMode() === "schedule" ? "Programado" : "Programação" }}
       </span>
     } @else if (
-      displayMode() !== 'composition' &&
+      displayMode() !== "composition" &&
       state.hasLiveTrains &&
       connected() &&
       !state.operationClosed
@@ -102,7 +110,7 @@
             }
           </div>
 
-          @if (displayMode() === 'schedule') {
+          @if (displayMode() === "schedule") {
             @if (
               direction.nextDisplay ||
               (direction.followingDisplays?.length ?? 0) > 0
@@ -137,7 +145,7 @@
               </table>
             }
           } @else if (
-            displayMode() !== 'composition' && direction.nextDisplay;
+            displayMode() !== "composition" && direction.nextDisplay;
             as next
           ) {
             <div
@@ -191,7 +199,7 @@
           }
 
           @if (
-            displayMode() !== 'schedule' && direction.composition;
+            displayMode() !== "schedule" && direction.composition;
             as composition
           ) {
             <lib-train-composition
@@ -205,7 +213,7 @@
   }
 
   @if (
-    displayMode() === 'composition' &&
+    displayMode() === "composition" &&
     !hasComposition() &&
     !state.processing &&
     !state.loading
@@ -224,7 +232,7 @@
   }
 
   @if (
-    displayMode() !== 'composition' &&
+    displayMode() !== "composition" &&
     !state.hasLiveTrains &&
     !state.showSchedule &&
     !state.processing &&

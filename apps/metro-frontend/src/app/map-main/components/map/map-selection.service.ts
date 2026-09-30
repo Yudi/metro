@@ -262,7 +262,8 @@ export class MapSelectionService {
   }
 
   removeStopFromSelection(stopId: string): void {
-    for (const [requestedStopId, pendingRequest] of this.pendingStopSelections) {
+    for (const [requestedStopId, pendingRequest] of this
+      .pendingStopSelections) {
       if (
         requestedStopId === stopId ||
         pendingRequest.canonicalStopId === stopId
@@ -348,8 +349,7 @@ export class MapSelectionService {
     if (
       isArtespRoute({
         routeId,
-        sourceAgency:
-          'sourceAgency' in route ? route.sourceAgency : undefined,
+        sourceAgency: 'sourceAgency' in route ? route.sourceAgency : undefined,
       })
     ) {
       this.realtimeService.subscribeToRoute(routeId);

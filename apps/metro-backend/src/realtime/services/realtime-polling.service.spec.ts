@@ -73,14 +73,14 @@ describe('RealtimePollingService ARTESP positions', () => {
       await waitUntil(() =>
         service.getVehiclePositionsCache().has(`${sptransRouteName}-dir1`),
       );
-      expect(service.getVehiclePositionsCache().has(`${sptransRouteName}-dir1`)).toBe(
-        true,
-      );
+      expect(
+        service.getVehiclePositionsCache().has(`${sptransRouteName}-dir1`),
+      ).toBe(true);
       expect(api.getAllPositions).toHaveBeenCalled();
       expect(requestedRouteCodes).toEqual([routeLabel]);
-      expect(
-        service.getRouteToDirectionsIndex().has(artespRouteId),
-      ).toBe(false);
+      expect(service.getRouteToDirectionsIndex().has(artespRouteId)).toBe(
+        false,
+      );
     } finally {
       resolvePositions([]);
       await service.onModuleDestroy();
@@ -106,7 +106,9 @@ describe('RealtimePollingService ARTESP positions', () => {
       resolvePositions([samplePosition]);
       await service.onModuleDestroy();
 
-      expect(service.getRouteToDirectionsIndex().has(artespRouteId)).toBe(false);
+      expect(service.getRouteToDirectionsIndex().has(artespRouteId)).toBe(
+        false,
+      );
       expect(
         Array.from(service.getVehiclePositionsCache().values()).some(
           ({ data }) => data.positions?.length,
@@ -133,8 +135,8 @@ describe('RealtimePollingService ARTESP positions', () => {
         const key = keys ? Array.from(keys)[0] : undefined;
         return (
           key !== undefined &&
-          (service.getVehiclePositionsCache().get(key)?.data.positions?.length ??
-            0) > 0
+          (service.getVehiclePositionsCache().get(key)?.data.positions
+            ?.length ?? 0) > 0
         );
       });
       await new Promise<void>((resolve) => setTimeout(resolve, 0));
@@ -144,9 +146,11 @@ describe('RealtimePollingService ARTESP positions', () => {
       const keys = service.getRouteToDirectionsIndex().get(artespRouteId);
       const key = keys ? Array.from(keys)[0] : undefined;
       if (!key) throw new Error('ARTESP snapshot cache key was not populated');
-      expect(
-        service.getVehiclePositionsCache().get(key)?.data,
-      ).toMatchObject({ l: [], positions: [], routeLabel });
+      expect(service.getVehiclePositionsCache().get(key)?.data).toMatchObject({
+        l: [],
+        positions: [],
+        routeLabel,
+      });
     } finally {
       await service.onModuleDestroy();
     }

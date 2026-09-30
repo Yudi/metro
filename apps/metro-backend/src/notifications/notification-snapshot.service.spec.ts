@@ -244,7 +244,7 @@ describe('NotificationSnapshotService', () => {
     );
 
     expect(snapshot).toMatchObject({
-      title: 'Intervalo médio · Luz',
+      title: 'Intervalo médio em Luz',
       normal: true,
     });
     expect(setup.headway.getHeadway).toHaveBeenCalledWith('L10', 'LUZ');
@@ -377,7 +377,7 @@ describe('NotificationSnapshotService', () => {
       NOW,
     );
 
-    expect(snapshot?.body).toContain('8000-10 · Terminal A às 09:10');
+    expect(snapshot?.body).toContain('8000-10 para Terminal A às 09:10');
     expect(setup.routeStopMapping.getApiStopCode).toHaveBeenCalledWith(
       'current-stop',
     );

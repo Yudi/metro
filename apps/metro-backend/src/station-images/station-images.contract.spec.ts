@@ -59,6 +59,8 @@ describe('station image metadata contract', () => {
       'station-images/metro/luz-l4.avif',
     );
     expect(() => buildStationImageObjectKey('../metro', 'luz.avif')).toThrow();
-    expect(() => buildStationImageObjectKey('metro', '../secret.avif')).toThrow();
+    expect(() =>
+      buildStationImageObjectKey('metro', '../secret.avif'),
+    ).toThrow();
   });
 });

@@ -4,7 +4,13 @@ import {
   applicationConfig,
   moduleMetadata,
 } from '@storybook/angular';
-import { ChangeDetectionStrategy, Component, afterNextRender, inject, input } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  afterNextRender,
+  inject,
+  input,
+} from '@angular/core';
 import { Router, RouterOutlet } from '@angular/router';
 import { userEvent, waitFor, within } from 'storybook/test';
 import { MapMainComponent } from '../../map-main.component';
@@ -13,11 +19,14 @@ import {
   MAP_STORY_ROUTER_PROVIDERS,
   STORY_MAP_DEFAULT_STATION,
 } from './map.stories.fixtures';
-import { ROUTE_477A, ROUTE_ARTESP_001, PINHEIROS_BUS_STOP, BIKE_STATION_FULL } from '@metro/storybook-mocks';
-import type { SelectedRoute } from './map.types';
 import {
-  PARAISO,
-} from '../subway-station-dialog/subway-station-dialog.stories.fixtures';
+  ROUTE_477A,
+  ROUTE_ARTESP_001,
+  PINHEIROS_BUS_STOP,
+  BIKE_STATION_FULL,
+} from '@metro/storybook-mocks';
+import type { SelectedRoute } from './map.types';
+import { PARAISO } from '../subway-station-dialog/subway-station-dialog.stories.fixtures';
 
 const LONG_STATION_NAME_FIXTURE = {
   ...PARAISO,
@@ -43,7 +52,8 @@ const SORTED_AGENCY_LINES_FIXTURE = {
   imports: [RouterOutlet],
   template: '<router-outlet />',
   host: { '[class.map-story-dark]': 'dark()' },
-  styles: ':host { display: block; } :host(.map-story-dark) { color-scheme: dark; }',
+  styles:
+    ':host { display: block; } :host(.map-story-dark) { color-scheme: dark; }',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 class MapStoryHostComponent {
@@ -89,7 +99,9 @@ function renderMapStoryHost(dark = false) {
   };
 }
 
-function selectedRoute(route: typeof ROUTE_477A | typeof ROUTE_ARTESP_001): SelectedRoute {
+function selectedRoute(
+  route: typeof ROUTE_477A | typeof ROUTE_ARTESP_001,
+): SelectedRoute {
   return {
     id: route.routeId,
     shortName: route.shortName,
@@ -139,11 +151,23 @@ async function verifyMapShell(canvasElement: HTMLElement): Promise<void> {
     }
     const panel = document.querySelector<HTMLElement>('.map-panel');
     await waitFor(() => {
-      if (!panel || Math.abs(panel.getBoundingClientRect().bottom - tabs.getBoundingClientRect().top) > 1) {
-        throw new Error('The panel and mobile city tabs do not share a moving edge');
+      if (
+        !panel ||
+        Math.abs(
+          panel.getBoundingClientRect().bottom -
+            tabs.getBoundingClientRect().top,
+        ) > 1
+      ) {
+        throw new Error(
+          'The panel and mobile city tabs do not share a moving edge',
+        );
       }
-      if (Math.abs(map.getBoundingClientRect().bottom - window.innerHeight) > 1) {
-        throw new Error('The map viewport should remain stable behind the sliding tabs');
+      if (
+        Math.abs(map.getBoundingClientRect().bottom - window.innerHeight) > 1
+      ) {
+        throw new Error(
+          'The map viewport should remain stable behind the sliding tabs',
+        );
       }
     });
   }
@@ -173,12 +197,10 @@ export const CityOverview: Story = {
     await verifyMapShell(canvasElement);
 
     const canvas = within(canvasElement);
-    for (const label of [
-      'Pesquisar no mapa',
-      'Camadas',
-      'Opções',
-    ]) {
-      if (!canvasElement.ownerDocument.querySelector(`[aria-label="${label}"]`)) {
+    for (const label of ['Pesquisar no mapa', 'Camadas', 'Opções']) {
+      if (
+        !canvasElement.ownerDocument.querySelector(`[aria-label="${label}"]`)
+      ) {
         throw new Error(`Expected map control "${label}"`);
       }
     }
@@ -211,7 +233,9 @@ export const CityOverview: Story = {
     }) as HTMLInputElement;
     await userEvent.click(stations);
     await userEvent.click(stations);
-    await userEvent.click(canvas.getByRole('button', { name: 'Fechar detalhes' }));
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Fechar detalhes' }),
+    );
     await waitFor(() => {
       if (page.queryByRole('region', { name: /Detalhes no mapa/ })) {
         throw new Error('The layer panel is still open');
@@ -222,7 +246,10 @@ export const CityOverview: Story = {
 
 export const RoutesSelected: Story = {
   decorators: withMapState({
-    selectedRoutes: [selectedRoute(ROUTE_477A), selectedRoute(ROUTE_ARTESP_001)],
+    selectedRoutes: [
+      selectedRoute(ROUTE_477A),
+      selectedRoute(ROUTE_ARTESP_001),
+    ],
   }),
   parameters: {
     docs: {
@@ -323,7 +350,9 @@ export const StationDetailsCompact: Story = {
     await verifyMapShell(canvasElement);
     const panel = canvasElement.querySelector<HTMLElement>('.map-panel');
     if (panel?.dataset['snap'] !== 'compact') {
-      throw new Error('Station details should start in the compact panel state');
+      throw new Error(
+        'Station details should start in the compact panel state',
+      );
     }
     if (!panel.getAttribute('aria-label')?.includes(PARAISO.name)) {
       throw new Error('The selected station name is missing from the panel');
@@ -351,13 +380,19 @@ export const StationDetailsSortedAgencyGroups: Story = {
 export const BusStopDetails: Story = {
   decorators: withMapState({ busStopDetail: true }),
   parameters: {
-    docs: { description: { story: 'Shows a bus stop on the map with its details panel expanded.' } },
+    docs: {
+      description: {
+        story: 'Shows a bus stop on the map with its details panel expanded.',
+      },
+    },
   },
   play: async ({ canvasElement }) => {
     await verifyMapShell(canvasElement);
     const panel = canvasElement.querySelector<HTMLElement>('.map-panel');
-    if (panel?.dataset['snap'] !== 'expanded' ||
-        !panel.getAttribute('aria-label')?.includes(PINHEIROS_BUS_STOP.name)) {
+    if (
+      panel?.dataset['snap'] !== 'expanded' ||
+      !panel.getAttribute('aria-label')?.includes(PINHEIROS_BUS_STOP.name)
+    ) {
       throw new Error('The bus stop details panel is missing');
     }
   },
@@ -366,13 +401,19 @@ export const BusStopDetails: Story = {
 export const BikeStationDetails: Story = {
   decorators: withMapState({ bikeStationDetail: true }),
   parameters: {
-    docs: { description: { story: 'Shows bike stations on the map with one station selected.' } },
+    docs: {
+      description: {
+        story: 'Shows bike stations on the map with one station selected.',
+      },
+    },
   },
   play: async ({ canvasElement }) => {
     await verifyMapShell(canvasElement);
     const panel = canvasElement.querySelector<HTMLElement>('.map-panel');
-    if (panel?.dataset['snap'] !== 'expanded' ||
-        !panel.getAttribute('aria-label')?.includes(BIKE_STATION_FULL.name)) {
+    if (
+      panel?.dataset['snap'] !== 'expanded' ||
+      !panel.getAttribute('aria-label')?.includes(BIKE_STATION_FULL.name)
+    ) {
       throw new Error('The bike station details panel is missing');
     }
   },
@@ -429,9 +470,8 @@ export const DarkStationDetails: Story = {
   },
   play: async ({ canvasElement }) => {
     await verifyMapShell(canvasElement);
-    const darkHost = canvasElement.querySelector<HTMLElement>(
-      '.map-story-dark',
-    );
+    const darkHost =
+      canvasElement.querySelector<HTMLElement>('.map-story-dark');
     if (
       !darkHost ||
       canvasElement.ownerDocument.defaultView?.getComputedStyle(darkHost)
@@ -517,7 +557,8 @@ export const StationDetailsHalf: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'On mobile, scroll or swipe the visible content to resize the sheet. Taps remain available at half height; expanded content scrolls normally. The city tabs follow expansion without resizing the map.',
+        story:
+          'On mobile, scroll or swipe the visible content to resize the sheet. Taps remain available at half height; expanded content scrolls normally. The city tabs follow expansion without resizing the map.',
       },
     },
   },

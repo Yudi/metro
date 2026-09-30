@@ -177,7 +177,7 @@ export class StopArrivalsComponent {
       const route = this.getScheduledDepartureRoute(departure);
       const [timeLabel, dayLabel] = this.formatScheduledDepartureTime(
         departure.departureTime,
-      ).split(' · ');
+      ).split(', ');
       return {
         ...departure,
         key: this.getScheduledDepartureKey(departure),

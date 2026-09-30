@@ -35,9 +35,7 @@ export function createGraphQLYogaConfig(
 ): YogaDriverConfig {
   return {
     path: '/api/graphql',
-    autoSchemaFile: isProduction
-      ? true
-      : join(__dirname, 'schema.gql'),
+    autoSchemaFile: isProduction ? true : join(__dirname, 'schema.gql'),
     sortSchema: true,
     graphiql: !isProduction,
     cors: false,

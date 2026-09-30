@@ -46,8 +46,7 @@ export class LayerSettingsDialogComponent {
   private mapService = inject(MapService);
   protected readonly panelRef = inject(MAP_PANEL_REF, { optional: true });
   private readonly dialogRef =
-    this.panelRef ??
-    inject(MatDialogRef<LayerSettingsDialogComponent>);
+    this.panelRef ?? inject(MatDialogRef<LayerSettingsDialogComponent>);
   private logger = inject(LoggerService);
   private layerService = this.mapService.getLayerService();
   private vectorTileLayerService = this.mapService.getVectorTileLayerService();

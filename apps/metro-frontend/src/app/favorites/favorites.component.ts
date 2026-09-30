@@ -373,7 +373,7 @@ export class FavoritesComponent {
         },
   ): string | null {
     if (route.fares && route.fares.length > 0) {
-      return route.fares.map((fare) => formatBusFare(fare)).join(' · ');
+      return route.fares.map((fare) => formatBusFare(fare)).join(', ');
     }
 
     return isArtespRoute(route) ? 'Tarifa não informada' : null;

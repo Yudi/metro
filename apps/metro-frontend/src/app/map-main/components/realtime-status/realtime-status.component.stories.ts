@@ -1,7 +1,10 @@
 import { signal } from '@angular/core';
 import { Meta, StoryObj, applicationConfig } from '@storybook/angular';
 import { OLHOVIVO_POLL_INTERVAL_MS } from '@metro/shared/utils';
-import { MapRealtimeStatusService, MapRealtimeState } from '../../realtime/map-realtime-status.service';
+import {
+  MapRealtimeStatusService,
+  MapRealtimeState,
+} from '../../realtime/map-realtime-status.service';
 import { RealtimeWebsocketService } from '../../realtime/realtime-websocket.service';
 import { RealtimeStatusComponent } from './realtime-status.component';
 
@@ -55,7 +58,4 @@ export const Offline: Story = statusStory(
   'Acompanhamento em tempo real desconectado\nÔnibus: 1 rota (477A)',
 );
 
-export const Idle: Story = statusStory(
-  'idle',
-  'Aguardando conexão',
-);
+export const Idle: Story = statusStory('idle', 'Aguardando conexão');

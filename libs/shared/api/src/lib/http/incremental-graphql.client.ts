@@ -35,7 +35,8 @@ export class IncrementalGraphqlClient {
         { query, variables },
         {
           headers: {
-            Accept: 'multipart/mixed, application/graphql-response+json, application/json',
+            Accept:
+              'multipart/mixed, application/graphql-response+json, application/json',
           },
           observe: 'events',
           responseType: 'text',
@@ -53,9 +54,8 @@ export class IncrementalGraphqlClient {
             ) {
               const contentType = event.headers.get('content-type') ?? '';
               if (/^multipart\/mixed\b/i.test(contentType) && !parser) {
-                const boundary = /\bboundary\s*=\s*(?:"([^"]+)"|([^;\s]+))/i.exec(
-                  contentType,
-                );
+                const boundary =
+                  /\bboundary\s*=\s*(?:"([^"]+)"|([^;\s]+))/i.exec(contentType);
                 if (!boundary) {
                   throw new Error('Missing GraphQL multipart boundary');
                 }

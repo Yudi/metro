@@ -63,11 +63,11 @@ export function getScheduledDepartureTimeParts(departureTime: string): {
   day: string | null;
 } {
   const label = formatScheduledDepartureTime(departureTime);
-  const separatorIndex = label.indexOf(' · ');
+  const separatorIndex = label.indexOf(', ');
   return separatorIndex >= 0
     ? {
         time: label.slice(0, separatorIndex),
-        day: label.slice(separatorIndex + 3),
+        day: label.slice(separatorIndex + 2),
       }
     : { time: label, day: null };
 }
@@ -94,7 +94,7 @@ export function routeFareLabel(
   route: BusRouteInsight | BusRouteGraphQL,
 ): string | null {
   if (route.fares && route.fares.length > 0) {
-    return route.fares.map((fare) => formatBusFare(fare)).join(' · ');
+    return route.fares.map((fare) => formatBusFare(fare)).join(', ');
   }
 
   return isArtespRoute(route) ? 'Tarifa não informada' : null;

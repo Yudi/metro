@@ -71,7 +71,9 @@ describe('OmniboxDialogComponent', () => {
     component.setQuery('paulis');
     component.focusSearch();
 
-    const input = fixture.nativeElement.querySelector('input') as HTMLInputElement;
+    const input = fixture.nativeElement.querySelector(
+      'input',
+    ) as HTMLInputElement;
     expect(document.activeElement).toBe(input);
     expect(input.value).toBe('paulis');
     input.value += 'ta';
@@ -80,7 +82,10 @@ describe('OmniboxDialogComponent', () => {
     expect(input.value).toBe('paulista');
     expect(component.query()).toBe('paulista');
     jest.advanceTimersByTime(250);
-    expect(search.search).toHaveBeenLastCalledWith('paulista', expect.any(Array));
+    expect(search.search).toHaveBeenLastCalledWith(
+      'paulista',
+      expect.any(Array),
+    );
   });
 
   it('keeps one visible filter selected when the active option is clicked again', async () => {
@@ -104,14 +109,17 @@ describe('OmniboxDialogComponent', () => {
 
   it('keeps server relevance order and navigates to deep-linked detail pages', () => {
     searchFor('paulista');
-    const navigate = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    const navigate = jest
+      .spyOn(TestBed.inject(Router), 'navigate')
+      .mockResolvedValue(true);
     expect(component.state().results.map((item) => item.id)).toEqual([
       '477A-10',
       '340015325',
       'CONS',
       'bike-35',
     ]);
-    for (const result of component.state().results) component.selectResult(result);
+    for (const result of component.state().results)
+      component.selectResult(result);
     expect(navigate).toHaveBeenCalledWith(
       ['/sp/busca', 'bus-route', '477A-10'],
       { queryParams: expect.objectContaining({ q: 'paulista' }) },
@@ -122,11 +130,21 @@ describe('OmniboxDialogComponent', () => {
     );
     expect(navigate).toHaveBeenCalledWith(
       ['/sp/busca', 'rail-station', 'CONS'],
-      { queryParams: expect.objectContaining({ q: 'paulista', name: 'Consolação' }) },
+      {
+        queryParams: expect.objectContaining({
+          q: 'paulista',
+          name: 'Consolação',
+        }),
+      },
     );
     expect(navigate).toHaveBeenCalledWith(
       ['/sp/busca', 'bike-station', 'bike-35'],
-      { queryParams: expect.objectContaining({ q: 'paulista', name: 'Estação 35 · Jardim Europa' }) },
+      {
+        queryParams: expect.objectContaining({
+          q: 'paulista',
+          name: 'Estação 35 (Jardim Europa)',
+        }),
+      },
     );
   });
 
@@ -196,5 +214,4 @@ describe('OmniboxDialogComponent', () => {
     expect(component.nearby()).toBe(false);
     expect(component.query()).toBe('paulista');
   });
-
 });

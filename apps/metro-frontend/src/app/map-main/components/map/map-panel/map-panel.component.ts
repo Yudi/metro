@@ -22,7 +22,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MapPanelService, MapPanelSnap } from './map-panel.service';
 import { MAP_PANEL_REF } from './map-panel-ref';
-import { PhotoHandleTone, samplePhotoHandleTone } from './map-panel-photo-contrast';
+import {
+  PhotoHandleTone,
+  samplePhotoHandleTone,
+} from './map-panel-photo-contrast';
 import type { StationHeaderImage } from '../../subway-station-dialog/station-images';
 
 interface FavoritablePanelContent {
@@ -34,10 +37,16 @@ interface FavoritablePanelContent {
 }
 
 function isFavoritable(value: unknown): value is FavoritablePanelContent {
-  return !!value && typeof value === 'object' &&
-    'isFavorite' in value && typeof value.isFavorite === 'function' &&
-    'favoriteIcon' in value && typeof value.favoriteIcon === 'function' &&
-    'toggleFavorite' in value && typeof value.toggleFavorite === 'function';
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    'isFavorite' in value &&
+    typeof value.isFavorite === 'function' &&
+    'favoriteIcon' in value &&
+    typeof value.favoriteIcon === 'function' &&
+    'toggleFavorite' in value &&
+    typeof value.toggleFavorite === 'function'
+  );
 }
 
 interface IllustratedPanelContent {
@@ -46,9 +55,14 @@ interface IllustratedPanelContent {
 }
 
 function isIllustrated(value: unknown): value is IllustratedPanelContent {
-  return !!value && typeof value === 'object' &&
-    'headerImage' in value && typeof value.headerImage === 'function' &&
-    'onHeaderImageError' in value && typeof value.onHeaderImageError === 'function';
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    'headerImage' in value &&
+    typeof value.headerImage === 'function' &&
+    'onHeaderImageError' in value &&
+    typeof value.onHeaderImageError === 'function'
+  );
 }
 
 const SNAP_POINTS: MapPanelSnap[] = ['compact', 'half', 'expanded'];
@@ -94,24 +108,31 @@ export class MapPanelComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly viewContainerRef = inject(ViewContainerRef);
-  private readonly panelFrame = viewChild<ElementRef<HTMLElement>>('panelFrame');
+  private readonly panelFrame =
+    viewChild<ElementRef<HTMLElement>>('panelFrame');
   private readonly panelBody = viewChild<ElementRef<HTMLElement>>('panelBody');
-  private readonly panelTitleBlock = viewChild<ElementRef<HTMLElement>>('panelTitleBlock');
-  private readonly panelTitleRow = viewChild<ElementRef<HTMLElement>>('panelTitleRow');
-  private readonly panelFooter = viewChild<ElementRef<HTMLElement>>('panelFooter');
+  private readonly panelTitleBlock =
+    viewChild<ElementRef<HTMLElement>>('panelTitleBlock');
+  private readonly panelTitleRow =
+    viewChild<ElementRef<HTMLElement>>('panelTitleRow');
+  private readonly panelFooter =
+    viewChild<ElementRef<HTMLElement>>('panelFooter');
   private readonly handle = viewChild<ElementRef<HTMLElement>>('handle');
   private readonly grabber = viewChild<ElementRef<HTMLElement>>('grabber');
-  private readonly headerPhoto = viewChild<ElementRef<HTMLImageElement>>('headerPhoto');
+  private readonly headerPhoto =
+    viewChild<ElementRef<HTMLImageElement>>('headerPhoto');
   private readonly photoSampleRevision = signal(0);
   private photoContrastContext?: CanvasRenderingContext2D | null;
   private photoSampleFrame?: number;
   readonly grabberTone = signal<PhotoHandleTone | null>(null);
   private readonly viewportHeight = signal(0);
   readonly isDesktop = signal(false);
-  readonly hasPanelContent = computed(() =>
-    this.panelService.panel() !== null || this.hasSelections(),
+  readonly hasPanelContent = computed(
+    () => this.panelService.panel() !== null || this.hasSelections(),
   );
-  readonly showHandle = computed(() => !this.isDesktop() && this.hasPanelContent());
+  readonly showHandle = computed(
+    () => !this.isDesktop() && this.hasPanelContent(),
+  );
   readonly regionLabel = computed(() => {
     const panel = this.panelService.panel();
     if (panel) return `Detalhes no mapa: ${this.title()}`;
@@ -119,14 +140,19 @@ export class MapPanelComponent {
   });
   readonly favoriteContent = signal<FavoritablePanelContent | null>(null);
   readonly illustratedContent = signal<IllustratedPanelContent | null>(null);
-  readonly headerImage = computed(() => this.illustratedContent()?.headerImage());
-  readonly photoProgress = computed(() => this.isDesktop() ? 1 : this.toolbarProgress());
+  readonly headerImage = computed(() =>
+    this.illustratedContent()?.headerImage(),
+  );
+  readonly photoProgress = computed(() =>
+    this.isDesktop() ? 1 : this.toolbarProgress(),
+  );
   private readonly bodyScrollTop = signal(0);
   // Only the handle's paint reacts to scroll; native sticky positioning owns
   // the header collapse, without changing the scroll area's geometry.
-  readonly handlePhotoVisibility = computed(() => this.headerImage()
-    ? this.photoProgress() * Math.max(0, 1 - this.bodyScrollTop() / 168)
-    : 0,
+  readonly handlePhotoVisibility = computed(() =>
+    this.headerImage()
+      ? this.photoProgress() * Math.max(0, 1 - this.bodyScrollTop() / 168)
+      : 0,
   );
   private readonly compactHeight = signal(152);
   readonly dragHeight = signal<number | null>(null);
@@ -137,19 +163,21 @@ export class MapPanelComponent {
     const compact = Math.min(full, this.compactHeight());
     return {
       compact,
-      half: Math.min(full, Math.max(
-        this.viewportHeight() / 2,
-        compact + (full - compact) / 4,
-      )),
+      half: Math.min(
+        full,
+        Math.max(this.viewportHeight() / 2, compact + (full - compact) / 4),
+      ),
       expanded: full,
     };
   });
   readonly height = computed(() => {
     if (!this.viewportHeight()) return null;
     if (!this.hasPanelContent()) return Math.round(this.anchors().compact);
-    return Math.round(this.isDesktop()
-      ? this.anchors().expanded
-      : (this.dragHeight() ?? this.anchors()[this.panelService.snap()]));
+    return Math.round(
+      this.isDesktop()
+        ? this.anchors().expanded
+        : (this.dragHeight() ?? this.anchors()[this.panelService.snap()]),
+    );
   });
   readonly expandedProgress = computed(() => {
     const anchors = this.anchors();
@@ -166,10 +194,16 @@ export class MapPanelComponent {
     const anchors = this.anchors();
     const range = anchors.expanded - anchors.half;
     const height = this.dragHeight() ?? anchors[this.panelService.snap()];
-    return range > 0 ? Math.max(0, Math.min(1, (height - anchors.half) / range)) : 0;
+    return range > 0
+      ? Math.max(0, Math.min(1, (height - anchors.half) / range))
+      : 0;
   });
-  readonly snapIndex = computed(() => SNAP_POINTS.indexOf(this.panelService.snap()));
-  readonly snapLabel = computed(() => ['Compacto', 'Meia altura', 'Expandido'][this.snapIndex()]);
+  readonly snapIndex = computed(() =>
+    SNAP_POINTS.indexOf(this.panelService.snap()),
+  );
+  readonly snapLabel = computed(
+    () => ['Compacto', 'Meia altura', 'Expandido'][this.snapIndex()],
+  );
   readonly summary = computed(() => {
     const summary = this.panelService.panel()?.summary;
     return typeof summary === 'function' ? summary() : (summary ?? '');
@@ -210,25 +244,34 @@ export class MapPanelComponent {
   private lastUpwardContentWheelTime = Number.NEGATIVE_INFINITY;
 
   constructor() {
-    afterRenderEffect({ read: () => {
-      this.photoSampleRevision();
-      this.handlePhotoVisibility();
-      this.headerPhoto();
-      this.grabber();
-      this.handle();
-      this.schedulePhotoContrastSample();
-    } });
+    afterRenderEffect({
+      read: () => {
+        this.photoSampleRevision();
+        this.handlePhotoVisibility();
+        this.headerPhoto();
+        this.grabber();
+        this.handle();
+        this.schedulePhotoContrastSample();
+      },
+    });
     afterNextRender(() => {
       const media = this.document.defaultView?.matchMedia('(min-width: 768px)');
       if (media) {
         this.isDesktop.set(media.matches);
-        const updateDesktop = (event: MediaQueryListEvent) => this.isDesktop.set(event.matches);
+        const updateDesktop = (event: MediaQueryListEvent) =>
+          this.isDesktop.set(event.matches);
         media.addEventListener('change', updateDesktop);
-        this.destroyRef.onDestroy(() => media.removeEventListener('change', updateDesktop));
+        this.destroyRef.onDestroy(() =>
+          media.removeEventListener('change', updateDesktop),
+        );
       }
       if (typeof ResizeObserver !== 'undefined') {
         this.resizeObserver = new ResizeObserver(() => this.measure());
-        for (const element of [this.host, this.panelFrame(), this.panelFooter()]) {
+        for (const element of [
+          this.host,
+          this.panelFrame(),
+          this.panelFooter(),
+        ]) {
           if (element) this.resizeObserver.observe(element.nativeElement);
         }
       }
@@ -283,18 +326,26 @@ export class MapPanelComponent {
         this.favoriteContent.set(null);
         this.illustratedContent.set(null);
       }
-      afterNextRender(() => {
-        this.resetContentScroll();
-        this.observeContentHeader();
-        this.measure();
-        if (isOpen) (this.handle()?.nativeElement ?? this.panelFrame()?.nativeElement)?.focus({ preventScroll: true });
-        else if (shouldRestoreFocus) this.restoreFocus();
-      }, { injector: this.injector });
+      afterNextRender(
+        () => {
+          this.resetContentScroll();
+          this.observeContentHeader();
+          this.measure();
+          if (isOpen)
+            (
+              this.handle()?.nativeElement ?? this.panelFrame()?.nativeElement
+            )?.focus({ preventScroll: true });
+          else if (shouldRestoreFocus) this.restoreFocus();
+        },
+        { injector: this.injector },
+      );
     });
 
     effect(() => {
       if (this.panelService.snap() === 'compact') {
-        afterNextRender(() => this.resetContentScroll(), { injector: this.injector });
+        afterNextRender(() => this.resetContentScroll(), {
+          injector: this.injector,
+        });
       }
     });
 
@@ -307,14 +358,27 @@ export class MapPanelComponent {
   }
 
   onAttached(attachedRef: unknown): void {
-    if (attachedRef && typeof attachedRef === 'object' && 'instance' in attachedRef) {
-      this.panelService.panel()?.ref.attachComponentInstance(attachedRef.instance);
-      this.favoriteContent.set(isFavoritable(attachedRef.instance) ? attachedRef.instance : null);
-      this.illustratedContent.set(isIllustrated(attachedRef.instance) ? attachedRef.instance : null);
-      afterNextRender(() => {
-        this.observeContentHeader();
-        this.measure();
-      }, { injector: this.injector });
+    if (
+      attachedRef &&
+      typeof attachedRef === 'object' &&
+      'instance' in attachedRef
+    ) {
+      this.panelService
+        .panel()
+        ?.ref.attachComponentInstance(attachedRef.instance);
+      this.favoriteContent.set(
+        isFavoritable(attachedRef.instance) ? attachedRef.instance : null,
+      );
+      this.illustratedContent.set(
+        isIllustrated(attachedRef.instance) ? attachedRef.instance : null,
+      );
+      afterNextRender(
+        () => {
+          this.observeContentHeader();
+          this.measure();
+        },
+        { injector: this.injector },
+      );
     }
   }
 
@@ -325,7 +389,7 @@ export class MapPanelComponent {
     const rect = frame?.getBoundingClientRect();
     return rect?.height
       ? this.host.nativeElement.getBoundingClientRect().bottom - rect.top
-      : this.height() ?? 0;
+      : (this.height() ?? 0);
   }
 
   onBodyTouchStart(event: TouchEvent): void {
@@ -336,8 +400,10 @@ export class MapPanelComponent {
     }
     const touch = event.touches[0];
     this.bodyGesture = {
-      startX: touch.clientX, startY: touch.clientY,
-      scrollTop: this.panelBody()?.nativeElement.scrollTop ?? 0, dragging: false,
+      startX: touch.clientX,
+      startY: touch.clientY,
+      scrollTop: this.panelBody()?.nativeElement.scrollTop ?? 0,
+      dragging: false,
     };
   }
 
@@ -348,8 +414,11 @@ export class MapPanelComponent {
     const delta = gesture.startY - touch.clientY;
     if (!gesture.dragging) {
       if (Math.abs(delta) < 6) return;
-      if (Math.abs(touch.clientX - gesture.startX) > Math.abs(delta) ||
-          (this.panelService.snap() === 'expanded' && (delta > 0 || gesture.scrollTop > 0))) {
+      if (
+        Math.abs(touch.clientX - gesture.startX) > Math.abs(delta) ||
+        (this.panelService.snap() === 'expanded' &&
+          (delta > 0 || gesture.scrollTop > 0))
+      ) {
         this.bodyGesture = null;
         return;
       }
@@ -358,24 +427,40 @@ export class MapPanelComponent {
       gesture.dragging = true;
     }
     event.preventDefault();
-    this.onHandlePointerMove({ pointerId: -1, clientY: touch.clientY, timeStamp: event.timeStamp });
+    this.onHandlePointerMove({
+      pointerId: -1,
+      clientY: touch.clientY,
+      timeStamp: event.timeStamp,
+    });
   }
 
   onBodyTouchEnd(event: TouchEvent): void {
     if (this.bodyGesture?.dragging) {
       const touch = event.changedTouches[0];
       this.suppressBodyClick = true;
-      this.onHandlePointerUp({ pointerId: -1, clientY: touch.clientY, timeStamp: event.timeStamp });
+      this.onHandlePointerUp({
+        pointerId: -1,
+        clientY: touch.clientY,
+        timeStamp: event.timeStamp,
+      });
     }
     this.bodyGesture = null;
   }
 
   onBodyPointerDown(event: PointerEvent): void {
-    if (event.pointerType === 'touch' || !this.showHandle() || event.button !== 0 || event.isPrimary === false) return;
+    if (
+      event.pointerType === 'touch' ||
+      !this.showHandle() ||
+      event.button !== 0 ||
+      event.isPrimary === false
+    )
+      return;
     this.suppressBodyClick = false;
     this.bodyGesture = {
-      startX: event.clientX, startY: event.clientY,
-      scrollTop: this.panelBody()?.nativeElement.scrollTop ?? 0, dragging: false,
+      startX: event.clientX,
+      startY: event.clientY,
+      scrollTop: this.panelBody()?.nativeElement.scrollTop ?? 0,
+      dragging: false,
     };
   }
 
@@ -386,8 +471,11 @@ export class MapPanelComponent {
     const delta = gesture.startY - event.clientY;
     if (!gesture.dragging) {
       if (Math.abs(delta) < 6) return;
-      if (Math.abs(event.clientX - gesture.startX) > Math.abs(delta) ||
-          (this.panelService.snap() === 'expanded' && (delta > 0 || gesture.scrollTop > 0))) {
+      if (
+        Math.abs(event.clientX - gesture.startX) > Math.abs(delta) ||
+        (this.panelService.snap() === 'expanded' &&
+          (delta > 0 || gesture.scrollTop > 0))
+      ) {
         this.bodyGesture = null;
         return;
       }
@@ -422,22 +510,42 @@ export class MapPanelComponent {
     this.wheelTimer = undefined;
     const startHeight = this.renderedHeight();
     this.activePointer = {
-      source: 'body', id, startY: y, startHeight, lastY: y, lastTime: time, velocity: 0, moved: false,
+      source: 'body',
+      id,
+      startY: y,
+      startHeight,
+      lastY: y,
+      lastTime: time,
+      velocity: 0,
+      moved: false,
     };
     this.draggingChange.emit(true);
     this.dragHeight.set(startHeight);
   }
 
   private onBodyWheel(event: WheelEvent): void {
-    if (!this.showHandle() || this.activePointer || event.ctrlKey || Math.abs(event.deltaX) > Math.abs(event.deltaY) || !event.deltaY) return;
+    if (
+      !this.showHandle() ||
+      this.activePointer ||
+      event.ctrlKey ||
+      Math.abs(event.deltaX) > Math.abs(event.deltaY) ||
+      !event.deltaY
+    )
+      return;
     const body = this.panelBody()?.nativeElement;
     if (!this.wheelTimer && this.panelService.snap() === 'expanded') {
       // Keep upward content scrolling and its momentum at the top native. A
       // downward scroll must not extend the pause before the sheet collapses.
       const scrollingUp = event.deltaY < 0;
-      const continuingUpwardScroll = scrollingUp &&
-        event.timeStamp - this.lastUpwardContentWheelTime < CONTENT_SCROLL_PAUSE_MS;
-      if (event.deltaY > 0 || (body?.scrollTop ?? 0) > 0 || continuingUpwardScroll) {
+      const continuingUpwardScroll =
+        scrollingUp &&
+        event.timeStamp - this.lastUpwardContentWheelTime <
+          CONTENT_SCROLL_PAUSE_MS;
+      if (
+        event.deltaY > 0 ||
+        (body?.scrollTop ?? 0) > 0 ||
+        continuingUpwardScroll
+      ) {
         this.lastUpwardContentWheelTime = scrollingUp
           ? event.timeStamp
           : Number.NEGATIVE_INFINITY;
@@ -445,20 +553,39 @@ export class MapPanelComponent {
       }
     }
     event.preventDefault();
-    const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? this.viewportHeight() : 1;
+    const scale =
+      event.deltaMode === 1
+        ? 16
+        : event.deltaMode === 2
+          ? this.viewportHeight()
+          : 1;
     const anchors = this.anchors();
     this.draggingChange.emit(true);
-    this.dragHeight.set(Math.max(anchors.compact, Math.min(anchors.expanded,
-      (this.dragHeight() ?? this.renderedHeight()) + event.deltaY * scale)));
+    this.dragHeight.set(
+      Math.max(
+        anchors.compact,
+        Math.min(
+          anchors.expanded,
+          (this.dragHeight() ?? this.renderedHeight()) + event.deltaY * scale,
+        ),
+      ),
+    );
     this.wheelDirection = Math.sign(event.deltaY);
     clearTimeout(this.wheelTimer);
     this.wheelTimer = setTimeout(() => {
       const height = this.dragHeight() ?? this.height() ?? 0;
       const nearest = this.nearestSnap(height);
       const current = this.panelService.snap();
-      this.panelService.setSnap(nearest === current
-        ? SNAP_POINTS[Math.max(0, Math.min(2, SNAP_POINTS.indexOf(current) + this.wheelDirection))]
-        : nearest);
+      this.panelService.setSnap(
+        nearest === current
+          ? SNAP_POINTS[
+              Math.max(
+                0,
+                Math.min(2, SNAP_POINTS.indexOf(current) + this.wheelDirection),
+              )
+            ]
+          : nearest,
+      );
       this.wheelTimer = undefined;
       this.dragHeight.set(null);
       this.draggingChange.emit(false);
@@ -467,7 +594,11 @@ export class MapPanelComponent {
 
   onHandlePointerDown(event: PointerEvent): void {
     if (!this.showHandle()) return;
-    if (event.isPrimary === false || (event.pointerType === 'mouse' && event.button !== 0)) return;
+    if (
+      event.isPrimary === false ||
+      (event.pointerType === 'mouse' && event.button !== 0)
+    )
+      return;
     clearTimeout(this.wheelTimer);
     this.wheelTimer = undefined;
     const startHeight = this.renderedHeight();
@@ -499,7 +630,12 @@ export class MapPanelComponent {
       pointer.lastTime = event.timeStamp;
     }
     const anchors = this.anchors();
-    this.dragHeight.set(Math.max(anchors.compact, Math.min(anchors.expanded, pointer.startHeight + delta)));
+    this.dragHeight.set(
+      Math.max(
+        anchors.compact,
+        Math.min(anchors.expanded, pointer.startHeight + delta),
+      ),
+    );
   }
 
   onHandlePointerUp(event: DragSample): void {
@@ -510,13 +646,18 @@ export class MapPanelComponent {
     if (pointer.moved) {
       const anchors = this.anchors();
       // Capture releases near an anchor before applying momentum between anchors.
-      const velocity = event.timeStamp - pointer.lastTime < 120 ? pointer.velocity : 0;
-      const projection = Math.max(-anchors.expanded / 4, Math.min(anchors.expanded / 4, velocity * 140));
+      const velocity =
+        event.timeStamp - pointer.lastTime < 120 ? pointer.velocity : 0;
+      const projection = Math.max(
+        -anchors.expanded / 4,
+        Math.min(anchors.expanded / 4, velocity * 140),
+      );
       const releasedHeight = this.dragHeight() ?? pointer.startHeight;
       const nearest = this.nearestSnap(releasedHeight);
-      const snap = Math.abs(anchors[nearest] - releasedHeight) <= 32
-        ? nearest
-        : this.nearestSnap(releasedHeight + projection);
+      const snap =
+        Math.abs(anchors[nearest] - releasedHeight) <= 32
+          ? nearest
+          : this.nearestSnap(releasedHeight + projection);
       this.panelService.setSnap(snap);
       this.suppressHandleClick = pointer.source === 'handle';
     }
@@ -537,7 +678,9 @@ export class MapPanelComponent {
       this.suppressHandleClick = false;
       return;
     }
-    this.panelService.setSnap(SNAP_POINTS[(this.snapIndex() + 1) % SNAP_POINTS.length]);
+    this.panelService.setSnap(
+      SNAP_POINTS[(this.snapIndex() + 1) % SNAP_POINTS.length],
+    );
   }
 
   onHandleKeydown(event: KeyboardEvent): void {
@@ -570,17 +713,24 @@ export class MapPanelComponent {
   }
 
   private observeContentHeader(): void {
-    if (this.observedHeader) this.resizeObserver?.unobserve(this.observedHeader);
-    this.observedHeader = this.panelTitleBlock()?.nativeElement ??
-      this.panelBody()?.nativeElement.querySelector<HTMLElement>('.panel-header') ?? null;
+    if (this.observedHeader)
+      this.resizeObserver?.unobserve(this.observedHeader);
+    this.observedHeader =
+      this.panelTitleBlock()?.nativeElement ??
+      this.panelBody()?.nativeElement.querySelector<HTMLElement>(
+        '.panel-header',
+      ) ??
+      null;
     if (this.observedHeader) this.resizeObserver?.observe(this.observedHeader);
   }
 
   private nearestSnap(height: number): MapPanelSnap {
     const anchors = this.anchors();
     return SNAP_POINTS.reduce((nearest, candidate) =>
-      Math.abs(anchors[candidate] - height) < Math.abs(anchors[nearest] - height)
-        ? candidate : nearest,
+      Math.abs(anchors[candidate] - height) <
+      Math.abs(anchors[nearest] - height)
+        ? candidate
+        : nearest,
     );
   }
 
@@ -588,21 +738,36 @@ export class MapPanelComponent {
     this.photoSampleRevision.update((revision) => revision + 1);
     this.viewportHeight.set(this.host.nativeElement.clientHeight);
     const body = this.panelBody()?.nativeElement;
-    const handleHeight = this.handle()?.nativeElement.getBoundingClientRect().height ?? 0;
-    const footerHeight = this.panelFooter()?.nativeElement.getBoundingClientRect().height ?? 0;
+    const handleHeight =
+      this.handle()?.nativeElement.getBoundingClientRect().height ?? 0;
+    const footerHeight =
+      this.panelFooter()?.nativeElement.getBoundingClientRect().height ?? 0;
     // The photo is part of the scrollable content; only the sticky title
     // belongs in the compact anchor.
     const titleBlock = this.panelTitleBlock()?.nativeElement;
     const titleRow = this.panelTitleRow()?.nativeElement;
-    const titleStyles = titleBlock ? this.document.defaultView?.getComputedStyle(titleBlock) : null;
+    const titleStyles = titleBlock
+      ? this.document.defaultView?.getComputedStyle(titleBlock)
+      : null;
     let headerHeight = titleRow
-      ? titleRow.getBoundingClientRect().height + parseFloat(titleStyles?.paddingBottom || '0')
+      ? titleRow.getBoundingClientRect().height +
+        parseFloat(titleStyles?.paddingBottom || '0')
       : 0;
-    if (!this.panelService.panel() && this.hasSelections() && body && this.observedHeader) {
-      headerHeight = this.observedHeader.getBoundingClientRect().bottom - body.getBoundingClientRect().top + 8;
+    if (
+      !this.panelService.panel() &&
+      this.hasSelections() &&
+      body &&
+      this.observedHeader
+    ) {
+      headerHeight =
+        this.observedHeader.getBoundingClientRect().bottom -
+        body.getBoundingClientRect().top +
+        8;
     }
     const minimumHeight = this.hasPanelContent() ? 96 : 0;
-    this.compactHeight.set(Math.max(minimumHeight, handleHeight + footerHeight + headerHeight));
+    this.compactHeight.set(
+      Math.max(minimumHeight, handleHeight + footerHeight + headerHeight),
+    );
     this.heightChange.emit(Math.round(this.renderedHeight()));
   }
 
@@ -620,8 +785,14 @@ export class MapPanelComponent {
     const grabber = this.grabber()?.nativeElement;
     const handle = this.handle()?.nativeElement;
     const frame = this.panelFrame()?.nativeElement;
-    if (!this.handlePhotoVisibility() || !image?.complete || !image.naturalWidth ||
-      !grabber || !handle || !frame) {
+    if (
+      !this.handlePhotoVisibility() ||
+      !image?.complete ||
+      !image.naturalWidth ||
+      !grabber ||
+      !handle ||
+      !frame
+    ) {
       this.grabberTone.set(null);
       return;
     }
@@ -629,14 +800,23 @@ export class MapPanelComponent {
       const canvas = this.document.createElement('canvas');
       canvas.width = 16;
       canvas.height = 4;
-      this.photoContrastContext = canvas.getContext('2d', { willReadFrequently: true });
+      this.photoContrastContext = canvas.getContext('2d', {
+        willReadFrequently: true,
+      });
     }
     const view = this.document.defaultView;
-    this.grabberTone.set(this.photoContrastContext && view
-      ? samplePhotoHandleTone(image, grabber.getBoundingClientRect(), this.photoContrastContext,
-        view.getComputedStyle(frame).backgroundColor, view.getComputedStyle(handle).backgroundColor,
-        this.grabberTone())
-      : null);
+    this.grabberTone.set(
+      this.photoContrastContext && view
+        ? samplePhotoHandleTone(
+            image,
+            grabber.getBoundingClientRect(),
+            this.photoContrastContext,
+            view.getComputedStyle(frame).backgroundColor,
+            view.getComputedStyle(handle).backgroundColor,
+            this.grabberTone(),
+          )
+        : null,
+    );
   }
 
   onHeaderPhotoLoad(): void {
@@ -645,7 +825,9 @@ export class MapPanelComponent {
   }
 
   onBodyScroll(): void {
-    this.bodyScrollTop.set(Math.max(0, this.panelBody()?.nativeElement.scrollTop ?? 0));
+    this.bodyScrollTop.set(
+      Math.max(0, this.panelBody()?.nativeElement.scrollTop ?? 0),
+    );
   }
 
   private resetContentScroll(): void {
@@ -656,13 +838,16 @@ export class MapPanelComponent {
 
   private capturePreviousFocus(): void {
     const element = this.document.activeElement;
-    this.previousFocus = element && element !== this.document.body && 'focus' in element
-      ? element as HTMLElement : null;
+    this.previousFocus =
+      element && element !== this.document.body && 'focus' in element
+        ? (element as HTMLElement)
+        : null;
   }
 
   private restoreFocus(): void {
     const target = this.previousFocus?.isConnected
-      ? this.previousFocus : this.document.getElementById('ol-map-tab');
+      ? this.previousFocus
+      : this.document.getElementById('ol-map-tab');
     this.previousFocus = null;
     target?.focus({ preventScroll: true });
   }

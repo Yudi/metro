@@ -14,7 +14,7 @@ import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink, UrlTree } from '@angular/router';
 import {
   getRailLineById,
   getUniqueAgencies,
@@ -59,23 +59,24 @@ interface DetailBase {
   mapParams: Record<string, string> | null;
 }
 
-type Detail = DetailBase & (
-  | { kind: 'bus-route'; data: { routeId: string } }
-  | { kind: 'rail-line'; data: RailLineInfo }
-  | {
-      kind: 'bus-stop';
-      data: {
-        stop: BusStopGraphQL;
-        routes: BusRouteGraphQL[];
-        selectedRoutes: Set<string>;
-        showMapActions: false;
-        routesLoading: boolean;
-        routesError: boolean;
-      };
-    }
-  | { kind: 'rail-station'; data: { stop: BusStopGraphQL } }
-  | { kind: 'bike-station'; data: { station: BikeStation } }
-);
+type Detail = DetailBase &
+  (
+    | { kind: 'bus-route'; data: { routeId: string } }
+    | { kind: 'rail-line'; data: RailLineInfo }
+    | {
+        kind: 'bus-stop';
+        data: {
+          stop: BusStopGraphQL;
+          routes: BusRouteGraphQL[];
+          selectedRoutes: Set<string>;
+          showMapActions: false;
+          routesLoading: boolean;
+          routesError: boolean;
+        };
+      }
+    | { kind: 'rail-station'; data: { stop: BusStopGraphQL } }
+    | { kind: 'bike-station'; data: { station: BikeStation } }
+  );
 
 interface DetailState {
   loading: boolean;
@@ -132,7 +133,17 @@ export class OmniboxResultPageComponent {
   readonly bikeStation = computed(() => {
     const detail = this.detail();
     if (detail?.kind !== 'bike-station') return null;
-    return this.bikes.getStation(detail.data.station.stationId) ?? detail.data.station;
+    return (
+      this.bikes.getStation(detail.data.station.stationId) ??
+      detail.data.station
+    );
+  });
+  readonly stationMapLink = computed<UrlTree | null>(() => {
+    const detail = this.detail();
+    if (detail?.kind !== 'rail-station' || !detail.mapParams) return null;
+    return this.router.createUrlTree([this.cityContext.path('/mapa')], {
+      queryParams: detail.mapParams,
+    });
   });
   readonly detailComponent = computed<Type<unknown> | null>(() => {
     switch (this.detail()?.kind) {
@@ -170,11 +181,12 @@ export class OmniboxResultPageComponent {
     const detail = this.detail();
     return {
       embedded: true,
-      ...(detail?.kind === 'bus-stop'
-        ? { detailsOverride: detail.data }
-        : {}),
+      ...(detail?.kind === 'bus-stop' ? { detailsOverride: detail.data } : {}),
       ...(detail?.kind === 'bike-station'
         ? { stationOverride: this.bikeStation() }
+        : {}),
+      ...(detail?.kind === 'rail-station'
+        ? { mapLink: this.stationMapLink() }
         : {}),
     };
   });
@@ -229,7 +241,7 @@ export class OmniboxResultPageComponent {
 
     const routes =
       snapshot.routes === undefined
-        ? previousDetail?.data.routes ?? []
+        ? (previousDetail?.data.routes ?? [])
         : (snapshot.routes ?? []).map(({ route }) => route);
     const routesError =
       previousDetail?.data.routesError === true ||
@@ -328,7 +340,8 @@ export class OmniboxResultPageComponent {
             };
           } else {
             if (!hasCoordinates) break;
-            const station = this.bikes.getStation(id) ??
+            const station =
+              this.bikes.getStation(id) ??
               this.bikes.upsertStationSummary({
                 stationId: id,
                 name: result.name,
@@ -418,23 +431,28 @@ export class OmniboxResultPageComponent {
         });
         ref.componentInstance.focusSearch();
         this.searchOpen.set(true);
-        ref.afterClosed()
+        ref
+          .afterClosed()
           .pipe(takeUntilDestroyed(this.destroyRef))
           .subscribe(() => {
             this.searchOpen.set(false);
             const draft = this.draftQuery();
             if (draft === null) return;
-            void this.router.navigate([], {
-              relativeTo: this.route,
-              queryParams: { q: draft || null },
-              queryParamsHandling: 'merge',
-              replaceUrl: true,
-            }).finally(() => this.draftQuery.set(null));
+            void this.router
+              .navigate([], {
+                relativeTo: this.route,
+                queryParams: { q: draft || null },
+                queryParamsHandling: 'merge',
+                replaceUrl: true,
+              })
+              .finally(() => this.draftQuery.set(null));
           });
       })
       .catch(() => {
         this.searchOpen.set(false);
-        this.searchError.set('Não foi possível abrir a busca. Tente novamente.');
+        this.searchError.set(
+          'Não foi possível abrir a busca. Tente novamente.',
+        );
       })
       .finally(() => {
         this.openingSearch = false;

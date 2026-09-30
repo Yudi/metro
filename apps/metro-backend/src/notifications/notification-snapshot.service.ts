@@ -364,7 +364,7 @@ export class NotificationSnapshotService {
             Math.round(direction.averageSeconds / 60),
           )} min${direction.isFallback ? ' (estimativa)' : ''}`,
       )
-      .join(' · ');
+      .join('\n');
     const semantic = {
       kind: 'rail_headway',
       lineCode,
@@ -373,7 +373,7 @@ export class NotificationSnapshotService {
     };
 
     return {
-      title: `Intervalo médio · ${station.name}`,
+      title: `Intervalo médio em ${station.name}`,
       body,
       lineCode,
       stationName: station.name,
@@ -460,13 +460,13 @@ export class NotificationSnapshotService {
       .map((train) => {
         const destination = train.destinationName || train.destinationCode;
         return `${destination} às ${train.arrivalTime}${
-          train.isAtPlatform ? ' · na plataforma' : ''
+          train.isAtPlatform ? ', na plataforma' : ''
         }`;
       })
       .join('\n');
 
     return {
-      title: `Próximas chegadas · ${station.name}`,
+      title: `Próximas chegadas em ${station.name}`,
       body: target.label ? `${target.label}: ${body}` : body,
       lineCode,
       stationName: station.name,
@@ -567,12 +567,12 @@ export class NotificationSnapshotService {
           minute: '2-digit',
           hourCycle: 'h23',
         }).format(new Date(arrival.expectedAt));
-        return `${arrival.route} · ${arrival.destination} às ${time}`;
+        return `${arrival.route} para ${arrival.destination} às ${time}`;
       })
       .join('\n');
 
     return {
-      title: `Chegadas de ônibus · ${name}`,
+      title: `Chegadas de ônibus em ${name}`,
       body,
       fingerprint: notificationHash(
         stableJson({ kind: 'bus_arrivals', arrivals: predictions }),

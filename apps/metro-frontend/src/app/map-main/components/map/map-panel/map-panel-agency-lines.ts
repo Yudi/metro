@@ -14,19 +14,14 @@ export function buildMapPanelAgencyLineGroups(
   const lineCodes = new Set(getLineCodesFromColorNames(routeShortNames));
 
   for (const lineName of routeShortNames) {
-    const numberedLine = lineName.match(
-      /^\s*0?(\d{1,2})(?:\s*[-–—:]|\s+|$)/,
-    );
+    const numberedLine = lineName.match(/^\s*0?(\d{1,2})(?:\s*[-–—:]|\s+|$)/);
     const code = numberedLine ? Number(numberedLine[1]) : undefined;
     if (code !== undefined && RAIL_LINES.some((line) => line.code === code)) {
       lineCodes.add(code);
     }
   }
 
-  const linesByAgency = new Map<
-    TransitAgency,
-    (typeof RAIL_LINES)[number][]
-  >();
+  const linesByAgency = new Map<TransitAgency, (typeof RAIL_LINES)[number][]>();
 
   for (const line of RAIL_LINES) {
     if (!lineCodes.has(line.code)) {

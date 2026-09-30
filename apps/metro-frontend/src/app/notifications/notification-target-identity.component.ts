@@ -145,7 +145,7 @@ export class NotificationTargetIdentityComponent {
       return target.label.trim();
     }
 
-    const suffix = ` · ${line.fullName}`;
+    const suffix = ` (${line.fullName})`;
     return target.label.endsWith(suffix)
       ? target.label.slice(0, -suffix.length).trim()
       : target.label.trim();
@@ -158,7 +158,7 @@ export class NotificationTargetIdentityComponent {
     }
 
     const label = target.label.trim();
-    const separatorIndex = label.indexOf('·');
+    const separatorIndex = label.indexOf(' (');
     return (
       separatorIndex === -1 ? label : label.slice(0, separatorIndex)
     ).trim();

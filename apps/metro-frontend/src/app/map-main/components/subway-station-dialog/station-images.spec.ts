@@ -1,12 +1,23 @@
 import { selectStationImage, StationImage } from './station-images';
 
 const primary: StationImage = {
-  key: 'station-images/metro/luz.avif', lineIds: ['1'],
-  author: 'Autor', title: 'Luz', sourceUrl: 'https://commons.wikimedia.org/', license: 'CC0',
+  key: 'station-images/metro/luz.avif',
+  lineIds: ['1'],
+  author: 'Autor',
+  title: 'Luz',
+  sourceUrl: 'https://commons.wikimedia.org/',
+  license: 'CC0',
 };
-const yellow = { ...primary, key: 'station-images/metro/luz-l4.avif', lineIds: ['4'] };
+const yellow = {
+  ...primary,
+  key: 'station-images/metro/luz-l4.avif',
+  lineIds: ['4'],
+};
 const train: StationImage = {
-  ...primary, key: 'station-images/metro/luz-trens.avif', lineIds: undefined, service: 'train',
+  ...primary,
+  key: 'station-images/metro/luz-trens.avif',
+  lineIds: undefined,
+  service: 'train',
 };
 const images = [primary, yellow, train];
 
@@ -17,7 +28,8 @@ describe('station image selection', () => {
   });
 
   it.each(['7', 'L8', '9', '10', '11', '12', '13', '14', '10X', 'EA'])(
-    'selects the train-service photo for %s', (line) => {
+    'selects the train-service photo for %s',
+    (line) => {
       expect(selectStationImage(images, line)).toBe(train);
     },
   );

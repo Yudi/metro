@@ -8,9 +8,13 @@ describe('TransitSearchFieldComponent', () => {
     fixture.componentInstance.activated.subscribe(activated);
     fixture.detectChanges();
 
-    const input = fixture.nativeElement.querySelector('input') as HTMLInputElement;
+    const input = fixture.nativeElement.querySelector(
+      'input',
+    ) as HTMLInputElement;
     input.click();
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+    );
     expect(activated).toHaveBeenCalledTimes(2);
   });
 

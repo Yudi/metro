@@ -30,7 +30,13 @@ describe('Bus', () => {
     await TestBed.configureTestingModule({
       imports: [MapMainComponent],
       providers: [
-        { provide: MapRealtimeStatusService, useValue: { state: signal('idle'), tooltip: signal('Aguardando conexão em tempo real') } },
+        {
+          provide: MapRealtimeStatusService,
+          useValue: {
+            state: signal('idle'),
+            tooltip: signal('Aguardando conexão em tempo real'),
+          },
+        },
         { provide: ActivatedRoute, useValue: activatedRouteStub },
         {
           provide: BikeStationsService,

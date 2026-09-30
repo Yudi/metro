@@ -140,7 +140,7 @@ function normalizeTargetSearch(value: string): string {
 
 function targetSearchTerms(target: NotificationTarget): string[] {
   const label = target.label.trim();
-  const terms = [label, label.split('·', 1)[0] ?? label];
+  const terms = [label, label.split(' (', 1)[0] ?? label];
 
   if (target.kind === 'rail_line') {
     const lineCode = target.railLineCode ?? /^linha\s*(\d+)/iu.exec(label)?.[1];

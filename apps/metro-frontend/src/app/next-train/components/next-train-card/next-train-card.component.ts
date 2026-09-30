@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   input,
   computed,
+  effect,
   inject,
   OnInit,
   OnDestroy,
@@ -118,7 +119,6 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
 
   /** Unsubscribe function for breathing animation */
   private unsubscribeBreathing: (() => void) | null = null;
-  private releaseNextTrainSubscription: (() => void) | null = null;
 
   /** Station data including error state */
   private readonly stationData = computed(() => {
@@ -365,20 +365,22 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
     return state.processing ? 'Em processamento' : 'Carregando horários...';
   });
 
-  ngOnInit(): void {
-    // Subscribe to next train updates
-    this.releaseNextTrainSubscription = this.nextTrainService.subscribe(
-      this.lineCode(),
-      this.stationCode(),
-    );
+  constructor() {
+    effect((onCleanup) => {
+      const release = this.nextTrainService.subscribe(
+        this.lineCode(),
+        this.stationCode(),
+      );
+      onCleanup(release);
+    });
+  }
 
+  ngOnInit(): void {
     // Subscribe to breathing animation
     this.unsubscribeBreathing = this.breathingService.subscribe();
   }
 
   ngOnDestroy(): void {
-    // Unsubscribe when component is destroyed
-    this.releaseNextTrainSubscription?.();
     this.unsubscribeBreathing?.();
   }
 

@@ -218,8 +218,11 @@ test('opens arrival details from a bus stop result', async ({ page }) => {
 
   await expect(page).toHaveURL(/\/sp\/busca\/bus-stop\/340015325\?q=paulista/);
   const stopDetail = page.locator('.detail');
+  await expect(
+    stopDetail.getByRole('heading', { name: 'Av. Paulista, 1000' }),
+  ).toBeVisible();
+  await expect(stopDetail.getByText('ID: 340015325')).toBeVisible();
   await expect(stopDetail.getByText('Previsão de chegada')).toBeVisible();
-  await expect(stopDetail.getByText('Ponto de ônibus')).toBeVisible();
   await page.reload();
   await expect(stopDetail.getByText('Previsão de chegada')).toBeVisible();
   await expect(

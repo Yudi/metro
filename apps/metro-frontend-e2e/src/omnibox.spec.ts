@@ -223,7 +223,7 @@ test('opens arrival details from a bus stop result', async ({ page }) => {
   ).toBeVisible();
   await expect(stopDetail.getByText('ID: 340015325')).toBeVisible();
   await expect(stopDetail.getByText('Previsão de chegada')).toBeVisible();
-  await page.reload();
+  await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(stopDetail.getByText('Previsão de chegada')).toBeVisible();
   await expect(
     stopDetail.getByRole('link', { name: 'Ver no mapa' }),

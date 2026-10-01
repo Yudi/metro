@@ -211,7 +211,7 @@ describe('LineStatusGridComponent', () => {
         title: 'GRU - Aeromóvel GRU',
         details: expect.arrayContaining([
           expect.stringContaining(
-            'De segunda a sexta, das 16h às 00h. Aos sábados e domingos, das 4h às 00h',
+            'De segunda a sexta, das 4h às 00h. Aos sábados e domingos, das 4h às 00h',
           ),
         ]),
       }),

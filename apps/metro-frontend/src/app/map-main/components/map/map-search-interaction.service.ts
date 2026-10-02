@@ -29,6 +29,8 @@ export class MapSearchInteractionService {
       maxWidth: '90vw',
       maxHeight: '80vh',
       panelClass: 'search-dialog-panel',
+      autoFocus: 'input',
+      delayFocusTrap: false,
     });
 
     dialogRef.afterClosed().subscribe((result) => {

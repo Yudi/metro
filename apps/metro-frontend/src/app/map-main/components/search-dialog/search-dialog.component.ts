@@ -5,9 +5,6 @@ import {
   signal,
   computed,
   isDevMode,
-  AfterViewInit,
-  ElementRef,
-  ViewChild,
   ChangeDetectionStrategy,
   effect,
 } from '@angular/core';
@@ -71,10 +68,7 @@ import {
   styleUrl: './search-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class SearchDialogComponent implements AfterViewInit {
-  @ViewChild('searchInput')
-  private readonly searchInputRef!: ElementRef<HTMLInputElement>;
-
+export class SearchDialogComponent {
   private readonly dialogRef = inject(MatDialogRef<SearchDialogComponent>);
   private readonly typesenseService = inject(TypesenseSearchService);
   private readonly geographyService = inject(GeographyGraphQLService);
@@ -125,13 +119,6 @@ export class SearchDialogComponent implements AfterViewInit {
   constructor() {
     this.setupSearchPipeline();
     this.setupNearbySearchEffect();
-  }
-
-  ngAfterViewInit(): void {
-    // Focus the search input when dialog opens
-    setTimeout(() => {
-      this.searchInputRef?.nativeElement?.focus();
-    }, 100);
   }
 
   /** Set up the search observable with debouncing */

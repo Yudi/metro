@@ -82,7 +82,10 @@ export class GbfsClientService {
   private async fetchGbfs<T>(url: string): Promise<GbfsResponse<T>> {
     try {
       const response = await firstValueFrom(
-        this.http.get<GbfsResponse<T>>(url, { timeout: 10_000 }),
+        this.http.get<GbfsResponse<T>>(url, {
+          timeout: 10_000,
+          maxRedirects: 0,
+        }),
       );
       this.assertValidResponse(response.data, url);
       return response.data;

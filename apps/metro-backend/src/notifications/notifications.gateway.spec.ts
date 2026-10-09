@@ -59,9 +59,11 @@ describe('NotificationsGateway', () => {
     connected: boolean;
     data: Record<string, unknown>;
     handshake: {
+      address: string;
       auth: Record<string, unknown>;
       headers: Record<string, string>;
     };
+    conn: { remoteAddress: string };
     join: jest.Mock;
     emit: jest.Mock;
     disconnect: jest.Mock;
@@ -69,7 +71,12 @@ describe('NotificationsGateway', () => {
     return {
       connected: true,
       data: {},
-      handshake: { auth: token ? { token } : {}, headers: {} },
+      handshake: {
+        address: '192.0.2.1',
+        auth: token ? { token } : {},
+        headers: {},
+      },
+      conn: { remoteAddress: '192.0.2.1' },
       join: jest.fn().mockResolvedValue(undefined),
       emit: jest.fn(),
       disconnect: jest.fn(),
@@ -95,6 +102,194 @@ describe('NotificationsGateway', () => {
       NOTIFICATION_CONFIGURATION_SNAPSHOT_EVENT,
       { type: 'snapshot', configuration },
     );
+  });
+
+  it('limits concurrent sockets for one account even across different IPs', async () => {
+    const sockets = Array.from({ length: 6 }, (_, index) => {
+      const socket = client('signed-token');
+      socket.handshake.address = `192.0.2.${index + 1}`;
+      return socket;
+    });
+    await Promise.all(
+      sockets.map((socket) => gateway.handleConnection(socket as never)),
+    );
+
+    expect(settings.getConfiguration).toHaveBeenCalledTimes(5);
+    expect(sockets[5].disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('limits concurrent connections by IP before authentication completes', async () => {
+    let resolveAuth!: (userId: string) => void;
+    auth.verifyToken.mockReturnValue(
+      new Promise<string>((resolve) => {
+        resolveAuth = resolve;
+      }),
+    );
+    const sockets = Array.from({ length: 11 }, () => client('signed-token'));
+    const connections = sockets.map((socket) =>
+      gateway.handleConnection(socket as never),
+    );
+
+    expect(auth.verifyToken).toHaveBeenCalledTimes(10);
+    expect(sockets[10].disconnect).toHaveBeenCalledTimes(1);
+    resolveAuth('account-a');
+    await Promise.all(connections);
+    expect(settings.getConfiguration).toHaveBeenCalledTimes(5);
+  });
+
+  it('keeps pending authentication reserved after a client disconnects', async () => {
+    let resolveAuth!: (userId: string) => void;
+    auth.verifyToken.mockReturnValue(
+      new Promise<string>((resolve) => {
+        resolveAuth = resolve;
+      }),
+    );
+    const sockets = Array.from({ length: 10 }, () => client('signed-token'));
+    const connections = sockets.map((socket) =>
+      gateway.handleConnection(socket as never),
+    );
+    for (const socket of sockets) {
+      socket.connected = false;
+      gateway.handleDisconnect(socket as never);
+    }
+    const blocked = client('signed-token');
+    await gateway.handleConnection(blocked as never);
+    expect(auth.verifyToken).toHaveBeenCalledTimes(10);
+    expect(blocked.disconnect).toHaveBeenCalledTimes(1);
+
+    resolveAuth('account-a');
+    await Promise.all(connections);
+    auth.verifyToken.mockResolvedValue('account-a');
+    await gateway.handleConnection(client('signed-token') as never);
+    expect(settings.getConfiguration).toHaveBeenCalledTimes(1);
+  });
+
+  it('throttles connection attempts before token verification and resets the window', async () => {
+    jest.useFakeTimers();
+    try {
+      for (let index = 0; index < 30; index += 1) {
+        const socket = client('signed-token');
+        await gateway.handleConnection(socket as never);
+        gateway.handleDisconnect(socket as never);
+      }
+      const blocked = client('signed-token');
+      await gateway.handleConnection(blocked as never);
+      expect(auth.verifyToken).toHaveBeenCalledTimes(30);
+      expect(blocked.disconnect).toHaveBeenCalledTimes(1);
+
+      jest.advanceTimersByTime(60_000);
+      await gateway.handleConnection(client('signed-token') as never);
+      expect(auth.verifyToken).toHaveBeenCalledTimes(31);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('releases account reservations exactly once on disconnect', async () => {
+    const sockets = Array.from({ length: 5 }, () => client('signed-token'));
+    await Promise.all(
+      sockets.map((socket) => gateway.handleConnection(socket as never)),
+    );
+    gateway.handleDisconnect(sockets[0] as never);
+    gateway.handleDisconnect(sockets[0] as never);
+    const replacement = client('signed-token');
+    await gateway.handleConnection(replacement as never);
+    const blocked = client('signed-token');
+    await gateway.handleConnection(blocked as never);
+    expect(replacement.disconnect).not.toHaveBeenCalled();
+    expect(blocked.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['auth', 'join', 'snapshot'])(
+    'releases reservations after a %s failure',
+    async (stage) => {
+      if (stage === 'auth') {
+        auth.verifyToken.mockRejectedValueOnce(new Error('Invalid token'));
+      }
+      if (stage === 'snapshot') {
+        settings.getConfiguration.mockRejectedValueOnce(new Error('Unavailable'));
+      }
+      const failed = client('signed-token');
+      if (stage === 'join') {
+        failed.join.mockRejectedValueOnce(new Error('Unable to join'));
+      }
+      await gateway.handleConnection(failed as never);
+      expect(failed.disconnect).toHaveBeenCalledTimes(1);
+      expect(failed.data).toEqual({});
+
+      const sockets = Array.from({ length: 5 }, () => client('signed-token'));
+      await Promise.all(
+        sockets.map((socket) => gateway.handleConnection(socket as never)),
+      );
+      expect(
+        sockets.every((socket) => socket.disconnect.mock.calls.length === 0),
+      ).toBe(true);
+    },
+  );
+
+  it('keeps account reservations until pending snapshots finish', async () => {
+    let resolveSnapshot!: (value: NotificationConfiguration) => void;
+    settings.getConfiguration.mockReturnValue(
+      new Promise<NotificationConfiguration>((resolve) => {
+        resolveSnapshot = resolve;
+      }),
+    );
+    const sockets = Array.from({ length: 5 }, () => client('signed-token'));
+    const connections = sockets.map((socket) =>
+      gateway.handleConnection(socket as never),
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+    for (const socket of sockets) {
+      socket.connected = false;
+      gateway.handleDisconnect(socket as never);
+    }
+    const blocked = client('signed-token');
+    await gateway.handleConnection(blocked as never);
+    expect(blocked.disconnect).toHaveBeenCalledTimes(1);
+    expect(settings.getConfiguration).toHaveBeenCalledTimes(5);
+
+    resolveSnapshot(configuration);
+    await Promise.all(connections);
+    await gateway.handleConnection(client('signed-token') as never);
+    expect(settings.getConfiguration).toHaveBeenCalledTimes(6);
+  });
+
+  it('bounds tracked IPs and recovers capacity after the attempt window expires', async () => {
+    jest.useFakeTimers();
+    try {
+      for (let index = 0; index < 10_000; index += 1) {
+        const socket = client();
+        socket.handshake.address = `address-${index}`;
+        await gateway.handleConnection(socket as never);
+      }
+      const socket = client('signed-token');
+      await gateway.handleConnection(socket as never);
+      expect(socket.disconnect).toHaveBeenCalledTimes(1);
+      expect(auth.verifyToken).not.toHaveBeenCalled();
+
+      jest.advanceTimersByTime(60_000);
+      await gateway.handleConnection(client('signed-token') as never);
+      expect(auth.verifyToken).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('does not use client-supplied forwarding headers to bypass the IP limit', async () => {
+    auth.verifyToken.mockImplementation(async () =>
+      `account-${auth.verifyToken.mock.calls.length}`,
+    );
+    const sockets = Array.from({ length: 11 }, (_, index) => {
+      const socket = client('signed-token');
+      socket.handshake.headers['x-forwarded-for'] = `192.0.2.${index + 1}`;
+      return socket;
+    });
+    for (const socket of sockets) {
+      await gateway.handleConnection(socket as never);
+    }
+    expect(auth.verifyToken).toHaveBeenCalledTimes(10);
+    expect(settings.getConfiguration).toHaveBeenCalledTimes(10);
+    expect(sockets[10].disconnect).toHaveBeenCalledTimes(1);
   });
 
   it('broadcasts a delta only to the verified account room and omits account identity from payload', () => {

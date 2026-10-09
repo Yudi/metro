@@ -156,7 +156,11 @@ export class LineStatusGridComponent {
     ),
   );
 
-  formatLineName(line: string): string {
+  formatLineName(line: unknown): string {
+    if (typeof line !== 'string') {
+      return '';
+    }
+
     return line.charAt(0).toUpperCase() + line.slice(1).toLowerCase();
   }
 

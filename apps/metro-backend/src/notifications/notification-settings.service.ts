@@ -9,6 +9,8 @@ import { ConfigService } from '@nestjs/config';
 import type { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  MAX_NOTIFICATION_TRIGGERS_PER_USER,
+  MAX_NOTIFICATION_DEVICES_PER_USER,
   TARGET_KIND_FOR_NOTIFICATION,
   NotificationConfiguration,
   NotificationDevice,
@@ -21,9 +23,11 @@ import {
 import { NotificationTargetsService } from './notification-targets.service';
 import { NotificationRealtimeService } from './notification-realtime.service';
 
-export const MAX_NOTIFICATION_TRIGGERS_PER_USER = 50;
+export {
+  MAX_NOTIFICATION_TRIGGERS_PER_USER,
+  MAX_NOTIFICATION_DEVICES_PER_USER,
+} from '@metro/shared/notification-contracts';
 export const MAX_NOTIFICATION_SEARCH_LENGTH = 100;
-export const MAX_NOTIFICATION_DEVICES_PER_USER = 20;
 export const MAX_PUSH_ENDPOINT_LENGTH = 2048;
 export const MAX_PUSH_LABEL_LENGTH = 120;
 

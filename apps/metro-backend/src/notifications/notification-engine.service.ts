@@ -1,11 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import {
+  MAX_NOTIFICATION_TRIGGERS_PER_USER,
+  MAX_NOTIFICATION_DEVICES_PER_USER,
+  MAX_NOTIFICATION_TARGETS_PER_TRIGGER,
+  MIN_NOTIFICATION_INTERVAL_MINUTES,
+  MAX_NOTIFICATION_INTERVAL_MINUTES,
   NotificationTriggerInput,
   notificationEligibility,
   validateNotificationTrigger,
   notificationRailState,
 } from '@metro/shared/notification-contracts';
+import type { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationSnapshotService } from './notification-snapshot.service';
 import {
@@ -20,6 +26,9 @@ import {
 import { nextNotificationEvaluation } from './notification-next-evaluation';
 import { notificationIssueIdentity } from './notification-issue-identity';
 import { notificationRetentionExpiry } from './notification-retention';
+
+// Keep the recurring delivery budget independent of configuration capacity.
+export const MAX_NOTIFICATION_DELIVERIES_PER_ACCOUNT_WINDOW = 500;
 
 @Injectable()
 export class NotificationEngineService {
@@ -43,8 +52,21 @@ export class NotificationEngineService {
       orderBy: { nextEvaluationAt: 'asc' },
       take: 500,
       include: {
-        user: { select: { last_login: true } },
-        targets: { include: { target: true } },
+        user: {
+          select: {
+            last_login: true,
+            notificationTriggers: {
+              where: { enabled: true },
+              orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+              take: MAX_NOTIFICATION_TRIGGERS_PER_USER,
+              select: { id: true },
+            },
+          },
+        },
+        targets: {
+          take: MAX_NOTIFICATION_TARGETS_PER_TRIGGER,
+          include: { target: true },
+        },
       },
     });
     for (let offset = 0; offset < due.length; offset += 8) {
@@ -64,8 +86,18 @@ export class NotificationEngineService {
             data: { claimToken, claimUntil: new Date(Date.now() + 120_000) },
           });
           if (!claimed.count) return;
-          let nextEvaluationAt = new Date(now.getTime() + 60_000);
+          let nextEvaluationAt = new Date(
+            now.getTime() + MIN_NOTIFICATION_INTERVAL_MINUTES * 60_000,
+          );
           try {
+            // A stable account selection bounds legacy accounts across pages,
+            // scheduler ticks, and replicas; a per-pass counter does not.
+            if (
+              !trigger.user.notificationTriggers.some(({ id }) => id === trigger.id)
+            ) {
+              nextEvaluationAt = new Date(now.getTime() + 86_400_000);
+              return;
+            }
             if (validateNotificationTrigger(trigger.config)) return;
             const config =
               trigger.config as unknown as NotificationTriggerInput;
@@ -73,6 +105,8 @@ export class NotificationEngineService {
             if (!notificationEligibility(config, now, true)) return;
             const subscriptions = await this.prisma.pushSubscription.findMany({
               where: { user_id: trigger.userId },
+              orderBy: [{ created_at: 'asc' }, { id: 'asc' }],
+              take: MAX_NOTIFICATION_DEVICES_PER_USER,
               select: { id: true },
             });
             if (!subscriptions.length) {
@@ -100,6 +134,9 @@ export class NotificationEngineService {
                 }
                 for (const snapshot of snapshots) {
                   await this.prisma.$transaction(async (tx) => {
+                    // Serialize account-wide arrival cooldown checks across replicas.
+                    // Settings mutations take this lock before the trigger lock too.
+                    await tx.$queryRaw`SELECT "id" FROM "public"."users" WHERE "id" = ${trigger.userId} FOR UPDATE`;
                     // Revalidate the claim/revision after provider I/O and before writing the outbox.
                     const stillCurrent =
                       await tx.notificationTrigger.updateMany({
@@ -112,6 +149,11 @@ export class NotificationEngineService {
                         data: { claimUntil: new Date(Date.now() + 120_000) },
                       });
                     if (!stillCurrent.count) return;
+                    if (
+                      !(await this.hasDeliveryBudget(
+                        tx, trigger.userId, subscriptions.length, now,
+                      ))
+                    ) return;
                     const issueKey = await notificationIssueIdentity(
                       tx,
                       config.kind,
@@ -136,8 +178,8 @@ export class NotificationEngineService {
                     ) {
                       const recent = await tx.notificationDelivery.findFirst({
                         where: {
-                          triggerId: trigger.id,
-                          revision: trigger.revision,
+                          subscription: { user_id: trigger.userId },
+                          trigger: { config: { path: ['kind'], equals: config.kind } },
                           createdAt: {
                             gt: new Date(
                               now.getTime() - config.intervalMinutes * 60_000,
@@ -227,6 +269,7 @@ export class NotificationEngineService {
     selectedTargets: readonly NotificationRailStatusTarget[],
   ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "public"."users" WHERE "id" = ${userId} FOR UPDATE`;
       // Revalidate the claim once after all provider reads and keep episode,
       // receipt, and aggregate outbox writes in the same transaction.
       const stillCurrent = await tx.notificationTrigger.updateMany({
@@ -234,6 +277,8 @@ export class NotificationEngineService {
         data: { claimUntil: new Date(Date.now() + 120_000) },
       });
       if (!stillCurrent.count) return;
+      if (!(await this.hasDeliveryBudget(tx, userId, subscriptions.length, now)))
+        return;
 
       let freshIssue = false;
       const currentEntries: Array<{
@@ -321,9 +366,42 @@ export class NotificationEngineService {
     });
   }
 
+  /** Called only while holding the account row lock, before reserving incident receipts. */
+  private async hasDeliveryBudget(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    deliveries: number,
+    now: Date,
+  ): Promise<boolean> {
+    const used = await tx.notificationDelivery.count({
+      where: {
+        subscription: { user_id: userId },
+        retentionKey: null,
+        createdAt: {
+          gt: new Date(now.getTime() - MIN_NOTIFICATION_INTERVAL_MINUTES * 60_000),
+        },
+      },
+    });
+    return used + deliveries <= MAX_NOTIFICATION_DELIVERIES_PER_ACCOUNT_WINDOW;
+  }
+
   async cleanup(now = new Date()): Promise<void> {
+    // Cooldowns need up to two hours of history; rail recovery and retention
+    // reminders still depend on the existing seven-day delivery history.
     await this.prisma.notificationDelivery.deleteMany({
-      where: { expiresAt: { lt: new Date(now.getTime() - 7 * 86_400_000) } },
+      where: {
+        OR: [
+          { expiresAt: { lt: new Date(now.getTime() - 7 * 86_400_000) } },
+          {
+            expiresAt: { lt: now },
+            createdAt: {
+              lt: new Date(now.getTime() - MAX_NOTIFICATION_INTERVAL_MINUTES * 60_000),
+            },
+            trigger: { config: { path: ['kind'], not: 'rail_status' } },
+            retentionKey: null,
+          },
+        ],
+      },
     });
   }
 }

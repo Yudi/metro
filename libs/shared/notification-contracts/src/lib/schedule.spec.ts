@@ -81,6 +81,11 @@ describe('notification schedules', () => {
       notificationEligibility(multiple, new Date('2026-09-08T19:15:00Z')),
     ).toBeNull();
   });
+  it('bounds arrival cadence and target fan-out', () => {
+    expect(validateNotificationTrigger({ ...trigger, kind: 'bus_arrivals', intervalMinutes: 1 })).not.toBeNull();
+    expect(validateNotificationTrigger({ ...trigger, intervalMinutes: 5, targetIds: Array.from({ length: 20 }, (_, index) => `target-${index}`) })).toBeNull();
+    expect(validateNotificationTrigger({ ...trigger, targetIds: Array.from({ length: 21 }, (_, index) => `target-${index}`) })).not.toBeNull();
+  });
   it('rejects other time zones', () => {
     expect(
       validateNotificationTrigger({ ...trigger, timezone: 'America/New_York' }),

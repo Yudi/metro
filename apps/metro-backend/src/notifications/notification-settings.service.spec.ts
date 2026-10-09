@@ -171,8 +171,10 @@ describe('NotificationSettingsService', () => {
     );
   });
 
-  it('allows the 50th trigger', async () => {
-    prisma.notificationTrigger.count.mockResolvedValueOnce(49);
+  it('allows the final permitted trigger', async () => {
+    prisma.notificationTrigger.count.mockResolvedValueOnce(
+      MAX_NOTIFICATION_TRIGGERS_PER_USER - 1,
+    );
     prisma.notificationTrigger.create.mockResolvedValueOnce({
       id: triggerId,
       revision: 0,
@@ -185,7 +187,9 @@ describe('NotificationSettingsService', () => {
   });
 
   it('enforces the trigger cap after locking the account row', async () => {
-    prisma.notificationTrigger.count.mockResolvedValueOnce(50);
+    prisma.notificationTrigger.count.mockResolvedValueOnce(
+      MAX_NOTIFICATION_TRIGGERS_PER_USER,
+    );
 
     await expect(service.saveTrigger('user-id', triggerInput)).rejects.toThrow(
       `até ${MAX_NOTIFICATION_TRIGGERS_PER_USER}`,

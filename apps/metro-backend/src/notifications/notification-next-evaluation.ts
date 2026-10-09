@@ -11,7 +11,7 @@ export function nextNotificationEvaluation(
   now: Date,
 ): Date {
   if (notificationEligibility(trigger, now, true))
-    return new Date(now.getTime() + 60_000);
+    return new Date(now.getTime() + trigger.intervalMinutes * 60_000);
   const local = Temporal.Instant.fromEpochMilliseconds(
     now.getTime(),
   ).toZonedDateTimeISO(NOTIFICATION_TIMEZONE);

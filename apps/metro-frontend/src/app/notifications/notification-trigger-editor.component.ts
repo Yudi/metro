@@ -29,6 +29,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { NotificationApiService } from '@metro/shared/api';
 import { getRailLineByCode } from '@metro/shared/utils';
 import {
+  MIN_NOTIFICATION_INTERVAL_MINUTES,
   NOTIFICATION_KINDS,
   NOTIFICATION_TIMEZONE,
   TARGET_KIND_FOR_NOTIFICATION,
@@ -627,7 +628,7 @@ export class NotificationTriggerEditorComponent implements OnChanges {
     const wasArrival =
       previousKind === 'rail_arrivals' || previousKind === 'bus_arrivals';
     const isArrival = kind === 'rail_arrivals' || kind === 'bus_arrivals';
-    const minimum = kind === 'rail_arrivals' || kind === 'bus_arrivals' ? 1 : 5;
+    const minimum = MIN_NOTIFICATION_INTERVAL_MINUTES;
     const control = this.form.controls.intervalMinutes;
     control.setValidators([
       Validators.required,

@@ -1,10 +1,22 @@
 import { ConfigService } from '@nestjs/config';
-import { Metadata, ServiceError, status } from '@grpc/grpc-js';
-import { RailIntegrationGrpcClient } from '@metro/rail-integration-contracts';
+import {
+  CallOptions,
+  Metadata,
+  Server,
+  ServerCredentials,
+  ServiceError,
+  status,
+} from '@grpc/grpc-js';
+import {
+  loadRailIntegrationGrpcDefinition,
+  RailIntegrationGrpcClient,
+  RailIntegrationGrpcHandlers,
+} from '@metro/rail-integration-contracts';
 import { RailIntegrationClientService } from './rail-integration-client.service';
 
 describe('RailIntegrationClientService', () => {
   afterEach(() => {
+    jest.useRealTimers();
     jest.restoreAllMocks();
   });
 
@@ -29,6 +41,7 @@ describe('RailIntegrationClientService', () => {
   });
 
   it('performs readiness and maps generic special status responses', async () => {
+    jest.useFakeTimers();
     const service = createServiceWithClient({
       fetchSpecialRailStatusLines: unarySuccess({
         lines: [
@@ -43,7 +56,9 @@ describe('RailIntegrationClientService', () => {
       }),
     });
 
-    const lines = await service.fetchSpecialRailStatusLines();
+    const request = service.fetchSpecialRailStatusLines();
+    await jest.advanceTimersByTimeAsync(295_000);
+    const lines = await request;
 
     expect(lines.get('EA')).toMatchObject({
       statusCode: 'Paralisada',
@@ -166,7 +181,7 @@ describe('RailIntegrationClientService', () => {
 
     expect(fetchScheduledService).toHaveBeenCalledWith(
       { lineCode: 'L1', stationCode: 'LUZ' },
-      expect.any(Date),
+      { deadline: expect.any(Date) },
       expect.any(Function),
     );
     service.onModuleDestroy();
@@ -228,16 +243,18 @@ describe('RailIntegrationClientService', () => {
       (
         _request: unknown,
         metadata: Metadata,
-        _options: unknown,
+        options: CallOptions,
         callback: (error: ServiceError | null, response?: unknown) => void,
       ) => {
         expect(metadata.get('x-correlation-id')).toEqual(['request-12345678']);
+        expect(options.deadline).toEqual(new Date(1_789_000_010_000));
         callback(null, { stationCodes: ['LUZ'] });
       },
     );
+    jest.spyOn(Date, 'now').mockReturnValue(1_789_000_000_000);
     const service = createServiceWithClient(
       { getStationCodes },
-      {},
+      { RAIL_INTEGRATION_GRPC_DEADLINE_MS: 10_000 },
       { getRequestId: () => 'request-12345678' },
     );
 
@@ -245,6 +262,91 @@ describe('RailIntegrationClientService', () => {
     expect(getStationCodes).toHaveBeenCalledTimes(1);
     service.onModuleDestroy();
   });
+
+  it('passes configured readiness and request deadlines through call options', async () => {
+    const now = 1_789_000_000_000;
+    jest.spyOn(Date, 'now').mockReturnValue(now);
+    const getStationCodes = jest.fn(unarySuccess({ stationCodes: ['LUZ'] }));
+    const service = createServiceWithClient(
+      { getStationCodes },
+      {
+        RAIL_INTEGRATION_GRPC_DEADLINE_MS: 10_000,
+        RAIL_INTEGRATION_GRPC_READINESS_DEADLINE_MS: 2_000,
+      },
+    );
+
+    await expect(service.getStationCodes('L11')).resolves.toEqual(['LUZ']);
+
+    expect(clientOf(service).check).toHaveBeenCalledWith(
+      {},
+      { deadline: new Date(now + 2_000) },
+      expect.any(Function),
+    );
+    expect(getStationCodes).toHaveBeenCalledWith(
+      { lineCode: 'L11' },
+      { deadline: new Date(now + 10_000) },
+      expect.any(Function),
+    );
+    service.onModuleDestroy();
+  });
+
+  it.each(['check', 'getStationCodes'] as const)(
+    'bounds retries when the real gRPC %s response stalls',
+    async (stalledMethod) => {
+      const server = new Server();
+      let stalledCalls = 0;
+      const handlers: RailIntegrationGrpcHandlers = {
+        check: (_call, callback) => {
+          if (stalledMethod === 'check') {
+            stalledCalls += 1;
+            return;
+          }
+          callback(null, { ready: true });
+        },
+        getStationCodes: (_call, callback) => {
+          if (stalledMethod === 'getStationCodes') {
+            stalledCalls += 1;
+            return;
+          }
+          callback(null, { stationCodes: ['LUZ'] });
+        },
+      };
+      server.addService(loadRailIntegrationGrpcDefinition().service, handlers);
+      let service: RailIntegrationClientService | undefined;
+      try {
+        const port = await new Promise<number>((resolve, reject) => {
+          server.bindAsync(
+            '127.0.0.1:0',
+            ServerCredentials.createInsecure(),
+            (error, boundPort) => error ? reject(error) : resolve(boundPort),
+          );
+        });
+        server.start();
+        service = new RailIntegrationClientService(configService({
+          RAIL_INTEGRATION_GRPC_URL: `127.0.0.1:${port}`,
+          RAIL_INTEGRATION_GRPC_DEADLINE_MS: 100,
+          RAIL_INTEGRATION_GRPC_READINESS_DEADLINE_MS: 100,
+          RAIL_INTEGRATION_GRPC_MAX_ATTEMPTS: 2,
+          RAIL_INTEGRATION_GRPC_RETRY_DELAY_MS: 1,
+        }));
+        const client = clientOf(service);
+        await new Promise<void>((resolve, reject) => {
+          client.waitForReady(
+            new Date(Date.now() + 2_000),
+            (error) => error ? reject(error) : resolve(),
+          );
+        });
+
+        await expect(service.getStationCodes('L11')).rejects.toMatchObject({
+          code: status.DEADLINE_EXCEEDED,
+        });
+        expect(stalledCalls).toBe(2);
+      } finally {
+        service?.onModuleDestroy();
+        server.forceShutdown();
+      }
+    },
+  );
 
   it('preserves generic vehicle display metadata across transport', async () => {
     jest.spyOn(Date, 'now').mockReturnValue(1_789_000_000_000);

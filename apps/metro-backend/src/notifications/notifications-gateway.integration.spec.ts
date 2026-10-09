@@ -59,7 +59,12 @@ describe('notification gateway account isolation', () => {
       id: 'socket-one',
       connected: true,
       data: {},
-      handshake: { auth: { token, userId: 'untrusted-user' }, headers: {} },
+      handshake: {
+        address: '192.0.2.1',
+        auth: { token, userId: 'untrusted-user' },
+        headers: {},
+      },
+      conn: { remoteAddress: '192.0.2.1' },
       join: jest.fn().mockResolvedValue(undefined),
       emit: jest.fn(),
       disconnect: jest.fn(),

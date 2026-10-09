@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { Component, inject, signal, WritableSignal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal, WritableSignal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { ApiService } from '@metro/shared/api';
@@ -15,6 +15,7 @@ import {
   imports: [RouterLink, DatePipe],
   templateUrl: './status.html',
   styleUrl: './status.css',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class Status {
   apiService = inject(ApiService);
@@ -23,7 +24,11 @@ export class Status {
   });
   expandedLine: WritableSignal<string | null> = signal(null);
 
-  normalizeColor(color: string): string {
+  normalizeColor(color: unknown): string {
+    if (typeof color !== 'string') {
+      return '';
+    }
+
     return color
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
@@ -45,7 +50,11 @@ export class Status {
     }
   }
 
-  formatLineName(line: string): string {
+  formatLineName(line: unknown): string {
+    if (typeof line !== 'string') {
+      return '';
+    }
+
     return line.charAt(0).toUpperCase() + line.slice(1).toLowerCase();
   }
 
@@ -64,15 +73,20 @@ export class Status {
     }
   }
 
+  formatLineCode(code: unknown): string | null {
+    return typeof code === 'number' && Number.isFinite(code)
+      ? String(code)
+      : null;
+  }
+
   lineClick(line: RailLineStatus): void {
-    if (this.isOperationNormal(line.statusColor, line.statusCode)) {
+    const code = this.formatLineCode(line.code);
+    if (code === null || this.isOperationNormal(line.statusColor, line.statusCode)) {
       return;
     }
     // Toggle the expanded state
     this.expandedLine.set(
-      this.expandedLine() === line.code.toString()
-        ? null
-        : line.code.toString(),
+      this.expandedLine() === code ? null : code,
     );
   }
 

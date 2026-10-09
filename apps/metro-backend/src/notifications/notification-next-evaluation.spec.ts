@@ -14,6 +14,10 @@ const trigger: NotificationTriggerInput = {
   statusMode: 'abnormal',
 };
 describe('indexed notification wakeups', () => {
+  it('uses the configured cadence while eligible', () => {
+    expect(nextNotificationEvaluation(trigger, new Date('2026-09-07T11:00:00Z')))
+      .toEqual(new Date('2026-09-07T11:15:00Z'));
+  });
   it('sleeps until the next selected weekday', () => {
     expect(
       nextNotificationEvaluation(

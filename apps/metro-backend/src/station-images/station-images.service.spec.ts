@@ -1,6 +1,7 @@
 import { NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { S3Client } from '@aws-sdk/client-s3';
+import { Readable } from 'node:stream';
 import { PrismaService } from '../prisma/prisma.service';
 import { StationImagesService } from './station-images.service';
 
@@ -55,6 +56,23 @@ describe('StationImagesService', () => {
     await expect(service.getManifest()).rejects.toBeInstanceOf(
       ServiceUnavailableException,
     );
+  });
+
+  it('passes downstream cancellation to the storage request', async () => {
+    const body = Readable.from(['image']);
+    const { service, send } = createService({ Body: body });
+    const cancellation = new AbortController();
+
+    const image = await service.getImage('metro', 'luz.avif', cancellation.signal);
+
+    expect(image.body).toBe(body);
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: { Bucket: 'metro', Key: 'station-images/metro/luz.avif' },
+      }),
+      { abortSignal: cancellation.signal },
+    );
+    body.destroy();
   });
 
   it('maps missing image keys to 404 and rejects traversal paths', async () => {

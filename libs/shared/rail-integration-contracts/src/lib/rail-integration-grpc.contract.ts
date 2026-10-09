@@ -1,10 +1,12 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  CallOptions,
   Client,
   ClientUnaryCall,
   handleUnaryCall,
   loadPackageDefinition,
+  Metadata,
   ServiceClientConstructor,
   ServiceDefinition,
   ServiceError,
@@ -24,7 +26,13 @@ export type GrpcUnaryCallback<TResponse> = (
 export interface GrpcUnaryCall<TRequest, TResponse> {
   (
     request: TRequest,
-    deadline: Date,
+    options: CallOptions,
+    callback: GrpcUnaryCallback<TResponse>,
+  ): ClientUnaryCall;
+  (
+    request: TRequest,
+    metadata: Metadata,
+    options: CallOptions,
     callback: GrpcUnaryCallback<TResponse>,
   ): ClientUnaryCall;
 }

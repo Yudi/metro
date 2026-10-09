@@ -99,15 +99,22 @@ export class StationImagesService implements OnModuleDestroy {
     }
   }
 
-  getImage(category: string, filename: string): Promise<StationImageObject> {
-    return this.getObject(this.getImageObjectKey(category, filename));
+  getImage(
+    category: string,
+    filename: string,
+    abortSignal?: AbortSignal,
+  ): Promise<StationImageObject> {
+    return this.getObject(this.getImageObjectKey(category, filename), abortSignal);
   }
 
   onModuleDestroy(): void {
     this.s3Client?.destroy();
   }
 
-  private async getObject(key: string): Promise<StationImageObject> {
+  private async getObject(
+    key: string,
+    abortSignal?: AbortSignal,
+  ): Promise<StationImageObject> {
     if (!this.s3Client) {
       throw new ServiceUnavailableException(
         'Station image storage is not configured',
@@ -123,6 +130,7 @@ export class StationImagesService implements OnModuleDestroy {
     try {
       const result = await this.s3Client.send(
         new GetObjectCommand({ Bucket: bucket, Key: key }),
+        { abortSignal },
       );
       const body = toNodeReadable(result.Body);
       if (!body) {
@@ -136,6 +144,9 @@ export class StationImagesService implements OnModuleDestroy {
         lastModified: result.LastModified,
       };
     } catch (error) {
+      if (abortSignal?.aborted) {
+        throw error;
+      }
       const statusCode = getStatusCode(error);
       if (statusCode === 404 || getErrorName(error) === 'NoSuchKey') {
         throw new NotFoundException('Station image not found');

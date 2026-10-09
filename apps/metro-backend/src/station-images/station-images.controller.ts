@@ -1,6 +1,7 @@
 import { Controller, Get, Param, Req, Res } from '@nestjs/common';
 import { ApiOkResponse, ApiParam, ApiProduces, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
+import type { Readable } from 'node:stream';
 import { StationImagesService } from './station-images.service';
 
 const MANIFEST_CACHE_CONTROL =
@@ -55,42 +56,88 @@ export class StationImagesController {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<void> {
-    const image = await this.stationImagesService.getImage(category, filename);
-    response.setHeader('Cache-Control', IMAGE_CACHE_CONTROL);
-    response.setHeader('Content-Type', 'image/avif');
-    response.setHeader('Content-Disposition', 'inline');
-    response.setHeader('X-Content-Type-Options', 'nosniff');
-    if (image.contentLength !== undefined) {
-      response.setHeader('Content-Length', image.contentLength);
-    }
-    setValidators(response, image.etag, image.lastModified);
-
-    if (isNotModified(request, image.etag)) {
-      image.body.destroy();
-      response.status(304).end();
-      return;
-    }
-
-    image.body.on('error', (error: Error) => {
-      if (response.headersSent) {
-        response.destroy(error);
-      } else {
-        image.body.destroy();
-        response.removeHeader('Content-Length');
-        response.removeHeader('Content-Type');
-        response.removeHeader('Content-Disposition');
-        response.removeHeader('Cache-Control');
-        response.removeHeader('ETag');
-        response.removeHeader('Last-Modified');
-        response.status(502).end('Station image storage is unavailable');
-      }
-    });
-    response.on('close', () => {
+    const cancellation = new AbortController();
+    let body: Readable | undefined;
+    const cleanup = () => {
+      request.off('aborted', onDisconnect);
+      response.off('close', onClose);
+      response.off('finish', cleanup);
+    };
+    const onDisconnect = () => {
+      cancellation.abort();
+      body?.destroy();
+      cleanup();
+    };
+    const onClose = () => {
       if (!response.writableEnded) {
-        image.body.destroy();
+        onDisconnect();
+      } else {
+        cleanup();
       }
-    });
-    image.body.pipe(response);
+    };
+    request.once('aborted', onDisconnect);
+    response.once('close', onClose);
+    response.once('finish', cleanup);
+
+    try {
+      if (request.aborted || response.destroyed) {
+        onDisconnect();
+        return;
+      }
+
+      const image = await this.stationImagesService.getImage(
+        category,
+        filename,
+        cancellation.signal,
+      );
+      body = image.body;
+      if (cancellation.signal.aborted || request.aborted || response.destroyed) {
+        onDisconnect();
+        return;
+      }
+
+      response.setHeader('Cache-Control', IMAGE_CACHE_CONTROL);
+      response.setHeader('Content-Type', 'image/avif');
+      response.setHeader('Content-Disposition', 'inline');
+      response.setHeader('X-Content-Type-Options', 'nosniff');
+      if (image.contentLength !== undefined) {
+        response.setHeader('Content-Length', image.contentLength);
+      }
+      setValidators(response, image.etag, image.lastModified);
+
+      if (isNotModified(request, image.etag)) {
+        body.destroy();
+        response.status(304).end();
+        cleanup();
+        return;
+      }
+
+      body.once('error', (error: Error) => {
+        body?.destroy();
+        cleanup();
+        if (response.destroyed) {
+          return;
+        }
+        if (response.headersSent) {
+          response.destroy(error);
+        } else {
+          response.removeHeader('Content-Length');
+          response.removeHeader('Content-Type');
+          response.removeHeader('Content-Disposition');
+          response.removeHeader('Cache-Control');
+          response.removeHeader('ETag');
+          response.removeHeader('Last-Modified');
+          response.status(502).end('Station image storage is unavailable');
+        }
+      });
+      body.pipe(response);
+    } catch (error) {
+      body?.destroy();
+      cleanup();
+      if (!cancellation.signal.aborted && !request.aborted && !response.destroyed) {
+        throw error;
+      }
+    }
   }
 }
 

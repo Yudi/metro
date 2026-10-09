@@ -13,6 +13,7 @@ import { NotificationPushService } from './notification-push.service';
 import { NotificationRetentionService } from './notification-retention.service';
 
 const QUEUE = 'metro-notifications';
+const SCHEDULER_QUEUE = 'metro-notification-scheduler';
 @Injectable()
 export class NotificationQueueService
   implements OnApplicationBootstrap, OnModuleDestroy
@@ -20,6 +21,8 @@ export class NotificationQueueService
   private readonly logger = new Logger(NotificationQueueService.name);
   private queue?: Queue;
   private worker?: Worker;
+  private schedulerQueue?: Queue;
+  private schedulerWorker?: Worker;
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
@@ -63,8 +66,15 @@ export class NotificationQueueService
     this.queue.on('error', () =>
       this.logger.error('Notification queue connection failed.'),
     );
-    this.worker = new Worker(
-      QUEUE,
+    this.schedulerQueue = new Queue(SCHEDULER_QUEUE, {
+      connection,
+      defaultJobOptions: { removeOnComplete: true, removeOnFail: 100 },
+    });
+    this.schedulerQueue.on('error', () =>
+      this.logger.error('Notification scheduler connection failed.'),
+    );
+    this.schedulerWorker = new Worker(
+      SCHEDULER_QUEUE,
       async (job) => {
         if (job.name === 'tick') {
           if (!pushEnabled) return;
@@ -73,11 +83,24 @@ export class NotificationQueueService
         } else if (job.name === 'cleanup') {
           await this.retention.maintain();
           await this.engine.cleanup();
-        } else if (job.name === 'deliver' && typeof job.data.id === 'string') {
+        }
+      },
+      { connection, concurrency: 1 },
+    );
+    this.worker = new Worker(
+      QUEUE,
+      async (job) => {
+        if (job.name === 'deliver' && typeof job.data.id === 'string') {
           await this.push.deliver(job.data.id);
         }
       },
       { connection, concurrency: 4 },
+    );
+    this.schedulerWorker.on('error', () =>
+      this.logger.error('Notification scheduler worker connection failed.'),
+    );
+    this.schedulerWorker.on('failed', () =>
+      this.logger.warn('Notification scheduler job failed.'),
     );
     this.worker.on('error', () =>
       this.logger.error('Notification worker connection failed.'),
@@ -87,16 +110,19 @@ export class NotificationQueueService
         'Notification job failed; durable work remains available for reconciliation.',
       ),
     );
-    await this.queue.upsertJobScheduler(
+    await this.schedulerQueue.upsertJobScheduler(
       'notification-tick',
       { every: 15_000 },
       { name: 'tick', data: {} },
     );
-    await this.queue.upsertJobScheduler(
+    await this.schedulerQueue.upsertJobScheduler(
       'notification-cleanup',
-      { every: 3_600_000 },
+      { every: 300_000 },
       { name: 'cleanup', data: {} },
     );
+    // Retire the previous shared-queue schedulers while its pending deliveries drain.
+    await this.queue.removeJobScheduler('notification-tick');
+    await this.queue.removeJobScheduler('notification-cleanup');
   }
 
   async reconcileDeliveries(now = new Date()): Promise<void> {
@@ -128,6 +154,8 @@ export class NotificationQueueService
   }
 
   async onModuleDestroy(): Promise<void> {
+    await this.schedulerWorker?.close();
+    await this.schedulerQueue?.close();
     await this.worker?.close();
     await this.queue?.close();
   }

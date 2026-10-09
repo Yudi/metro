@@ -1,5 +1,5 @@
 import { Test } from '@nestjs/testing';
-import { NotificationEngineService } from './notification-engine.service';
+import { NotificationEngineService, MAX_NOTIFICATION_DELIVERIES_PER_ACCOUNT_WINDOW } from './notification-engine.service';
 import { NotificationSnapshotService } from './notification-snapshot.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -39,13 +39,14 @@ describe('notification evaluation to durable outbox integration', () => {
       createMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     $queryRaw: jest.fn(),
-    notificationDelivery: { createMany, findFirst: jest.fn() },
+    notificationDelivery: { createMany, findFirst: jest.fn(), count: jest.fn(), deleteMany: jest.fn() },
     $transaction: jest.fn(),
   };
   let engine: NotificationEngineService;
   beforeEach(async () => {
     jest.clearAllMocks();
     createMany.mockReset();
+    prisma.notificationDelivery.count.mockResolvedValue(0);
     prisma.notificationDelivery.findFirst.mockReset().mockResolvedValue(null);
     prisma.pushSubscription.findMany.mockResolvedValue([{ id: 'device' }]);
     prisma.notificationIssueReceipt.createMany.mockResolvedValue({ count: 1 });
@@ -58,7 +59,7 @@ describe('notification evaluation to durable outbox integration', () => {
       {
         id: 'trigger',
         userId: 'user',
-        user: { last_login: now },
+        user: { last_login: now, notificationTriggers: [{ id: 'trigger' }] },
         revision: 1,
         config,
         targets: [{ target: { id: 'target', available: true } }],
@@ -95,7 +96,7 @@ describe('notification evaluation to durable outbox integration', () => {
     const row = {
       id: 'trigger',
       userId: 'user',
-      user: { last_login: now },
+      user: { last_login: now, notificationTriggers: [{ id: 'trigger' }] },
       revision: 1,
       config: { ...config, statusMode: 'all', targetIds: targets },
       targets: targets.map((id) => ({ target: { id, available: true } })),
@@ -171,7 +172,7 @@ describe('notification evaluation to durable outbox integration', () => {
       {
         id: 'trigger',
         userId: 'user',
-        user: { last_login: now },
+        user: { last_login: now, notificationTriggers: [{ id: 'trigger' }] },
         revision: 1,
         config: { ...config, statusMode: 'all', targetIds: targets },
         targets: targets.map((id) => ({ target: { id, available: true } })),
@@ -211,7 +212,7 @@ describe('notification evaluation to durable outbox integration', () => {
       {
         id: 'trigger',
         userId: 'user',
-        user: { last_login: now },
+        user: { last_login: now, notificationTriggers: [{ id: 'trigger' }] },
         revision: 1,
         config: { ...config, statusMode: 'all', targetIds: targets },
         targets: targets.map((id) => ({
@@ -267,7 +268,7 @@ describe('notification evaluation to durable outbox integration', () => {
     const row = {
       id: 'trigger',
       userId: 'user',
-      user: { last_login: now },
+      user: { last_login: now, notificationTriggers: [{ id: 'trigger' }] },
       revision: 1,
       config: { ...config, kind: 'rail_headway' },
       targets: [{ target: { id: 'target', available: true } }],
@@ -285,7 +286,7 @@ describe('notification evaluation to durable outbox integration', () => {
       {
         id: 'trigger',
         userId: 'user',
-        user: { last_login: now },
+        user: { last_login: now, notificationTriggers: [{ id: 'trigger' }] },
         revision: 1,
         config: { ...config, statusMode: 'all' },
         targets: [{ target: { id: 'target', available: true } }],
@@ -326,7 +327,7 @@ describe('notification evaluation to durable outbox integration', () => {
       {
         id: 'trigger',
         userId: 'user',
-        user: { last_login: now },
+        user: { last_login: now, notificationTriggers: [{ id: 'trigger' }] },
         revision: 1,
         config: { ...config, kind: 'rail_arrivals' },
         targets: [{ target: { id: 'target', available: true } }],
@@ -349,6 +350,111 @@ describe('notification evaluation to durable outbox integration', () => {
     });
     await engine.evaluateDue(now);
     expect(createMany).not.toHaveBeenCalled();
+    expect(prisma.notificationDelivery.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ subscription: { user_id: 'user' } }),
+    }));
+    expect(prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      prisma.notificationDelivery.findFirst.mock.invocationCallOrder[0],
+    );
+  });
+  it('bounds a maximum-valid arrival account across repeated scheduler ticks', async () => {
+    const ids = Array.from({ length: 25 }, (_, index) => `trigger-${index}`);
+    findMany.mockResolvedValue(ids.map(id => {
+      const targets = Array.from({ length: 20 }, (_, index) => ({
+        target: { id: `${id}-target-${index}`, available: true },
+      }));
+      return {
+        id,
+        userId: 'user',
+        user: { last_login: now, notificationTriggers: ids.map(id => ({ id })) },
+        revision: 1,
+        config: {
+          ...config,
+          kind: 'bus_arrivals',
+          intervalMinutes: 5,
+          targetIds: targets.map(({ target }) => target.id),
+        },
+        targets,
+      };
+    }));
+    prisma.pushSubscription.findMany.mockResolvedValue(
+      Array.from({ length: 10 }, (_, index) => ({ id: `device-${index}` })),
+    );
+    read.mockResolvedValue([{
+      title: 'Próximos ônibus',
+      body: '',
+      fingerprint: 'arrival',
+      important: false,
+      normal: true,
+      observedAt: now,
+      url: '/',
+      arrivals: [{ destination: 'Centro', expectedAt: now.getTime() + 120_000 }],
+    }]);
+    let rows = 0;
+    // Model the database account lock: concurrent trigger transactions serialize.
+    let transaction = Promise.resolve();
+    prisma.$transaction.mockImplementation((callback) => {
+      transaction = transaction.then(() => callback(prisma));
+      return transaction;
+    });
+    prisma.notificationDelivery.count.mockImplementation(async () => rows);
+    createMany.mockImplementation(async ({ data }: { data: unknown[] }) => {
+      rows += data.length;
+      return { count: data.length };
+    });
+    await engine.evaluateDue(now);
+    expect(read).toHaveBeenCalledTimes(500);
+    expect(rows).toBe(MAX_NOTIFICATION_DELIVERIES_PER_ACCOUNT_WINDOW);
+    await engine.evaluateDue(new Date(now.getTime() + 15_000));
+    expect(rows).toBe(MAX_NOTIFICATION_DELIVERIES_PER_ACCOUNT_WINDOW);
+  });
+  it('shares the delivery budget across triggers and checks it before reserving issues', async () => {
+    prisma.notificationDelivery.count.mockResolvedValue(
+      MAX_NOTIFICATION_DELIVERIES_PER_ACCOUNT_WINDOW,
+    );
+    await engine.evaluateDue(now);
+    expect(createMany).not.toHaveBeenCalled();
+    expect(prisma.notificationIssueReceipt.createMany).not.toHaveBeenCalled();
+    expect(prisma.notificationDelivery.count).toHaveBeenCalledWith({ where: {
+      subscription: { user_id: 'user' }, retentionKey: null,
+      createdAt: { gt: new Date(now.getTime() - 300_000) },
+    } });
+  });
+  it('does not rotate excess legacy triggers into later scheduler passes', async () => {
+    findMany.mockResolvedValue([{
+      id: 'excess',
+      userId: 'user',
+      user: { last_login: now, notificationTriggers: [{ id: 'trigger' }] },
+      revision: 1,
+      config,
+      targets: [{ target: { id: 'target', available: true } }],
+    }]);
+    await engine.evaluateDue(now);
+    await engine.evaluateDue(new Date(now.getTime() + 300_000));
+    expect(read).not.toHaveBeenCalled();
+    expect(createMany).not.toHaveBeenCalled();
+  });
+  it('keeps runtime trigger and device selection bounded', async () => {
+    await engine.evaluateDue(now);
+    expect(
+      findMany.mock.calls[0][0].include.user.select.notificationTriggers.take,
+    ).toBe(25);
+    expect(findMany.mock.calls[0][0].include.targets.take).toBe(20);
+    expect(prisma.pushSubscription.findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 10 }));
+  });
+  it('preserves cooldown, rail recovery, and retention history during cleanup', async () => {
+    await engine.cleanup(now);
+    expect(prisma.notificationDelivery.deleteMany).toHaveBeenCalledWith({
+      where: { OR: [
+        { expiresAt: { lt: new Date(now.getTime() - 7 * 86_400_000) } },
+        {
+          expiresAt: { lt: now },
+          createdAt: { lt: new Date(now.getTime() - 120 * 60_000) },
+          trigger: { config: { path: ['kind'], not: 'rail_status' } },
+          retentionKey: null,
+        },
+      ] },
+    });
   });
   it('leaves idle schedules asleep until the next window without transit calls', async () => {
     await engine.evaluateDue(new Date('2026-09-07T10:00:00Z'));
@@ -414,7 +520,7 @@ describe('notification evaluation to durable outbox integration', () => {
       {
         id: 'trigger',
         userId: 'user',
-        user: { last_login: now },
+        user: { last_login: now, notificationTriggers: [{ id: 'trigger' }] },
         revision: 1,
         config: {
           ...config,
@@ -483,7 +589,7 @@ describe('notification evaluation to durable outbox integration', () => {
     const trigger = {
       id: 'trigger',
       userId: 'user',
-      user: { last_login: now },
+      user: { last_login: now, notificationTriggers: [{ id: 'trigger' }] },
       revision: 1,
       config: {
         ...config,
@@ -531,7 +637,7 @@ describe('notification evaluation to durable outbox integration', () => {
       {
         id: 'trigger',
         userId: 'user',
-        user: { last_login: now },
+        user: { last_login: now, notificationTriggers: [{ id: 'trigger' }] },
         revision: 1,
         config: { ...config, statusMode, targetIds: ['line-1', 'line-2'] },
         targets: [1, 2].map((code) => ({

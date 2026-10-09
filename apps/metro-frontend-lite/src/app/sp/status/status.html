@@ -6,25 +6,26 @@
   <div class="grid">
     @if (lineStatusSignal(); as lineStatus) { @for (line of lineStatus.lines;
     track line) {
+    @let code = formatLineCode(line.code);
 
     <div
       class="line"
-      [class.clickable]="!isOperationNormal(line.statusColor, line.statusCode)"
+      [class.clickable]="code !== null && !isOperationNormal(line.statusColor, line.statusCode)"
       (click)="lineClick(line)"
       (keypress)="lineClick(line)"
       tabindex="0"
     >
       <div class="badge" [style.backgroundColor]="line.colorHex || '#000'">
-        {{ line.code }}
+        {{ code ?? '—' }}
       </div>
       <div class="line-name">{{ formatLineName(line.colorName) }}</div>
       <div class="status">{{ statusLabelFormat(line.statusLabel) }}</div>
       <div [class]="getStatusColor(line.statusColor)"></div>
     </div>
-    @if (expandedLine() === line.code.toString()) {
+    @if (code !== null && expandedLine() === code) {
     <div class="description">
       <div class="description-title">
-        {{ line.code }} - {{ line.colorName }}
+        {{ code }} - {{ line.colorName }}
       </div>
       <p>{{ line.description }}</p>
       @if (line.detail) {

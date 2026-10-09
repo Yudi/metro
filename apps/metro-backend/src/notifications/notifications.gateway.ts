@@ -23,9 +23,21 @@ import { NotificationRealtimeService } from './notification-realtime.service';
 
 const NOTIFICATION_NAMESPACE = '/notifications';
 const NOTIFICATION_ROOM_PREFIX = 'notification-account:';
+const CONNECTION_ATTEMPT_WINDOW_MS = 60_000;
+const MAX_CONNECTION_ATTEMPTS_PER_IP = 30;
+const MAX_CONNECTIONS_PER_IP = 10;
+const MAX_CONNECTIONS_PER_USER = 5;
+const MAX_TRACKED_IPS = 10_000;
+
+type ConnectionAttempts = { count: number; windowStartedAt: number };
 
 type AuthenticatedSocket = Socket & {
-  data: Socket['data'] & { userId?: string; tokenExpiryTimer?: NodeJS.Timeout };
+  data: Socket['data'] & {
+    connectionIp?: string;
+    connectionPending?: boolean;
+    userId?: string;
+    tokenExpiryTimer?: NodeJS.Timeout;
+  };
 };
 
 /**
@@ -52,6 +64,10 @@ export class NotificationsGateway
   private readonly logger = new Logger(NotificationsGateway.name);
   private readonly removeRealtimeListener: () => void;
   private readonly removeTransportResetListener: () => void;
+  private readonly connectionAttemptsByIp = new Map<string, ConnectionAttempts>();
+  private readonly connectionsByIp = new Map<string, number>();
+  private readonly connectionsByUser = new Map<string, number>();
+  private lastAttemptPruneAt = 0;
 
   constructor(
     private readonly auth: AuthService,
@@ -69,38 +85,59 @@ export class NotificationsGateway
   onModuleDestroy(): void {
     this.removeRealtimeListener();
     this.removeTransportResetListener();
+    this.connectionAttemptsByIp.clear();
+    this.connectionsByIp.clear();
+    this.connectionsByUser.clear();
   }
 
   async handleConnection(client: Socket): Promise<void> {
     const socket = client as AuthenticatedSocket;
-    const token = extractSocketToken(socket);
-    if (!token) {
+    const ip = socket.handshake.address || socket.conn.remoteAddress || 'unknown';
+    if (!this.reserveIpConnection(socket, ip)) {
       this.rejectConnection(socket);
       return;
     }
 
-    let userId: false | string;
+    socket.data.connectionPending = true;
+    let accepted = false;
     try {
-      userId = await this.auth.verifyToken(token);
-    } catch {
-      this.rejectConnection(socket);
-      return;
-    }
+      const token = extractSocketToken(socket);
+      if (!token) {
+        this.rejectConnection(socket);
+        return;
+      }
 
-    if (!userId || !socket.connected) {
-      this.rejectConnection(socket);
-      return;
-    }
+      let userId: false | string;
+      try {
+        userId = await this.auth.verifyToken(token);
+      } catch {
+        this.rejectConnection(socket);
+        return;
+      }
 
-    socket.data.userId = userId;
-    this.scheduleTokenExpiry(socket, token);
-    await socket.join(accountRoom(userId));
+      if (
+        !userId ||
+        !socket.connected ||
+        !this.reserveUserConnection(socket, userId)
+      ) {
+        this.rejectConnection(socket);
+        return;
+      }
 
-    try {
-      await this.sendSnapshot(socket);
-    } catch {
-      this.logger.warn('Unable to send notification settings snapshot.');
-      socket.disconnect();
+      this.scheduleTokenExpiry(socket, token);
+      try {
+        await socket.join(accountRoom(userId));
+        await this.sendSnapshot(socket);
+        accepted = true;
+      } catch {
+        this.logger.warn('Unable to send notification settings snapshot.');
+        this.rejectConnection(socket);
+      }
+    } finally {
+      delete socket.data.connectionPending;
+      if (!accepted || !socket.connected) {
+        this.handleDisconnect(socket);
+      }
     }
   }
 
@@ -110,7 +147,11 @@ export class NotificationsGateway
       clearTimeout(socket.data.tokenExpiryTimer);
       delete socket.data.tokenExpiryTimer;
     }
-    delete socket.data.userId;
+    // Keep reservations until pending auth/snapshot work settles. Otherwise a
+    // client could disconnect and immediately start more expensive work.
+    if (!socket.data.connectionPending) {
+      this.releaseConnection(socket);
+    }
   }
 
   @SubscribeMessage(NOTIFICATION_CONFIGURATION_RESYNC_EVENT)
@@ -187,6 +228,68 @@ export class NotificationsGateway
     client.disconnect();
   }
 
+  private reserveIpConnection(client: AuthenticatedSocket, ip: string): boolean {
+    const now = Date.now();
+    if (now - this.lastAttemptPruneAt >= CONNECTION_ATTEMPT_WINDOW_MS) {
+      this.lastAttemptPruneAt = now;
+      for (const [address, attempts] of this.connectionAttemptsByIp) {
+        if (now - attempts.windowStartedAt >= CONNECTION_ATTEMPT_WINDOW_MS) {
+          this.connectionAttemptsByIp.delete(address);
+        }
+      }
+    }
+
+    let attempts = this.connectionAttemptsByIp.get(ip);
+    if (
+      !attempts ||
+      now - attempts.windowStartedAt >= CONNECTION_ATTEMPT_WINDOW_MS
+    ) {
+      if (!attempts && this.connectionAttemptsByIp.size >= MAX_TRACKED_IPS) {
+        return false;
+      }
+      attempts = { count: 0, windowStartedAt: now };
+      this.connectionAttemptsByIp.set(ip, attempts);
+    }
+    if (attempts.count >= MAX_CONNECTION_ATTEMPTS_PER_IP) {
+      return false;
+    }
+    attempts.count += 1;
+
+    const connections = this.connectionsByIp.get(ip) ?? 0;
+    if (connections >= MAX_CONNECTIONS_PER_IP) {
+      return false;
+    }
+    this.connectionsByIp.set(ip, connections + 1);
+    client.data.connectionIp = ip;
+    return true;
+  }
+
+  private reserveUserConnection(
+    client: AuthenticatedSocket,
+    userId: string,
+  ): boolean {
+    const connections = this.connectionsByUser.get(userId) ?? 0;
+    if (connections >= MAX_CONNECTIONS_PER_USER) {
+      return false;
+    }
+    this.connectionsByUser.set(userId, connections + 1);
+    client.data.userId = userId;
+    return true;
+  }
+
+  private releaseConnection(client: AuthenticatedSocket): void {
+    const ip = client.data.connectionIp;
+    if (ip) {
+      decrementCounter(this.connectionsByIp, ip);
+      delete client.data.connectionIp;
+    }
+    const userId = client.data.userId;
+    if (userId) {
+      decrementCounter(this.connectionsByUser, userId);
+      delete client.data.userId;
+    }
+  }
+
   private scheduleTokenExpiry(
     client: AuthenticatedSocket,
     token: string,
@@ -199,6 +302,15 @@ export class NotificationsGateway
     client.data.tokenExpiryTimer = setTimeout(() => {
       client.disconnect();
     }, delay);
+  }
+}
+
+function decrementCounter(counts: Map<string, number>, key: string): void {
+  const next = (counts.get(key) ?? 1) - 1;
+  if (next > 0) {
+    counts.set(key, next);
+  } else {
+    counts.delete(key);
   }
 }
 

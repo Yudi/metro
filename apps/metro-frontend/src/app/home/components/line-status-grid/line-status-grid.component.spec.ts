@@ -68,6 +68,38 @@ describe('LineStatusGridComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  it.each([null, undefined, 8, {}, [], true, ''])(
+    'renders a line with malformed or empty color name %p',
+    (colorName) => {
+      expect(component.formatLineName(colorName)).toBe('');
+      status.lines = [
+        {
+          code: 5,
+          // Simulate an API payload that does not match its declared type.
+          colorName: colorName as unknown as string,
+          colorHex: '#800080',
+          line: 'Linha 5 - Lilás',
+          statusCode: 'OperacaoNormal',
+          statusLabel: 'Operação Normal',
+          statusColor: 'verde',
+          description: null,
+        },
+      ];
+      component.retryFetch();
+
+      expect(() => fixture.detectChanges()).not.toThrow();
+      const card = fixture.nativeElement.querySelector(
+        '.regular-grid .line-card',
+      ) as HTMLElement;
+      expect(card.textContent).toContain('5');
+      expect(card.textContent).toContain('Normal');
+    },
+  );
+
+  it('preserves formatting for valid accented color names', () => {
+    expect(component.formatLineName('LILÁS')).toBe('Lilás');
+  });
+
   it('shows PAESE below the line status and keeps its message in the dialog', () => {
     const line = {
       code: 1,

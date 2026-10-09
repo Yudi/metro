@@ -6,6 +6,11 @@ export const NOTIFICATION_KINDS = [
   'bus_notices',
   'special_departures',
 ] as const;
+export const MAX_NOTIFICATION_TRIGGERS_PER_USER = 25;
+export const MAX_NOTIFICATION_DEVICES_PER_USER = 10;
+export const MAX_NOTIFICATION_TARGETS_PER_TRIGGER = 20;
+export const MIN_NOTIFICATION_INTERVAL_MINUTES = 5;
+export const MAX_NOTIFICATION_INTERVAL_MINUTES = 120;
 export const NOTIFICATION_TIMEZONE = 'America/Sao_Paulo';
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 export const NOTIFICATION_LINE_NAME_FORMATS = [
@@ -170,8 +175,7 @@ export function validateNotificationTrigger(value: unknown): string | null {
     (v.leadMinutes ?? 61) > 60
   )
     return 'A antecedência deve estar entre 0 e 60 minutos.';
-  const arrival = v.kind === 'bus_arrivals' || v.kind === 'rail_arrivals';
-  const minimumInterval = arrival ? 1 : 5;
+  const minimumInterval = MIN_NOTIFICATION_INTERVAL_MINUTES;
   if (
     !Number.isInteger(v.intervalMinutes) ||
     (v.intervalMinutes ?? 0) < minimumInterval ||
@@ -188,13 +192,13 @@ export function validateNotificationTrigger(value: unknown): string | null {
   if (
     !Array.isArray(v.targetIds) ||
     !v.targetIds.length ||
-    v.targetIds.length > 20 ||
+    v.targetIds.length > MAX_NOTIFICATION_TARGETS_PER_TRIGGER ||
     new Set(v.targetIds).size !== v.targetIds.length ||
     v.targetIds.some(
       (id) => typeof id !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(id),
     )
   )
-    return 'Selecione de 1 a 20 linhas, estações ou pontos.';
+    return `Selecione de 1 a ${MAX_NOTIFICATION_TARGETS_PER_TRIGGER} linhas, estações ou pontos.`;
   if (v.statusMode !== 'all' && v.statusMode !== 'abnormal')
     return 'Selecione quando avisar sobre a operação.';
   if (

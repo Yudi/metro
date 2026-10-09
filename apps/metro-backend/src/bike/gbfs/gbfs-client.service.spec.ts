@@ -44,12 +44,12 @@ describe('GbfsClientService', () => {
     expect(http.get).toHaveBeenNthCalledWith(
       1,
       'https://saopaulo.publicbikesystem.net/customer/gbfs/v3.0/gbfs.json',
-      { timeout: 10_000 },
+      { timeout: 10_000, maxRedirects: 0 },
     );
     expect(http.get).toHaveBeenNthCalledWith(
       2,
       'https://saopaulo.publicbikesystem.net/customer/gbfs/v3.0/station_status',
-      { timeout: 10_000 },
+      { timeout: 10_000, maxRedirects: 0 },
     );
   });
 

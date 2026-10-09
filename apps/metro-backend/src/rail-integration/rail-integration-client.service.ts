@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  CallOptions,
   ChannelCredentials,
   Client,
   Metadata,
@@ -444,7 +445,7 @@ export class RailIntegrationClientService
     return new Promise<TResponse>((resolve, reject) => {
       const unaryCall = this.client[method] as (
         request: Record<string, unknown>,
-        deadline: Date,
+        options: CallOptions,
         callback: (error: ServiceError | null, response?: unknown) => void,
       ) => unknown;
       const callback: UnaryCallback = (error, response) => {
@@ -467,13 +468,13 @@ export class RailIntegrationClientService
           unaryCall as unknown as (
             request: Record<string, unknown>,
             metadata: Metadata,
-            options: { deadline: Date },
+            options: CallOptions,
             callback: UnaryCallback,
           ) => unknown
         ).call(this.client, request, metadata, { deadline }, callback);
         return;
       }
-      unaryCall.call(this.client, request, deadline, callback);
+      unaryCall.call(this.client, request, { deadline }, callback);
     });
   }
 

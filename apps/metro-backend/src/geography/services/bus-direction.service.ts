@@ -46,15 +46,18 @@ export class BusDirectionService {
     const routes = await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SET LOCAL statement_timeout = '5s'`;
       return tx.$queryRaw<Array<{ route_id: string }>>`
-      SELECT DISTINCT trip.route_id FROM "public"."Gtfs_Trip" trip
-      INNER JOIN "public"."Gtfs_StopTime" stop_time ON stop_time.trip_id = trip.trip_id
-      WHERE stop_time.stop_id = ${stopId} OR stop_time.stop_id IN (
+      WITH requested_source_stops AS (
+        SELECT ${stopId} AS stop_id
+        UNION
         SELECT source_stop_id FROM "public"."physical_stop_members"
         WHERE physical_stop_id = COALESCE((
           SELECT physical_stop_id FROM "public"."physical_stop_members"
           WHERE source_stop_id = ${stopId} LIMIT 1
         ), ${stopId})
       )
+      SELECT DISTINCT pattern.route_id
+      FROM "public"."bus_direction_patterns" pattern
+      WHERE pattern.served_stop_ids && ARRAY(SELECT stop_id FROM requested_source_stops)
     `;
     }, { maxWait: 2_000, timeout: 10_000 });
     return this.forRoutes(routes.map((route) => route.route_id), stopId);
@@ -120,48 +123,11 @@ export class BusDirectionService {
           WHERE source_stop_id = ${stopId ?? ''} LIMIT 1
         ), ${stopId ?? ''})
       ),
-      trip_summaries AS MATERIALIZED (
-        SELECT trip.route_id, trip.direction_id, trip.trip_headsign, trip.shape_id, trip.trip_id,
-          itinerary.stop_count,
-          itinerary.stop_ids[1] AS origin_stop_id,
-          itinerary.stop_ids[itinerary.stop_count::int] AS destination_stop_id,
-          itinerary.serves_stop
-        FROM "public"."Gtfs_Trip" trip
-        INNER JOIN selected_routes route ON route.route_id = trip.route_id
-        -- Aggregate per selected trip so the feed-view branches can use their
-        -- trip indexes instead of joining and sorting the entire stop-time feed.
-        CROSS JOIN LATERAL (
-          SELECT COUNT(stop_time.stop_sequence) AS stop_count,
-            ARRAY_AGG(stop_time.stop_id ORDER BY stop_time.stop_sequence) AS stop_ids,
-            BOOL_OR(stop_time.stop_id IN (SELECT stop_id FROM requested_source_stops)) AS serves_stop
-          FROM "public"."Gtfs_StopTime" stop_time
-          WHERE stop_time.trip_id = trip.trip_id
-          HAVING COUNT(stop_time.stop_sequence) > 0
-        ) itinerary
-      ),
-      patterns AS MATERIALIZED (
-        SELECT DISTINCT ON (route_id, direction_id, trip_headsign, shape_id, origin_stop_id, destination_stop_id)
-          summary.*,
-          BOOL_OR(serves_stop) OVER (
-            PARTITION BY route_id, direction_id, trip_headsign, shape_id, origin_stop_id, destination_stop_id
-          ) AS pattern_serves_stop
-        FROM trip_summaries summary
-        ORDER BY route_id, direction_id, trip_headsign, shape_id, origin_stop_id, destination_stop_id,
-          stop_count DESC, trip_id
-      ),
       pattern_stops AS (
-        SELECT pattern.route_id, pattern.direction_id, pattern.trip_headsign, pattern.shape_id, pattern.trip_id,
-          itinerary.stops, pattern.pattern_serves_stop AS serves_stop
-        FROM patterns pattern
-        CROSS JOIN LATERAL (
-          SELECT jsonb_agg(jsonb_build_object(
-            'latitude', stop.stop_lat, 'longitude', stop.stop_lon, 'name', stop.stop_name
-          ) ORDER BY stop_time.stop_sequence) AS stops
-          FROM "public"."Gtfs_StopTime" stop_time
-          INNER JOIN "public"."Gtfs_Stop" stop ON stop.stop_id = stop_time.stop_id
-          WHERE stop_time.trip_id = pattern.trip_id
-        ) itinerary
-        WHERE jsonb_array_length(itinerary.stops) >= 2
+        SELECT pattern.*,
+          pattern.served_stop_ids && ARRAY(SELECT stop_id FROM requested_source_stops) AS serves_stop
+        FROM "public"."bus_direction_patterns" pattern
+        INNER JOIN selected_routes route ON route.route_id = pattern.route_id
       ),
       anchored_patterns AS (
         SELECT pattern.*,

@@ -27,9 +27,10 @@ describe('TransitDataPrecomputeService', () => {
     );
   });
 
-  it('refreshes both GTFS-derived views and records their source signatures', async () => {
+  it('refreshes GTFS-derived views and records their source signatures', async () => {
     prisma.$queryRaw
       .mockResolvedValueOnce([{ source_signature: 'gtfs-hash' }])
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ source_signature: 'rail-hash' }])
       .mockResolvedValueOnce([]);
@@ -42,15 +43,24 @@ describe('TransitDataPrecomputeService', () => {
     );
     expect(prisma.$executeRawUnsafe).toHaveBeenNthCalledWith(
       2,
+      'REFRESH MATERIALIZED VIEW CONCURRENTLY "public"."bus_direction_patterns"',
+    );
+    expect(prisma.$executeRawUnsafe).toHaveBeenNthCalledWith(
+      3,
+      'ANALYZE "public"."bus_direction_patterns"',
+    );
+    expect(prisma.$executeRawUnsafe).toHaveBeenNthCalledWith(
+      4,
       'REFRESH MATERIALIZED VIEW CONCURRENTLY "public"."route_rail_connection_hits"',
     );
-    expect(prisma.$executeRaw).toHaveBeenCalledTimes(2);
+    expect(prisma.$executeRaw).toHaveBeenCalledTimes(3);
   });
 
   it('skips refreshes when the imported GTFS and merged GeoSampa data are unchanged', async () => {
     prisma.$queryRaw
       .mockResolvedValueOnce([{ source_signature: 'gtfs-hash' }])
       .mockResolvedValueOnce([{ source_signature: 'v2:gtfs-hash' }])
+      .mockResolvedValueOnce([{ source_signature: 'v1:gtfs-hash' }])
       .mockResolvedValueOnce([{ source_signature: 'rail-hash' }])
       .mockResolvedValueOnce([
         {
@@ -61,6 +71,36 @@ describe('TransitDataPrecomputeService', () => {
     await service.refreshAfterGtfsImport();
 
     expect(prisma.$executeRawUnsafe).not.toHaveBeenCalled();
+    expect(prisma.$executeRaw).not.toHaveBeenCalled();
+  });
+
+  it('builds direction patterns for an unchanged feed after upgrading the catalog', async () => {
+    prisma.$queryRaw
+      .mockResolvedValueOnce([{ source_signature: 'gtfs-hash' }])
+      .mockResolvedValueOnce([{ source_signature: 'v2:gtfs-hash' }])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ source_signature: 'rail-hash' }])
+      .mockResolvedValueOnce([
+        { source_signature: 'v2:radius=200:gtfs=gtfs-hash:rail=rail-hash' },
+      ]);
+
+    await service.refreshAfterGtfsImport();
+
+    expect(prisma.$executeRawUnsafe.mock.calls).toEqual([
+      ['REFRESH MATERIALIZED VIEW CONCURRENTLY "public"."bus_direction_patterns"'],
+      ['ANALYZE "public"."bus_direction_patterns"'],
+    ]);
+    expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves failed direction refreshes eligible for retry', async () => {
+    prisma.$queryRaw
+      .mockResolvedValueOnce([{ source_signature: 'gtfs-hash' }])
+      .mockResolvedValueOnce([{ source_signature: 'v2:gtfs-hash' }])
+      .mockResolvedValueOnce([]);
+    prisma.$executeRawUnsafe.mockRejectedValueOnce(new Error('direction refresh failed'));
+
+    await expect(service.refreshAfterGtfsImport()).rejects.toThrow('direction refresh failed');
     expect(prisma.$executeRaw).not.toHaveBeenCalled();
   });
 

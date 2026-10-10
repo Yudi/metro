@@ -7,6 +7,8 @@ export const ROUTE_RAIL_CONNECTION_RADIUS_METERS = 200;
 
 const GTFS_STOP_SUMMARY_STATE_KEY = 'gtfs-stop-service-summary';
 const GTFS_STOP_SUMMARY_VERSION = 2;
+const BUS_DIRECTION_PATTERNS_STATE_KEY = 'bus-direction-patterns';
+const BUS_DIRECTION_PATTERNS_VERSION = 1;
 const ROUTE_RAIL_CONNECTION_STATE_KEY = 'route-rail-connections';
 const ROUTE_RAIL_CONNECTION_VERSION = 2;
 const GTFS_POST_PROCESSING_STATE_KEY = 'gtfs-post-processing';
@@ -21,6 +23,7 @@ const ROUTE_RAIL_GTFS_FILES = [
 
 type PrecomputedView =
   | 'gtfs_stop_service_summary'
+  | 'bus_direction_patterns'
   | 'route_rail_connection_hits';
 
 @Injectable()
@@ -70,6 +73,11 @@ export class TransitDataPrecomputeService {
       'gtfs_stop_service_summary',
     );
     await this.physicalStops.refresh(gtfsSignature);
+    await this.refreshMaterializedViewIfNeeded(
+      BUS_DIRECTION_PATTERNS_STATE_KEY,
+      gtfsSignature ? `v${BUS_DIRECTION_PATTERNS_VERSION}:${gtfsSignature}` : null,
+      'bus_direction_patterns',
+    );
     await this.refreshRouteRailConnections(gtfsSignature);
   }
 
@@ -118,6 +126,14 @@ export class TransitDataPrecomputeService {
   }
 
   private async refreshMaterializedView(view: PrecomputedView): Promise<void> {
+    if (view === 'bus_direction_patterns') {
+      await this.prisma.$executeRawUnsafe(
+        'REFRESH MATERIALIZED VIEW CONCURRENTLY "public"."bus_direction_patterns"',
+      );
+      await this.prisma.$executeRawUnsafe('ANALYZE "public"."bus_direction_patterns"');
+      return;
+    }
+
     if (view === 'gtfs_stop_service_summary') {
       await this.prisma.$executeRawUnsafe(
         'REFRESH MATERIALIZED VIEW CONCURRENTLY "public"."gtfs_stop_service_summary"',

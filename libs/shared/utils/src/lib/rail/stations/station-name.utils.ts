@@ -78,8 +78,8 @@ export function normalizeStationName(name: string): string {
   return (
     name
       .trim()
-      // Normalize hyphens: convert " - " to "-" for consistent comparison
-      .replace(/\s*-\s*/g, '-')
+      // Normalize hyphens and Unicode dashes for consistent comparison and display
+      .replace(/\s*[-\u2010-\u2015]\s*/g, '-')
       // Remove "(linha X)" suffix (used in GTFS to distinguish same-named stations on different lines)
       .replace(/\s*\(linha\s*\d+\)\s*/gi, '')
       // Remove common suffixes (case insensitive)

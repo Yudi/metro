@@ -101,15 +101,44 @@ describe('RailStationProcessorService precompute lifecycle', () => {
     await service.refreshMergedStationsWithinImport();
 
     const stations = persist.mock.calls[0][0] as unknown as Array<typeof mergedStation>;
-    expect(stations).toHaveLength(5);
-    expect(stations.find((station) => station.name === 'Água Branca')).toMatchObject({
-      primaryId: 100001, lines: ['Laranja', 'Rubi'], agencies: ['linhauni', 'tictrens'],
+    expect(stations).toHaveLength(6);
+    expect(stations.find((station) => station.name === 'Água Branca (linha 7)')).toMatchObject({
+      primaryId: 100001, lines: ['Rubi'], agencies: ['tictrens'],
+    });
+    expect(stations.find((station) => station.name === 'Água Branca (linha 6)')).toMatchObject({
+      lines: ['Laranja'], agencies: ['linhauni'],
     });
     expect(stations.find((station) => station.name === 'Jardim Colonial')).toMatchObject({
       lines: ['Prata'], latitude: -23.599, longitude: -46.469,
     });
     expect(stations.find((station) => station.name === 'Brooklin Paulista')?.mergedIds).toHaveLength(2);
     expect(stations.find((station) => station.name === 'SPTrans-only L10')).toBeUndefined();
+  });
+
+  it('merges Palmeiras-Barra Funda across line-specific canonical dash variants', async () => {
+    const service = new RailStationProcessorService(
+      {} as never,
+      { refreshRouteRailConnections: jest.fn() } as never,
+      {} as never,
+    );
+    jest.spyOn(service as never, 'fetchRawRailStations' as never).mockResolvedValue([
+      { id: 3, name: 'PALMEIRAS - BARRA FUNDA', line: 'Vermelha', lineCode: 3, latitude: -23.525, longitude: -46.667 },
+      { id: 8, name: 'Palmeiras–Barra Funda', line: 'Diamante', lineCode: 8, latitude: -23.5251, longitude: -46.6671 },
+      { id: 10, name: 'Palmeiras-Barra Funda', line: 'Turquesa', lineCode: 10, latitude: -23.5252, longitude: -46.6672 },
+    ] as never);
+    jest.spyOn(service, 'getAllStations').mockResolvedValue([]);
+    const persist = jest.spyOn(service as never, 'persistMergedStations' as never)
+      .mockResolvedValue(undefined as never);
+
+    await service.refreshMergedStationsWithinImport();
+
+    expect(persist).toHaveBeenCalledWith([
+      expect.objectContaining({
+        name: 'Palmeiras-Barra Funda',
+        mergedIds: [3, 8, 10],
+        lines: ['Diamante', 'Turquesa', 'Vermelha'],
+      }),
+    ]);
   });
 
   it('clears removed station data instead of retaining an obsolete catalog', async () => {

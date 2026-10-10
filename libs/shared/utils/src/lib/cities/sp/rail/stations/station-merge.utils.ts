@@ -1,14 +1,15 @@
+import { hardNormalizeString } from '../../../../common/strings.utils';
 import { normalizeStationName } from '../../../../rail/stations/station-name.utils';
 
 /**
  * Stations that should never be merged even if their normalized names match.
  * These are different physical locations that happen to share similar names.
  */
-const MERGE_EXCEPTIONS = ['lapa', 'mooca'] as const;
+const MERGE_EXCEPTIONS = ['lapa', 'mooca', 'aguabranca'] as const;
 const LINE_QUALIFIER_REGEX = /\(\s*linha\s*(\d+)\s*\)/i;
 
 export function isStationMergeException(name: string): boolean {
-  const normalizedName = normalizeStationName(name).toLowerCase();
+  const normalizedName = hardNormalizeString(normalizeStationName(name));
   return MERGE_EXCEPTIONS.some((exception) =>
     normalizedName.includes(exception),
   );

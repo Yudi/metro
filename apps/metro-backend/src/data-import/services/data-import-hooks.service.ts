@@ -1,11 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { GTFSDatabaseService } from './gtfs-database.service';
 import { SearchService } from '../../search/services/search.service';
-import { SubwayStationProcessorService } from '../../vector-tiles/services/subway-station-processor.service';
+import { RailVectorTileService } from '../../vector-tiles/services/rail-vector-tile.service';
 import { VectorTilesService } from '../../vector-tiles/vector-tiles.service';
 import { TransitDataPrecomputeService } from '../../transit-data/transit-data-precompute.service';
 import { RouteStopMappingService } from '../../realtime/services/route-stop-mapping.service';
 import { GTFSFeed } from '../config/gtfs.config';
+import { RAIL_DATASET_SIGNATURE } from '../../rail-import/config/rail-datasets.config';
 
 export interface DataImportHookOptions {
   readonly dataChanged?: boolean;
@@ -19,7 +20,7 @@ export class DataImportHooksService {
 
   constructor(
     private readonly searchService: SearchService,
-    private readonly subwayStationProcessor: SubwayStationProcessorService,
+    private readonly railVectorTileService: RailVectorTileService,
     private readonly vectorTilesService: VectorTilesService,
     private readonly transitDataPrecompute: TransitDataPrecomputeService,
     private readonly gtfsDatabaseService: GTFSDatabaseService,
@@ -30,7 +31,9 @@ export class DataImportHooksService {
     options: DataImportHookOptions = {},
   ): Promise<void> {
     const dataChanged = options.dataChanged ?? true;
-    const sourceSignature = options.sourceSignature;
+    const sourceSignature = options.sourceSignature
+      ? `${options.sourceSignature}:rail=${RAIL_DATASET_SIGNATURE}`
+      : undefined;
     const feeds = options.feeds ?? ['sptrans'];
 
     if (
@@ -62,8 +65,8 @@ export class DataImportHooksService {
       }
     }
 
-    this.logger.debug('Processing subway stations...');
-    await this.subwayStationProcessor.refreshMergedStations();
+    this.logger.debug('Refreshing the selected rail station and route catalog...');
+    await this.railVectorTileService.refreshMvtViewsWithinImport();
 
     this.logger.debug('Refreshing GTFS-derived transit data...');
     await this.transitDataPrecompute.refreshAfterGtfsImport();
@@ -74,7 +77,7 @@ export class DataImportHooksService {
     // processing succeeds.
     this.vectorTilesService.clearCache();
     this.logger.debug(
-      'Subway stations and precomputed transit data refreshed; tile cache cleared',
+      'Rail stations and precomputed transit data refreshed; tile cache cleared',
     );
 
     this.logger.debug('Updating search index...');

@@ -13,12 +13,16 @@ import { RailStationService } from '../../geography/services/rail-station.servic
 import { QueryOptimizationService } from '../../geography/services/query-optimization.service';
 import {
   getCanonicalRailStationName,
+  getLineCodesFromColorNames,
   hardNormalizeString,
   RAIL_LINES,
-  RailLineInfo,
-  TransitAgency,
 } from '@metro/shared/utils';
 import { BikePollingService } from '../../bike/services/bike-polling.service';
+import {
+  GPKG_LINES_COLLECTION_NAME,
+  GPKG_STATIONS_COLLECTION_NAME,
+} from './typesense-schemas';
+import { railRoutesSql } from '../../rail-import/services/rail-route-interop.sql';
 
 import {
   BusRouteRow,
@@ -62,8 +66,7 @@ export class SearchService {
 
   async indexRoutes(): Promise<void> {
     try {
-      // Exclude GTFS rail routes (METRÔ% and CPTM%)
-      // These are now handled by GeoSampa rail data
+      // Rail routes are indexed through the selected rail catalog.
       const routes = await this.prisma.$queryRaw<BusRouteRow[]>`
         SELECT r.*,
           COALESCE((
@@ -187,9 +190,6 @@ export class SearchService {
     }
   }
 
-  /**
-   * Search GeoSampa rail stations (wrapper for RailStationService)
-   */
   async searchRailStations(searchTerm: string, limit = 20) {
     try {
       return await this.railStationService.searchRailStations(
@@ -204,9 +204,6 @@ export class SearchService {
     }
   }
 
-  /**
-   * Search nearby GeoSampa rail stations (wrapper for RailStationService)
-   */
   async searchNearbyRailStations(
     latitude: number,
     longitude: number,
@@ -230,78 +227,31 @@ export class SearchService {
 
   async indexRailLines(): Promise<void> {
     try {
-      // Get all metro and train lines from db, remap to RouteDocument format, and index in Typesense
-      const allMetroLines = await this.prisma.$queryRaw<
+      const selectedLines = await this.prisma.$queryRaw<
         Array<{
-          lmt_nome: string | null;
-          lmt_linom: string | null;
-          lmt_empres: string | null;
-          lmt_linha: number | null;
+          id: number;
+          line_number: number;
+          name: string;
+          agency: string;
         }>
       >`
-        SELECT lmt_nome, lmt_linom, lmt_empres, lmt_linha
-        FROM external_gpkg.metro_line
+        ${railRoutesSql()}
+        SELECT id, line_number, name, agency
+        FROM selected_rail_routes
+        ORDER BY line_number
       `;
-      const allTrainLines = await this.prisma.$queryRaw<
-        Array<{
-          nr_linha: number | null;
-          nm_linha: string | null;
-          empresa: string | null;
-        }>
-      >`
-        SELECT nr_linha, nm_linha, empresa
-        FROM external_gpkg.trem_line
-      `;
-      const dbLines: RailLineInfo[] = [];
 
-      allMetroLines.forEach((line) => {
-        dbLines.push({
-          code: line.lmt_linha || 0,
-          lineId: line.lmt_linha ? line.lmt_linha.toString() : 'null',
-          fullName: line.lmt_linom || 'null',
-          colorHex: '#000000',
-          colorName: line.lmt_nome || 'null',
-          agency: (line.lmt_empres || 'null') as TransitAgency,
-          stations: [],
-          carCount: 0,
-          carDoorCount: 0,
-        });
-      });
-
-      allTrainLines.forEach((line) => {
-        dbLines.push({
-          code: line.nr_linha || 0,
-          lineId: line.nr_linha ? line.nr_linha.toString() : 'null',
-          fullName: `Linha ${line.nr_linha} - ${line.nr_linha}`,
-          colorHex: '#000000',
-          colorName: line.nm_linha || 'null',
-          agency: (line.empresa || 'null') as TransitAgency,
-          stations: [],
-          carCount: 0,
-          carDoorCount: 0,
-        });
-      });
-
-      const finalRailLines = [...RAIL_LINES];
-      dbLines.forEach((line) => {
-        if (
-          !finalRailLines.some(
-            (existingLine) => existingLine.code === line.code,
-          )
-        ) {
-          finalRailLines.push(line);
-        }
-      });
-
-      const lineDocuments: LineDocument[] = finalRailLines.map((line) => ({
-        id: line.code.toString(),
-        line_code: line.code.toString(),
-        line_fullname: line.fullName,
+      const lineDocuments: LineDocument[] = selectedLines.map((line) => ({
+        id: String(line.id),
+        line_code: String(line.line_number),
+        line_fullname: line.name,
         agency: line.agency,
       }));
 
       await this.typesenseService.indexRailLines(lineDocuments);
-      this.logger.debug(`Indexed ${lineDocuments.length} rail lines`);
+      this.logger.debug(
+        `Indexed ${lineDocuments.length} selected rail lines`,
+      );
     } catch (error) {
       this.logger.error(
         `Failed to index rail lines: ${formatTypesenseError(error)}`,
@@ -310,115 +260,74 @@ export class SearchService {
     }
   }
 
+  async rebuildRailData(): Promise<void> {
+    await this.typesenseService.beginFullRebuild([
+      GPKG_LINES_COLLECTION_NAME,
+      GPKG_STATIONS_COLLECTION_NAME,
+    ]);
+
+    try {
+      await this.indexRailLines();
+      await this.indexRailStations();
+      await this.typesenseService.finishFullRebuild();
+      this.logger.debug('Selected rail search collections rebuilt');
+    } catch (error) {
+      await this.typesenseService.discardFullRebuild();
+      this.logger.error(
+        `Selected rail search rebuild failed: ${formatTypesenseError(error)}`,
+      );
+      throw error;
+    }
+  }
+
   async indexRailStations(): Promise<void> {
     try {
-      const stations = await this.railStationService.getAllRailStations();
-
-      // Build a map from normalized station name to its Typesense document.
-      // This lets us merge DB stations with the static list (RAIL_LINES) and
-      // still index static-only stations.
-      const stationDocsByNormalizedName = new Map<string, StationDocument>();
-
-      // Start with stations present in the DB (have coordinates)
-      stations.forEach((station) => {
-        const normalizedName = hardNormalizeString(station.name);
-
-        // Find matching static stations to attach aliases and codes
-        const matchingStaticStations = RAIL_LINES.flatMap((line) =>
-          line.stations.filter((staticStation) => {
-            const normalizedStaticName = hardNormalizeString(
-              staticStation.name,
-            );
-            const normalizedAlternativeNames = (
-              staticStation.alternativeNames ?? []
-            ).map(hardNormalizeString);
-
-            return (
-              normalizedName === normalizedStaticName ||
-              normalizedAlternativeNames.includes(normalizedName)
-            );
-          }),
+      const stations = await this.prisma.mergedRailStation.findMany();
+      const stationDocuments: StationDocument[] = stations.map((station) => {
+        const lineCodes = getLineCodesFromColorNames(station.lines);
+        const selectedLines = RAIL_LINES.filter((line) =>
+          lineCodes.includes(line.code),
         );
-
-        const stationCodes = Array.from(
-          new Set(
-            matchingStaticStations.map((staticStation) => staticStation.code),
+        const normalizedNames = new Set(
+          [station.name, station.originalName].map(hardNormalizeString),
+        );
+        const matchingStaticStations = selectedLines.flatMap((line) =>
+          line.stations.filter((staticStation) =>
+            [staticStation.name, ...(staticStation.alternativeNames ?? [])]
+              .map(hardNormalizeString)
+              .some((name) => normalizedNames.has(name)),
           ),
         );
-        const sortedStationCodes = [...stationCodes].sort();
-        const matchingLineCodes = RAIL_LINES.filter((line) =>
-          line.stations.some((staticStation) =>
-            matchingStaticStations.includes(staticStation),
-          ),
-        ).map((line) => line.code);
-
-        const aliases = Array.from(
-          new Set([
-            station.name,
-            station.id,
-            ...station.lines,
-            ...sortedStationCodes,
-            ...matchingStaticStations.flatMap((staticStation) => [
-              staticStation.name,
-              ...(staticStation.alternativeNames ?? []),
-            ]),
-            ...RAIL_LINES.filter((line) =>
-              line.stations.some((staticStation) =>
-                matchingStaticStations.includes(staticStation),
-              ),
-            ).flatMap((line) => [line.colorName, line.lineId, line.fullName]),
-          ]),
-        );
-
-        const canonicalStationName = getCanonicalRailStationName(
+        const stationCode = station.primaryId.toString();
+        const aliases = new Set([
           station.name,
-          matchingLineCodes,
-        );
-        const stationKey = station.id;
+          station.originalName,
+          stationCode,
+          ...station.mergedIds.map(String),
+          ...station.lines,
+          ...selectedLines.flatMap((line) => [
+            line.colorName,
+            line.lineId,
+            line.fullName,
+          ]),
+          ...matchingStaticStations.flatMap((staticStation) => [
+            staticStation.code,
+            staticStation.name,
+            ...(staticStation.alternativeNames ?? []),
+          ]),
+        ]);
 
-        stationDocsByNormalizedName.set(normalizedName, {
-          id: stationKey,
-          station_code: stationKey,
-          station_name: canonicalStationName,
-          station_aliases: aliases,
+        return {
+          id: stationCode,
+          station_code: stationCode,
+          station_name:
+            lineCodes.length > 0
+              ? getCanonicalRailStationName(station.name, lineCodes)
+              : station.name,
+          station_aliases: Array.from(aliases),
           location: [station.latitude, station.longitude],
-        });
+        };
       });
-
-      // Add any static-only stations from RAIL_LINES that don't exist in the DB
-      // When deciding whether a station already exists, consider the normalized
-      // alternative names in RAIL_LINES too (so we don't duplicate stations when
-      // the DB name matches a static station's alt name).
-      RAIL_LINES.forEach((line) => {
-        line.stations.forEach((staticStation) => {
-          const normalizedStaticName = hardNormalizeString(staticStation.name);
-          const normalizedAlternativeNames = (
-            staticStation.alternativeNames ?? []
-          ).map(hardNormalizeString);
-
-          const alreadyIndexed = [
-            normalizedStaticName,
-            ...normalizedAlternativeNames,
-          ].some((normalized) => stationDocsByNormalizedName.has(normalized));
-
-          if (!alreadyIndexed) {
-            stationDocsByNormalizedName.set(normalizedStaticName, {
-              id: staticStation.code,
-              station_code: staticStation.code,
-              station_name: staticStation.name,
-              station_aliases: [
-                ...(staticStation.alternativeNames ?? []),
-                line.colorName,
-                line.lineId,
-                line.fullName,
-              ],
-              // No location available for static-only stations
-            });
-          }
-        });
-      });
-
-      const stationDocuments = Array.from(stationDocsByNormalizedName.values());
 
       await this.typesenseService.indexRailStations(stationDocuments);
       this.logger.debug(`Indexed ${stationDocuments.length} rail stations`);

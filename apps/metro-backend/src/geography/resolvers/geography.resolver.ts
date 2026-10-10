@@ -318,7 +318,7 @@ export class GeographyResolver {
 
   @Query(() => [RouteRailConnection], {
     description:
-      'Find GeoSampa rail stations within 200m of future stops for bus routes serving a stop',
+      'Find selected rail stations within 200m of future stops for bus routes serving a stop',
   })
   async routeRailConnectionsForStop(
     @Args('stopId', { type: () => String }) stopId: string,
@@ -330,16 +330,15 @@ export class GeographyResolver {
     );
   }
 
-  // GeoSampa rail stations (from mvt_rail_stations materialized view)
   @Query(() => [RailStation], {
-    description: 'Get all rail stations from GeoSampa data (Metro and CPTM)',
+    description: 'Get all rail stations from the selected dataset per line',
   })
   async railStations(): Promise<RailStation[]> {
     return this.railStationService.getAllRailStations();
   }
 
   @Query(() => [RailStation], {
-    description: 'Get rail stations within bounding box from GeoSampa data',
+    description: 'Get selected rail stations within a bounding box',
   })
   async railStationsInBounds(
     @Args('bounds', { type: () => BoundingBoxInput }, new ValidationPipe())
@@ -350,7 +349,7 @@ export class GeographyResolver {
 
   @Query(() => RailStation, {
     nullable: true,
-    description: 'Get a single rail station by ID from GeoSampa data',
+    description: 'Get a selected rail station by its primary ID or source alias',
   })
   async railStation(
     @Args('id', { type: () => ID }) id: string,
@@ -359,7 +358,7 @@ export class GeographyResolver {
   }
 
   @Query(() => [RailStation], {
-    description: 'Search rail stations by name from GeoSampa data',
+    description: 'Search selected rail stations by name',
   })
   async searchRailStations(
     @Args('searchTerm', { type: () => String }) searchTerm: string,
@@ -369,7 +368,6 @@ export class GeographyResolver {
     return this.railStationService.searchRailStations(searchTerm, limit);
   }
 
-  // Merged rail stations (GeoSampa data - for merged Metro + CPTM stations)
   @Query(() => [MergedRailStation], {
     description:
       'Get all merged rail stations (pre-processed for deduplication)',

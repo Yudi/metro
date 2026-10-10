@@ -24,8 +24,7 @@ describe('RailImportService', () => {
   let railVectorTileService: { refreshMvtViewsWithinImport: jest.Mock };
   let vectorTilesService: { clearCache: jest.Mock };
   let searchService: {
-    indexRailLines: jest.Mock;
-    indexRailStations: jest.Mock;
+    rebuildRailData: jest.Mock;
   };
 
   beforeEach(() => {
@@ -57,8 +56,7 @@ describe('RailImportService', () => {
     railVectorTileService = { refreshMvtViewsWithinImport: jest.fn() };
     vectorTilesService = { clearCache: jest.fn() };
     searchService = {
-      indexRailLines: jest.fn(),
-      indexRailStations: jest.fn(),
+      rebuildRailData: jest.fn(),
     };
 
     service = new RailImportService(
@@ -159,8 +157,7 @@ describe('RailImportService', () => {
       expect(
         railVectorTileService.refreshMvtViewsWithinImport,
       ).toHaveBeenCalledTimes(1);
-      expect(searchService.indexRailLines).toHaveBeenCalledTimes(1);
-      expect(searchService.indexRailStations).toHaveBeenCalledTimes(1);
+      expect(searchService.rebuildRailData).toHaveBeenCalledTimes(1);
       expect(vectorTilesService.clearCache).toHaveBeenCalledTimes(1);
       expect(datasets.get(changedSource.source)?.fileHash).toBe(retryHash);
 
@@ -181,7 +178,7 @@ describe('RailImportService', () => {
       const refresh =
         stage === 'views'
           ? railVectorTileService.refreshMvtViewsWithinImport
-          : searchService.indexRailStations;
+          : searchService.rebuildRailData;
       refresh.mockRejectedValueOnce(new Error('refresh failed'));
 
       await expect(service.clearAndReimport()).rejects.toThrow(
@@ -190,7 +187,7 @@ describe('RailImportService', () => {
       expect(datasets.size).toBe(0);
       expect(vectorTilesService.clearCache).not.toHaveBeenCalled();
 
-      searchService.indexRailStations.mockImplementation(async () => {
+      searchService.rebuildRailData.mockImplementation(async () => {
         expect(datasets.size).toBe(0);
       });
       restart();
@@ -295,15 +292,28 @@ describe('RailImportService', () => {
     expect(vectorTilesService.clearCache).not.toHaveBeenCalled();
   });
 
-  it('finishes GeoSampa-derived views before rebuilding rail search indexes', async () => {
+  it('finishes GeoSampa-derived views before replacing rail search collections', async () => {
+    const [source] = WFSConfig.getAllSources();
     Object.defineProperty(service, 'performImport', {
-      value: jest.fn().mockResolvedValue({
-        success: true,
-        sourcesProcessed: 1,
-        recordsImported: 1,
-        skippedSources: [],
-        errors: [],
-      }),
+      value: jest.fn(
+        async (
+          _forceReimport: boolean,
+          pendingDatasets: WFSDatasetMetadata[],
+        ) => {
+          pendingDatasets.push({
+            source: source.source,
+            fileHash: 'updated-hash',
+            fileSize: 123,
+          });
+          return {
+            success: true,
+            sourcesProcessed: 1,
+            recordsImported: 1,
+            skippedSources: [],
+            errors: [],
+          };
+        },
+      ),
     });
 
     await service.startImport();
@@ -312,11 +322,14 @@ describe('RailImportService', () => {
       railVectorTileService.refreshMvtViewsWithinImport.mock
         .invocationCallOrder[0];
     expect(viewRefreshOrder).toBeLessThan(
-      searchService.indexRailLines.mock.invocationCallOrder[0],
+      searchService.rebuildRailData.mock.invocationCallOrder[0],
     );
-    expect(viewRefreshOrder).toBeLessThan(
-      searchService.indexRailStations.mock.invocationCallOrder[0],
+    expect(
+      searchService.rebuildRailData.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      wfsDatabaseService.createOrUpdateDataset.mock.invocationCallOrder[0],
     );
+    expect(searchService.rebuildRailData).toHaveBeenCalledTimes(1);
     expect(vectorTilesService.clearCache).toHaveBeenCalledTimes(1);
   });
 

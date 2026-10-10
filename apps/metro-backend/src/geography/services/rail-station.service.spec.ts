@@ -38,4 +38,17 @@ describe('RailStationService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(queryRaw).not.toHaveBeenCalled();
   });
+
+  it('looks up source aliases and returns the same public ID as list and tile results', async () => {
+    const queryRaw = jest.fn().mockResolvedValue([
+      { id: 42, name: 'Campo Belo', lines: ['Lilás', 'Ouro'], agencies: ['motiva', 'metro'],
+        latitude: -23.6185, longitude: -46.6834, status: null },
+    ]);
+    const service = new RailStationService({ $queryRaw: queryRaw } as never);
+
+    expect(await service.getRailStationById('1000000001')).toMatchObject({ id: '42' });
+    const query = queryRaw.mock.calls[0][0] as TemplateStringsArray;
+    expect(query.join('')).toContain('m."primaryId" AS id');
+    expect(query.join('')).toContain('ANY(m."mergedIds")');
+  });
 });

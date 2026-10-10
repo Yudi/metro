@@ -1,6 +1,15 @@
 import { RailVectorTileService } from './rail-vector-tile.service';
 
 describe('RailVectorTileService refresh coordination', () => {
+  it('publishes configured station and shape sources on startup', async () => {
+    const service = new RailVectorTileService({} as never, {} as never, {} as never);
+    const refresh = jest.spyOn(service, 'refreshMvtViews').mockResolvedValue(undefined);
+
+    await service.onModuleInit();
+
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
   it('uses the shared transit catalog lock outside an existing import', async () => {
     const importLock = {
       withLock: jest.fn(

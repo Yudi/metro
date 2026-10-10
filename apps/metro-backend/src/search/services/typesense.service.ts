@@ -263,13 +263,30 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
     throw error;
   }
 
-  async beginFullRebuild(): Promise<void> {
+  async beginFullRebuild(
+    collectionNames: readonly string[] = TYPESENSE_BASE_COLLECTION_NAMES,
+  ): Promise<void> {
+    if (!Array.isArray(collectionNames) || collectionNames.length === 0) {
+      throw new Error('Typesense rebuild requires at least one collection');
+    }
+
+    const requestedNames = new Set(collectionNames);
+    const validNames = new Set(TYPESENSE_BASE_COLLECTION_NAMES);
+    if (
+      requestedNames.size !== collectionNames.length ||
+      collectionNames.some((name) => !validNames.has(name))
+    ) {
+      throw new Error('Typesense rebuild contains an invalid collection name');
+    }
+
     if (this.rebuildCollectionTargets.size > 0) {
       throw new Error('Typesense full rebuild already in progress');
     }
 
     const rebuildId = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-    const schemas = TYPESENSE_COLLECTION_SCHEMAS;
+    const schemas = TYPESENSE_COLLECTION_SCHEMAS.filter(([baseName]) =>
+      requestedNames.has(baseName),
+    );
 
     const created: string[] = [];
     try {

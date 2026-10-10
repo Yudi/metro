@@ -7,6 +7,11 @@ import {
   busRouteSearchResult,
   busStopSearchResult,
 } from '../testing/search.fixtures';
+import {
+  GPKG_LINES_COLLECTION_NAME,
+  GPKG_STATIONS_COLLECTION_NAME,
+  TYPESENSE_COLLECTION_SCHEMAS,
+} from './typesense-schemas';
 
 describe('TypesenseService', () => {
   afterEach(() => {
@@ -69,6 +74,106 @@ describe('TypesenseService', () => {
       ).importDocuments('metro-sptrans-gtfs-routes', [{ id: 'bad' }]),
     ).rejects.toThrow('rejected 1 malformed');
   });
+
+  it('rebuilds only the requested collections and swaps only their aliases', async () => {
+    const createdSchemas: Array<Record<string, unknown>> = [];
+    const createCollection = jest.fn(
+      async (schema: Record<string, unknown>) => {
+        createdSchemas.push(schema);
+        return {};
+      },
+    );
+    const retrieveCollection = jest
+      .fn()
+      .mockResolvedValue({ num_documents: 0 });
+    const deleteCollection = jest.fn().mockResolvedValue(undefined);
+    const upsertAlias = jest.fn().mockResolvedValue(undefined);
+    const collections = jest.fn((name?: string) =>
+      name
+        ? { retrieve: retrieveCollection, delete: deleteCollection }
+        : { create: createCollection },
+    );
+    const service = new TypesenseService(new ConfigService());
+    (service as never as { client: unknown }).client = {
+      collections,
+      aliases: jest.fn(() => ({ upsert: upsertAlias })),
+    };
+
+    await service.beginFullRebuild([
+      GPKG_LINES_COLLECTION_NAME,
+      GPKG_STATIONS_COLLECTION_NAME,
+    ]);
+
+    expect(createdSchemas.map((schema) => schema['name'])).toEqual([
+      expect.stringMatching(/^metro-rail-lines__rebuild_/),
+      expect.stringMatching(/^metro-rail-stations__rebuild_/),
+    ]);
+
+    await service.finishFullRebuild();
+
+    expect(upsertAlias.mock.calls.map(([name]) => name)).toEqual([
+      `${GPKG_LINES_COLLECTION_NAME}__live`,
+      `${GPKG_STATIONS_COLLECTION_NAME}__live`,
+    ]);
+    service.onModuleDestroy();
+  });
+
+  it('keeps full rebuild as the default collection scope', async () => {
+    const createdSchemas: Array<Record<string, unknown>> = [];
+    const deleteCollection = jest.fn().mockResolvedValue(undefined);
+    const createCollection = jest.fn(
+      async (schema: Record<string, unknown>) => {
+        createdSchemas.push(schema);
+        return {};
+      },
+    );
+    const service = new TypesenseService(new ConfigService());
+    (service as never as { client: unknown }).client = {
+      collections: jest.fn((name?: string) =>
+        name
+          ? { delete: deleteCollection }
+          : { create: createCollection },
+      ),
+    };
+
+    await service.beginFullRebuild();
+
+    expect(createdSchemas.map((schema) => schema['name'])).toEqual(
+      TYPESENSE_COLLECTION_SCHEMAS.map(([name]) =>
+        expect.stringMatching(new RegExp(`^${name}__rebuild_`)),
+      ),
+    );
+    await service.discardFullRebuild();
+    service.onModuleDestroy();
+  });
+
+  it.each([
+    { collectionNames: [] as string[], expectedMessage: 'at least one' },
+    { collectionNames: [''], expectedMessage: 'invalid collection name' },
+    { collectionNames: ['unknown'], expectedMessage: 'invalid collection name' },
+    {
+      collectionNames: [
+        GPKG_LINES_COLLECTION_NAME,
+        GPKG_LINES_COLLECTION_NAME,
+      ],
+      expectedMessage: 'invalid collection name',
+    },
+  ])(
+    'rejects invalid scoped rebuild names before creating collections: $expectedMessage',
+    async ({ collectionNames, expectedMessage }) => {
+      const createCollection = jest.fn();
+      const service = new TypesenseService(new ConfigService());
+      (service as never as { client: unknown }).client = {
+        collections: jest.fn(() => ({ create: createCollection })),
+      };
+
+      await expect(
+        service.beginFullRebuild(collectionNames),
+      ).rejects.toThrow(expectedMessage);
+      expect(createCollection).not.toHaveBeenCalled();
+      service.onModuleDestroy();
+    },
+  );
 
   it('requests Typesense relevance order with stable per-collection ties', async () => {
     const route1 = busRouteSearchResult({

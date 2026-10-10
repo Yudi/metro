@@ -1,9 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { RAIL_LINES } from '@metro/shared/utils';
-import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { tileToBounds } from '../utils/vector-tile-geometry.util';
 import { RailVectorTileService } from './rail-vector-tile.service';
+import { railRoutesSql } from '../../rail-import/services/rail-route-interop.sql';
 
 type RailMvtViewName = 'mvt_rail_stations' | 'mvt_rail_routes';
 
@@ -17,9 +16,6 @@ export class RailTileService {
     private readonly railVectorTileService: RailVectorTileService,
   ) {}
 
-  /**
-   * Generate MVT tile for rail stations (Metro + CPTM stations from GeoSampa WFS).
-   */
   async generateRailStationsTile(
     z: number,
     x: number,
@@ -36,7 +32,7 @@ export class RailTileService {
       const result = await this.prisma.$queryRaw<[{ mvt: Buffer }]>`
         WITH mvtgeom AS (
           SELECT
-            s.id,
+            m."primaryId" AS id,
             s.name,
             to_jsonb(s.agencies)::text AS agencies,
             to_jsonb(s.lines)::text AS lines,
@@ -49,6 +45,7 @@ export class RailTileService {
               true
             ) AS geom
           FROM mvt_rail_stations s
+          INNER JOIN merged_rail_stations m ON m.id = s.id
           WHERE ST_Intersects(
             s.geom_3857,
             ST_MakeEnvelope(${minX}::float8, ${minY}::float8, ${maxX}::float8, ${maxY}::float8, 3857)
@@ -68,9 +65,6 @@ export class RailTileService {
     }
   }
 
-  /**
-   * Generate MVT tile for rail routes (Metro + CPTM lines from GeoSampa WFS).
-   */
   async generateRailRoutesTile(
     z: number,
     x: number,
@@ -84,20 +78,18 @@ export class RailTileService {
     const { minX, minY, maxX, maxY } = tileToBounds(z, x, y);
 
     try {
-      const railLineMetadata = this.getRailLineMetadataValues();
       const result = await this.prisma.$queryRaw<[{ mvt: Buffer }]>`
-        WITH line_metadata(line_code, color_hex, inferred_agency) AS (
-          VALUES ${railLineMetadata}
-        ),
+        ${railRoutesSql()},
         mvtgeom AS (
           SELECT
             r.id,
             r.name,
             r.line_number,
             r.agency,
-            lm.line_code,
-            lm.color_hex,
-            lm.inferred_agency,
+            r.line_number AS line_code,
+            r.color_hex,
+            r.agency AS inferred_agency,
+            r.source,
             ST_AsMVTGeom(
               r.geom_3857,
               ST_MakeEnvelope(${minX}::float8, ${minY}::float8, ${maxX}::float8, ${maxY}::float8, 3857),
@@ -105,8 +97,7 @@ export class RailTileService {
               256,
               true
             ) AS geom
-          FROM mvt_rail_routes r
-          LEFT JOIN line_metadata lm ON lm.line_code = r.line_number
+          FROM selected_rail_routes r
           WHERE ST_Intersects(
             r.geom_3857,
             ST_MakeEnvelope(${minX}::float8, ${minY}::float8, ${maxX}::float8, ${maxY}::float8, 3857)
@@ -124,15 +115,6 @@ export class RailTileService {
       );
       throw error;
     }
-  }
-
-  private getRailLineMetadataValues(): Prisma.Sql {
-    return Prisma.join(
-      RAIL_LINES.map(
-        (line) =>
-          Prisma.sql`(${line.code}::smallint, ${line.colorHex}::text, ${line.agency}::text)`,
-      ),
-    );
   }
 
   private async ensureRailMvtViewExists(

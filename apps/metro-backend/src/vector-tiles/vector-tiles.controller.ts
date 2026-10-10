@@ -47,7 +47,7 @@ export class VectorTilesController {
   @Get('rail-stations/:z/:x/:y.pbf')
   @Header('Content-Type', 'application/x-protobuf')
   @Header('Content-Encoding', 'identity')
-  @Header('Cache-Control', 'public, max-age=86400') // 24 hour cache
+  @Header('Cache-Control', 'public, max-age=300, must-revalidate')
   @Header('Access-Control-Allow-Origin', '*')
   @ApiOperation({
     summary: 'Get rail stations vector tile',
@@ -94,7 +94,7 @@ export class VectorTilesController {
   @Get('rail-routes/:z/:x/:y.pbf')
   @Header('Content-Type', 'application/x-protobuf')
   @Header('Content-Encoding', 'identity')
-  @Header('Cache-Control', 'public, max-age=86400') // 24 hour cache
+  @Header('Cache-Control', 'public, max-age=300, must-revalidate')
   @Header('Access-Control-Allow-Origin', '*')
   @ApiOperation({
     summary: 'Get rail routes vector tile',

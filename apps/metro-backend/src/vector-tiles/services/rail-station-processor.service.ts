@@ -1,9 +1,12 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { haversineDistanceKm } from '../../common/utils/geo-distance.util';
 import { SAO_PAULO_CITY } from '@metro/shared/cities';
 import {
   getStationDisplayName,
+  getCanonicalRailStationName,
+  hardNormalizeString,
   isStationMergeException,
   normalizeStationName,
   shouldMergeStations,
@@ -16,6 +19,11 @@ import {
   ImportLockService,
   TRANSIT_CATALOG_IMPORT_LOCK,
 } from '../../common/import-lock.service';
+import { RAIL_DATASETS } from '../../rail-import/config/rail-datasets.config';
+import {
+  type DatasetRailStation as RawRailStation,
+  selectRailStations,
+} from '../../rail-import/services/rail-station-interop.utils';
 
 /**
  * Raw station data from the local GeoSampa rail tables.
@@ -25,15 +33,6 @@ interface RawRailStationRow {
   name: string;
   line: string;
   line_number: number | null;
-  latitude: number;
-  longitude: number;
-}
-
-interface RawRailStation {
-  id: number;
-  name: string;
-  line: string;
-  lineCode: number | null;
   latitude: number;
   longitude: number;
 }
@@ -52,22 +51,8 @@ interface ProcessedRailStation {
   lines: string[];
 }
 
-/**
- * Service responsible for processing and merging rail stations from GeoSampa WFS data.
- *
- * This service:
- * 1. Fetches raw rail station data from provider-shaped PostGIS tables
- * 2. Merges stations with similar names (intermodal stations)
- * 3. Stores the merged results in the merged_rail_stations table
- *
- * The merging logic follows the same rules as GTFS:
- * - Stations with the same normalized name are merged
- * - Known exceptions (Lapa, Mooca) are never merged
- * - "Morumbi" and "São Paulo - Morumbi" are kept separate
- * - The closest station to city center is used as primary
- */
 @Injectable()
-export class RailStationProcessorService implements OnModuleInit {
+export class RailStationProcessorService {
   private readonly logger = new Logger(RailStationProcessorService.name);
 
   constructor(
@@ -76,48 +61,7 @@ export class RailStationProcessorService implements OnModuleInit {
     private readonly importLockService: ImportLockService,
   ) {}
 
-  /**
-   * Initialize on module startup - check if data exists
-   */
-  async onModuleInit(): Promise<void> {
-    this.logger.debug('Initializing rail station processor...');
-
-    try {
-      const hasData = await this.checkRailDataExists();
-      if (hasData) {
-        await this.refreshMergedStations();
-      } else {
-        this.logger.warn(
-          'No GeoSampa rail data found, skipping station processing',
-        );
-      }
-    } catch (error) {
-      this.logger.error('Failed to initialize rail station processor:', error);
-      // Don't throw - let the app continue starting
-    }
-  }
-
-  /**
-   * Check if GeoSampa rail data exists in the database
-   */
-  private async checkRailDataExists(): Promise<boolean> {
-    try {
-      const result = await this.prisma.$queryRaw<[{ count: bigint }]>`
-        SELECT COUNT(*) as count 
-        FROM information_schema.tables 
-        WHERE table_schema = 'external_gpkg'
-        AND table_name IN ('metro_station', 'trem_station')
-      `;
-      return Number(result[0]?.count || 0) >= 2;
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Process and refresh all merged rail stations.
-   * This should be called after GeoSampa WFS data import.
-   */
+  /** Refresh the catalog after a rail dataset import. */
   async refreshMergedStations(): Promise<void> {
     await this.importLockService.withLock(
       TRANSIT_CATALOG_IMPORT_LOCK,
@@ -130,20 +74,12 @@ export class RailStationProcessorService implements OnModuleInit {
     this.logger.debug('Starting rail station processing...');
 
     try {
-      // Step 1: Fetch raw station data
       const rawStations = await this.fetchRawRailStations();
       this.logger.debug(`Fetched ${rawStations.length} raw rail stations`);
 
-      if (rawStations.length === 0) {
-        this.logger.warn('No raw rail stations found');
-        return;
-      }
-
-      // Step 2: Merge stations with identical names
       const mergedStations = this.mergeStations(rawStations);
       this.logger.debug(`Merged into ${mergedStations.length} unique stations`);
 
-      // Step 3: Persist only when GeoSampa-derived station data changed.
       const existingStations = await this.getAllStations();
       if (!this.haveSameStations(existingStations, mergedStations)) {
         await this.persistMergedStations(mergedStations);
@@ -151,8 +87,7 @@ export class RailStationProcessorService implements OnModuleInit {
         this.logger.debug('Merged rail stations are unchanged');
       }
 
-      // Refreshing is signature-gated, so this is also a cheap recovery check
-      // after a previous post-processing failure.
+      // This signature-gated refresh also recovers failed post-processing.
       await this.transitDataPrecompute.refreshRouteRailConnections();
 
       this.logger.debug('Rail station processing completed successfully');
@@ -162,10 +97,16 @@ export class RailStationProcessorService implements OnModuleInit {
     }
   }
 
-  /**
-   * Fetch raw rail stations from local GeoSampa tables
-   */
+  /** Select each line's source before merging interchanges. */
   private async fetchRawRailStations(): Promise<RawRailStation[]> {
+    const [geosampa, sptrans] = await Promise.all([
+      this.fetchGeosampaStations(),
+      this.fetchSptransStations(),
+    ]);
+    return selectRailStations(geosampa, sptrans);
+  }
+
+  private async fetchGeosampaStations(): Promise<RawRailStation[]> {
     const stations = await this.prisma.$queryRaw<RawRailStationRow[]>`
       WITH metro_stations AS (
         SELECT 
@@ -205,6 +146,52 @@ export class RailStationProcessorService implements OnModuleInit {
     }));
   }
 
+  private async fetchSptransStations(): Promise<RawRailStation[]> {
+    const lineByRouteId = new Map(
+      RAIL_DATASETS.flatMap((line) =>
+        line.gtfsRouteIds.map((routeId) => [routeId, line.lineCode] as const),
+      ),
+    );
+    const routeIds = [...lineByRouteId.keys()];
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        stop_id: string;
+        stop_name: string;
+        stop_lat: number;
+        stop_lon: number;
+        route_id: string;
+      }>
+    >`
+      SELECT DISTINCT s.stop_id, s.stop_name, s.stop_lat, s.stop_lon, t.route_id
+      FROM "public"."SPTrans_Stop" s
+      INNER JOIN "public"."SPTrans_StopTime" st ON st.stop_id = s.stop_id
+      INNER JOIN "public"."SPTrans_Trip" t ON t.trip_id = st.trip_id
+      WHERE t.route_id = ANY(${routeIds}::text[])
+      ORDER BY s.stop_id, t.route_id
+    `;
+
+    // Hash stable provider IDs into a numeric range reserved for SPTrans IDs.
+    const stopIdByNumericId = new Map<number, string>();
+    return rows.map((row) => {
+      const hash = createHash('sha256').update(`sptrans:${row.stop_id}`).digest();
+      const id = 1_000_000_000 + (hash.readUInt32BE(0) % 1_000_000_000);
+      const existingStopId = stopIdByNumericId.get(id);
+      if (existingStopId && existingStopId !== row.stop_id) {
+        throw new Error('SPTrans rail station identifier collision');
+      }
+      stopIdByNumericId.set(id, row.stop_id);
+      const lineCode = lineByRouteId.get(row.route_id) ?? null;
+      return {
+        id,
+        name: row.stop_name,
+        line: getRailLineByCode(lineCode ?? 0)?.colorName ?? row.route_id,
+        lineCode,
+        latitude: row.stop_lat,
+        longitude: row.stop_lon,
+      };
+    });
+  }
+
   /**
    * Merge stations with identical normalized names
    */
@@ -213,19 +200,31 @@ export class RailStationProcessorService implements OnModuleInit {
     const stationGroups = new Map<string, RawRailStation[]>();
 
     for (const station of stations) {
-      const normalizedName = normalizeStationName(station.name).toLowerCase();
+      const canonicalName = this.getCanonicalName(station);
+      const normalizedName = hardNormalizeString(normalizeStationName(canonicalName));
 
-      if (isStationMergeException(station.name)) {
+      if (isStationMergeException(canonicalName)) {
         const groupKey = this.getExceptionStationGroupKey(
           normalizedName,
           station.lineCode,
         );
         const group = stationGroups.get(groupKey);
 
-        if (group) {
+        if (
+          group &&
+          haversineDistanceKm(
+            station.latitude,
+            station.longitude,
+            group[0].latitude,
+            group[0].longitude,
+          ) <= 0.5
+        ) {
           group.push(station);
         } else {
-          stationGroups.set(groupKey, [station]);
+          stationGroups.set(
+            group ? `${groupKey}::station:${station.id}` : groupKey,
+            [station],
+          );
         }
 
         continue;
@@ -236,7 +235,15 @@ export class RailStationProcessorService implements OnModuleInit {
 
       for (const [existingKey, existingGroup] of stationGroups.entries()) {
         const existingStation = existingGroup[0];
-        if (shouldMergeStations(station.name, existingStation.name)) {
+        if (
+          shouldMergeStations(canonicalName, this.getCanonicalName(existingStation)) &&
+          haversineDistanceKm(
+            station.latitude,
+            station.longitude,
+            existingStation.latitude,
+            existingStation.longitude,
+          ) <= 0.5
+        ) {
           groupKey = existingKey;
           break;
         }
@@ -245,6 +252,9 @@ export class RailStationProcessorService implements OnModuleInit {
       // Use normalized name as key if no existing group found
       if (!groupKey) {
         groupKey = normalizedName;
+        if (stationGroups.has(groupKey)) {
+          groupKey = `${normalizedName}::station:${station.id}`;
+        }
       }
 
       const group = stationGroups.get(groupKey);
@@ -273,9 +283,9 @@ export class RailStationProcessorService implements OnModuleInit {
 
         mergedStations.push({
           primaryId: station.id,
-          mergedIds: [station.id],
+          mergedIds: station.mergedIds ?? [station.id],
           name: getStationDisplayName(
-            station.name,
+            this.getCanonicalName(station),
             station.lineCode ?? undefined,
           ),
           originalName: station.name,
@@ -298,8 +308,13 @@ export class RailStationProcessorService implements OnModuleInit {
    * Merge a group of stations into a single processed station
    */
   private mergeStationGroup(group: RawRailStation[]): ProcessedRailStation {
-    // Find the station closest to city center (primary station)
+    // Preserve GeoSampa IDs for interchanges; use proximity within each source.
     const primaryStation = group.reduce((closest, current) => {
+      const closestIsGtfsOnly = closest.id >= 1_000_000_000;
+      const currentIsGtfsOnly = current.id >= 1_000_000_000;
+      if (closestIsGtfsOnly !== currentIsGtfsOnly) {
+        return closestIsGtfsOnly ? current : closest;
+      }
       const closestDistance = haversineDistanceKm(
         closest.latitude,
         closest.longitude,
@@ -338,9 +353,9 @@ export class RailStationProcessorService implements OnModuleInit {
 
     return {
       primaryId: primaryStation.id,
-      mergedIds: group.map((s) => s.id),
+      mergedIds: [...new Set(group.flatMap((s) => s.mergedIds ?? [s.id]))],
       name: getStationDisplayName(
-        primaryStation.name,
+        this.getCanonicalName(primaryStation),
         primaryStation.lineCode ?? undefined,
       ),
       originalName: primaryStation.name,
@@ -349,6 +364,13 @@ export class RailStationProcessorService implements OnModuleInit {
       agencies: Array.from(allAgencies).sort(),
       lines: Array.from(allLines).sort(),
     };
+  }
+
+  private getCanonicalName(station: RawRailStation): string {
+    return getCanonicalRailStationName(
+      station.name,
+      station.lineCode === null ? [] : [station.lineCode],
+    );
   }
 
   private getExceptionStationGroupKey(

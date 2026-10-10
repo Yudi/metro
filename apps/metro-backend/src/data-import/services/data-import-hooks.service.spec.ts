@@ -1,9 +1,10 @@
 import { DataImportHooksService } from './data-import-hooks.service';
+import { RAIL_DATASET_SIGNATURE } from '../../rail-import/config/rail-datasets.config';
 
 describe('DataImportHooksService', () => {
   it('refreshes GTFS-derived data before rebuilding search indexes', async () => {
-    const subwayStationProcessor = {
-      refreshMergedStations: jest.fn().mockResolvedValue(undefined),
+    const railVectorTileService = {
+      refreshMvtViewsWithinImport: jest.fn().mockResolvedValue(undefined),
     };
     const precompute = {
       refreshAfterGtfsImport: jest.fn().mockResolvedValue(undefined),
@@ -16,7 +17,7 @@ describe('DataImportHooksService', () => {
     const routeStopMapping = { clearCaches: jest.fn() };
     const service = new DataImportHooksService(
       search as never,
-      subwayStationProcessor as never,
+      railVectorTileService as never,
       vectorTiles as never,
       precompute as never,
       gtfsDatabase as never,
@@ -25,7 +26,7 @@ describe('DataImportHooksService', () => {
 
     await service.onDataImportComplete();
 
-    expect(subwayStationProcessor.refreshMergedStations).toHaveBeenCalledTimes(
+    expect(railVectorTileService.refreshMvtViewsWithinImport).toHaveBeenCalledTimes(
       1,
     );
     expect(precompute.refreshAfterGtfsImport).toHaveBeenCalledTimes(1);
@@ -36,7 +37,7 @@ describe('DataImportHooksService', () => {
     expect(
       gtfsDatabase.analyzeImportedTables.mock.invocationCallOrder[0],
     ).toBeLessThan(
-      subwayStationProcessor.refreshMergedStations.mock.invocationCallOrder[0],
+      railVectorTileService.refreshMvtViewsWithinImport.mock.invocationCallOrder[0],
     );
     expect(
       precompute.refreshAfterGtfsImport.mock.invocationCallOrder[0],
@@ -57,7 +58,7 @@ describe('DataImportHooksService', () => {
     const routeStopMapping = { clearCaches: jest.fn() };
     const service = new DataImportHooksService(
       { indexAllData: search.indexAllData } as never,
-      { refreshMergedStations: jest.fn() } as never,
+      { refreshMvtViewsWithinImport: jest.fn() } as never,
       vectorTiles as never,
       precompute as never,
       gtfsDatabase as never,
@@ -78,14 +79,14 @@ describe('DataImportHooksService', () => {
       markGtfsPostProcessingComplete: jest.fn(),
       refreshAfterGtfsImport: jest.fn(),
     };
-    const subwayStationProcessor = { refreshMergedStations: jest.fn() };
+    const railVectorTileService = { refreshMvtViewsWithinImport: jest.fn() };
     const vectorTiles = { clearCache: jest.fn() };
     const search = { indexAllData: jest.fn() };
     const gtfsDatabase = { analyzeImportedTables: jest.fn() };
     const routeStopMapping = { clearCaches: jest.fn() };
     const service = new DataImportHooksService(
       search as never,
-      subwayStationProcessor as never,
+      railVectorTileService as never,
       vectorTiles as never,
       precompute as never,
       gtfsDatabase as never,
@@ -98,11 +99,11 @@ describe('DataImportHooksService', () => {
     });
 
     expect(precompute.isGtfsPostProcessingCurrent).toHaveBeenCalledWith(
-      'unchanged-feed',
+      `unchanged-feed:rail=${RAIL_DATASET_SIGNATURE}`,
     );
     expect(precompute.markGtfsPostProcessingPending).not.toHaveBeenCalled();
     expect(gtfsDatabase.analyzeImportedTables).not.toHaveBeenCalled();
-    expect(subwayStationProcessor.refreshMergedStations).not.toHaveBeenCalled();
+    expect(railVectorTileService.refreshMvtViewsWithinImport).not.toHaveBeenCalled();
     expect(search.indexAllData).not.toHaveBeenCalled();
     expect(routeStopMapping.clearCaches).not.toHaveBeenCalled();
   });
@@ -114,8 +115,8 @@ describe('DataImportHooksService', () => {
       markGtfsPostProcessingComplete: jest.fn().mockResolvedValue(undefined),
       refreshAfterGtfsImport: jest.fn().mockResolvedValue(undefined),
     };
-    const subwayStationProcessor = {
-      refreshMergedStations: jest.fn().mockResolvedValue(undefined),
+    const railVectorTileService = {
+      refreshMvtViewsWithinImport: jest.fn().mockResolvedValue(undefined),
     };
     const vectorTiles = { clearCache: jest.fn() };
     const search = {
@@ -130,7 +131,7 @@ describe('DataImportHooksService', () => {
     const routeStopMapping = { clearCaches: jest.fn() };
     const service = new DataImportHooksService(
       search as never,
-      subwayStationProcessor as never,
+      railVectorTileService as never,
       vectorTiles as never,
       precompute as never,
       gtfsDatabase as never,
@@ -152,6 +153,9 @@ describe('DataImportHooksService', () => {
     ).resolves.toBeUndefined();
 
     expect(precompute.markGtfsPostProcessingPending).toHaveBeenCalledTimes(2);
+    expect(precompute.markGtfsPostProcessingPending).toHaveBeenCalledWith(
+      `feed-with-failed-search:rail=${RAIL_DATASET_SIGNATURE}`,
+    );
     expect(precompute.markGtfsPostProcessingComplete).toHaveBeenCalledTimes(1);
     expect(gtfsDatabase.analyzeImportedTables).toHaveBeenCalledTimes(2);
     expect(search.indexAllData).toHaveBeenCalledTimes(2);

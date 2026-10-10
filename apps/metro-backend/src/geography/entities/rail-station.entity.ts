@@ -1,11 +1,7 @@
 import { ObjectType, Field, ID } from '@nestjs/graphql';
 import { GeometryData } from './geography.entity';
 
-/**
- * Rail station from the mvt_rail_stations materialized view.
- * Represents a Metro or CPTM station from authoritative GeoSampa WFS data.
- */
-@ObjectType({ description: 'Rail station from GeoSampa data (Metro or CPTM)' })
+@ObjectType({ description: 'Rail station from the selected dataset per line' })
 export class RailStation {
   @Field(() => ID)
   id!: string;

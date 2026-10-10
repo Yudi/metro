@@ -182,10 +182,7 @@ export class RailImportService implements OnModuleInit, OnApplicationBootstrap {
       if (result.sourcesProcessed > 0) {
         this.logger.debug('Refreshing rail vector tile views...');
         await this.railVectorTileService.refreshMvtViewsWithinImport();
-        await Promise.all([
-          this.searchService.indexRailLines(),
-          this.searchService.indexRailStations(),
-        ]);
+        await this.searchService.rebuildRailData();
 
         this.vectorTilesService.clearCache();
       }

@@ -3,10 +3,6 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { RailStation } from '../entities/rail-station.entity';
 import { BoundingBoxInput } from '../dto/geography.input';
 
-/**
- * Service for GeoSampa rail stations (Metro and CPTM)
- * Queries the mvt_rail_stations materialized view
- */
 @Injectable()
 export class RailStationService {
   private readonly logger = new Logger(RailStationService.name);
@@ -30,7 +26,7 @@ export class RailStationService {
         },
       }));
     } catch (error) {
-      this.logger.error('Failed to fetch merged subway stations', error);
+      this.logger.error('Failed to fetch selected rail stations', error);
       throw error;
     }
   }
@@ -53,14 +49,15 @@ export class RailStationService {
       }>
     >`
       SELECT 
-        id,
-        name,
-        lines,
-        agencies,
+        m."primaryId" AS id,
+        s.name,
+        s.lines,
+        s.agencies,
         NULL::TEXT as status,
         ST_Y(ST_Transform(geom_3857, 4326)) as latitude,
         ST_X(ST_Transform(geom_3857, 4326)) as longitude
-      FROM mvt_rail_stations
+      FROM mvt_rail_stations s
+      INNER JOIN merged_rail_stations m ON m.id = s.id
       WHERE ST_Within(
         geom_3857,
         ST_Transform(
@@ -118,15 +115,16 @@ export class RailStationService {
       }>
     >`
       SELECT 
-        id,
-        name,
-        lines,
-        agencies,
+        m."primaryId" AS id,
+        s.name,
+        s.lines,
+        s.agencies,
         NULL::TEXT as status,
         ST_Y(ST_Transform(geom_3857, 4326)) as latitude,
         ST_X(ST_Transform(geom_3857, 4326)) as longitude
-      FROM mvt_rail_stations
-      WHERE id = ${numericId}
+      FROM mvt_rail_stations s
+      INNER JOIN merged_rail_stations m ON m.id = s.id
+      WHERE m."primaryId" = ${numericId} OR ${numericId} = ANY(m."mergedIds")
       LIMIT 1
     `;
 

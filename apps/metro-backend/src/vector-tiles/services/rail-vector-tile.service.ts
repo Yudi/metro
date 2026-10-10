@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RailStationProcessorService } from './rail-station-processor.service';
 import {
@@ -7,13 +7,10 @@ import {
 } from '../../common/import-lock.service';
 
 /**
- * Service responsible for refreshing rail data MVT materialized views.
- *
- * The views are created by migration and recreated after GeoSampa WFS import.
- * Views: mvt_rail_stations, mvt_rail_routes
+ * Refreshes the selected station catalog and caches raw GeoSampa route shapes.
  */
 @Injectable()
-export class RailVectorTileService {
+export class RailVectorTileService implements OnModuleInit {
   private readonly logger = new Logger(RailVectorTileService.name);
 
   constructor(
@@ -22,10 +19,16 @@ export class RailVectorTileService {
     private readonly importLockService: ImportLockService,
   ) {}
 
-  /**
-   * Refresh all rail MVT materialized views
-   * Call this after GeoSampa WFS data import
-   */
+  async onModuleInit(): Promise<void> {
+    try {
+      // Refresh views on startup so source configuration changes take effect.
+      await this.refreshMvtViews();
+    } catch (error) {
+      this.logger.error('Failed to initialize the selected rail catalog:', error);
+    }
+  }
+
+  /** Refresh views after a rail-data import or source configuration change. */
   async refreshMvtViews(): Promise<void> {
     await this.importLockService.withLock(
       TRANSIT_CATALOG_IMPORT_LOCK,

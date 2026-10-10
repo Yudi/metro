@@ -9,6 +9,7 @@ import {
   type RailVehicleMapContext,
 } from '@metro/rail-integration-contracts';
 import { PrismaService } from '../../prisma/prisma.service';
+import { railRoutesSql } from '../../rail-import/services/rail-route-interop.sql';
 
 const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000;
 
@@ -127,11 +128,12 @@ export class RailMapContextService {
 
   private async loadPathPoints(lineNumber: number): Promise<PathPointRow[]> {
     return this.prisma.$queryRaw<PathPointRow[]>`
-      WITH line_shape AS (
+      ${railRoutesSql()},
+      line_shape AS (
         SELECT ST_LineMerge(
           ST_CollectionExtract(ST_Collect(r.geom_3857 ORDER BY r.id), 2)
         ) AS geom
-        FROM "public"."mvt_rail_routes" r
+        FROM selected_rail_routes r
         WHERE r.line_number = ${lineNumber}
           AND r.geom_3857 IS NOT NULL
       ),

@@ -14,6 +14,12 @@ export interface BusRouteInsight {
   routeId: string;
   shortName: string;
   longName: string;
+  favoriteId?: string;
+  favoriteCode?: string;
+  requestedCode?: string;
+  destination?: string;
+  directionId?: number;
+  favoriteNotice?: string;
   color?: string;
   textColor?: string;
   sourceAgency?: string;
@@ -44,6 +50,10 @@ export interface BusRouteGraphQL {
   routeId: string;
   shortName: string;
   longName: string;
+  favoriteCode?: string;
+  requestedCode?: string;
+  destination?: string;
+  directionId?: number;
   color?: string;
   textColor?: string;
   sourceAgency?: string;
@@ -66,6 +76,7 @@ export interface BusFavoritesLookupResponse {
       mergedStopIds?: string[];
     }>;
   };
+  errors?: readonly unknown[];
 }
 
 export interface MergedRailStationInsight {

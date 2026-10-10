@@ -41,7 +41,9 @@
                 [style.color]="routeTextColor()"
                 >{{ route.shortName }}</span
               >
-              <span class="route-name">{{ route.longName }}</span>
+              <span class="route-name">
+                {{ requestedDirection()?.direction.destination || route.longName }}
+              </span>
             </h2>
             <p class="agency">
               @if (agencyLogo(); as logo) {
@@ -61,6 +63,67 @@
             </a>
           }
         </header>
+
+        <section
+          class="direction-favorites"
+          aria-labelledby="direction-favorites-heading"
+        >
+          <h3 id="direction-favorites-heading">Favoritar por destino</h3>
+          <p class="supporting">
+            Escolha os destinos que deseja acompanhar nos seus favoritos.
+          </p>
+          @if (directions().length && isWholeLineFavorite(directions()[0])) {
+            @if (directionCandidates().length < 2) {
+              <p class="supporting" role="status">
+                A linha inteira está salva. Os sentidos ainda não puderam ser
+                separados.
+              </p>
+            } @else {
+            <p class="supporting" role="status">
+              A linha inteira está salva. Ao escolher um destino, ela será
+              separada em favoritos por sentido.
+            </p>
+            }
+          }
+          @if (directionState().loading) {
+            <p role="status">Carregando destinos da linha…</p>
+          } @else if (directions().length) {
+            <div class="direction-favorite-list">
+              @for (
+                direction of directions();
+                track direction.favoriteCode || direction.directionId
+              ) {
+                <button
+                  mat-stroked-button
+                  type="button"
+                  class="direction-favorite"
+                  [attr.aria-pressed]="isDirectionFavorite(direction)"
+                  [attr.aria-label]="directionFavoriteLabel(direction)"
+                  [disabled]="directionFavoriteDisabled(direction)"
+                  (click)="toggleDirectionFavorite(direction)"
+                >
+                  <span
+                    class="route-badge direction-badge"
+                    [style.background-color]="directionColor(direction)"
+                    [style.color]="directionTextColor(direction)"
+                  >
+                    {{ direction.shortName }}
+                  </span>
+                  <span class="destination-name">
+                    {{ direction.destination || direction.longName }}
+                  </span>
+                  <mat-icon aria-hidden="true">
+                    {{ isDirectionFavorite(direction) ? "favorite" : "favorite_border" }}
+                  </mat-icon>
+                </button>
+              }
+            </div>
+          } @else {
+            <p class="supporting" role="status">
+              Os destinos desta linha estão indisponíveis no momento.
+            </p>
+          }
+        </section>
 
         <div class="controls">
           @if (published(); as published) {
@@ -126,6 +189,18 @@
             }
           }
         </div>
+
+        @if (requestedFavoriteCode && !requestedFavoriteIsWholeLine() && !directionState().loading && !requestedDirection()) {
+          <p class="supporting" role="status">
+            O destino salvo não foi localizado nesta linha. Escolha um percurso
+            disponível para consultar os horários.
+          </p>
+        } @else if (requestedDirection() && patterns().length && !pattern()) {
+          <p class="supporting" role="status">
+            Não foi possível relacionar o destino salvo a um percurso. Escolha
+            um sentido manualmente para consultar os horários.
+          </p>
+        }
 
         <dl class="route-facts">
           <div>

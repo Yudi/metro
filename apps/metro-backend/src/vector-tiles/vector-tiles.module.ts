@@ -7,6 +7,7 @@ import { RailStationProcessorService } from './services/rail-station-processor.s
 import { BikeVectorTileService } from './services/bike-vector-tile.service';
 import { BusVectorTileService } from './services/bus-vector-tile.service';
 import { RailTileService } from './services/rail-tile.service';
+import { BusDirectionService } from '../geography/services/bus-direction.service';
 import { VectorTileCacheService } from './services/vector-tile-cache.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { BikeModule } from '../bike/bike.module';
@@ -22,6 +23,7 @@ import { TransitDataModule } from '../transit-data/transit-data.module';
     RailStationProcessorService,
     VectorTileCacheService,
     RailTileService,
+    BusDirectionService,
     BusVectorTileService,
     BikeVectorTileService,
   ],

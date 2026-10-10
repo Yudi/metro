@@ -77,3 +77,22 @@ export const UnknownAgency: Story = {
     }),
   },
 };
+
+/** Synthetic opposite-direction cards share a line code but retain separate identities. */
+export const SeparateDestinations: Story = {
+  render: () => {
+    const outbound = toSearchResult(ROUTE_ARTESP_001);
+    const inbound = toSearchResult(ROUTE_ARTESP_001);
+    if (!outbound.routeData || !inbound.routeData) {
+      throw new Error('Direction fixtures must include route data');
+    }
+    outbound.id = 'direction-outbound';
+    inbound.id = 'direction-inbound';
+    outbound.routeData = { ...outbound.routeData, favoriteCode: outbound.id, destination: 'Terminal Central', directionId: 0 };
+    inbound.routeData = { ...inbound.routeData, favoriteCode: inbound.id, destination: 'Terminal Bairro', directionId: 1 };
+    return {
+      props: { outbound, inbound },
+      template: `<app-search-result-card [result]="outbound" /><app-search-result-card [result]="inbound" />`,
+    };
+  },
+};

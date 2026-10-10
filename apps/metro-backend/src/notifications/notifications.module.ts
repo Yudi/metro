@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { BusDirectionService } from '../geography/services/bus-direction.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AuthService } from '../user/auth.service';
 import { SaoPauloTransitModule } from '../cities/sp/sp-transit.module';
@@ -20,6 +21,7 @@ import { WsThrottlerGuard } from '../common/guards/ws-throttler.guard';
 @Module({
   imports: [PrismaModule, SaoPauloTransitModule],
   providers: [
+    BusDirectionService,
     NotificationRetentionService,
     AuthService,
     WsThrottlerGuard,

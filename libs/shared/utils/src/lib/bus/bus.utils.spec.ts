@@ -14,6 +14,12 @@ describe('bus identity and feed helpers', () => {
   it('keeps route identity independent from a colliding short name', () => {
     expect(getBusRouteIdentity({ routeId: 'artesp:001' })).toBe('artesp:001');
     expect(getBusRouteIdentity({ routeId: '001' })).toBe('001');
+    expect(
+      getBusRouteIdentity({
+        routeId: 'gtfs:001',
+        favoriteCode: ' bus:v1:sptrans:001:0~0:0~0:0~0 ',
+      }),
+    ).toBe('bus:v1:sptrans:001:0~0:0~0:0~0');
   });
 
   it('allows realtime only for SPTrans routes', () => {
@@ -157,4 +163,16 @@ describe('bus identity and feed helpers', () => {
     expect(departures[0].departureTime).toContain('14:30');
     expect(groupScheduledBusDepartures([])).toEqual([]);
   });
+});
+
+it('groups opposite destinations independently while preserving each departure route ID', () => {
+  const departures = [
+    { routeId: 'feed-route', headsign: 'Terminal A', departureTime: '2026-10-10T12:00:00Z' },
+    { routeId: 'feed-route', headsign: 'Terminal B', departureTime: '2026-10-10T12:05:00Z' },
+  ];
+  const groups = groupScheduledBusDepartures(departures, 5,
+    (departure) => JSON.stringify([departure.routeId, departure.headsign]),
+  );
+  expect(groups).toHaveLength(2);
+  expect(groups.every((group) => group.departures[0].routeId === 'feed-route')).toBe(true);
 });

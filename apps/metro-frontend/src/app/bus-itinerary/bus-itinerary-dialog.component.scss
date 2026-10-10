@@ -70,6 +70,39 @@ dt,
 .route-heading a {
   flex-shrink: 0;
 }
+.direction-favorites {
+  margin-block: 0 1.5rem;
+}
+.direction-favorites h3 {
+  margin-bottom: 0.375rem;
+}
+.direction-favorite-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.direction-favorite {
+  display: inline-flex;
+  min-height: 44px;
+  height: auto;
+  align-items: center;
+  gap: 0.625rem;
+  padding-block: 0.375rem;
+  text-align: start;
+}
+.direction-badge {
+  min-width: 0;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+.destination-name {
+  max-width: 28ch;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+.direction-favorite mat-icon {
+  flex-shrink: 0;
+}
 .agency {
   display: inline-flex;
   align-items: center;

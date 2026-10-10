@@ -32,6 +32,17 @@
                 >
                   {{ route.shortName }}
                 </span>
+                @if (route.destination) {
+                  <span
+                    class="route-direction"
+                    [title]="'Sentido ' + route.destination"
+                  >
+                    <span class="route-direction-label">Sentido</span>
+                    <span class="route-direction-destination">
+                      {{ route.destination }}
+                    </span>
+                  </span>
+                }
                 @if (getAgencyIdentity(route); as agency) {
                   <span class="agency-identity">
                     @if (agency.iconPath; as iconPath) {
@@ -54,7 +65,11 @@
               </span>
               <button
                 matChipRemove
-                aria-label="Remover rota {{ route.shortName }}"
+                [attr.aria-label]="
+                  'Remover rota ' +
+                  route.shortName +
+                  (route.destination ? ' no sentido ' + route.destination : '')
+                "
               >
                 <mat-icon>cancel</mat-icon>
               </button>

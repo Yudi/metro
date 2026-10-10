@@ -21,9 +21,14 @@ import {
   createRailStatusResponse,
   LINES_WITH_ISSUES,
 } from '@metro/storybook-mocks';
-import { FavoriteList, emptyFavorites } from '@metro/shared/utils';
+import {
+  FavoriteList,
+  emptyFavorites,
+  encodeBusDirectionFavorite,
+} from '@metro/shared/utils';
 import { LiteRealtimeService } from '../../shared/realtime/lite-realtime.service';
 import { Dashboard } from './dashboard';
+import type { BusRouteGraphQL } from './dashboard.types';
 
 type DashboardScenario =
   | 'comFavoritos'
@@ -64,6 +69,76 @@ const artespDashboardSelections: DashboardFavoriteSelections = {
   railStationLines: {},
 };
 
+const sptransStoryRoute: BusRouteGraphQL = {
+  routeId: '477A-10',
+  shortName: '477A-10',
+  longName: 'Sacoma - Terminal Pinheiros',
+  color: '2563eb',
+  textColor: 'ffffff',
+  sourceAgency: 'sptrans',
+};
+
+const secondSptransStoryRoute: BusRouteGraphQL = {
+  routeId: '875A-10',
+  shortName: '875A-10',
+  longName: 'Aeroporto - Perdizes',
+  color: '16a34a',
+  textColor: 'ffffff',
+  sourceAgency: 'sptrans',
+};
+
+function createStoryDirections(route: BusRouteGraphQL): BusRouteGraphQL[] {
+  const [origin, destination] = route.longName.split(/\s+[-–]\s+/);
+  const firstTerminal = origin || route.longName;
+  const secondTerminal = destination || route.longName;
+  return [0, 1].map((directionId) => {
+    const start = directionId === 0 ? 0 : 1;
+    const end = directionId === 0 ? 1 : 0;
+    const coordinates = [
+      { latitude: -23.55, longitude: -46.63 },
+      { latitude: -23.56, longitude: -46.62 },
+    ];
+    const favoriteCode = encodeBusDirectionFavorite({
+      sourceAgency: route.sourceAgency ?? 'sptrans',
+      shortName: route.shortName,
+      originLatitude: coordinates[start].latitude,
+      originLongitude: coordinates[start].longitude,
+      viaLatitude: -23.555,
+      viaLongitude: -46.625,
+      destinationLatitude: coordinates[end].latitude,
+      destinationLongitude: coordinates[end].longitude,
+    });
+    if (!favoriteCode) {
+      throw new Error('Story direction key was invalid');
+    }
+    return {
+      ...route,
+      favoriteCode,
+      destination: directionId === 0 ? secondTerminal : firstTerminal,
+      directionId,
+    };
+  });
+}
+
+function resolveFavoriteRows(
+  codes: string[],
+  routes: BusRouteGraphQL[],
+): BusRouteGraphQL[] {
+  const directions = routes.flatMap((route) => createStoryDirections(route));
+  return codes.flatMap((code) => {
+    const savedDirection = directions.find(
+      (direction) => direction.favoriteCode === code,
+    );
+    const matches = savedDirection
+      ? [savedDirection]
+      : directions.filter((direction) => direction.routeId === code);
+    return matches.map((direction) => ({
+      ...direction,
+      requestedCode: code,
+    }));
+  });
+}
+
 function createFavoritesService(scenario: DashboardScenario) {
   const favorites =
     scenario === 'semFavoritos'
@@ -73,11 +148,28 @@ function createFavoritesService(scenario: DashboardScenario) {
         : favoriteList;
   const selections =
     scenario === 'artesp' ? artespDashboardSelections : dashboardSelections;
+  const favoritesState = signal(favorites);
 
   return {
-    favorites: signal(favorites).asReadonly(),
+    favorites: favoritesState.asReadonly(),
     dashboardSelections: signal(selections).asReadonly(),
-    readFavoritesSnapshot: () => Promise.resolve(favorites),
+    migrateBusRouteFavorite: async (
+      legacyCode: string,
+      directionCodes: string[],
+    ) => {
+      if (!favoritesState().busRoute.includes(legacyCode)) {
+        return false;
+      }
+      favoritesState.update((current) => ({
+        ...current,
+        busRoute: [
+          ...current.busRoute.filter((code) => code !== legacyCode),
+          ...directionCodes.filter((code) => !current.busRoute.includes(code)),
+        ],
+      }));
+      return true;
+    },
+    readFavoritesSnapshot: () => Promise.resolve(favoritesState()),
     readDashboardSelectionsSnapshot: () => Promise.resolve(selections),
   };
 }
@@ -132,6 +224,11 @@ function createHttpClient(
         typeof body === 'object' && body && 'query' in body
           ? String((body as { query?: string }).query)
           : '';
+      const routeIds =
+        typeof body === 'object' && body && 'variables' in body
+          ? ((body as { variables?: { routeIds?: string[] } }).variables
+              ?.routeIds ?? [])
+          : [];
 
       if (
         scenario === 'erroParcial' &&
@@ -144,7 +241,10 @@ function createHttpClient(
         if (scenario === 'artesp') {
           return of({
             data: {
-              multipleBusRoutes: [ROUTE_ARTESP_001, ROUTE_ARTESP_WITHOUT_FARE],
+              multipleBusRoutes: resolveFavoriteRows(routeIds, [
+                ROUTE_ARTESP_001,
+                ROUTE_ARTESP_WITHOUT_FARE,
+              ]),
               multipleBusStops: [ARTESP_ONLY_BUS_STOP],
             },
           } as T);
@@ -152,15 +252,9 @@ function createHttpClient(
 
         return of({
           data: {
-            multipleBusRoutes: [
-              {
-                routeId: '477A-10',
-                shortName: '477A-10',
-                longName: 'Sacoma - Terminal Pinheiros',
-                color: '2563eb',
-                textColor: 'ffffff',
-              },
-            ],
+            multipleBusRoutes: resolveFavoriteRows(routeIds, [
+              sptransStoryRoute,
+            ]),
             multipleBusStops: [
               {
                 id: 'stop-701441',
@@ -216,7 +310,10 @@ function createHttpClient(
         if (scenario === 'artesp') {
           return of({
             data: {
-              routesForStop: [ROUTE_ARTESP_001, ROUTE_ARTESP_WITHOUT_FARE],
+              routesForStop: [
+                ...createStoryDirections(ROUTE_ARTESP_001),
+                ...createStoryDirections(ROUTE_ARTESP_WITHOUT_FARE),
+              ],
             },
           } as T);
         }
@@ -224,22 +321,8 @@ function createHttpClient(
         return of({
           data: {
             routesForStop: [
-              {
-                id: 'route-477a',
-                routeId: '477A-10',
-                shortName: '477A-10',
-                longName: 'Sacoma - Terminal Pinheiros',
-                color: '2563eb',
-                textColor: 'ffffff',
-              },
-              {
-                id: 'route-875a',
-                routeId: '875A-10',
-                shortName: '875A-10',
-                longName: 'Aeroporto - Perdizes',
-                color: '16a34a',
-                textColor: 'ffffff',
-              },
+              ...createStoryDirections(sptransStoryRoute),
+              ...createStoryDirections(secondSptransStoryRoute),
             ],
           },
         } as T);

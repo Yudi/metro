@@ -11,6 +11,7 @@ export interface BusFare {
 
 export interface BusRouteIdentityLike {
   routeId: string;
+  favoriteCode?: string | null;
   sourceAgency?: string | null;
   sourceId?: string | null;
   supportsRealtime?: boolean | null;
@@ -35,7 +36,7 @@ export interface BusAgencySortableLike {
  * (for example, an SPTrans 001 and an Artesp 001).
  */
 export function getBusRouteIdentity(route: BusRouteIdentityLike): string {
-  return route.routeId;
+  return route.favoriteCode?.trim() || route.routeId;
 }
 
 export function getBusRouteDisplayId(
@@ -244,16 +245,18 @@ export function groupScheduledBusDepartures<
 >(
   departures: readonly T[],
   limitPerRoute = 5,
+  groupKey: (departure: T) => string = (departure) => departure.routeId,
 ): Array<{ routeId: string; departures: T[] }> {
   const groups = new Map<string, { routeId: string; departures: T[] }>();
   const chronological = [...departures].sort(
     (a, b) => Date.parse(a.departureTime) - Date.parse(b.departureTime),
   );
   for (const departure of chronological) {
-    let group = groups.get(departure.routeId);
+    const key = groupKey(departure);
+    let group = groups.get(key);
     if (!group) {
-      group = { routeId: departure.routeId, departures: [] };
-      groups.set(departure.routeId, group);
+      group = { routeId: key, departures: [] };
+      groups.set(key, group);
     }
     if (group.departures.length < limitPerRoute) {
       group.departures.push(departure);

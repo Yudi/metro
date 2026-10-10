@@ -17,6 +17,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { ActivatedRoute, Router, RouterLink, UrlTree } from '@angular/router';
 import {
   getRailLineById,
+  isBusDirectionFavorite,
   getUniqueAgencies,
   RailLineInfo,
 } from '@metro/shared/utils';
@@ -61,7 +62,7 @@ interface DetailBase {
 
 type Detail = DetailBase &
   (
-    | { kind: 'bus-route'; data: { routeId: string } }
+    | { kind: 'bus-route'; data: { routeId: string; favoriteCode?: string } }
     | { kind: 'rail-line'; data: RailLineInfo }
     | {
         kind: 'bus-stop';
@@ -275,14 +276,19 @@ export class OmniboxResultPageComponent {
     try {
       let detail: Detail | null = null;
       switch (kind) {
-        case 'bus-route':
+        case 'bus-route': {
+          const direction = isBusDirectionFavorite(id)
+            ? (await firstValueFrom(this.geography.getFavoriteBusDirections([id])))[0]
+            : null;
+          if (isBusDirectionFavorite(id) && !direction) break;
           detail = {
             kind,
             title: 'Itinerário de ônibus',
-            data: { routeId: id },
+            data: { routeId: direction?.routeId ?? id, favoriteCode: direction?.favoriteCode },
             mapParams: { busRoutes: id, focusRoute: id },
           };
           break;
+        }
         case 'rail-line': {
           const line = getRailLineById(id);
           if (line) {

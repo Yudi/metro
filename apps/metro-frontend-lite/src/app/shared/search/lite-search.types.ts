@@ -11,6 +11,9 @@ import type {
 export type LiteSearchResultKind = 'busStop' | 'railStation' | 'bikeStation';
 
 export interface LiteBusRoute {
+  favoriteCode?: string;
+  destination?: string;
+  directionId?: number;
   id: string;
   routeId: string;
   shortName: string;
@@ -138,6 +141,9 @@ export interface SearchGraphQLResult {
 }
 
 export interface LiteBusRouteGraphQL {
+  favoriteCode?: string;
+  destination?: string;
+  directionId?: number;
   id: string;
   route_id: string;
   route_short_name: string;

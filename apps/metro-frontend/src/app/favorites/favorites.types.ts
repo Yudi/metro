@@ -22,6 +22,12 @@ export interface FavoriteBusRoute {
   routeId: string;
   shortName: string;
   longName: string;
+  favoriteId?: string;
+  favoriteCode?: string;
+  requestedCode?: string;
+  destination?: string;
+  directionId?: number;
+  favoriteNotice?: string;
   sourceAgency?: string;
   color?: string;
   textColor?: string;
@@ -38,8 +44,9 @@ export interface FavoriteBusStop {
 }
 
 export interface FavoriteBusLookupResponse {
-  data: {
+  data?: {
     multipleBusRoutes: FavoriteBusRoute[];
     multipleBusStops: FavoriteBusStop[];
   };
+  errors?: unknown[];
 }

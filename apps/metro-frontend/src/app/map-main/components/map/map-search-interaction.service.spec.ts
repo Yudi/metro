@@ -15,9 +15,11 @@ import { MapStateService } from './map-state.service';
 describe('MapSearchInteractionService', () => {
   let service: MapSearchInteractionService;
   let openDialog: jest.Mock;
+  let addRouteToSelection: jest.Mock;
 
   beforeEach(() => {
     openDialog = jest.fn(() => ({ afterClosed: () => of(null) }));
+    addRouteToSelection = jest.fn();
 
     TestBed.configureTestingModule({
       providers: [
@@ -29,7 +31,10 @@ describe('MapSearchInteractionService', () => {
         { provide: MapDetailsDialogService, useValue: {} },
         { provide: MapDisplayService, useValue: {} },
         { provide: MapPanelService, useValue: { compactOnMobile: jest.fn() } },
-        { provide: MapSelectionService, useValue: {} },
+        {
+          provide: MapSelectionService,
+          useValue: { addRouteToSelection },
+        },
         { provide: MapStateService, useValue: {} },
       ],
     });
@@ -47,5 +52,29 @@ describe('MapSearchInteractionService', () => {
         delayFocusTrap: false,
       }),
     );
+  });
+
+  it('selects the favorite direction key from a bus route search result', () => {
+    const favoriteCode =
+      'bus:v1:sptrans:100:-23.5000~-46.6000:-23.5100~-46.6100:-23.5200~-46.6200';
+    const result = {
+      id: 'gtfs:100',
+      name: '100 Centro',
+      type: 'route' as const,
+      routeData: {
+        route_id: 'gtfs:100',
+        favoriteCode,
+        route_short_name: '100',
+        route_long_name: 'Terminal A - Terminal B',
+        route_color: '112233',
+        route_text_color: 'FFFFFF',
+        route_type: 3,
+      },
+    };
+    openDialog.mockImplementationOnce(() => ({ afterClosed: () => of(result) }));
+
+    service.openSearchModal();
+
+    expect(addRouteToSelection).toHaveBeenCalledWith(favoriteCode, true);
   });
 });

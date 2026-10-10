@@ -62,7 +62,9 @@ export class LiteBusStopDetail {
   readonly scheduledRows = computed(() =>
     this.scheduledDepartures().map((departure) => {
       const route = this.routes().find(
-        (item) => item.routeId === departure.routeId,
+        (item) => item.routeId === departure.routeId &&
+          (item.directionId === undefined || item.directionId === departure.directionId) &&
+          (!item.destination || item.destination.trim().toLocaleUpperCase('pt-BR') === departure.headsign.trim().toLocaleUpperCase('pt-BR')),
       );
       const timeLabel = this.formatScheduledDepartureTime(
         departure.departureTime,
@@ -80,7 +82,9 @@ export class LiteBusStopDetail {
     }),
   );
   readonly scheduledRouteGroups = computed(() =>
-    groupScheduledBusDepartures(this.scheduledRows(), 5),
+    groupScheduledBusDepartures(this.scheduledRows(), 5,
+      (row) => JSON.stringify([row.routeId, row.directionId, row.headsign]),
+    ),
   );
   readonly stationLineBadges = computed(() => {
     const badges = new Map<
@@ -171,9 +175,16 @@ export class LiteBusStopDetail {
   getRouteDirectionsWithRail(
     route: LiteBusRoute,
   ): LiteRouteRailConnectionDirection[] {
+    if (route.destination) {
+      const destination = route.destination.trim().toLocaleUpperCase('pt-BR');
+      return this.getRouteConnection(route)?.directions.filter((direction) =>
+        direction.stations.length > 0 && direction.headsign.trim().toLocaleUpperCase('pt-BR') === destination,
+      ) ?? [];
+    }
     return (
       this.getRouteConnection(route)?.directions.filter(
-        (direction) => direction.stations.length > 0,
+        (direction) => direction.stations.length > 0 &&
+          (route.directionId === undefined || direction.directionId === route.directionId),
       ) ?? []
     );
   }

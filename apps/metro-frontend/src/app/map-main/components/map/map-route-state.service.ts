@@ -10,6 +10,11 @@ import {
   FavoriteList,
   getRailLineByCode,
   getRailLineById,
+  isBusDirectionFavorite,
+  isBusLineFavorite,
+  getBusLineDirectionAnchor,
+  matchBusDirectionFavorite,
+  parseBusDirectionFavorite,
 } from '@metro/shared/utils';
 import { MapService } from './map.service';
 import { MapStateService } from './map-state.service';
@@ -262,7 +267,24 @@ export class MapRouteStateService {
   }
 
   private autoSelectFavorites(favorites: FavoriteList): void {
+    const directionCandidates = favorites.busRoute.flatMap((code) => {
+      const identity = parseBusDirectionFavorite(code);
+      return identity ? [{ ...identity, directionId: -1, destination: '' }] : [];
+    });
+    for (const key of this.appliedFavoriteSelections) {
+      if (!key.startsWith('busRoute:')) continue;
+      const code = key.slice('busRoute:'.length);
+      const anchor = getBusLineDirectionAnchor(code);
+      if (anchor && !favorites.busRoute.includes(code) && matchBusDirectionFavorite(anchor, directionCandidates)) {
+        this.interactionService.removeRouteFromSelection(code, false);
+        this.appliedFavoriteSelections.delete(key);
+      }
+    }
     for (const routeId of favorites.busRoute) {
+      // Legacy line favorites are expanded by FavoritesService. Waiting for
+      // that result avoids also selecting a whole-line overlay underneath
+      // the two independently removable direction selections.
+      if (!isBusDirectionFavorite(routeId) && !isBusLineFavorite(routeId)) continue;
       this.applyFavoriteSelection(`busRoute:${routeId}`, () => {
         void this.interactionService.addRouteToSelection(routeId, false);
       });

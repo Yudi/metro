@@ -12,21 +12,28 @@ const fixtures = `
     route_color, route_text_color, source_agency, source_id) AS (
     VALUES
       ('bus-route', 3, 'Bus', 'Bus route', '123456', 'ffffff', 'sptrans', 'bus-route'),
+      ('directional-route', 3, '123A', 'Directional route', 'abcdef', 'ffffff', 'sptrans', 'directional-original-route'),
       ('artesp:bus-route', 3, 'Regional', 'Regional route', '654321', 'ffffff', 'artesp', 'bus-route'),
       ('rail-route', 1, 'Rail', 'Rail route', '000000', 'ffffff', 'sptrans', 'rail-route'),
       ('METRÔ1', 3, 'Metro', 'Metro route', '000000', 'ffffff', 'sptrans', 'METRÔ1'),
       ('CPTM1', 3, 'Train', 'Train route', '000000', 'ffffff', 'sptrans', 'CPTM1')
   ),
-  fixture_trips(trip_id, route_id, shape_id) AS (
-    VALUES ('bus-trip', 'bus-route', 'shape'),
-      ('bus-trip-copy', 'bus-route', 'shape'),
-      ('regional-trip', 'artesp:bus-route', 'artesp:shape'),
-      ('rail-trip', 'rail-route', 'shape'),
-      ('metro-trip', 'METRÔ1', 'shape'), ('train-trip', 'CPTM1', 'shape')
+  fixture_trips(trip_id, route_id, shape_id, direction_id) AS (
+    VALUES ('bus-trip', 'bus-route', 'shape', 0),
+      ('bus-trip-copy', 'bus-route', 'shape', 0),
+      ('outbound-trip', 'directional-route', 'shape-out', 0),
+      ('outbound-copy', 'directional-route', 'shape-out', 0),
+      ('inbound-trip', 'directional-route', 'shape-in', 1),
+      ('inbound-shared-shape', 'directional-route', 'shape-out', 1),
+      ('regional-trip', 'artesp:bus-route', 'artesp:shape', 0),
+      ('rail-trip', 'rail-route', 'shape', 0),
+      ('metro-trip', 'METRÔ1', 'shape', 0), ('train-trip', 'CPTM1', 'shape', 0)
   ),
   fixture_stop_times(trip_id, stop_id) AS (
     VALUES ('bus-trip', 'bus'), ('bus-trip-copy', 'bus'),
       ('bus-trip', 'far'), ('regional-trip', 'artesp:mixed'),
+      ('outbound-trip', 'out-only'), ('outbound-trip', 'shared-direction'),
+      ('inbound-trip', 'in-only'), ('inbound-shared-shape', 'wrong-direction'),
       ('rail-trip', 'mixed'), ('rail-trip', 'rail'),
       ('metro-trip', 'metro'), ('train-trip', 'train')
   ),
@@ -42,7 +49,9 @@ const fixtures = `
       ('mixed', -46.64, -23.575), ('artesp:mixed', -46.6401, -23.575),
       ('rail', -46.64, -23.575), ('metro', -46.64, -23.575),
       ('train', -46.64, -23.575), ('unknown', -46.64, -23.575),
-      ('far', -46.635, -23.58)
+      ('far', -46.635, -23.58),
+      ('out-only', -46.641, -23.574), ('in-only', -46.642, -23.573),
+      ('shared-direction', -46.643, -23.572), ('wrong-direction', -46.644, -23.571)
     ) AS stops(stop_id, longitude, latitude)
   ),
   fixture_members(source_stop_id, physical_stop_id) AS (
@@ -59,7 +68,7 @@ const fixtures = `
   fixture_shapes AS (
     SELECT shape_id, ST_GeomFromText(
       'LINESTRING(-46.64 -23.575, -46.635 -23.58)', 4326) AS geom
-    FROM (VALUES ('shape'), ('artesp:shape')) AS shapes(shape_id)
+    FROM (VALUES ('shape'), ('artesp:shape'), ('shape-out'), ('shape-in')) AS shapes(shape_id)
   )
 `;
 
@@ -68,6 +77,10 @@ interface TileRow {
   merged_stop_ids?: string;
   route_id?: string;
   shape_id?: string;
+  source_id?: string;
+  destination?: string;
+  favorite_code?: string;
+  direction_id?: number;
 }
 
 interface TileQuery {
@@ -93,13 +106,27 @@ describeDatabase('bus vector tile SQL feature parity', () => {
   async function tileRows(
     layer: 'stops' | 'routes',
     options: VectorTileOptions,
+    directions: Array<{
+      routeId: string;
+      directionId: number;
+      destination: string;
+      favoriteCode: string;
+      shapeIds: string[];
+    }> = [],
   ): Promise<TileRow[]> {
     const query = jest.fn().mockResolvedValue([{ mvt: Buffer.alloc(0) }]);
     const transaction = { $queryRaw: query, $executeRaw: jest.fn() };
+    const busDirections = {
+      forFavorites: jest.fn(async (codes: string[]) =>
+        directions.filter((direction) =>
+          codes.includes(direction.favoriteCode),
+        ),
+      ),
+    };
     const service = new BusVectorTileService({
       $transaction: (operation: (tx: typeof transaction) => Promise<unknown>) =>
         operation(transaction),
-    } as never);
+    } as never, busDirections as never);
     if (layer === 'stops') {
       await service.generateBusStopsTile(14, 6069, 9296, options);
     } else {
@@ -136,6 +163,24 @@ describeDatabase('bus vector tile SQL feature parity', () => {
   }
 
   const nearby = { latitude: -23.575, longitude: -46.64, radiusMeters: 100 };
+  const outboundCode =
+    'bus:v1:sptrans:123A:-23.5000~-46.6000:-23.5100~-46.6100:-23.5200~-46.6200';
+  const inboundCode =
+    'bus:v1:sptrans:123A:-23.5200~-46.6200:-23.5100~-46.6100:-23.5000~-46.6000';
+  const outbound = {
+    routeId: 'directional-route',
+    directionId: 0,
+    destination: 'Terminal Norte',
+    favoriteCode: outboundCode,
+    shapeIds: ['shape-out'],
+  };
+  const inbound = {
+    routeId: 'directional-route',
+    directionId: 1,
+    destination: 'Terminal Sul',
+    favoriteCode: inboundCode,
+    shapeIds: ['shape-in'],
+  };
   const ids = (rows: TileRow[]) =>
     rows.map((row) => row.physical_stop_id).sort();
 
@@ -210,5 +255,64 @@ describeDatabase('bus vector tile SQL feature parity', () => {
       ['artesp:bus-route', 'artesp:shape'],
       ['bus-route', 'shape'],
     ]);
+  });
+
+  it('filters route features by the selected direction and exposes its selection key', async () => {
+    const outboundRows = await tileRows(
+      'routes',
+      { routeIds: [outboundCode] },
+      [outbound, inbound],
+    );
+
+    expect(
+      outboundRows.map((row) => [
+        row.route_id,
+        row.shape_id,
+        row.destination,
+        row.favorite_code,
+        row.direction_id,
+        row.source_id,
+      ]),
+    ).toEqual([
+      [
+        outboundCode,
+        'shape-out',
+        'Terminal Norte',
+        outboundCode,
+        0,
+        'directional-original-route',
+      ],
+    ]);
+
+    const inboundRows = await tileRows(
+      'routes',
+      { routeIds: [inboundCode] },
+      [outbound, inbound],
+    );
+    expect(inboundRows.map((row) => [row.route_id, row.shape_id])).toEqual([
+      [inboundCode, 'shape-in'],
+    ]);
+  });
+
+  it('filters stop features by direction ID as well as selected shape IDs', async () => {
+    expect(
+      ids(
+        await tileRows(
+          'stops',
+          { routeIds: [outboundCode] },
+          [outbound, inbound],
+        ),
+      ),
+    ).toEqual(['out-only', 'shared-direction']);
+
+    expect(
+      ids(
+        await tileRows(
+          'stops',
+          { routeIds: [inboundCode] },
+          [outbound, inbound],
+        ),
+      ),
+    ).toEqual(['in-only']);
   });
 });

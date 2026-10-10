@@ -27,11 +27,15 @@ export class DashboardApiService {
     return this.http
       .post<BusFavoritesLookupResponse>(this.graphqlEndpoint, {
         query: `
-          query LiteDashboardBusFavorites($routeIds: [ID!]!, $stopIds: [ID!]!) {
-            multipleBusRoutes(ids: $routeIds) {
+          query LiteDashboardBusFavorites($routeIds: [String!]!, $stopIds: [ID!]!) {
+            multipleBusRoutes: favoriteBusDirections(codes: $routeIds) {
               routeId
               shortName
               longName
+              favoriteCode
+              requestedCode
+              destination
+              directionId
               color
               textColor
               sourceAgency
@@ -136,11 +140,15 @@ export class DashboardApiService {
     return this.http
       .post<RoutesForStopResponse>(this.graphqlEndpoint, {
         query: `
-          query LiteDashboardRoutesForStop($stopId: String!) {
-            routesForStop(stopId: $stopId) {
+          query LiteDashboardRoutesForStop($stopId: ID!) {
+            routesForStop: busStopDirections(stopId: $stopId) {
               routeId
               shortName
               longName
+              favoriteCode
+              requestedCode
+              destination
+              directionId
               color
               textColor
               sourceAgency

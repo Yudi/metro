@@ -196,27 +196,34 @@ export class MapFeatureInteractionService {
       return;
     }
 
+    const routeId = routeData.favoriteCode ?? routeData.routeId;
     const properties = {
       shortName: routeData.shortName,
       longName: routeData.longName,
       color: routeData.color,
       textColor: routeData.textColor,
+      destination: routeData.destination,
+      favoriteCode: routeData.favoriteCode,
+      directionId: routeData.directionId,
     };
 
     if (!this.geographyService) {
-      this.showRouteDetails(routeData.routeId, properties);
+      this.showRouteDetails(routeId, properties);
       return;
     }
 
-    this.geographyService.getBusRoute(routeData.routeId).subscribe({
+    this.geographyService.getBusRoute(routeId).subscribe({
       next: (route) => {
-        this.showRouteDetails(routeData.routeId, {
+        this.showRouteDetails(route?.favoriteCode ?? routeId, {
           ...properties,
           sourceAgency: route?.sourceAgency,
           fares: route?.fares,
+          destination: route?.destination ?? routeData.destination,
+          directionId: route?.directionId ?? routeData.directionId,
+          favoriteCode: route?.favoriteCode ?? routeData.favoriteCode,
         });
       },
-      error: () => this.showRouteDetails(routeData.routeId, properties),
+      error: () => this.showRouteDetails(routeId, properties),
     });
   }
 
@@ -309,14 +316,23 @@ export class MapFeatureInteractionService {
     routeId: string,
     properties: Record<string, unknown>,
   ): void {
+    const destination = properties['destination'];
     const routeName = properties['shortName']
-      ? `${properties['shortName']} - ${properties['longName']}`
+      ? destination
+        ? String(properties['shortName'])
+        : `${properties['shortName']} - ${properties['longName']}`
       : properties['longName'] || routeId;
+    const directionSuffix =
+      typeof destination === 'string' && destination.trim()
+        ? `, sentido ${destination.trim()}`
+        : '';
     const fareLabel = this.getFareLabel(properties['fares']);
     const fareSuffix = fareLabel ? ` (tarifa ${fareLabel})` : '';
 
     this.snackBar
-      .open(`Rota: ${routeName}${fareSuffix}`, 'Adicionar', { duration: 5000 })
+      .open(`Rota: ${routeName}${directionSuffix}${fareSuffix}`, 'Adicionar', {
+        duration: 5000,
+      })
       .onAction()
       .subscribe(() => {
         this.selectionService.addRouteToSelection(routeId, true);

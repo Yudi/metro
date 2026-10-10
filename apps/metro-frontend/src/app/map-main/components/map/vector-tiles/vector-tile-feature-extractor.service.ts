@@ -131,6 +131,11 @@ export class VectorTileFeatureExtractorService {
   extractBusRouteData(feature: FeatureLike): BusRouteTileData | null {
     const properties = feature.getProperties();
     const routeId = properties['route_id'];
+    const directionId = properties['direction_id'];
+    const parsedDirectionId =
+      directionId === null || directionId === undefined || directionId === ''
+        ? Number.NaN
+        : Number(directionId);
 
     if (!routeId) {
       return null;
@@ -138,6 +143,11 @@ export class VectorTileFeatureExtractorService {
 
     return {
       routeId: String(routeId),
+      favoriteCode: this.toOptionalString(properties['favorite_code']),
+      destination: this.toOptionalString(properties['destination']),
+      directionId: Number.isFinite(parsedDirectionId)
+        ? parsedDirectionId
+        : undefined,
       shortName: String(properties['route_short_name'] ?? routeId),
       longName: String(properties['route_long_name'] ?? ''),
       color: String(properties['route_color'] ?? ''),

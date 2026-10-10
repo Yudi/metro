@@ -2,6 +2,7 @@ export * from './lib/rail/stations/station-name.utils';
 export * from './lib/cities/sp/rail/stations/station-merge.utils';
 export * from './lib/cities/sp/transit/transit-agency.utils';
 export * from './lib/bus/bus.utils';
+export * from './lib/bus/bus-direction-favorite.utils';
 export * from './lib/common/date-time.utils';
 export * from './lib/rail/rail-line.utils';
 export { getStaticRailStationsByLine } from './lib/cities/sp/rail/stations/rail-stations.entity';

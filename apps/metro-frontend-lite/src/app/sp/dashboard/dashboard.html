@@ -175,7 +175,10 @@
             @let selectedRoutes = getSelectedBusRoutes(stop.stopId); @if
             (selectedRoutes.length > 0) {
             <div class="route-selection-list">
-              @for (route of selectedRoutes; track route.routeId) {
+              @for (
+                route of selectedRoutes;
+                track route.favoriteCode || route.routeId
+              ) {
               <div class="dashboard-route">
                 <span
                   class="route-chip"
@@ -185,7 +188,7 @@
                   {{ route.shortName }}
                 </span>
                 <div class="route-copy">
-                  <strong>{{ route.longName }}</strong>
+                  <strong>{{ route.destination || route.longName }}</strong>
                   <span class="agency-lockup route-agency">
                     @if (getBusRouteAgencyKey(route); as agencyKey) {
                     <img
@@ -261,7 +264,7 @@
                 group); track getScheduledDepartureKey(departure)) { @let
                 scheduleTime = departure.timeParts; @let scheduleRoute =
                 getBusRouteForScheduledDeparture(stop.stopId,
-                departure.routeId);
+                departure.routeId, departure.directionId);
                 <div class="scheduled-row">
                   <time [attr.datetime]="departure.departureTime">
                     <span>{{ scheduleTime.time }}</span>
@@ -310,7 +313,10 @@
       <div class="section-block">
         <h4>Linhas favoritas</h4>
         <div class="item-list">
-          @for (route of busRoutes(); track route.routeId) {
+          @for (
+            route of busRoutes();
+            track route.favoriteCode || route.favoriteId || route.routeId
+          ) {
           <article class="item-row route-row">
             <span
               class="route-chip large"
@@ -320,7 +326,10 @@
               {{ route.shortName }}
             </span>
             <div class="route-summary">
-              <strong>{{ route.longName }}</strong>
+              <strong>{{ route.destination || route.longName }}</strong>
+              @if (route.favoriteNotice) {
+              <small>{{ route.favoriteNotice }}</small>
+              }
               <span class="agency-lockup route-agency">
                 @if (getBusRouteAgencyKey(route); as agencyKey) {
                 <img

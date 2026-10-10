@@ -11,7 +11,10 @@ import {
   HEADWAY_DEFAULT_ENABLED_LINES,
   RAIL_LINES,
   SPECIAL_RAIL_LINE_CODES,
+  isBusDirectionFavorite,
+  isBusLineFavorite,
 } from '@metro/shared/utils';
+import { BusDirectionService } from '../geography/services/bus-direction.service';
 import type { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { notificationHash } from './notification-message';
@@ -64,7 +67,10 @@ const FAVORITE_TYPE_BY_TARGET_KIND: Partial<
 
 @Injectable()
 export class NotificationFavoriteTargetsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly directions: BusDirectionService,
+  ) {}
 
   async getTargets(
     userId: string,
@@ -208,14 +214,23 @@ export class NotificationFavoriteTargetsService {
   private async resolveBusRoutes(
     codes: string[],
   ): Promise<FavoriteTargetCandidate[]> {
+    // Operational notices target the entire line. Collapse saved directions
+    // after resolving them against the current feed, preserving that contract.
+    const directionCodes = codes.filter((code) => isBusDirectionFavorite(code) || isBusLineFavorite(code));
+    const resolved = directionCodes.length ? await this.directions.forFavorites(directionCodes) : [];
+    const routeIds = [...new Set([
+      ...codes.filter((code) => !code.startsWith('bus:')),
+      ...resolved.map((direction) => direction.routeId),
+    ])];
+    if (routeIds.length === 0) return [];
     const rows = await this.prisma.$queryRaw<RouteRow[]>`
       SELECT route_short_name AS name, min(route_long_name) AS label,
         min(route_color) AS color, min(route_text_color) AS "textColor"
       FROM public."Gtfs_Route"
       WHERE route_type = 3 AND source_agency = 'sptrans'
-        AND route_id = ANY(${codes}::TEXT[])
+        AND route_id = ANY(${routeIds}::TEXT[])
       GROUP BY route_short_name
-      ORDER BY min(array_position(${codes}::TEXT[], route_id)), route_short_name
+      ORDER BY min(array_position(${routeIds}::TEXT[], route_id)), route_short_name
       LIMIT ${MAX_SUGGESTED_TARGETS}
     `;
 

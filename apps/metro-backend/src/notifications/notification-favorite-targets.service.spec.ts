@@ -21,7 +21,7 @@ function setup() {
     },
   };
   return {
-    service: new NotificationFavoriteTargetsService(prisma as never),
+    service: new NotificationFavoriteTargetsService(prisma as never, { forFavorites: jest.fn().mockResolvedValue([]) } as never),
     prisma,
   };
 }

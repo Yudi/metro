@@ -1,6 +1,9 @@
 import type { BusFare } from '@metro/shared/utils';
 
 export interface TypesenseRoute {
+  favoriteCode?: string;
+  destination?: string;
+  directionId?: number;
   id: string;
   route_id: string;
   route_short_name: string;

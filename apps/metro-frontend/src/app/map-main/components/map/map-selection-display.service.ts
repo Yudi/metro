@@ -6,6 +6,7 @@ import { FeatureFactoryService } from './feature-factory.service';
 import { LoggerService } from '@metro/shared/api';
 import { FeatureCreationSource } from './map.types';
 import { MapStateService } from './map-state.service';
+import { getBusRouteIdentity } from '@metro/shared/utils';
 
 /** Keeps selected map features in their dedicated layer. */
 @Service()
@@ -33,7 +34,8 @@ export class MapSelectionDisplayService {
         .displayedShapes()
         .filter(
           (shape) =>
-            shape.routeInfo && selectedRouteIds.has(shape.routeInfo.routeId),
+            shape.routeInfo &&
+            selectedRouteIds.has(getBusRouteIdentity(shape.routeInfo)),
         )
         .map((shape) => shape.id),
     ]);
@@ -76,7 +78,10 @@ export class MapSelectionDisplayService {
     this.logger.debug('Updating selection layer');
 
     this.mapState.displayedShapes().forEach((shape) => {
-      if (shape.routeInfo && selectedRouteIds.has(shape.routeInfo.routeId)) {
+      if (
+        shape.routeInfo &&
+        selectedRouteIds.has(getBusRouteIdentity(shape.routeInfo))
+      ) {
         const feature = this.featureFactory.createShapeFeature(
           shape,
           FeatureCreationSource.SELECTION,

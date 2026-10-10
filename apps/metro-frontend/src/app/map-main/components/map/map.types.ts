@@ -20,9 +20,12 @@ export interface BusShapeWithRoute extends BusShapeGraphQL {
 
 // Selection item types for centralized state management
 export interface SelectedRoute {
-  id: string; // routeId (e.g., "477A-10")
+  id: string; // Stable selection identity: favoriteCode or legacy routeId.
+  routeId?: string; // Actual feed route ID used for route-wide operations.
   shortName: string;
   longName: string;
+  destination?: string;
+  directionId?: number;
   color?: string;
   textColor?: string;
   sourceAgency?: string;
@@ -63,6 +66,9 @@ export interface SearchResult {
   /** Route data for route-type results */
   routeData?: {
     route_id: string;
+    favoriteCode?: string;
+    destination?: string;
+    directionId?: number;
     route_short_name: string;
     route_long_name: string;
     route_color: string;

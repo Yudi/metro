@@ -58,8 +58,8 @@ export class MapInteractionService {
     );
   }
 
-  removeRouteFromSelection(routeId: string): void {
-    this.selectionService.removeRouteFromSelection(routeId);
+  removeRouteFromSelection(routeId: string, shouldDisplaySnackbar = true): void {
+    this.selectionService.removeRouteFromSelection(routeId, shouldDisplaySnackbar);
   }
 
   removeStopFromSelection(stopId: string): void {

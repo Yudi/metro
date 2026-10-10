@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { of } from 'rxjs';
 import { LoggerService } from '@metro/shared/api';
 import { MapFeatureInteractionService } from './map-feature-interaction.service';
 import { MapStateService } from './map-state.service';
@@ -139,6 +140,28 @@ describe('MapFeatureInteractionService', () => {
         title: 'Ônibus ABC1D23',
         summary: 'Linha 001, sentido Terminal Centro',
       }),
+    );
+  });
+
+  it('shows the destination alongside a selected bus route', () => {
+    snackBar.open.mockReturnValue({ onAction: () => of(undefined) });
+    const properties = {
+      routeId:
+        'bus:v1:sptrans:100:-23.5000~-46.6000:-23.5100~-46.6100:-23.5200~-46.6200',
+      shortName: '100',
+      longName: 'Terminal A - Terminal B',
+      destination: 'Terminal Centro',
+    };
+
+    service.handleFeatureSelection({
+      get: () => undefined,
+      getProperties: () => properties,
+    } as never);
+
+    expect(snackBar.open).toHaveBeenCalledWith(
+      'Rota: 100, sentido Terminal Centro',
+      'Adicionar',
+      { duration: 5000 },
     );
   });
 });

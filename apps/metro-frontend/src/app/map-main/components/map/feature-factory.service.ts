@@ -10,6 +10,7 @@ import {
 } from './map.types';
 import { isSubwayRoute } from '../../geography/transit-utils';
 import { createBikeStationFeatureProperties } from './layers/bike-feature-properties.utils';
+import { getBusRouteIdentity } from '@metro/shared/utils';
 
 /**
  * Factory service for creating OpenLayers features from GraphQL data
@@ -68,7 +69,11 @@ export class FeatureFactoryService {
     if (shape.routeInfo) {
       properties['color'] = shape.routeInfo.color;
       properties['textColor'] = shape.routeInfo.textColor;
-      properties['routeId'] = shape.routeInfo.routeId;
+      properties['routeId'] = getBusRouteIdentity(shape.routeInfo);
+      properties['gtfsRouteId'] = shape.routeInfo.routeId;
+      properties['favoriteCode'] = shape.routeInfo.favoriteCode;
+      properties['destination'] = shape.routeInfo.destination;
+      properties['directionId'] = shape.routeInfo.directionId;
       properties['shortName'] = shape.routeInfo.shortName;
       properties['longName'] = shape.routeInfo.longName;
       properties['sourceAgency'] = shape.routeInfo.sourceAgency;

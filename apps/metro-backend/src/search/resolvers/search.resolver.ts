@@ -33,6 +33,7 @@ import {
   SearchResultUnion,
 } from '../entities/search.entity';
 import { SearchFiltersInput } from '../dto/search.input';
+import { BusDirectionService } from '../../geography/services/bus-direction.service';
 import { DevelopmentOnlyGuard } from '../../common/guards/development-only.guard';
 import { DevOnly } from '../../common/decorators/development-only.decorator';
 import type { GraphQLLoaders } from '../../common/graphql/loaders.service';
@@ -59,6 +60,7 @@ export class SearchResolver {
   constructor(
     private readonly typesenseService: TypesenseService,
     private readonly searchService: SearchService,
+    private readonly directions: BusDirectionService,
   ) {}
 
   @Query(() => [SearchResultUnion])
@@ -107,12 +109,29 @@ export class SearchResolver {
         this.compareSearchResults(a, b, input.query),
       );
 
-      return sortedByRelevance.slice(0, input.limit ?? 10).map((hit) => ({
-        ...this.formatSearchDocument(hit.document, hit.type),
-        score: hit.score,
-        type: hit.type,
-        highlights: this.formatHighlights(hit.highlights || {}),
-      }));
+      const hits = sortedByRelevance.slice(0, input.limit ?? 10);
+      const directions = await this.directions.forRoutes(
+        hits.flatMap((hit) => hit.type === 'busRoute' ? [(hit.document as RouteDocument).route_id] : []),
+      );
+      return hits.flatMap((hit) => {
+        const base = {
+          ...this.formatSearchDocument(hit.document, hit.type),
+          score: hit.score,
+          type: hit.type,
+          highlights: this.formatHighlights(hit.highlights || {}),
+        };
+        if (hit.type !== 'busRoute') return [base];
+        const routeId = (hit.document as RouteDocument).route_id;
+        const matches = directions.filter((direction) => direction.routeId === routeId);
+        // Missing direction data stays explicitly unavailable rather than inventing terminals.
+        return matches.length ? matches.map((direction) => ({
+          ...base,
+          id: direction.favoriteCode,
+          favoriteCode: direction.favoriteCode,
+          destination: direction.destination,
+          directionId: direction.directionId,
+        })) : [base];
+      });
     } catch (error) {
       if (error instanceof ServiceUnavailableException) {
         throw error;
@@ -133,7 +152,18 @@ export class SearchResolver {
       return [];
     }
 
-    return loaders.routesLoader.load(stop.stop_id);
+    const routes = await loaders.routesLoader.load(stop.stop_id);
+    const directions = await this.directions.forRoutes(routes.map((route) => route.route_id), stopId);
+    return routes.flatMap((route) => {
+      const matches = directions.filter((direction) => direction.routeId === route.route_id);
+      return matches.length ? matches.map((direction) => ({
+        ...route,
+        id: direction.favoriteCode,
+        favoriteCode: direction.favoriteCode,
+        destination: direction.destination,
+        directionId: direction.directionId,
+      })) : [route];
+    });
   }
 
   @Mutation(() => Boolean)

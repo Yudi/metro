@@ -257,7 +257,7 @@ export class OmniboxDialogComponent {
   }
 
   selectResult(result: SearchResult): void {
-    const id = result.type === 'route' ? result.routeData?.route_id : result.id;
+    const id = result.type === 'route' ? (result.routeData?.favoriteCode ?? result.routeData?.route_id) : result.id;
     if (!id) return;
     void this.router.navigate(
       [this.cityContext.path('/busca'), resultKind(result), id],

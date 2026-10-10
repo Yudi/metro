@@ -83,7 +83,10 @@
                         class="selection-row"
                         aria-label="Linhas exibidas no painel"
                       >
-                        @for (route of routes; track route.routeId) {
+                        @for (
+                          route of routes;
+                          track route.favoriteCode || route.routeId
+                        ) {
                           <button
                             type="button"
                             class="choice-button route-choice-button"
@@ -104,7 +107,7 @@
                             </span>
                             <span class="choice-copy">
                               <span class="choice-title">{{
-                                route.longName
+                                route.destination || route.longName
                               }}</span>
                               <span class="choice-meta">
                                 @if (agencyIdentity(route); as agency) {
@@ -158,11 +161,19 @@
               @if (busRoutes().length === 0) {
                 <span class="empty-category">Nenhuma linha salva.</span>
               } @else {
-                @for (route of busRoutes(); track route.routeId) {
+                @for (
+                  route of busRoutes();
+                  track route.favoriteCode || route.favoriteId || route.routeId
+                ) {
                   <mat-chip
                     class="route-favorite-chip"
                     removable
-                    (removed)="removeFavorite(route.routeId, 'busRoute')"
+                    (removed)="
+                      removeFavorite(
+                        route.favoriteId || route.favoriteCode || route.routeId,
+                        'busRoute'
+                      )
+                    "
                   >
                     <span class="route-favorite-content">
                       <span
@@ -173,7 +184,10 @@
                         {{ route.shortName }}
                       </span>
                       <span class="route-favorite-copy">
-                        <strong>{{ route.longName }}</strong>
+                        <strong>{{ route.destination || route.longName }}</strong>
+                        @if (route.favoriteNotice) {
+                          <span class="favorite-route-notice">{{ route.favoriteNotice }}</span>
+                        }
                         <span class="route-favorite-meta">
                           @if (agencyIdentity(route); as agency) {
                             <span class="agency-identity">
@@ -208,7 +222,7 @@
                       matChipRemove
                       matTooltip="Remover dos favoritos"
                       [aria-label]="
-                        'Remover ' + route.longName + ' dos favoritos'
+                        'Remover ' + (route.destination || route.longName) + ' dos favoritos'
                       "
                     >
                       <mat-icon>favorite</mat-icon>

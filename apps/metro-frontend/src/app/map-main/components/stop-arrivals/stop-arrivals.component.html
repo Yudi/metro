@@ -231,7 +231,7 @@
                           ? 'Recolher horários da linha '
                           : 'Ver ' +
                             group.departures.length +
-                            ' horários da linha ') + group.next.routeShortName
+                            ' horários da linha ') + group.next.routeShortName + ', sentido ' + group.next.headsign
                       "
                       (click)="toggleScheduleRoute(group.routeId)"
                     >
@@ -250,7 +250,7 @@
                   <ul
                     class="scheduled-following"
                     [attr.aria-label]="
-                      'Mais horários da linha ' + group.next.routeShortName
+                      'Mais horários da linha ' + group.next.routeShortName + ', sentido ' + group.next.headsign
                     "
                   >
                     @for (departure of group.remaining; track departure.key) {
@@ -315,7 +315,7 @@
         </div>
 
         <mat-accordion class="route-chip-list" multi>
-          @for (route of displayRoutes(); track route.routeId) {
+          @for (route of displayRoutes(); track getRouteKey(route)) {
             <mat-expansion-panel
               class="route-panel mat-elevation-z0"
               [expanded]="isRouteExpanded(route)"
@@ -330,7 +330,7 @@
                     [style.color]="'#' + route.textColor"
                     >{{ route.shortName }}</span
                   >
-                  <span class="route-label">{{ route.longName }}</span>
+                  <span class="route-label">{{ route.destination ? "Sentido " + route.destination : route.longName }}</span>
                   <span class="route-meta">
                     <span class="agency-identity">
                       @if (route.agencyLogo; as logo) {

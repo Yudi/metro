@@ -28,6 +28,10 @@ import {
   getBusStopIdentityAliases,
   getBusRouteIdentity,
   getContrastColor,
+  isBusDirectionFavorite,
+  matchBusDirectionFavorite,
+  parseBusDirectionFavorite,
+  getBusLineDirectionAnchor,
 } from '@metro/shared/utils';
 import { DialogHeaderComponent } from '../../../shared/components/dialog-header/dialog-header.component';
 import {
@@ -91,17 +95,65 @@ export class BusStopDialogComponent {
   );
   readonly isFavorite = computed(() => this.favoriteStopIds().length > 0);
   readonly routesSortedByFavorite = computed(() => {
-    const favoriteRouteIds = new Set(
-      this.favoriteService
-        .favorites()
-        .busRoute.map((routeId) => this.normalizeRouteCode(routeId)),
+    const favoriteCodes = this.favoriteService.favorites().busRoute;
+    const routes = this.routes();
+    const favoriteRouteIds = new Set<string>();
+    const legacyRouteIds = new Set(
+      favoriteCodes
+        .filter((code) => !isBusDirectionFavorite(code))
+        .map((code) => this.normalizeRouteCode(code)),
     );
+    const currentDirections = routes.flatMap((route) => {
+      const key = route.favoriteCode
+        ? parseBusDirectionFavorite(route.favoriteCode)
+        : null;
+      return key
+        ? [
+            {
+              ...key,
+              directionId: route.directionId ?? -1,
+              destination: route.destination ?? '',
+              route,
+            },
+          ]
+        : [];
+    });
 
-    return this.routes()
+    for (const favoriteCode of favoriteCodes) {
+      const lineAnchor = getBusLineDirectionAnchor(favoriteCode);
+      if (lineAnchor) {
+        const match = matchBusDirectionFavorite(lineAnchor, currentDirections);
+        if (match) legacyRouteIds.add(this.normalizeRouteCode(match.route.routeId));
+        continue;
+      }
+      if (!isBusDirectionFavorite(favoriteCode)) {
+        continue;
+      }
+
+      const match = matchBusDirectionFavorite(
+        favoriteCode,
+        currentDirections,
+      );
+      if (match) {
+        favoriteRouteIds.add(
+          this.normalizeRouteCode(getBusRouteIdentity(match.route)),
+        );
+      }
+    }
+
+    return routes
       .map((route, index) => ({ route, index }))
       .sort((a, b) => {
-        const aIsFavorite = this.isFavoriteRoute(a.route, favoriteRouteIds);
-        const bIsFavorite = this.isFavoriteRoute(b.route, favoriteRouteIds);
+        const aIsFavorite = this.isFavoriteRoute(
+          a.route,
+          favoriteRouteIds,
+          legacyRouteIds,
+        );
+        const bIsFavorite = this.isFavoriteRoute(
+          b.route,
+          favoriteRouteIds,
+          legacyRouteIds,
+        );
 
         if (aIsFavorite !== bIsFavorite) {
           return aIsFavorite ? -1 : 1;
@@ -238,10 +290,11 @@ export class BusStopDialogComponent {
   private isFavoriteRoute(
     route: BusRouteGraphQL,
     favoriteRouteIds: Set<string>,
+    legacyRouteIds: Set<string>,
   ): boolean {
     return favoriteRouteIds.has(
       this.normalizeRouteCode(getBusRouteIdentity(route)),
-    );
+    ) || legacyRouteIds.has(this.normalizeRouteCode(route.routeId));
   }
 
   private normalizeRouteCode(routeCode: string): string {

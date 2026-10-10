@@ -72,6 +72,18 @@ export class BusStop {
 
 @ObjectType()
 export class BusRoute {
+  @Field({ nullable: true })
+  favoriteCode?: string;
+
+  @Field({ nullable: true })
+  requestedCode?: string;
+
+  @Field({ nullable: true })
+  destination?: string;
+
+  @Field(() => Int, { nullable: true })
+  directionId?: number;
+
   @Field(() => ID)
   id!: string;
 

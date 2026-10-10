@@ -12,9 +12,14 @@ import {
 import { liveQuery } from 'dexie';
 // eslint-disable-next-line @nx/enforce-module-boundaries
 import { firebaseIdToken, firebaseUser } from '@metro/shared/firebase';
-import { createEmptyFavorites } from '@metro/shared/utils';
+import {
+  createEmptyFavorites,
+  encodeBusLineFavorite,
+  isBusDirectionFavorite,
+  isBusLineFavorite,
+} from '@metro/shared/utils';
 import type { FavoriteList, FavoriteTypes } from '@metro/shared/utils';
-import { firstValueFrom } from 'rxjs';
+import { catchError, firstValueFrom, of } from 'rxjs';
 import type {
   DashboardFavoriteSelections,
   DashboardSelectionRecord,
@@ -61,6 +66,24 @@ const FAVORITE_SYNC_ERROR_MESSAGE =
   'Não foi possível sincronizar seus favoritos. Revise os favoritos pendentes e tente novamente.';
 const FAVORITE_LIMIT_ERROR_MESSAGE =
   'Você já atingiu o limite de 500 favoritos.';
+const LEGACY_BUS_FAVORITE_LOOKUP_QUERY = `
+  query LegacyBusFavoriteDirections($codes: [String!]!) {
+    favoriteBusDirections(codes: $codes) {
+      favoriteCode
+      requestedCode
+    }
+  }
+`;
+
+interface LegacyBusFavoriteDirectionsResponse {
+  data?: {
+    favoriteBusDirections?: Array<{
+      favoriteCode?: string;
+      requestedCode?: string;
+    }>;
+  };
+  errors?: readonly unknown[];
+}
 
 @Service()
 export class FavoritesService implements OnDestroy {
@@ -74,6 +97,7 @@ export class FavoritesService implements OnDestroy {
   private favoritesSubscription?: { unsubscribe(): void };
   private dashboardSelectionsSubscription?: { unsubscribe(): void };
   private readonly onlineHandler = () => {
+    this.busFavoriteMigrationEpoch.update((epoch) => epoch + 1);
     this.syncWithServer();
   };
   private activeScope = getFavoritesScope(this.firebaseUser()?.uid);
@@ -84,6 +108,7 @@ export class FavoritesService implements OnDestroy {
   private anonymousImportApprovedScope: string | null = null;
 
   private readonly _favorites = signal<FavoriteList>(createEmptyFavorites());
+  private readonly busFavoriteMigrationEpoch = signal(0);
   readonly favorites: Signal<FavoriteList> = this._favorites.asReadonly();
   private readonly _syncError = signal<string | null>(null);
   readonly syncError: Signal<string | null> = this._syncError.asReadonly();
@@ -111,6 +136,59 @@ export class FavoritesService implements OnDestroy {
         this.switchScope(scope);
       }
     });
+
+    effect((onCleanup) => {
+      this.busFavoriteMigrationEpoch();
+      const legacyCodes = this._favorites().busRoute.filter(
+        (code) => !isBusDirectionFavorite(code),
+      );
+      if (legacyCodes.length === 0) {
+        return;
+      }
+
+      const scope = this.activeScope;
+      const generation = this.scopeGeneration;
+      const subscription = this.http
+        .post<LegacyBusFavoriteDirectionsResponse>('/api/graphql', {
+          query: LEGACY_BUS_FAVORITE_LOOKUP_QUERY,
+          variables: { codes: legacyCodes },
+        })
+        .pipe(catchError(() => of(null)))
+        .subscribe((response) => {
+          if (
+            !response ||
+            response.errors?.length ||
+            !response.data?.favoriteBusDirections ||
+            scope !== this.activeScope ||
+            generation !== this.scopeGeneration
+          ) {
+            return;
+          }
+
+          const routesByRequestedCode = new Map<
+            string,
+            Array<{ favoriteCode?: string; requestedCode?: string }>
+          >();
+          for (const route of response.data.favoriteBusDirections) {
+            if (!route.requestedCode) {
+              continue;
+            }
+            const routes =
+              routesByRequestedCode.get(route.requestedCode) ?? [];
+            routes.push(route);
+            routesByRequestedCode.set(route.requestedCode, routes);
+          }
+
+          void this.migrateResolvedBusRouteFavorites(
+            legacyCodes,
+            routesByRequestedCode,
+            scope,
+            generation,
+          );
+        });
+
+      onCleanup(() => subscription.unsubscribe());
+    });
   }
 
   ngOnDestroy(): void {
@@ -137,6 +215,226 @@ export class FavoritesService implements OnDestroy {
     }
 
     void this.removeFavoriteRecord(code, type);
+  }
+
+  /**
+   * Replaces one legacy bus-route favorite with all resolved direction keys.
+   * The update and its sync operations are scoped and committed atomically so
+   * a full favorites list or an account switch cannot lose the old favorite.
+   */
+  async migrateBusRouteFavorite(
+    legacyCode: string,
+    directionCodes: string[],
+  ): Promise<boolean> {
+    if (!isPlatformBrowser(this.platformId) || !this.db) {
+      return false;
+    }
+
+    const normalizedLegacyCode = this.normalizeFavoriteCode(legacyCode);
+    const normalizedDirectionCodes = directionCodes.map((code) =>
+      this.normalizeFavoriteCode(code),
+    );
+    if (
+      !normalizedLegacyCode ||
+      isBusDirectionFavorite(normalizedLegacyCode) ||
+      normalizedDirectionCodes.length === 0 ||
+      normalizedDirectionCodes.some(
+        (code) => !code || !isBusDirectionFavorite(code),
+      )
+    ) {
+      return false;
+    }
+    const uniqueDirectionCodes = Array.from(
+      new Set(normalizedDirectionCodes as string[]),
+    );
+    if (uniqueDirectionCodes.length < 2) {
+      return false;
+    }
+
+    return this.exchangeBusRouteFavorite(
+      normalizedLegacyCode,
+      uniqueDirectionCodes,
+    );
+  }
+
+  async preserveBusLineFavorite(
+    legacyCode: string,
+    directionCode: string,
+  ): Promise<boolean> {
+    if (!isPlatformBrowser(this.platformId) || !this.db) {
+      return false;
+    }
+
+    const normalizedLegacyCode = this.normalizeFavoriteCode(legacyCode);
+    const normalizedDirectionCode = this.normalizeFavoriteCode(directionCode);
+    if (
+      !normalizedLegacyCode ||
+      isBusDirectionFavorite(normalizedLegacyCode) ||
+      isBusLineFavorite(normalizedLegacyCode) ||
+      !normalizedDirectionCode ||
+      !isBusDirectionFavorite(normalizedDirectionCode)
+    ) {
+      return false;
+    }
+
+    const broadCode = encodeBusLineFavorite(normalizedDirectionCode);
+    if (!broadCode) {
+      return false;
+    }
+
+    return this.exchangeBusRouteFavorite(normalizedLegacyCode, [broadCode]);
+  }
+
+  private async exchangeBusRouteFavorite(
+    sourceCode: string,
+    targetCodes: string[],
+  ): Promise<boolean> {
+    if (!this.db) {
+      return false;
+    }
+    const scope = this.activeScope;
+    const generation = this.scopeGeneration;
+    const db = this.db;
+    const uniqueTargetCodes = Array.from(new Set(targetCodes));
+    if (uniqueTargetCodes.length === 0) {
+      return false;
+    }
+    const migrated = await db.transaction(
+      'rw',
+      db.favorites,
+      db.outbox,
+      async () => {
+        if (scope !== this.activeScope || generation !== this.scopeGeneration) {
+          return false;
+        }
+
+        const legacyKey = getFavoriteKey(
+          scope,
+          'busRoute',
+          sourceCode,
+        );
+        if (!(await db.favorites.get(legacyKey))) {
+          return false;
+        }
+
+        const scopedFavorites = await db.favorites
+          .where('scope')
+          .equals(scope)
+          .toArray();
+        const existingCodes = new Set(
+          scopedFavorites
+            .filter((favorite) => favorite.type === 'busRoute')
+            .map((favorite) => favorite.code),
+        );
+        const missingCodes = uniqueTargetCodes.filter(
+          (code) => !existingCodes.has(code),
+        );
+
+        if (
+          scopedFavorites.length - 1 + missingCodes.length >
+          MAX_FAVORITES_PER_SCOPE
+        ) {
+          return false;
+        }
+
+        // All async reads finish before writing. If account state changed
+        // while the transaction was queued, do not mutate either scope.
+        if (scope !== this.activeScope || generation !== this.scopeGeneration) {
+          return false;
+        }
+
+        const now = Date.now();
+        await db.favorites.delete(legacyKey);
+        for (const code of missingCodes) {
+          await db.favorites.put({
+            key: getFavoriteKey(scope, 'busRoute', code),
+            scope,
+            type: 'busRoute',
+            code,
+            updatedAt: now,
+          });
+        }
+
+        if (scope !== ANONYMOUS_FAVORITES_SCOPE) {
+          await this.replacePendingOperation(scope, {
+            operationId: this.createOperationId(),
+            scope,
+            status: 'pending',
+            operation: 'remove',
+            type: 'busRoute',
+            code: sourceCode,
+            createdAt: now,
+          });
+          for (const code of missingCodes) {
+            await this.replacePendingOperation(scope, {
+              operationId: this.createOperationId(),
+              scope,
+              status: 'pending',
+              operation: 'add',
+              type: 'busRoute',
+              code,
+              createdAt: now,
+            });
+          }
+        }
+
+        return true;
+      },
+    );
+
+    if (migrated && scope === this.activeScope && generation === this.scopeGeneration) {
+      this.syncWithServer();
+    }
+    return migrated;
+  }
+
+  private async migrateResolvedBusRouteFavorites(
+    legacyCodes: string[],
+    routesByRequestedCode: Map<
+      string,
+      Array<{ favoriteCode?: string; requestedCode?: string }>
+    >,
+    scope: string,
+    generation: number,
+  ): Promise<void> {
+    for (const code of legacyCodes) {
+      if (scope !== this.activeScope || generation !== this.scopeGeneration) {
+        return;
+      }
+
+      const directions = routesByRequestedCode.get(code) ?? [];
+      const directionCodes = directions.flatMap((direction) =>
+        direction.favoriteCode &&
+        isBusDirectionFavorite(direction.favoriteCode)
+          ? [direction.favoriteCode]
+          : [],
+      );
+      if (directions.length === 0 || directionCodes.length !== directions.length) {
+        continue;
+      }
+
+      try {
+        const uniqueDirectionCodes = Array.from(new Set(directionCodes));
+        const directionAnchor = uniqueDirectionCodes[0];
+        if (uniqueDirectionCodes.length >= 2 && directionAnchor) {
+          const migrated = await this.migrateBusRouteFavorite(
+            code,
+            uniqueDirectionCodes,
+          );
+          if (!migrated && !isBusLineFavorite(code)) {
+            await this.preserveBusLineFavorite(code, directionAnchor);
+          }
+        } else if (
+          uniqueDirectionCodes.length === 1 &&
+          directionAnchor &&
+          !isBusLineFavorite(code)
+        ) {
+          await this.preserveBusLineFavorite(code, directionAnchor);
+        }
+      } catch {
+        // A later favorites change or reconnect can retry this lookup.
+      }
+    }
   }
 
   clearFavorites(type: FavoriteTypes | 'all'): void {
@@ -312,6 +610,132 @@ export class FavoritesService implements OnDestroy {
 
   setDashboardBusStopRoutes(stopId: string, routeKeys: string[]): void {
     this.setDashboardSelection('busStopRoutes', stopId, routeKeys);
+  }
+
+  async migrateDashboardBusStopRoutes(
+    stopId: string,
+    routes: Array<{ routeId: string; favoriteCode?: string }>,
+    sourceStopIds: string[] = [],
+  ): Promise<boolean> {
+    if (!isPlatformBrowser(this.platformId) || !this.db || !stopId) {
+      return false;
+    }
+
+    const scope = this.activeScope;
+    const generation = this.scopeGeneration;
+    const db = this.db;
+    const key = getDashboardSelectionKey(scope, 'busStopRoutes', stopId);
+    const aliasIds = Array.from(
+      new Set(sourceStopIds.filter((id) => id && id !== stopId)),
+    );
+    const migrated = await db.transaction(
+      'rw',
+      db.dashboardSelections,
+      async () => {
+        if (scope !== this.activeScope || generation !== this.scopeGeneration) {
+          return false;
+        }
+
+        const canonicalRecord = await db.dashboardSelections.get(key);
+        const aliasRecords = await Promise.all(
+          aliasIds.map((aliasId) =>
+            db.dashboardSelections.get(
+              getDashboardSelectionKey(scope, 'busStopRoutes', aliasId),
+            ),
+          ),
+        );
+        const existingAliasRecords = aliasRecords.filter(
+          (record): record is DashboardSelectionRecord => Boolean(record),
+        );
+        if (!canonicalRecord && existingAliasRecords.length === 0) {
+          return false;
+        }
+
+        const directionCodesByRouteId = new Map<string, string[]>();
+        for (const route of routes) {
+          if (
+            !route.favoriteCode ||
+            !isBusDirectionFavorite(route.favoriteCode)
+          ) {
+            continue;
+          }
+          const codes = directionCodesByRouteId.get(route.routeId) ?? [];
+          codes.push(route.favoriteCode);
+          directionCodesByRouteId.set(route.routeId, codes);
+        }
+        const migrateValues = (values: string[]) => {
+          const nextValues = new Set(values);
+          let changed = false;
+          for (const value of values) {
+            const directionCodes = directionCodesByRouteId.get(value);
+            if (!directionCodes?.length) {
+              continue;
+            }
+
+            nextValues.delete(value);
+            for (const directionCode of directionCodes) {
+              nextValues.add(directionCode);
+            }
+            changed = true;
+          }
+          return { values: [...nextValues], changed };
+        };
+
+        const canonicalValues = canonicalRecord
+          ? migrateValues(canonicalRecord.values)
+          : undefined;
+        const aliasValues = existingAliasRecords.map((record) => ({
+          record,
+          ...migrateValues(record.values),
+        }));
+        if (
+          scope !== this.activeScope ||
+          generation !== this.scopeGeneration
+        ) {
+          return false;
+        }
+
+        let changed = false;
+        const now = Date.now();
+        if (canonicalRecord && canonicalValues?.changed) {
+          await db.dashboardSelections.put({
+            ...canonicalRecord,
+            values: canonicalValues.values,
+            updatedAt: now,
+          });
+          changed = true;
+        }
+        for (const alias of aliasValues) {
+          if (!alias.changed) {
+            continue;
+          }
+          await db.dashboardSelections.put({
+            ...alias.record,
+            values: alias.values,
+            updatedAt: now,
+          });
+          changed = true;
+        }
+
+        // If the canonical identity has no saved preference, carry the first
+        // legacy alias forward while leaving that alias record in place.
+        if (!canonicalRecord && aliasValues.length > 0) {
+          const source = aliasValues[0];
+          await db.dashboardSelections.put({
+            ...source.record,
+            key,
+            scope,
+            values: source.values,
+            updatedAt: now,
+          });
+          changed = true;
+        }
+
+        return changed;
+      },
+    );
+
+    return migrated;
   }
 
   toggleDashboardRailStationLine(stationKey: string, lineId: string): void {

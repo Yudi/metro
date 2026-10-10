@@ -1,4 +1,6 @@
 import { ScheduledBusService } from './scheduled-bus/scheduled-bus.service';
+import { BusDirectionService } from './services/bus-direction.service';
+import { BusDirectionResolver } from './resolvers/bus-direction.resolver';
 import { ScheduledBusResolver } from './scheduled-bus/scheduled-bus.resolver';
 import { Module, forwardRef } from '@nestjs/common';
 import { PostGISService } from './services/postgis.service';
@@ -23,6 +25,8 @@ import { VectorTilesModule } from '../vector-tiles/vector-tiles.module';
 @Module({
   imports: [forwardRef(() => VectorTilesModule)],
   providers: [
+    BusDirectionService,
+    BusDirectionResolver,
     ScheduledBusService,
     ScheduledBusResolver,
     PostGISService,
@@ -41,6 +45,7 @@ import { VectorTilesModule } from '../vector-tiles/vector-tiles.module';
     GeographyServiceOptimized,
   ],
   exports: [
+    BusDirectionService,
     PostGISService,
     BusStopService,
     SubwayStationService,

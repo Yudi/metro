@@ -48,6 +48,9 @@ export interface BusStopTileData {
 
 export interface BusRouteTileData {
   routeId: string;
+  favoriteCode?: string;
+  destination?: string;
+  directionId?: number;
   shortName: string;
   longName: string;
   color: string;

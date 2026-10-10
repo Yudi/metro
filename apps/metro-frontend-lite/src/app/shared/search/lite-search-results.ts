@@ -18,7 +18,10 @@ export function processLiteSearchResults(
         latitude: result.stop_lat || 0,
         longitude: result.stop_lon || 0,
         routes: (result.routes || []).map((route) => ({
-          id: route.id,
+          id: route.favoriteCode ?? route.id,
+          favoriteCode: route.favoriteCode,
+          destination: route.destination,
+          directionId: route.directionId,
           routeId: route.route_id,
           shortName: route.route_short_name,
           longName: route.route_long_name,

@@ -26,7 +26,7 @@
       <div class="result-info">
         <h4 class="result-title">
           @if (result().type === "route" && result().routeData; as route) {
-            {{ route.route_long_name }}
+            {{ route.destination ? "Sentido " + route.destination : route.route_long_name }}
           } @else {
             {{ result().name }}
           }

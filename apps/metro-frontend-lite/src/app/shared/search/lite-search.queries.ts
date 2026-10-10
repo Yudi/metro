@@ -13,6 +13,9 @@ export const LITE_SEARCH_QUERY = `
           platformCode
           mergedStopIds
           routes {
+            favoriteCode
+            destination
+            directionId
             id
             route_id
             route_short_name
@@ -64,6 +67,9 @@ export const LITE_NEARBY_QUERY = `
           platformCode
           mergedStopIds
           routes {
+            favoriteCode
+            destination
+            directionId
             id
             route_id
             route_short_name

@@ -36,10 +36,18 @@ import {
   getRailStationIdentityKey,
   getSptransStopCode,
   getBusStopIdentityAliases,
+  supportsSptransRealtime,
+  getOlhoVivoDestination,
   groupScheduledBusDepartures,
   hasArtespStopData,
   getTerminalForDestination,
   NextTrainLineCode,
+  encodeBusLineFavorite,
+  isBusDirectionFavorite,
+  isBusLineFavorite,
+  matchBusDirectionFavorite,
+  parseBusDirectionFavorite,
+  parseBusLineFavorite,
   sortBusRoutesByAgency,
   hasFetchableNextTrain,
   sortRailLineCodes,
@@ -81,6 +89,7 @@ export class Dashboard {
   private readonly platformId = inject(PLATFORM_ID);
   private readonly authService = inject(AuthService);
   private favoriteSnapshotKey = '';
+  private dataGeneration = 0;
   private refreshQueued = false;
 
   readonly loading = signal(false);
@@ -109,12 +118,13 @@ export class Dashboard {
         [...this.busSchedulesByStopId()].map(([stopId, departures]) => [
           stopId,
           groupScheduledBusDepartures(
-            departures.map((departure) => ({
+            this.filterScheduledDestinations(stopId, departures).map((departure) => ({
               ...departure,
               timeParts: this.getScheduledDepartureTimeParts(
                 departure.departureTime,
               ),
-            })),
+            })), 5,
+            (departure) => JSON.stringify([departure.routeId, departure.directionId, departure.headsign]),
           ),
         ]),
       ),
@@ -236,6 +246,7 @@ export class Dashboard {
         snapshotKey !== this.favoriteSnapshotKey
       ) {
         this.favoriteSnapshotKey = snapshotKey;
+        this.dataGeneration += 1;
         queueMicrotask(() => this.requestDashboardRefresh());
       }
     });
@@ -248,6 +259,7 @@ export class Dashboard {
 
     this.loading.set(true);
     this.error.set(null);
+    const generation = this.dataGeneration;
 
     try {
       const favorites = this.favorites();
@@ -261,8 +273,10 @@ export class Dashboard {
         return;
       }
 
-      await this.loadDashboardData(favorites);
-      this.lastLoadedAt.set(new Date());
+      await this.loadDashboardData(favorites, generation);
+      if (generation === this.dataGeneration) {
+        this.lastLoadedAt.set(new Date());
+      }
     } catch {
       this.error.set('Não foi possível carregar o painel agora.');
     } finally {
@@ -315,12 +329,29 @@ export class Dashboard {
 
   getSelectedBusRoutes(stopId: string): BusRouteGraphQL[] {
     const routes = this.busRoutesByStopId().get(stopId) ?? [];
-    const selectedRouteKeys =
-      this.dashboardSelections()?.busStopRoutes[stopId] ??
-      routes.map((route) => this.getBusRouteSelectionKey(route));
+    const selections = this.dashboardSelections()?.busStopRoutes ?? {};
+    const aliasIds = (this.favorites()?.busStop ?? []).filter(
+      (favoriteId) =>
+        favoriteId !== stopId &&
+        this.busStopsById().get(favoriteId)?.stopId === stopId,
+    );
+    const hasSavedSelection =
+      selections[stopId] !== undefined ||
+      aliasIds.some((favoriteId) => selections[favoriteId] !== undefined);
+    const savedKeys =
+      selections[stopId] ??
+      aliasIds.flatMap((favoriteId) => selections[favoriteId] ?? []);
+    const selectedRouteKeys = hasSavedSelection
+      ? savedKeys
+      : routes.map((route) => this.getBusRouteSelectionKey(route));
     const selectedRouteKeySet = new Set(selectedRouteKeys);
 
-    return routes.filter((route) => selectedRouteKeySet.has(route.routeId));
+    return routes.filter(
+      (route) =>
+        selectedRouteKeySet.has(this.getBusRouteSelectionKey(route)) ||
+        selectedRouteKeySet.has(route.routeId) ||
+        this.hasMatchingSavedDirection(route, selectedRouteKeys, routes),
+    );
   }
 
   getSelectedRailLines(station: RailStationInsight): FavoriteRailLineOption[] {
@@ -424,13 +455,37 @@ export class Dashboard {
   }
 
   getBusArrivalLines(stopId: string): LiteArrivalLine[] {
-    return this.busArrivalsByStopId().get(stopId)?.p?.l ?? [];
+    const lines = this.busArrivalsByStopId().get(stopId)?.p?.l ?? [];
+    const selectedRoutes = this.getSelectedBusRoutes(stopId);
+    if (selectedRoutes.length === 0) {
+      return [];
+    }
+
+    return lines.filter((line) => {
+      return selectedRoutes.some(
+        (route) =>
+          supportsSptransRealtime(route) &&
+          route.shortName.trim().toLocaleUpperCase('pt-BR') ===
+            line.c.trim().toLocaleUpperCase('pt-BR') &&
+          (!route.destination || route.destination.trim().toLocaleUpperCase('pt-BR') ===
+            getOlhoVivoDestination(line).trim().toLocaleUpperCase('pt-BR')),
+      );
+    });
   }
 
   readonly getBusDestination = dashboardPresentation.getBusDestination;
 
   getBusScheduledDepartures(stopId: string): LiteScheduledBusDeparture[] {
-    return this.busSchedulesByStopId().get(stopId) ?? [];
+    return this.filterScheduledDestinations(stopId, this.busSchedulesByStopId().get(stopId) ?? []);
+  }
+
+  private filterScheduledDestinations(stopId: string, departures: LiteScheduledBusDeparture[]): LiteScheduledBusDeparture[] {
+    const routes = this.getSelectedBusRoutes(stopId);
+    if (!this.busRoutesByStopId().has(stopId)) return departures;
+    return departures.filter((departure) => routes.some((route) =>
+      route.routeId === departure.routeId &&
+      (!route.destination || route.destination.trim().toLocaleUpperCase('pt-BR') === departure.headsign.trim().toLocaleUpperCase('pt-BR')),
+    ));
   }
 
   getBusScheduledRouteGroups(stopId: string) {
@@ -488,12 +543,21 @@ export class Dashboard {
   getBusRouteForScheduledDeparture(
     stopId: string,
     routeId: string,
+    directionId?: number,
   ): BusRouteInsight | BusRouteGraphQL | null {
     return (
       this.busRoutesByStopId()
         .get(stopId)
-        ?.find((route) => route.routeId === routeId) ??
-      this.busRoutesById().get(routeId) ??
+        ?.find(
+          (route) =>
+            route.routeId === routeId &&
+            (directionId === undefined || route.directionId === directionId),
+        ) ??
+      [...this.busRoutesById().values()].find(
+        (route) =>
+          route.routeId === routeId &&
+          (directionId === undefined || route.directionId === directionId),
+      ) ??
       null
     );
   }
@@ -529,7 +593,10 @@ export class Dashboard {
 
   readonly statusTone = dashboardPresentation.statusTone;
 
-  private async loadDashboardData(favorites: FavoriteList): Promise<void> {
+  private async loadDashboardData(
+    favorites: FavoriteList,
+    generation: number,
+  ): Promise<void> {
     const routeIds = uniqueIds(favorites.busRoute);
     const stopIds = uniqueIds(favorites.busStop);
 
@@ -541,7 +608,14 @@ export class Dashboard {
       ]),
     );
 
-    this.applyBusLookup(routeIds, stopIds, busLookup);
+    if (generation !== this.dataGeneration) {
+      return;
+    }
+
+    await this.applyBusLookup(routeIds, stopIds, busLookup, generation);
+    if (generation !== this.dataGeneration) {
+      return;
+    }
     this.mergedRailStations.set(mergedStations);
     this.railStatus.set(railStatus);
 
@@ -551,8 +625,29 @@ export class Dashboard {
         this.fetchNextTrainsForSelectedStations(),
       ]),
     );
+    if (generation !== this.dataGeneration) {
+      return;
+    }
+    for (const stopId of stopIds) {
+      if (generation !== this.dataGeneration) {
+        return;
+      }
+      const canonicalStopId =
+        this.busStopsById().get(stopId)?.stopId ?? stopId;
+      await this.favoritesService.migrateDashboardBusStopRoutes(
+        canonicalStopId,
+        routesByStop.get(stopId) ?? [],
+        canonicalStopId === stopId ? [] : [stopId],
+      );
+      if (generation !== this.dataGeneration) {
+        return;
+      }
+    }
     const arrivalsByStop = await this.fetchBusArrivals(stopIds);
     const schedulesByStop = await this.fetchBusSchedules(stopIds);
+    if (generation !== this.dataGeneration) {
+      return;
+    }
 
     this.busRoutesByStopId.set(routesByStop);
     this.nextTrainGroups.set(nextTrains);
@@ -660,17 +755,101 @@ export class Dashboard {
     return new Map(schedules.map((entry) => [entry.stopId, entry.departures]));
   }
 
-  private applyBusLookup(
+  private async applyBusLookup(
     routeIds: string[],
     stopIds: string[],
     response: BusFavoritesLookupResponse | null,
-  ): void {
-    const routesById = new Map(
-      response?.data?.multipleBusRoutes.map((route) => [
-        route.routeId,
-        route,
-      ]) ?? [],
-    );
+    generation: number,
+  ): Promise<void> {
+    const routes = response && !response.errors?.length
+      ? response.data?.multipleBusRoutes ?? []
+      : [];
+    const routesByFavoriteCode = new Map<string, BusRouteInsight>();
+    const routesByRequestedCode = new Map<string, BusRouteInsight[]>();
+    for (const route of routes) {
+      routesByFavoriteCode.set(route.favoriteCode ?? route.routeId, route);
+      const requestedCode = route.requestedCode ?? route.routeId;
+      const requestedRoutes = routesByRequestedCode.get(requestedCode) ?? [];
+      requestedRoutes.push(route);
+      routesByRequestedCode.set(requestedCode, requestedRoutes);
+    }
+
+    const migratedLegacyCodes = new Set<string>();
+    const preservedLineCodeByRequest = new Map<string, string>();
+    for (const code of routeIds) {
+      if (generation !== this.dataGeneration) {
+        return;
+      }
+      if (
+        !response ||
+        response.errors?.length ||
+        isBusDirectionFavorite(code)
+      ) {
+        continue;
+      }
+
+      const directions = routesByRequestedCode.get(code) ?? [];
+      const directionCodes = directions.flatMap((direction) =>
+        direction.favoriteCode && isBusDirectionFavorite(direction.favoriteCode)
+          ? [direction.favoriteCode]
+          : [],
+      );
+      if (directions.length === 0 || directionCodes.length !== directions.length) {
+        continue;
+      }
+
+      try {
+        const uniqueDirectionCodes = Array.from(new Set(directionCodes));
+        const currentFavorites = new Set(this.favorites()?.busRoute ?? []);
+        const alreadyExpanded =
+          !currentFavorites.has(code) &&
+          uniqueDirectionCodes.every((directionCode) =>
+            currentFavorites.has(directionCode),
+          );
+        let migrated = alreadyExpanded;
+        if (!alreadyExpanded && uniqueDirectionCodes.length >= 2) {
+          migrated = await this.favoritesService.migrateBusRouteFavorite(
+            code,
+            uniqueDirectionCodes,
+          );
+        }
+
+        if (migrated) {
+          migratedLegacyCodes.add(code);
+          continue;
+        }
+
+        const anchor = uniqueDirectionCodes[0];
+        if (!anchor) {
+          continue;
+        }
+        let preservedCode = isBusLineFavorite(code) ? code : null;
+        if (!preservedCode) {
+          const encodedLineCode = encodeBusLineFavorite(anchor);
+          if (!encodedLineCode) {
+            continue;
+          }
+          const preserved = await this.favoritesService.preserveBusLineFavorite(
+            code,
+            anchor,
+          );
+          const favoritesAfter = new Set(this.favorites()?.busRoute ?? []);
+          if (preserved || favoritesAfter.has(encodedLineCode)) {
+            preservedCode = encodedLineCode;
+          }
+        }
+        if (preservedCode) {
+          preservedLineCodeByRequest.set(code, preservedCode);
+        }
+      } catch {
+        // Keep the whole-line favorite while its direction migration retries.
+      }
+
+      if (generation !== this.dataGeneration) {
+        return;
+      }
+    }
+
     const stopsById = new Map<string, BusStopInsight>();
     for (const stop of response?.data?.multipleBusStops ?? []) {
       const mappedStop = {
@@ -688,18 +867,43 @@ export class Dashboard {
       }
     }
 
-    this.busRoutesById.set(
-      new Map(
-        routeIds.map((id) => [
-          id,
-          routesById.get(id) ?? {
-            routeId: id,
-            shortName: id,
-            longName: 'Linha não encontrada',
-          },
-        ]),
-      ),
-    );
+    const nextRoutes = new Map<string, BusRouteInsight>();
+    for (const code of routeIds) {
+      if (isBusDirectionFavorite(code)) {
+        const route = routesByFavoriteCode.get(code);
+        nextRoutes.set(
+          code,
+          route
+            ? { ...route, favoriteCode: code }
+            : this.missingFavoriteBusRoute(code),
+        );
+        continue;
+      }
+
+      const requestedRoutes = routesByRequestedCode.get(code) ?? [];
+      if (migratedLegacyCodes.has(code)) {
+        for (const route of requestedRoutes) {
+          const favoriteCode = route.favoriteCode;
+          if (favoriteCode && isBusDirectionFavorite(favoriteCode)) {
+            nextRoutes.set(favoriteCode, { ...route, favoriteCode });
+          }
+        }
+      } else if (requestedRoutes.length > 0) {
+        const lineFavoriteCode = preservedLineCodeByRequest.get(code) ?? code;
+        nextRoutes.set(lineFavoriteCode, {
+          ...requestedRoutes[0],
+          favoriteCode: undefined,
+          favoriteId: lineFavoriteCode,
+          favoriteNotice:
+            'Os sentidos desta linha ainda não puderam ser separados.',
+        });
+      } else {
+        const preservedCode = preservedLineCodeByRequest.get(code) ?? code;
+        nextRoutes.set(preservedCode, this.missingFavoriteBusRoute(preservedCode));
+      }
+    }
+
+    this.busRoutesById.set(nextRoutes);
     this.busStopsById.set(
       new Map(
         stopIds.map((id) => [
@@ -715,7 +919,51 @@ export class Dashboard {
   }
 
   private getBusRouteSelectionKey(route: BusRouteGraphQL): string {
-    return route.routeId;
+    return route.favoriteCode ?? route.routeId;
+  }
+
+  private hasMatchingSavedDirection(
+    route: BusRouteGraphQL,
+    savedKeys: string[],
+    routes: BusRouteGraphQL[],
+  ): boolean {
+    const candidates = routes.flatMap((currentRoute) => {
+      const identity = parseBusDirectionFavorite(
+        currentRoute.favoriteCode ?? '',
+      );
+      if (!identity || currentRoute.directionId === undefined) {
+        return [];
+      }
+      return [
+        {
+          ...identity,
+          directionId: currentRoute.directionId,
+          destination: currentRoute.destination ?? currentRoute.longName,
+          sourceAgency: identity.sourceAgency,
+          shortName: identity.shortName,
+          route: currentRoute,
+        },
+      ];
+    });
+    return savedKeys.some(
+      (code) =>
+        isBusDirectionFavorite(code) &&
+        matchBusDirectionFavorite(code, candidates)?.route === route,
+    );
+  }
+
+  private missingFavoriteBusRoute(code: string): BusRouteInsight {
+    const identity =
+      parseBusDirectionFavorite(code) ?? parseBusLineFavorite(code);
+    const direction = parseBusDirectionFavorite(code);
+    return {
+      routeId: code,
+      favoriteId: code,
+      favoriteCode: direction ? code : undefined,
+      shortName: identity?.shortName ?? code,
+      sourceAgency: identity?.sourceAgency,
+      longName: direction ? 'Sentido não encontrado' : 'Linha não encontrada',
+    };
   }
 
   private clearRemoteData(): void {

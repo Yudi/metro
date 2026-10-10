@@ -102,10 +102,11 @@ export class MapSearchInteractionService {
           );
         } else {
           this.logger.debug('Loading bus route', {
-            routeCode: result.routeData.route_id,
+            routeCode:
+              result.routeData.favoriteCode ?? result.routeData.route_id,
           });
           this.selectionService.addRouteToSelection(
-            result.routeData.route_id,
+            result.routeData.favoriteCode ?? result.routeData.route_id,
             true,
           );
         }

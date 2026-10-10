@@ -79,6 +79,17 @@ describe('MapDataLoaderService', () => {
     mapState = TestBed.inject(MapStateService);
   });
 
+  it('does not restore a replaced whole-line overlay after a late route-data response', async () => {
+    const updates = new Subject<RouteFullDataGraphQL>();
+    geographyService.getRouteFullData.mockReturnValue(updates.asObservable());
+    const pending = service.loadRouteData('pending-line', false);
+    service.removeRouteDisplayData('pending-line');
+    updates.next({ route: { ...route('feed-id'), favoriteCode: 'pending-line' } });
+    updates.complete();
+    await pending;
+    expect(mapState.displayedRoutes()).toEqual([]);
+  });
+
   it('reports a failed route-data request in Brazilian Portuguese', async () => {
     await service.loadRouteData('route-1');
 
@@ -142,6 +153,62 @@ describe('MapDataLoaderService', () => {
     expect(vectorTileLayer.setBusRouteIds).toHaveBeenCalledTimes(1);
     expect(mapState.isLoading()).toBe(false);
     expect(snackBar.open).not.toHaveBeenCalled();
+  });
+
+  it('keeps selected direction keys in vector-tile filters without adding the feed route ID', () => {
+    const favoriteCode =
+      'bus:v1:sptrans:100:-23.5000~-46.6000:-23.5100~-46.6100:-23.5200~-46.6200';
+    const direction = {
+      ...route('gtfs:100'),
+      favoriteCode,
+      destination: 'Centro',
+      directionId: 0,
+    };
+    mapState.addRouteToSelection({
+      id: favoriteCode,
+      routeId: direction.routeId,
+      shortName: direction.shortName,
+      longName: direction.longName,
+      destination: direction.destination,
+      directionId: direction.directionId,
+    });
+    mapState.addRouteToDisplay(direction, favoriteCode);
+
+    service.syncVectorTileFilters();
+
+    expect(vectorTileLayer.setBusRouteIds).toHaveBeenLastCalledWith([
+      favoriteCode,
+    ]);
+    expect(vectorTileLayer.setBusStopFilter).toHaveBeenLastCalledWith(
+      expect.objectContaining({ routeIds: [favoriteCode] }),
+    );
+  });
+
+  it('tracks directions independently when they share one feed route ID', () => {
+    const outboundCode =
+      'bus:v1:sptrans:100:-23.5000~-46.6000:-23.5100~-46.6100:-23.5200~-46.6200';
+    const inboundCode =
+      'bus:v1:sptrans:100:-23.5200~-46.6200:-23.5150~-46.6100:-23.5000~-46.6000';
+    const outbound = {
+      ...route('gtfs:100'),
+      favoriteCode: outboundCode,
+      destination: 'Centro',
+      directionId: 0,
+    };
+    const inbound = {
+      ...outbound,
+      favoriteCode: inboundCode,
+      destination: 'Bairro',
+      directionId: 1,
+    };
+    mapState.addRouteToDisplay(outbound, outboundCode);
+    mapState.addRouteToDisplay(inbound, inboundCode);
+
+    expect(mapState.displayedRoutes()).toEqual([outbound, inbound]);
+
+    mapState.removeRouteDisplayData(outboundCode);
+
+    expect(mapState.displayedRoutes()).toEqual([inbound]);
   });
 
   it('keeps the initial stop when deferred route delivery fails', async () => {

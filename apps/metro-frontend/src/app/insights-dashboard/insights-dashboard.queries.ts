@@ -1,9 +1,13 @@
 export const BUS_FAVORITES_LOOKUP_QUERY = `
-  query BusFavoritesLookup($routeIds: [ID!]!, $stopIds: [ID!]!) {
-    multipleBusRoutes(ids: $routeIds) {
+  query BusFavoritesLookup($routeIds: [String!]!, $stopIds: [ID!]!) {
+    multipleBusRoutes: favoriteBusDirections(codes: $routeIds) {
       routeId
       shortName
       longName
+      favoriteCode
+      requestedCode
+      destination
+      directionId
       color
       textColor
       sourceAgency

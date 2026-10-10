@@ -132,7 +132,7 @@
         type="button"
         class="schedule-toggle"
         [attr.aria-expanded]="isScheduledRouteExpanded(group.routeId)"
-        [attr.aria-label]="getScheduledRouteToggleLabel(group.routeId, group.departures.length) + ' da linha ' + group.departures[0].routeShortName"
+        [attr.aria-label]="getScheduledRouteToggleLabel(group.routeId, group.departures.length) + ' da linha ' + group.departures[0].routeShortName + ', sentido ' + group.departures[0].headsign"
         (click)="toggleScheduledRoute(group.routeId)"
       >
         {{ getScheduledRouteToggleLabel(group.routeId, group.departures.length)
@@ -167,7 +167,7 @@
   </div>
 
   <div class="routes-list">
-    @for (route of routes(); track route.routeId) {
+    @for (route of routes(); track getRouteKey(route)) {
     <article class="route-item">
       <button
         type="button"
@@ -184,7 +184,7 @@
           {{ route.shortName }}
         </span>
         <span class="route-main">
-          <span class="route-name">{{ route.longName }}</span>
+          <span class="route-name">{{ route.destination ? "Sentido " + route.destination : route.longName }}</span>
           <span class="agency-lockup route-agency">
             @if (getRouteAgencyKey(route); as agencyKey) {
             <img

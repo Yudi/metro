@@ -1,9 +1,13 @@
 export const FAVORITE_REMOVAL_LOOKUP_QUERY = `
-  query FavoriteRemovalLookup($routeIds: [ID!]!, $stopIds: [ID!]!) {
-    multipleBusRoutes(ids: $routeIds) {
+  query FavoriteRemovalLookup($routeIds: [String!]!, $stopIds: [ID!]!) {
+    multipleBusRoutes: favoriteBusDirections(codes: $routeIds) {
       routeId
       shortName
       longName
+      favoriteCode
+      requestedCode
+      destination
+      directionId
       sourceAgency
       color
       textColor

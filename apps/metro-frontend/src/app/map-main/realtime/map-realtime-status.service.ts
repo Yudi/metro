@@ -47,12 +47,14 @@ export class MapRealtimeStatusService {
     if (this.busRoutes().length) {
       const selectedRoutes = this.mapState.selectedRoutes();
       const positions = this.buses.vehiclePositions();
-      const busRouteLabels = this.busRoutes().map(
-        (routeKey) =>
-          positions.get(routeKey)?.routeLabel ??
-          selectedRoutes.get(routeKey)?.shortName ??
-          routeKey,
-      );
+      const busRouteLabels = this.busRoutes().map((routeKey) => {
+        const selections = [...selectedRoutes.values()].filter((route) =>
+          route.id === routeKey || route.routeId === routeKey || route.shortName === routeKey,
+        );
+        const code = positions.get(routeKey)?.routeLabel ?? selections[0]?.shortName ?? routeKey;
+        const destinations = [...new Set(selections.flatMap((route) => route.destination ? [route.destination] : []))];
+        return destinations.length ? `${code}, sentido ${destinations.join(' / ')}` : code;
+      });
       lines.push(
         `Ônibus: ${describeSubscriptions(busRouteLabels, 'rota', 'rotas')}`,
       );

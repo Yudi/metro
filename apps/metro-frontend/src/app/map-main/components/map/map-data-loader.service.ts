@@ -10,6 +10,7 @@ import { MapStateService } from './map-state.service';
 import { LoggerService } from '@metro/shared/api';
 import { isSubwayRoute } from '../../geography/transit-utils';
 import { VectorTileLayerService } from './vector-tiles/vector-tile-layer.service';
+import { getBusRouteIdentity } from '@metro/shared/utils';
 
 export type StopDataLoadResult =
   | { status: 'loaded'; stop: BusStopGraphQL }
@@ -35,6 +36,7 @@ export class MapDataLoaderService {
     ActiveStopDataRequest
   >();
   private activeLoadCount = 0;
+  private readonly activeRouteRequests = new Map<string, object>();
 
   // Callback to update display - will be set by the component
   private updateDisplayCallback?: () => void;
@@ -54,6 +56,8 @@ export class MapDataLoaderService {
     shouldDisplaySnackbar = true,
   ): Promise<void> {
     const finishLoading = this.beginLoading();
+    const request = {};
+    this.activeRouteRequests.set(routeId, request);
     this.logger.debug('loadRouteData called', { routeId });
 
     try {
@@ -62,6 +66,7 @@ export class MapDataLoaderService {
         .getRouteFullData(routeId)
         .toPromise();
 
+      if (this.activeRouteRequests.get(routeId) !== request) return;
       if (!routeFullData) {
         this.logger.warn('Route not found', { routeId });
         return;
@@ -88,6 +93,9 @@ export class MapDataLoaderService {
         );
       }
     } finally {
+      if (this.activeRouteRequests.get(routeId) === request) {
+        this.activeRouteRequests.delete(routeId);
+      }
       finishLoading();
     }
   }
@@ -202,10 +210,11 @@ export class MapDataLoaderService {
         if (snapshot.routes !== undefined) {
           const routeSnapshot = snapshot.routes ?? [];
           const newRouteData = routeSnapshot.filter(({ route }) => {
-            if (processedRouteIds.has(route.routeId)) {
+            const routeIdentity = getBusRouteIdentity(route);
+            if (processedRouteIds.has(routeIdentity)) {
               return false;
             }
-            processedRouteIds.add(route.routeId);
+            processedRouteIds.add(routeIdentity);
             return true;
           });
           const newRoutes = newRouteData.map(({ route }) => route);
@@ -288,6 +297,7 @@ export class MapDataLoaderService {
   }
 
   refreshDisplayedData(): void {
+    this.activeRouteRequests.clear();
     // Rebuild displayed data based on current selections
     this.mapState.resetDisplayedData();
 
@@ -312,6 +322,7 @@ export class MapDataLoaderService {
    * Uses source tracking to only remove items that are no longer needed by any selection.
    */
   removeRouteDisplayData(routeId: string): void {
+    this.activeRouteRequests.delete(routeId);
     this.logger.debug('Removing display data sourced from route', { routeId });
     this.mapState.removeRouteDisplayData(routeId);
     this.syncVectorTileFilters();
@@ -341,7 +352,7 @@ export class MapDataLoaderService {
     const selectedRoutes = Array.from(this.mapState.selectedRoutes().keys());
     const displayedRoutes = this.mapState
       .displayedRoutes()
-      .map((route) => route.routeId);
+      .map((route) => getBusRouteIdentity(route));
     const routeIds = Array.from(
       new Set([...selectedRoutes, ...displayedRoutes]),
     );

@@ -13,6 +13,7 @@ import {
   SelectedStop,
   SelectedBikeStation,
 } from './map.types';
+import { getBusRouteIdentity } from '@metro/shared/utils';
 
 @Service()
 export class MapStateService {
@@ -51,7 +52,7 @@ export class MapStateService {
    */
   private displayedStopSources = new Map<string, Set<string>>(); // stopId -> Set of sourceSelectionIds
   private displayedShapeSources = new Map<string, Set<string>>(); // shapeId -> Set of sourceSelectionIds
-  private displayedRouteSources = new Map<string, Set<string>>(); // routeId -> Set of sourceSelectionIds
+  private displayedRouteSources = new Map<string, Set<string>>(); // route identity -> Set of source selection IDs
 
   // Display data - what's currently shown on map
   readonly displayedRoutes = signal<BusRouteGraphQL[]>([]);
@@ -176,7 +177,7 @@ export class MapStateService {
     }
 
     const currentRoutes = this.displayedRoutes();
-    const routeIds = new Set(currentRoutes.map((route) => route.id));
+    const routeIds = new Set(currentRoutes.map(getBusRouteIdentity));
     const nextRoutes = [...currentRoutes];
     let displayChanged = false;
 
@@ -186,21 +187,22 @@ export class MapStateService {
     let derivedRoutesChanged = false;
 
     for (const route of routes) {
-      if (!routeIds.has(route.id)) {
-        routeIds.add(route.id);
+      const routeIdentity = getBusRouteIdentity(route);
+      if (!routeIds.has(routeIdentity)) {
+        routeIds.add(routeIdentity);
         nextRoutes.push(route);
         displayChanged = true;
       }
 
       if (sourceSelectionId) {
         const sources =
-          this.displayedRouteSources.get(route.routeId) ?? new Set<string>();
+          this.displayedRouteSources.get(routeIdentity) ?? new Set<string>();
         sources.add(sourceSelectionId);
-        this.displayedRouteSources.set(route.routeId, sources);
+        this.displayedRouteSources.set(routeIdentity, sources);
       }
 
-      if (derivedRouteIds && !derivedRouteIds.has(route.routeId)) {
-        derivedRouteIds.add(route.routeId);
+      if (derivedRouteIds && !derivedRouteIds.has(routeIdentity)) {
+        derivedRouteIds.add(routeIdentity);
         derivedRoutesChanged = true;
       }
     }
@@ -338,11 +340,11 @@ export class MapStateService {
     });
 
     // Check routes
-    this.displayedRouteSources.forEach((sources, routeId) => {
+    this.displayedRouteSources.forEach((sources, routeIdentity) => {
       sources.delete(sourceSelectionId);
       if (sources.size === 0) {
-        routesToRemove.push(routeId);
-        this.displayedRouteSources.delete(routeId);
+        routesToRemove.push(routeIdentity);
+        this.displayedRouteSources.delete(routeIdentity);
       }
     });
 
@@ -367,7 +369,9 @@ export class MapStateService {
       const routeIdsToRemove = new Set(routesToRemove);
       const currentRoutes = this.displayedRoutes();
       this.displayedRoutes.set(
-        currentRoutes.filter((r) => !routeIdsToRemove.has(r.routeId)),
+        currentRoutes.filter(
+          (route) => !routeIdsToRemove.has(getBusRouteIdentity(route)),
+        ),
       );
 
       // Also update derived routes tracking

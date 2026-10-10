@@ -21,6 +21,7 @@ import {
   convertToBusShape,
   convertToBusStop,
 } from './geography-graphql.mapper';
+import { isBusDirectionFavorite, isBusLineFavorite } from '@metro/shared/utils';
 import { ROUTE_FIELDS, STOP_FIELDS } from './geography-graphql.queries';
 
 export type {
@@ -165,7 +166,35 @@ export class GeographyGraphQLService {
     );
   }
 
+  getBusRouteDirections(ids: string[], stopId?: string): Observable<BusRouteGraphQL[]> {
+    return this.executeGraphQL<{ busRouteDirections: BusRouteGraphQL[] }>(`
+      query BusRouteDirections($ids: [ID!]!, $stopId: ID) {
+        busRouteDirections(ids: $ids, stopId: $stopId) { ${ROUTE_FIELDS} }
+      }
+    `, { ids, stopId }).pipe(map((data) => data.busRouteDirections));
+  }
+
+  getFavoriteBusDirections(codes: string[]): Observable<BusRouteGraphQL[]> {
+    return this.executeGraphQL<{ favoriteBusDirections: BusRouteGraphQL[] }>(`
+      query FavoriteBusDirections($codes: [String!]!) {
+        favoriteBusDirections(codes: $codes) { ${ROUTE_FIELDS} geometry { type coordinates } }
+      }
+    `, { codes }).pipe(map((data) => data.favoriteBusDirections));
+  }
+
   getBusRoute(id: string): Observable<BusRouteGraphQL | null> {
+    if (isBusDirectionFavorite(id) || isBusLineFavorite(id)) {
+      return this.getFavoriteBusDirections([id]).pipe(map((directions) => {
+        const route = directions[0];
+        if (!route) return null;
+        return isBusLineFavorite(id) ? {
+          ...route,
+          favoriteCode: id,
+          destination: directions.length === 1 ? route.destination : undefined,
+          directionId: directions.length === 1 ? route.directionId : undefined,
+        } : route;
+      }));
+    }
     const query = `
       query GetBusRoute($id: ID!) {
         busRoute(id: $id) {
@@ -289,29 +318,11 @@ export class GeographyGraphQLService {
 
   // Get routes for a specific stop
   getRoutesForStop(stopId: string): Observable<BusRouteGraphQL[]> {
-    const query = `
-      query GetRoutesForStop($stopId: String!) {
-        routesForStop(stopId: $stopId) {
-          id
-          routeId
-          shortName
-          longName
-          color
-          textColor
-          sourceAgency
-          sourceId
-          supportsRealtime
-          fares {
-            price
-            currency
-          }
-        }
+    return this.executeGraphQL<{ busStopDirections: BusRouteGraphQL[] }>(`
+      query GetRoutesForStop($stopId: ID!) {
+        busStopDirections(stopId: $stopId) { ${ROUTE_FIELDS} }
       }
-    `;
-
-    return this.executeGraphQL<{ routesForStop: BusRouteGraphQL[] }>(query, {
-      stopId,
-    }).pipe(map((data) => data?.routesForStop || []));
+    `, { stopId }).pipe(map((data) => data.busStopDirections));
   }
 
   // Batch get route short names for multiple stops - single network request
@@ -347,6 +358,9 @@ export class GeographyGraphQLService {
    * Use this instead of separate getTripsForRoute, getBusShape, getStopsForRoute calls.
    */
   getRouteFullData(routeId: string): Observable<RouteFullDataGraphQL | null> {
+    if (isBusDirectionFavorite(routeId) || isBusLineFavorite(routeId)) {
+      return this.getBusRoute(routeId).pipe(map((route) => route ? { route } : null));
+    }
     const query = `
       query GetRouteFullData($routeId: String!) {
         routeFullData(routeId: $routeId) {

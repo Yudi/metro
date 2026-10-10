@@ -1,5 +1,10 @@
 import { signal } from '@angular/core';
-import { createEmptyFavorites, FavoriteList } from '@metro/shared/utils';
+import {
+  createEmptyFavorites,
+  encodeBusLineFavorite,
+  encodeBusDirectionFavorite,
+  FavoriteList,
+} from '@metro/shared/utils';
 
 jest.mock('@metro/shared/firebase', () => ({
   firebaseIdToken: jest.fn(() => null),
@@ -14,6 +19,24 @@ import {
   getFavoritesScope,
   replayFavoriteOperations,
 } from './favorites.service';
+
+function createDirectionFavoriteCode(
+  favorite: Parameters<typeof encodeBusDirectionFavorite>[0],
+): string {
+  const code = encodeBusDirectionFavorite(favorite);
+  if (!code) {
+    throw new Error('Test direction key was invalid');
+  }
+  return code;
+}
+
+function createBusLineFavoriteCode(directionCode: string): string {
+  const code = encodeBusLineFavorite(directionCode);
+  if (!code) {
+    throw new Error('Test whole-line key was invalid');
+  }
+  return code;
+}
 
 function operation(
   value: Partial<FavoriteOutboxRecord> &
@@ -164,6 +187,547 @@ describe('favorites persistence contracts', () => {
       'Você já atingiu o limite de 500 favoritos.',
     );
     expect(service.syncWithServer).not.toHaveBeenCalled();
+  });
+});
+
+describe('legacy bus-route favorite migration', () => {
+  const legacyCode = '477A-10';
+  const directionCode = (destinationLongitude: number) =>
+    createDirectionFavoriteCode({
+      sourceAgency: 'sptrans',
+      shortName: legacyCode,
+      originLatitude: -23.55,
+      originLongitude: -46.63,
+      viaLatitude: -23.555,
+      viaLongitude: -46.625,
+      destinationLatitude: -23.56,
+      destinationLongitude,
+    });
+
+  function createHarness(
+    initialFavorites: FavoriteOutboxRecord[] = [],
+    favoriteRecords: Array<{
+      key: string;
+      scope: string;
+      type: 'busRoute' | 'railLine';
+      code: string;
+      updatedAt: number;
+    }> = [],
+    afterRead?: () => void,
+  ) {
+    const favorites = new Map(favoriteRecords.map((record) => [record.key, record]));
+    const operations = [...initialFavorites];
+    const favoritesTable = {
+      get: async (key: string) => favorites.get(key),
+      put: async (record: (typeof favoriteRecords)[number]) => {
+        favorites.set(record.key, record);
+      },
+      delete: async (key: string) => {
+        favorites.delete(key);
+      },
+      where: (index: string) => ({
+        equals: (value: string) => ({
+          toArray: async () => {
+            if (index !== 'scope') throw new Error(`Unexpected index ${index}`);
+            afterRead?.();
+            return [...favorites.values()].filter(
+              (record) => record.scope === value,
+            );
+          },
+        }),
+      }),
+    };
+    const outboxTable = {
+      where: (index: string) => ({
+        equals: (value: string) => ({
+          toArray: async () => {
+            if (index !== 'scope') throw new Error(`Unexpected index ${index}`);
+            return operations.filter((operation) => operation.scope === value);
+          },
+        }),
+      }),
+      bulkDelete: async (ids: string[]) => {
+        for (let index = operations.length - 1; index >= 0; index -= 1) {
+          if (ids.includes(operations[index].operationId)) {
+            operations.splice(index, 1);
+          }
+        }
+      },
+      put: async (operation: FavoriteOutboxRecord) => {
+        operations.push(operation);
+      },
+    };
+    type Harness = {
+      db: {
+        favorites: typeof favoritesTable;
+        outbox: typeof outboxTable;
+        transaction: (...args: unknown[]) => Promise<unknown>;
+      };
+      activeScope: string;
+      scopeGeneration: number;
+      platformId: string;
+      syncWithServer: jest.Mock;
+      migrateBusRouteFavorite(
+        code: string,
+        directionCodes: string[],
+      ): Promise<boolean>;
+      preserveBusLineFavorite(code: string, directionCode: string): Promise<boolean>;
+    };
+    const service = Object.create(FavoritesService.prototype) as Harness;
+    service.db = {
+      favorites: favoritesTable,
+      outbox: outboxTable,
+      transaction: async (...args: unknown[]) => {
+        const callback = args[args.length - 1] as () => Promise<unknown>;
+        return callback();
+      },
+    };
+    service.activeScope = 'user:user-a';
+    service.scopeGeneration = 3;
+    service.platformId = 'browser';
+    service.syncWithServer = jest.fn();
+    return { service, favorites, operations };
+  }
+
+  function favoriteRecord(
+    scope: string,
+    type: 'busRoute' | 'railLine',
+    code: string,
+  ) {
+    return {
+      key: `${scope}:${type}:${code}`,
+      scope,
+      type,
+      code,
+      updatedAt: 1,
+    };
+  }
+
+  it('replaces a legacy route with missing directions and queues only the needed operations', async () => {
+    const existingDirection = directionCode(-46.62);
+    const missingDirection = directionCode(-46.61);
+    const { service, favorites, operations } = createHarness([], [
+      favoriteRecord('user:user-a', 'busRoute', legacyCode),
+      favoriteRecord('user:user-a', 'busRoute', existingDirection),
+      favoriteRecord('user:user-a', 'railLine', 'L4'),
+      favoriteRecord('user:user-b', 'busRoute', '5511-10'),
+    ]);
+
+    await expect(
+      service.migrateBusRouteFavorite(legacyCode, [
+        existingDirection,
+        missingDirection,
+      ]),
+    ).resolves.toBe(true);
+
+    expect(favorites.has(`user:user-a:busRoute:${legacyCode}`)).toBe(false);
+    expect(favorites.has(`user:user-a:busRoute:${existingDirection}`)).toBe(
+      true,
+    );
+    expect(favorites.has(`user:user-a:busRoute:${missingDirection}`)).toBe(
+      true,
+    );
+    expect(favorites.has('user:user-a:railLine:L4')).toBe(true);
+    expect(favorites.has('user:user-b:busRoute:5511-10')).toBe(true);
+    expect(
+      operations.map(({ operation, code }) => [operation, code]),
+    ).toEqual([
+      ['remove', legacyCode],
+      ['add', missingDirection],
+    ]);
+    expect(service.syncWithServer).toHaveBeenCalledTimes(1);
+
+    await expect(
+      service.migrateBusRouteFavorite(legacyCode, [
+        existingDirection,
+        missingDirection,
+      ]),
+    ).resolves.toBe(false);
+    expect(operations).toHaveLength(2);
+  });
+
+  it('keeps the old favorite when expanding would exceed the favorites cap', async () => {
+    const records: ReturnType<typeof favoriteRecord>[] = [
+      favoriteRecord('user:user-a', 'busRoute', legacyCode),
+    ];
+    records.push(
+      ...Array.from({ length: 499 }, (_, index) =>
+        favoriteRecord('user:user-a', 'railLine', `L${index}`),
+      ),
+    );
+    const { service, favorites, operations } = createHarness([], records);
+
+    await expect(
+      service.migrateBusRouteFavorite(legacyCode, [
+        directionCode(-46.62),
+        directionCode(-46.61),
+      ]),
+    ).resolves.toBe(false);
+
+    expect(favorites.has(`user:user-a:busRoute:${legacyCode}`)).toBe(true);
+    const anchor = directionCode(-46.62);
+    const broadCode = createBusLineFavoriteCode(anchor);
+    await expect(
+      service.preserveBusLineFavorite(legacyCode, anchor),
+    ).resolves.toBe(true);
+    expect(favorites.has(`user:user-a:busRoute:${legacyCode}`)).toBe(false);
+    expect(favorites.has(`user:user-a:busRoute:${broadCode}`)).toBe(true);
+    expect(operations.map(({ operation, code }) => [operation, code])).toEqual([
+      ['remove', legacyCode],
+      ['add', broadCode],
+    ]);
+    expect(service.syncWithServer).toHaveBeenCalledTimes(1);
+  });
+
+  it('stores a single resolved direction as a stable whole-line favorite', async () => {
+    const anchor = directionCode(-46.62);
+    const broadCode = createBusLineFavoriteCode(anchor);
+    const { service, favorites, operations } = createHarness([], [
+      favoriteRecord('user:user-a', 'busRoute', legacyCode),
+    ]);
+
+    await expect(
+      service.preserveBusLineFavorite(legacyCode, anchor),
+    ).resolves.toBe(true);
+
+    expect(favorites.has(`user:user-a:busRoute:${legacyCode}`)).toBe(false);
+    expect(favorites.has(`user:user-a:busRoute:${broadCode}`)).toBe(true);
+    expect(operations.map(({ operation, code }) => [operation, code])).toEqual([
+      ['remove', legacyCode],
+      ['add', broadCode],
+    ]);
+  });
+
+  it('keeps the whole-line anchor immutable when current terminals move', async () => {
+    const broadCode = createBusLineFavoriteCode(directionCode(-46.62));
+    const { service, favorites, operations } = createHarness([], [
+      favoriteRecord('user:user-a', 'busRoute', broadCode),
+    ]);
+
+    await expect(
+      service.preserveBusLineFavorite(broadCode, directionCode(-46.621)),
+    ).resolves.toBe(false);
+
+    expect(favorites.has(`user:user-a:busRoute:${broadCode}`)).toBe(true);
+    expect(operations).toHaveLength(0);
+    expect(service.syncWithServer).not.toHaveBeenCalled();
+  });
+
+  it('expands the stable whole-line key when two directions become available', async () => {
+    const firstDirection = directionCode(-46.62);
+    const secondDirection = directionCode(-46.61);
+    const broadCode = createBusLineFavoriteCode(firstDirection);
+    const { service, favorites, operations } = createHarness([], [
+      favoriteRecord('user:user-a', 'busRoute', broadCode),
+    ]);
+
+    await expect(
+      service.migrateBusRouteFavorite(broadCode, [
+        firstDirection,
+        secondDirection,
+      ]),
+    ).resolves.toBe(true);
+
+    expect(favorites.has(`user:user-a:busRoute:${broadCode}`)).toBe(false);
+    expect(favorites.has(`user:user-a:busRoute:${firstDirection}`)).toBe(true);
+    expect(favorites.has(`user:user-a:busRoute:${secondDirection}`)).toBe(true);
+    expect(operations.map(({ operation, code }) => [operation, code])).toEqual([
+      ['remove', broadCode],
+      ['add', firstDirection],
+      ['add', secondDirection],
+    ]);
+  });
+
+  it('does not write if the favorites scope changes during lookup', async () => {
+    const serviceHolder: {
+      current?: ReturnType<typeof createHarness>['service'];
+    } = {};
+    const harness = createHarness(
+      [],
+      [favoriteRecord('user:user-a', 'busRoute', legacyCode)],
+      () => {
+        const current = serviceHolder.current;
+        if (!current) throw new Error('Migration service was not initialized');
+        current.activeScope = 'user:user-b';
+        current.scopeGeneration += 1;
+      },
+    );
+    const { service } = harness;
+    serviceHolder.current = service;
+
+    await expect(
+      service.migrateBusRouteFavorite(legacyCode, [directionCode(-46.62)]),
+    ).resolves.toBe(false);
+
+    expect(harness.favorites.has(`user:user-a:busRoute:${legacyCode}`)).toBe(
+      true,
+    );
+    expect(harness.operations).toHaveLength(0);
+  });
+});
+
+describe('dashboard bus-direction selection migration', () => {
+  it('expands old route selections while preserving unrelated and existing choices', async () => {
+    const existingDirection = createDirectionFavoriteCode({
+      sourceAgency: 'sptrans',
+      shortName: '477A-10',
+      originLatitude: -23.55,
+      originLongitude: -46.63,
+      viaLatitude: -23.555,
+      viaLongitude: -46.625,
+      destinationLatitude: -23.56,
+      destinationLongitude: -46.62,
+    });
+    const newDirection = createDirectionFavoriteCode({
+      sourceAgency: 'sptrans',
+      shortName: '477A-10',
+      originLatitude: -23.56,
+      originLongitude: -46.62,
+      viaLatitude: -23.555,
+      viaLongitude: -46.625,
+      destinationLatitude: -23.55,
+      destinationLongitude: -46.63,
+    });
+    const selection = {
+      key: 'user:user-a:busStopRoutes:stop-1',
+      scope: 'user:user-a',
+      values: ['477A-10', 'stale-route', existingDirection],
+      updatedAt: 1,
+    };
+    const dashboardSelections = {
+      get: jest.fn(async (key: string) =>
+        key === selection.key ? selection : undefined,
+      ),
+      put: jest.fn(async (record: typeof selection) => {
+        Object.assign(selection, record);
+      }),
+    };
+    type MigrationHarness = {
+      db: {
+        dashboardSelections: typeof dashboardSelections;
+        transaction: (...args: unknown[]) => Promise<unknown>;
+      };
+      activeScope: string;
+      scopeGeneration: number;
+      platformId: string;
+      migrateDashboardBusStopRoutes(
+        stopId: string,
+        routes: Array<{ routeId: string; favoriteCode?: string }>,
+      ): Promise<boolean>;
+    };
+    const service = Object.create(FavoritesService.prototype) as MigrationHarness;
+    service.db = {
+      dashboardSelections,
+      transaction: async (...args: unknown[]) => {
+        const callback = args[args.length - 1] as () => Promise<unknown>;
+        return callback();
+      },
+    };
+    service.activeScope = 'user:user-a';
+    service.scopeGeneration = 1;
+    service.platformId = 'browser';
+
+    await expect(
+      service.migrateDashboardBusStopRoutes('stop-1', [
+        { routeId: '477A-10', favoriteCode: existingDirection },
+        { routeId: '477A-10', favoriteCode: newDirection },
+      ]),
+    ).resolves.toBe(true);
+
+    expect(selection.values).toEqual([
+      'stale-route',
+      existingDirection,
+      newDirection,
+    ]);
+    expect(dashboardSelections.put).toHaveBeenCalledTimes(1);
+  });
+
+  it('migrates a route selection to the single direction currently serving its stop', async () => {
+    const directionCode = createDirectionFavoriteCode({
+      sourceAgency: 'sptrans',
+      shortName: '477A-10',
+      originLatitude: -23.55,
+      originLongitude: -46.63,
+      viaLatitude: -23.555,
+      viaLongitude: -46.625,
+      destinationLatitude: -23.56,
+      destinationLongitude: -46.62,
+    });
+    const selection = {
+      key: 'user:user-a:busStopRoutes:stop-1',
+      scope: 'user:user-a',
+      values: ['477A-10'],
+      updatedAt: 1,
+    };
+    const dashboardSelections = {
+      get: jest.fn(async () => selection),
+      put: jest.fn(async (record: typeof selection) => {
+        Object.assign(selection, record);
+      }),
+    };
+    type MigrationHarness = {
+      db: {
+        dashboardSelections: typeof dashboardSelections;
+        transaction: (...args: unknown[]) => Promise<unknown>;
+      };
+      activeScope: string;
+      scopeGeneration: number;
+      platformId: string;
+      migrateDashboardBusStopRoutes(
+        stopId: string,
+        routes: Array<{ routeId: string; favoriteCode?: string }>,
+      ): Promise<boolean>;
+    };
+    const service = Object.create(FavoritesService.prototype) as MigrationHarness;
+    service.db = {
+      dashboardSelections,
+      transaction: async (...args: unknown[]) => {
+        const callback = args[args.length - 1] as () => Promise<unknown>;
+        return callback();
+      },
+    };
+    service.activeScope = 'user:user-a';
+    service.scopeGeneration = 1;
+    service.platformId = 'browser';
+
+    await expect(
+      service.migrateDashboardBusStopRoutes('stop-1', [
+        { routeId: '477A-10', favoriteCode: directionCode },
+      ]),
+    ).resolves.toBe(true);
+
+    expect(selection.values).toEqual([directionCode]);
+  });
+
+  it('leaves default and explicitly empty selections unchanged', async () => {
+    const emptySelection = {
+      key: 'user:user-a:busStopRoutes:stop-2',
+      scope: 'user:user-a',
+      values: [] as string[],
+      updatedAt: 1,
+    };
+    const dashboardSelections = {
+      get: jest.fn(async (key: string) =>
+        key === emptySelection.key ? emptySelection : undefined,
+      ),
+      put: jest.fn(),
+    };
+    type MigrationHarness = {
+      db: {
+        dashboardSelections: typeof dashboardSelections;
+        transaction: (...args: unknown[]) => Promise<unknown>;
+      };
+      activeScope: string;
+      scopeGeneration: number;
+      platformId: string;
+      migrateDashboardBusStopRoutes(
+        stopId: string,
+        routes: Array<{ routeId: string; favoriteCode?: string }>,
+      ): Promise<boolean>;
+    };
+    const service = Object.create(FavoritesService.prototype) as MigrationHarness;
+    service.db = {
+      dashboardSelections,
+      transaction: async (...args: unknown[]) => {
+        const callback = args[args.length - 1] as () => Promise<unknown>;
+        return callback();
+      },
+    };
+    service.activeScope = 'user:user-a';
+    service.scopeGeneration = 1;
+    service.platformId = 'browser';
+
+    const route = { routeId: '477A-10', favoriteCode: 'bus:v1:valid' };
+    await expect(
+      service.migrateDashboardBusStopRoutes('missing-stop', [route]),
+    ).resolves.toBe(false);
+    await expect(
+      service.migrateDashboardBusStopRoutes('stop-2', [route]),
+    ).resolves.toBe(false);
+    expect(dashboardSelections.put).not.toHaveBeenCalled();
+  });
+
+  it('copies an original stop selection to the canonical stop and keeps the alias record', async () => {
+    const directionCodes = [
+      createDirectionFavoriteCode({
+        sourceAgency: 'sptrans',
+        shortName: '477A-10',
+        originLatitude: -23.55,
+        originLongitude: -46.63,
+        viaLatitude: -23.555,
+        viaLongitude: -46.625,
+        destinationLatitude: -23.56,
+        destinationLongitude: -46.62,
+      }),
+      createDirectionFavoriteCode({
+        sourceAgency: 'sptrans',
+        shortName: '477A-10',
+        originLatitude: -23.56,
+        originLongitude: -46.62,
+        viaLatitude: -23.555,
+        viaLongitude: -46.625,
+        destinationLatitude: -23.55,
+        destinationLongitude: -46.63,
+      }),
+    ];
+    const aliasRecord = {
+      key: 'user:user-a:busStopRoutes:old-stop',
+      scope: 'user:user-a',
+      values: ['477A-10', 'stale-route'],
+      updatedAt: 1,
+    };
+    const records = new Map([[aliasRecord.key, aliasRecord]]);
+    const dashboardSelections = {
+      get: jest.fn(async (key: string) => records.get(key)),
+      put: jest.fn(async (record: typeof aliasRecord) => {
+        records.set(record.key, record);
+      }),
+    };
+    type MigrationHarness = {
+      db: {
+        dashboardSelections: typeof dashboardSelections;
+        transaction: (...args: unknown[]) => Promise<unknown>;
+      };
+      activeScope: string;
+      scopeGeneration: number;
+      platformId: string;
+      migrateDashboardBusStopRoutes(
+        stopId: string,
+        routes: Array<{ routeId: string; favoriteCode?: string }>,
+        sourceStopIds?: string[],
+      ): Promise<boolean>;
+    };
+    const service = Object.create(FavoritesService.prototype) as MigrationHarness;
+    service.db = {
+      dashboardSelections,
+      transaction: async (...args: unknown[]) => {
+        const callback = args[args.length - 1] as () => Promise<unknown>;
+        return callback();
+      },
+    };
+    service.activeScope = 'user:user-a';
+    service.scopeGeneration = 1;
+    service.platformId = 'browser';
+
+    await expect(
+      service.migrateDashboardBusStopRoutes(
+        'new-stop',
+        directionCodes.map((favoriteCode) => ({
+          routeId: '477A-10',
+          favoriteCode,
+        })),
+        ['old-stop'],
+      ),
+    ).resolves.toBe(true);
+
+    expect(records.get('user:user-a:busStopRoutes:old-stop')?.values).toEqual([
+      'stale-route',
+      ...directionCodes,
+    ]);
+    expect(records.get('user:user-a:busStopRoutes:new-stop')?.values).toEqual([
+      'stale-route',
+      ...directionCodes,
+    ]);
   });
 });
 

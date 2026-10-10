@@ -55,6 +55,9 @@ export class SearchBusRoute implements SearchResult {
   @Field(() => [BusFare]) fares!: BusFare[];
   @Field() route_short_name!: string;
   @Field() route_long_name!: string;
+  @Field({ nullable: true }) favoriteCode?: string;
+  @Field({ nullable: true }) destination?: string;
+  @Field(() => Int, { nullable: true }) directionId?: number;
   @Field(() => Int) route_type!: number;
   @Field({ nullable: true }) route_color?: string;
   @Field({ nullable: true }) route_text_color?: string;

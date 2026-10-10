@@ -5,7 +5,6 @@ import {
   formatBusFare,
   formatScheduledBusDepartureTime,
   getAgencyIconPath,
-  getBusRouteIdentity,
   getOlhoVivoDestination,
   isArtespRoute,
   sortBusRoutesByAgency,
@@ -141,7 +140,7 @@ export function findRailConnectionByShortName(
 export function getUniqueRouteIds(routes: BusRouteGraphQL[]): string[] {
   return Array.from(
     new Set(
-      routes.map((route) => getBusRouteIdentity(route).trim()).filter(Boolean),
+      routes.map((route) => route.routeId.trim()).filter(Boolean),
     ),
   );
 }
@@ -190,11 +189,19 @@ export function findRouteForArrivalLine(
   routes: BusRouteGraphQL[],
 ): BusRouteGraphQL | undefined {
   const normalizedRouteCode = normalizeRouteCode(line.c);
-  return routes.find(
-    (route) =>
-      supportsSptransRealtime(route) &&
-      normalizeRouteCode(route.shortName) === normalizedRouteCode,
+  const candidates = routes.filter((route) =>
+    supportsSptransRealtime(route) && normalizeRouteCode(route.shortName) === normalizedRouteCode,
   );
+  const destination = normalizeName(getOlhoVivoDestination(line));
+  const exact = candidates.filter((route) => route.destination && normalizeName(route.destination) === destination);
+  if (exact.length === 1) return exact[0];
+  const approximate = candidates.filter((route) => {
+    const name = route.destination ? normalizeName(route.destination) : '';
+    return name && destination && (name.includes(destination) || destination.includes(name));
+  });
+  if (approximate.length === 1) return approximate[0];
+  return candidates.find((route) => !route.favoriteCode);
+
 }
 
 export function formatHexColor(color: string): string | null {

@@ -89,7 +89,7 @@ describe('GeographyResolver full-data selections', () => {
     const geographyService = {
       getStopRoutesFullData: jest.fn().mockResolvedValue([]),
     };
-    const resolver = new StopFullDataResolver(geographyService as never);
+    const resolver = new StopFullDataResolver(geographyService as never, { forRoutes: jest.fn().mockResolvedValue([]) } as never);
 
     await resolver.routes(
       { stop: { stopId: 'stop-1' } } as never,

@@ -61,7 +61,7 @@
                             <div class="chip-row">
                               @for (
                                 route of selectedRoutes;
-                                track route.routeId
+                                track route.favoriteCode || route.routeId
                               ) {
                                 <span class="route-summary">
                                   <span
@@ -72,6 +72,9 @@
                                     {{ route.shortName }}
                                   </span>
                                   <span class="route-summary-copy">
+                                    <span class="route-destination">
+                                      {{ route.destination || route.longName }}
+                                    </span>
                                     @if (agencyIdentity(route); as agency) {
                                       <span class="agency-identity">
                                         @if (agency.iconPath; as iconPath) {
@@ -153,7 +156,10 @@
                 <div class="empty-category">Nenhuma linha salva.</div>
               } @else {
                 <div class="item-list">
-                  @for (route of busRoutes(); track route.routeId) {
+                  @for (
+                    route of busRoutes();
+                    track route.favoriteCode || route.favoriteId || route.routeId
+                  ) {
                     <article class="insight-row">
                       <span
                         class="route-badge"
@@ -163,7 +169,10 @@
                         {{ route.shortName }}
                       </span>
                       <div class="row-content">
-                        <h3>{{ route.longName }}</h3>
+                        <h3>{{ route.destination || route.longName }}</h3>
+                        @if (route.favoriteNotice) {
+                          <p class="muted">{{ route.favoriteNotice }}</p>
+                        }
                         <div class="route-meta">
                           <span class="muted">{{ routeDisplayId(route) }}</span>
                           @if (agencyIdentity(route); as agency) {

@@ -69,4 +69,18 @@ describe('mapTypesenseSearchResponse', () => {
     });
     expect(response.results[4].document).toMatchObject({ source: 'bike' });
   });
+  it('keeps opposite destinations as separate map search identities', () => {
+    const base = {
+      __typename: 'SearchBusRoute' as const,
+      route_id: 'feed-route', route_short_name: '001', route_long_name: 'A - B',
+      route_color: '', route_text_color: '',
+    };
+    const response = mapTypesenseSearchResponse('001', [
+      { ...base, favoriteCode: 'saved-outbound', destination: 'Terminal B', directionId: 0 },
+      { ...base, favoriteCode: 'saved-inbound', destination: 'Terminal A', directionId: 1 },
+    ]);
+    expect(response.results.map((result) => result.document.id)).toEqual(['saved-outbound', 'saved-inbound']);
+    expect(response.results[1].document).toMatchObject({ route_id: 'feed-route', destination: 'Terminal A' });
+  });
+
 });

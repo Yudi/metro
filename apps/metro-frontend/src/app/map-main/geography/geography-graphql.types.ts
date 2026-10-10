@@ -21,6 +21,10 @@ export interface BusStopGraphQL {
 }
 
 export interface BusRouteGraphQL {
+  favoriteCode?: string;
+  requestedCode?: string;
+  destination?: string;
+  directionId?: number;
   id: string;
   routeId: string;
   shortName: string;

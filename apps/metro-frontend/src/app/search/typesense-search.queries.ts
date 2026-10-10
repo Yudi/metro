@@ -3,6 +3,9 @@ export const TYPESENSE_SEARCH_QUERY = `
       search(input: $input) {
         __typename
         ... on SearchBusRoute {
+          favoriteCode
+          destination
+          directionId
           route_id
           route_short_name
           route_long_name
@@ -27,6 +30,9 @@ export const TYPESENSE_SEARCH_QUERY = `
           platformCode
           mergedStopIds
           routes {
+            favoriteCode
+            destination
+            directionId
             id
             route_id
             route_short_name
@@ -78,6 +84,9 @@ export const TYPESENSE_NEARBY_STOPS_QUERY = `
           platformCode
           mergedStopIds
           routes {
+            favoriteCode
+            destination
+            directionId
             id
             route_id
             route_short_name

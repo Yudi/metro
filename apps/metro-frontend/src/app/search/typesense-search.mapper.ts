@@ -15,7 +15,10 @@ export function mapTypesenseSearchResponse(
         return {
           type: 'route',
           document: {
-            id: result.route_id,
+            id: result.favoriteCode ?? result.route_id,
+            favoriteCode: result.favoriteCode,
+            destination: result.destination,
+            directionId: result.directionId,
             route_id: result.route_id,
             route_short_name: result.route_short_name,
             route_long_name: result.route_long_name,
@@ -47,7 +50,10 @@ export function mapTypesenseSearchResponse(
             platformCode: result.platformCode || undefined,
             mergedStopIds: result.mergedStopIds || undefined,
             routes: (result.routes || []).map((route) => ({
-              id: route.id,
+              id: route.favoriteCode ?? route.id,
+              favoriteCode: route.favoriteCode,
+              destination: route.destination,
+              directionId: route.directionId,
               route_id: route.route_id,
               route_short_name: route.route_short_name,
               route_long_name: route.route_long_name,

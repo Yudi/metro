@@ -121,6 +121,28 @@ $primary: var(--mat-sys-primary, #6750a4);
   white-space: nowrap;
 }
 
+.route-direction {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  min-width: 0;
+  color: $on-surface-variant;
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+
+.route-direction-label {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.route-direction-destination {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 16ch;
+}
+
 .route-chip-content .agency-identity {
   display: inline-flex;
   align-items: center;

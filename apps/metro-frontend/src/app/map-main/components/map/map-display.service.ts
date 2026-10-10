@@ -13,6 +13,7 @@ import { fromLonLat } from 'ol/proj';
 import { createBikeStationFeatureProperties } from './layers/bike-feature-properties.utils';
 import { MapSelectionDisplayService } from './map-selection-display.service';
 import { updatePreservedFeaturesCreationSource } from './map-feature-source.utils';
+import { getBusRouteIdentity } from '@metro/shared/utils';
 
 @Service()
 export class MapDisplayService {
@@ -366,10 +367,11 @@ export class MapDisplayService {
 
         // Use SELECTION source for shapes from explicitly selected routes or routes derived from stop selections
         const isExplicitlySelected =
-          shape.routeInfo && selectedRouteIds.has(shape.routeInfo.routeId);
+          shape.routeInfo &&
+          selectedRouteIds.has(getBusRouteIdentity(shape.routeInfo));
         const isFromStopSelection =
           shape.routeInfo &&
-          routesDerivedFromStops.has(shape.routeInfo.routeId);
+          routesDerivedFromStops.has(getBusRouteIdentity(shape.routeInfo));
         const creationSource =
           isExplicitlySelected || isFromStopSelection
             ? FeatureCreationSource.SELECTION

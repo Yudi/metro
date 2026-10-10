@@ -109,6 +109,46 @@ describe('BusStopDialogComponent', () => {
     );
   });
 
+  it('sorts a direction favorite first when its current coordinates move slightly', () => {
+    const savedCode =
+      'bus:v1:sptrans:100:-23.5505~-46.6333:-23.5555~-46.6440:-23.5612~-46.6558';
+    const currentCode =
+      'bus:v1:sptrans:100:-23.5508~-46.6333:-23.5555~-46.6440:-23.5612~-46.6558';
+    const favoriteRoute: BusRouteGraphQL = {
+      id: 'sptrans:100',
+      routeId: 'sptrans:100',
+      favoriteCode: currentCode,
+      directionId: 1,
+      destination: 'Terminal Centro',
+      shortName: '100',
+      longName: 'Terminal A - Terminal Centro',
+      color: '112233',
+      textColor: 'FFFFFF',
+      sourceAgency: 'sptrans',
+    };
+    const otherRoute: BusRouteGraphQL = {
+      ...favoriteRoute,
+      id: 'sptrans:200',
+      routeId: 'sptrans:200',
+      favoriteCode:
+        'bus:v1:sptrans:200:-23.5505~-46.6333:-23.5555~-46.6440:-23.5612~-46.6558',
+      shortName: '200',
+    };
+    favoritesService.favorites.set({
+      busStop: ['artesp:42'],
+      busRoute: [savedCode],
+      railStation: [],
+      railLine: [],
+      bikeStation: [],
+    });
+    component.routes.set([otherRoute, favoriteRoute]);
+
+    expect(component.routesSortedByFavorite()).toEqual([
+      favoriteRoute,
+      otherRoute,
+    ]);
+  });
+
   it('applies streamed stop and route details through its stable component input', () => {
     const instance = component;
     const updatedStop = { ...stop, name: 'Av. Brigadeiro Faria Lima, 1400' };

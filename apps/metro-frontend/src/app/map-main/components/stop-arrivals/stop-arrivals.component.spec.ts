@@ -108,6 +108,24 @@ describe('StopArrivalsComponent', () => {
 
   afterEach(() => fixture.destroy());
 
+  it('shows rail connections only for the displayed destination when direction IDs disagree', () => {
+    const currentDirection = { ...route, destination: 'Term. Pirituba', directionId: 0 };
+    expect(fixture.componentInstance.getRouteDirectionsWithRail(currentDirection).map((direction) => direction.headsign)).toEqual(['Term. Pirituba']);
+  });
+
+  it('shows only the selected destination when opposite arrivals share a line code', () => {
+    const outbound = { ...route, favoriteCode: 'outbound', destination: 'Vl. Olímpia', directionId: 1 };
+    const inbound = { ...route, favoriteCode: 'inbound', destination: 'Term. Pirituba', directionId: 0 };
+    fixture.componentRef.setInput('routes', [outbound, inbound]);
+    fixture.componentRef.setInput('selectedRouteKeys', ['outbound']);
+    fixture.componentInstance.arrivals.set(createArrivals(line));
+    fixture.detectChanges();
+    expect(fixture.componentInstance.arrivalLines()).toHaveLength(0);
+    fixture.componentInstance.arrivals.set(createArrivals({ ...line, sl: 1 }));
+    fixture.detectChanges();
+    expect(fixture.componentInstance.arrivalLines()).toHaveLength(1);
+  });
+
   it('places a warning only under the matching arrival item and does not refetch on arrival updates', () => {
     const api = TestBed.inject(BusInformationService);
     const query = api.notices as jest.Mock;

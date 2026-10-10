@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
+import { encodeBusDirectionFavorite } from '@metro/shared/utils';
 import { LoggerService } from '@metro/shared/api';
 import { BikeStationsService } from '../../geography/bike-stations.service';
 import { CptmVehicleLayerService } from '../../realtime/cptm-vehicle-layer.service';
@@ -101,6 +102,35 @@ describe('MapSelectionService', () => {
     mapState = TestBed.inject(MapStateService);
   });
 
+  it('does not add a second selection when a feed update slightly moves the same saved direction', async () => {
+    const snapshot = {
+      sourceAgency: 'sptrans', shortName: '001',
+      originLatitude: -23.5, originLongitude: -46.6,
+      viaLatitude: -23.51, viaLongitude: -46.61,
+      destinationLatitude: -23.53, destinationLongitude: -46.63,
+    };
+    const saved = encodeBusDirectionFavorite(snapshot);
+    const fresh = encodeBusDirectionFavorite({ ...snapshot, originLatitude: -23.5002 });
+    if (!saved || !fresh) throw new Error('Invalid fixtures');
+    mapState.addRouteToSelection({ id: saved, routeId: 'old-id', shortName: '001', longName: 'Old name' });
+    cache.getRoute.mockReturnValue(of({ routeId: 'new-id', favoriteCode: fresh, shortName: '001', longName: 'New name' }));
+    await service.addRouteToSelection(fresh, false);
+    expect([...mapState.selectedRoutes().keys()]).toEqual([saved]);
+    expect(dataLoader.loadRouteData).not.toHaveBeenCalled();
+  });
+
+  it('does not restore a whole-line selection after its pending lookup was replaced', async () => {
+    const updates = new Subject<unknown>();
+    cache.getRoute.mockReturnValue(updates.asObservable());
+    const pending = service.addRouteToSelection('pending-line', false);
+    service.removeRouteFromSelection('pending-line', false);
+    updates.next({ routeId: 'feed-id', favoriteCode: 'pending-line', shortName: '001', longName: 'A - B' });
+    await pending;
+    expect(mapState.selectedRoutes().size).toBe(0);
+    expect(dataLoader.loadRouteData).not.toHaveBeenCalled();
+    expect(snackBar.open).not.toHaveBeenCalled();
+  });
+
   it('handles a failed route lookup without selecting or loading the route', async () => {
     const error = new Error('request timed out');
     cache.getRoute.mockReturnValue(throwError(() => error));
@@ -178,6 +208,58 @@ describe('MapSelectionService', () => {
     ).toBeLessThan(dataLoader.loadRouteData.mock.invocationCallOrder[0]);
     expect(mapState.selectedRoutes().has('route-1')).toBe(true);
     expect(snackBar.open).not.toHaveBeenCalled();
+  });
+
+  it('keeps two directions of one feed route as separate selections', async () => {
+    const outboundCode =
+      'bus:v1:sptrans:100:-23.5000~-46.6000:-23.5100~-46.6100:-23.5200~-46.6200';
+    const inboundCode =
+      'bus:v1:sptrans:100:-23.5200~-46.6200:-23.5150~-46.6100:-23.5000~-46.6000';
+    cache.getRoute.mockImplementation((favoriteCode: string) =>
+      of({
+        id: 'gtfs:100',
+        routeId: 'gtfs:100',
+        favoriteCode,
+        directionId: favoriteCode === outboundCode ? 0 : 1,
+        destination: favoriteCode === outboundCode ? 'Centro' : 'Bairro',
+        shortName: '100',
+        longName: 'Terminal A - Terminal B',
+        color: '112233',
+        textColor: 'FFFFFF',
+        sourceAgency: 'sptrans',
+        supportsRealtime: true,
+      }),
+    );
+
+    await service.addRouteToSelection(outboundCode, false);
+    await service.addRouteToSelection(inboundCode, false);
+
+    expect(Array.from(mapState.selectedRoutes().keys())).toEqual([
+      outboundCode,
+      inboundCode,
+    ]);
+    expect(mapState.selectedRoutes().get(outboundCode)).toMatchObject({
+      id: outboundCode,
+      routeId: 'gtfs:100',
+      destination: 'Centro',
+      directionId: 0,
+    });
+    expect(mapState.selectedRoutes().get(inboundCode)).toMatchObject({
+      id: inboundCode,
+      routeId: 'gtfs:100',
+      destination: 'Bairro',
+      directionId: 1,
+    });
+    expect(dataLoader.loadRouteData).toHaveBeenNthCalledWith(
+      1,
+      outboundCode,
+      false,
+    );
+    expect(dataLoader.loadRouteData).toHaveBeenNthCalledWith(
+      2,
+      inboundCode,
+      false,
+    );
   });
 
   it('uses the full-data response to populate the selection before updating filters', async () => {

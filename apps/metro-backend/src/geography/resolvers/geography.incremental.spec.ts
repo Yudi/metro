@@ -48,6 +48,7 @@ describe('geography incremental GraphQL delivery', () => {
     );
     const stopFullDataResolver = new StopFullDataResolver(
       geographyService as never,
+      { forRoutes: jest.fn().mockResolvedValue([]) } as never,
     );
     const routeFullDataResolver = new RouteFullDataResolver(
       geographyService as never,
@@ -163,6 +164,7 @@ describe('geography incremental GraphQL delivery', () => {
     );
     const stopFullDataResolver = new StopFullDataResolver(
       geographyService as never,
+      { forRoutes: jest.fn().mockResolvedValue([]) } as never,
     );
     const routeFullDataResolver = new RouteFullDataResolver(
       geographyService as never,

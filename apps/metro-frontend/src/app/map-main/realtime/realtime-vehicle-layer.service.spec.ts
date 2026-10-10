@@ -32,6 +32,24 @@ describe('RealtimeVehicleLayerService', () => {
     });
   });
 
+  it('removes opposite-direction markers when only one saved destination remains selected', () => {
+    const mapState = TestBed.inject(MapStateService);
+    const service = TestBed.inject(RealtimeVehicleLayerService);
+    const outbound = { id: 'outbound', routeId: 'feed-id', shortName: '001', longName: 'A - B', destination: 'Terminal Centro' };
+    const inbound = { ...outbound, id: 'inbound', destination: 'Terminal Bairro' };
+    mapState.selectedRoutes.set(new Map([['outbound', outbound], ['inbound', inbound]]));
+    const vehicle = { p: 1, a: false, ta: '', py: -23.5, px: -46.6 };
+    const line = { c: '001', cl: 1, sl: 1, lt0: 'TERMINAL CENTRO', lt1: 'TERMINAL BAIRRO', qv: 1, vs: [vehicle] };
+    realtime.vehiclePositions.set(new Map([['001', {
+      routeShortName: '001', hr: '12:00', l: [line, { ...line, sl: 2, vs: [{ ...vehicle, p: 2 }] }], cacheTimestamp: 1,
+    }]]));
+    TestBed.tick();
+    expect(service.getVehicleCount()).toBe(2);
+    mapState.selectedRoutes.set(new Map([['outbound', outbound]]));
+    TestBed.tick();
+    expect(service.getVehicleCount()).toBe(1);
+  });
+
   it('renders sanitized ARTESP positions beside unchanged SPTrans markers', () => {
     const mapState = TestBed.inject(MapStateService);
     mapState.selectedRoutes.set(

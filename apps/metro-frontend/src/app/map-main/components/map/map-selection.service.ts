@@ -3,6 +3,9 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { firstValueFrom, Observable } from 'rxjs';
 import {
   extractTrackedRailVehicleLineCode,
+  getBusRouteIdentity,
+  matchBusDirectionFavorite,
+  parseBusDirectionFavorite,
   getRailLineById,
   isArtespRoute,
   SpecialRailService,
@@ -43,12 +46,15 @@ export class MapSelectionService {
     string,
     PendingStopSelection
   >();
+  private readonly pendingRouteSelections = new Map<string, object>();
 
   async addRouteToSelection(
     routeId: string,
     shouldDisplaySnackbar: boolean,
   ): Promise<void> {
     this.logger.debug('Adding route to selection', { routeId });
+    const request = {};
+    this.pendingRouteSelections.set(routeId, request);
 
     const routeResult = await firstValueFrom(this.cache.getRoute(routeId)).then(
       (route) => ({ success: true as const, route }),
@@ -62,6 +68,8 @@ export class MapSelectionService {
         return { success: false as const };
       },
     );
+    if (this.pendingRouteSelections.get(routeId) !== request) return;
+    this.pendingRouteSelections.delete(routeId);
     if (!routeResult.success) {
       return;
     }
@@ -77,17 +85,36 @@ export class MapSelectionService {
       return;
     }
 
+    const selectionId = getBusRouteIdentity(route);
+    const currentIdentity = parseBusDirectionFavorite(selectionId);
+    if (currentIdentity) {
+      const candidates = [...this.mapState.selectedRoutes().values()].flatMap((selection) => {
+        const identity = parseBusDirectionFavorite(selection.id);
+        // A single via point cannot prove that two circular trips are the
+        // same service; leave those selections independent.
+        if (!identity || Math.hypot(
+          identity.destinationLatitude - identity.originLatitude,
+          identity.destinationLongitude - identity.originLongitude,
+        ) < 0.001) return [];
+        return [{ ...identity, directionId: selection.directionId ?? -1, destination: selection.destination ?? '' }];
+      });
+      if (matchBusDirectionFavorite(selectionId, candidates)) return;
+    }
+
     // The lookup is asynchronous, so two callers can pass the initial
     // selection check before either one updates map state. Only the first
     // completed lookup owns the realtime route subscription.
-    if (this.mapState.selectedRoutes().has(route.routeId)) {
+    if (this.mapState.selectedRoutes().has(selectionId)) {
       return;
     }
 
     const selectedRoute: SelectedRoute = {
-      id: route.routeId,
+      id: selectionId,
+      routeId: route.routeId,
       shortName: route.shortName,
       longName: route.longName,
+      destination: route.destination,
+      directionId: route.directionId,
       color: route.color ?? undefined,
       textColor: route.textColor ?? undefined,
       sourceAgency: route.sourceAgency,
@@ -251,14 +278,17 @@ export class MapSelectionService {
     }
   }
 
-  removeRouteFromSelection(routeId: string): void {
+  removeRouteFromSelection(routeId: string, shouldDisplaySnackbar = true): void {
+    this.pendingRouteSelections.delete(routeId);
     const route = this.mapState.selectedRoutes().get(routeId);
     this.unsubscribeFromRouteRealtime(route);
 
     this.mapState.removeRouteFromSelection(routeId);
     this.dataLoader.removeRouteDisplayData(routeId);
 
-    this.snackBar.open(`Rota removida`, 'Fechar', { duration: 2000 });
+    if (shouldDisplaySnackbar) {
+      this.snackBar.open(`Rota removida`, 'Fechar', { duration: 2000 });
+    }
   }
 
   removeStopFromSelection(stopId: string): void {
@@ -310,6 +340,7 @@ export class MapSelectionService {
   }
 
   clearAllSelections(shouldDisplaySnackbar = true): void {
+    this.pendingRouteSelections.clear();
     for (const route of this.mapState.selectedRoutes().values()) {
       this.unsubscribeFromRouteRealtime(route);
     }
@@ -341,7 +372,8 @@ export class MapSelectionService {
     route: SelectedRoute | { routeId: string; shortName: string },
   ): void {
     const shortName = route.shortName;
-    const routeId = 'routeId' in route ? route.routeId : route.id;
+    const routeId =
+      'id' in route ? route.routeId ?? route.id : route.routeId;
     if (!shortName) {
       return;
     }
@@ -390,7 +422,7 @@ export class MapSelectionService {
 
   private unsubscribeFromRouteRealtime(route: SelectedRoute | undefined): void {
     const shortName = route?.shortName;
-    const routeId = route?.id ?? '';
+    const routeId = route?.routeId ?? route?.id ?? '';
     if (!shortName) {
       return;
     }

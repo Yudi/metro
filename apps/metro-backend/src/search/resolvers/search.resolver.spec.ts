@@ -18,6 +18,7 @@ describe('SearchResolver', () => {
     const resolver = new SearchResolver(
       { search } as unknown as TypesenseService,
       {} as SearchService,
+      { forRoutes: jest.fn().mockResolvedValue([]) } as never,
     );
 
     await expect(resolver.search({ query: 'Sé' })).rejects.toBe(unavailable);
@@ -31,11 +32,27 @@ describe('SearchResolver', () => {
     const resolver = new SearchResolver(
       { search } as unknown as TypesenseService,
       {} as SearchService,
+      { forRoutes: jest.fn().mockResolvedValue([]) } as never,
     );
 
     await expect(resolver.search({ query: 'Sé' })).rejects.toThrow(
       'Search failed',
     );
+  });
+
+  it('presents one search result for each destination while keeping current feed route IDs', async () => {
+    const resolver = new SearchResolver(
+      { search: jest.fn().mockResolvedValue([busRouteSearchResult({ route_id: 'route-1' })]) } as unknown as TypesenseService,
+      {} as SearchService,
+      { forRoutes: jest.fn().mockResolvedValue([
+        { routeId: 'route-1', favoriteCode: 'outbound', destination: 'Terminal B', directionId: 0 },
+        { routeId: 'route-1', favoriteCode: 'inbound', destination: 'Terminal A', directionId: 1 },
+      ]) } as never,
+    );
+    const results = await resolver.search({ query: '001' });
+    expect(results).toHaveLength(2);
+    expect(results.map((result) => result.id)).toEqual(['outbound', 'inbound']);
+    expect(results[1]).toMatchObject({ route_id: 'route-1', destination: 'Terminal A' });
   });
 
   it('applies the global limit after Typesense relevance ordering', async () => {
@@ -49,6 +66,7 @@ describe('SearchResolver', () => {
     const resolver = new SearchResolver(
       { search } as unknown as TypesenseService,
       {} as SearchService,
+      { forRoutes: jest.fn().mockResolvedValue([]) } as never,
     );
 
     const result = await resolver.search({ query: 'Sé', limit: 2 });
@@ -79,6 +97,7 @@ describe('SearchResolver relevance order', () => {
         ]),
       } as unknown as TypesenseService,
       {} as SearchService,
+      { forRoutes: jest.fn().mockResolvedValue([]) } as never,
     );
     const result = await resolver.search({ query: '001' });
     expect(result.map((route) => route.id)).toEqual(['artesp:001', '001']);
@@ -107,6 +126,7 @@ describe('SearchResolver relevance order', () => {
         ]),
       } as unknown as TypesenseService,
       {} as SearchService,
+      { forRoutes: jest.fn().mockResolvedValue([]) } as never,
     );
 
     const result = await resolver.search({ query: '477A' });
@@ -136,6 +156,7 @@ describe('SearchResolver relevance order', () => {
         ]),
       } as unknown as TypesenseService,
       {} as SearchService,
+      { forRoutes: jest.fn().mockResolvedValue([]) } as never,
     );
 
     const result = await resolver.search({ query: '477A-10' });
@@ -166,6 +187,7 @@ describe('SearchResolver relevance order', () => {
         ]),
       } as unknown as TypesenseService,
       {} as SearchService,
+      { forRoutes: jest.fn().mockResolvedValue([]) } as never,
     );
 
     const result = await resolver.search({ query: 'Terminal Interlagos' });
@@ -194,6 +216,7 @@ describe('SearchResolver relevance order', () => {
         ]),
       } as unknown as TypesenseService,
       {} as SearchService,
+      { forRoutes: jest.fn().mockResolvedValue([]) } as never,
     );
 
     const result = await resolver.search({ query: 'Terminal' });
@@ -214,6 +237,7 @@ describe('SearchResolver relevance order', () => {
         ]),
       } as unknown as TypesenseService,
       {} as SearchService,
+      { forRoutes: jest.fn().mockResolvedValue([]) } as never,
     );
 
     const result = await resolver.search({ query: 'Azul' });

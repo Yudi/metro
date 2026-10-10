@@ -48,11 +48,11 @@ export class MapSelectionsPanelComponent {
       .sort(
         (a, b) =>
           getBusAgencyOrder({
-            routeId: a.route.id,
+            routeId: a.route.routeId ?? a.route.id,
             sourceAgency: a.route.sourceAgency,
           }) -
             getBusAgencyOrder({
-              routeId: b.route.id,
+              routeId: b.route.routeId ?? b.route.id,
               sourceAgency: b.route.sourceAgency,
             }) || a.index - b.index,
       )
@@ -93,7 +93,7 @@ export class MapSelectionsPanelComponent {
     }
 
     return isArtespRoute({
-      routeId: route.id,
+      routeId: route.routeId ?? route.id,
       sourceAgency: route.sourceAgency,
     })
       ? 'Tarifa não informada'
@@ -104,7 +104,12 @@ export class MapSelectionsPanelComponent {
     let agency: TransitAgency | undefined;
     const sourceAgency = route.sourceAgency?.trim().toLowerCase();
 
-    if (isArtespRoute({ routeId: route.id, sourceAgency })) {
+    if (
+      isArtespRoute({
+        routeId: route.routeId ?? route.id,
+        sourceAgency,
+      })
+    ) {
       agency = TransitAgency.ARTESP;
     } else if (sourceAgency && this.isTransitAgency(sourceAgency)) {
       agency = sourceAgency;

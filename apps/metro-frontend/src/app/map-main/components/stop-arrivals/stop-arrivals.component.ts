@@ -65,7 +65,6 @@ import {
   getMinutesUntilArrival,
   getRailDirectionForLine,
   getRailDirections,
-  getRailStationCount,
   getRouteAgencyLabel,
   getRouteFareLabel,
   getScheduledDepartureKey,
@@ -173,7 +172,7 @@ export class StopArrivalsComponent {
     })),
   );
   readonly scheduledRows = computed(() =>
-    this.scheduledDepartures().map((departure) => {
+    this.scheduledDepartures().filter((departure) => this.isScheduledDepartureSelected(departure)).map((departure) => {
       const route = this.getScheduledDepartureRoute(departure);
       const [timeLabel, dayLabel] = this.formatScheduledDepartureTime(
         departure.departureTime,
@@ -189,7 +188,9 @@ export class StopArrivalsComponent {
     }),
   );
   readonly scheduledGroups = computed(() =>
-    groupScheduledBusDepartures(this.scheduledRows()).map((group) => ({
+    groupScheduledBusDepartures(this.scheduledRows(), 5,
+      (row) => JSON.stringify([row.routeId, row.directionId, row.headsign]),
+    ).map((group) => ({
       ...group,
       next: group.departures[0],
       remaining: group.departures.slice(1),
@@ -542,7 +543,20 @@ export class StopArrivalsComponent {
     departure: ScheduledBusDepartureGraphQL,
   ): BusRouteGraphQL | undefined {
     return this.routes().find(
-      (route) => getBusRouteIdentity(route) === departure.routeId,
+      (route) => route.routeId === departure.routeId &&
+        (route.directionId === undefined || route.directionId === departure.directionId) &&
+        (!route.destination || route.destination.trim().toLocaleUpperCase('pt-BR') === departure.headsign.trim().toLocaleUpperCase('pt-BR')),
+    );
+  }
+
+  private isScheduledDepartureSelected(departure: ScheduledBusDepartureGraphQL): boolean {
+    const keys = [...this.selectedRouteKeys(), ...(this.selectedRouteKey() ? [this.selectedRouteKey() as string] : [])];
+    if (keys.length === 0) return true;
+    return this.routes().some((route) =>
+      route.routeId === departure.routeId &&
+      (route.directionId === undefined || route.directionId === departure.directionId) &&
+      (!route.destination || route.destination.trim().toLocaleUpperCase('pt-BR') === departure.headsign.trim().toLocaleUpperCase('pt-BR')) &&
+      (keys.includes(getBusRouteIdentity(route)) || keys.includes(route.routeId)),
     );
   }
 
@@ -551,13 +565,20 @@ export class StopArrivalsComponent {
   }
 
   getRouteRailStationCount(route: BusRouteGraphQL): number {
-    return getRailStationCount(this.getRouteConnection(route));
+    return new Set(this.getRouteDirectionsWithRail(route).flatMap((direction) => direction.stations.map((station) => station.id))).size;
   }
 
   getRouteDirectionsWithRail(
     route: BusRouteGraphQL,
   ): RouteRailConnectionDirectionGraphQL[] {
-    return getRailDirections(this.getRouteConnection(route));
+    const directions = getRailDirections(this.getRouteConnection(route));
+    if (route.destination) {
+      const destination = route.destination.trim().toLocaleUpperCase('pt-BR');
+      return directions.filter((direction) => direction.headsign.trim().toLocaleUpperCase('pt-BR') === destination);
+    }
+    return directions.filter((direction) =>
+      route.directionId === undefined || direction.directionId === route.directionId,
+    );
   }
 
   getLineRailStations(

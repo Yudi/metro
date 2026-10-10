@@ -1,12 +1,13 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  PLATFORM_ID,
   computed,
   inject,
   input,
   signal,
 } from '@angular/core';
-import { DatePipe, NgOptimizedImage } from '@angular/common';
+import { DatePipe, NgOptimizedImage, isPlatformBrowser } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import {
@@ -19,6 +20,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
+import { FavoritesService } from '@metro/shared/api';
 import {
   catchError,
   distinctUntilChanged,
@@ -28,6 +30,11 @@ import {
   switchMap,
 } from 'rxjs';
 import {
+  isBusDirectionFavorite,
+  isBusLineFavorite,
+  getBusLineDirectionAnchor,
+  matchBusDirectionFavorite,
+  parseBusDirectionFavorite,
   formatBusFare,
   getAgencyIconPath,
   getContrastColor,
@@ -46,6 +53,10 @@ import { BusInformationComponent } from '../map-main/components/bus-information/
 import { routeNoticeView } from '../map-main/components/bus-information/bus-notice-view';
 import { ScheduledDeparturesComponent } from '../shared/components/scheduled-departures/scheduled-departures.component';
 import { CityContextService } from '../cities/city-context.service';
+import {
+  BusRouteGraphQL,
+  GeographyGraphQLService,
+} from '../map-main/geography/geography-graphql.service';
 import {
   BusItineraryService,
   ItineraryPattern,
@@ -82,6 +93,7 @@ export function serviceDayKind(date: string): PublishedDayKind {
 
 export interface BusItineraryDialogData {
   routeId: string;
+  favoriteCode?: string;
   serviceDate?: string;
 }
 
@@ -108,6 +120,7 @@ export interface BusItineraryDialogData {
 export class BusItineraryDialogComponent {
   readonly embedded = input(false);
   private readonly dialogData = inject<BusItineraryDialogData>(MAT_DIALOG_DATA);
+  private readonly platformId = inject(PLATFORM_ID);
   private readonly dialogRef = inject(
     MatDialogRef<BusItineraryDialogComponent>,
     { optional: true },
@@ -115,7 +128,58 @@ export class BusItineraryDialogComponent {
   readonly cityContext = inject(CityContextService);
   private readonly itineraries = inject(BusItineraryService);
   private readonly information = inject(BusInformationService);
+  private readonly geography = inject(GeographyGraphQLService);
+  private readonly favoritesService = inject(FavoritesService);
   readonly routeId = this.dialogData.routeId;
+  readonly directionState = toSignal(
+    isPlatformBrowser(this.platformId) && this.routeId
+      ? this.geography.getBusRouteDirections([this.routeId]).pipe(
+          map((directions) => ({ loading: false, directions })),
+          catchError(() =>
+            of({ loading: false, directions: [] as BusRouteGraphQL[] }),
+          ),
+          startWith({ loading: true, directions: [] as BusRouteGraphQL[] }),
+        )
+      : of({ loading: false, directions: [] as BusRouteGraphQL[] }),
+    {
+      initialValue: { loading: false, directions: [] as BusRouteGraphQL[] },
+    },
+  );
+  readonly directions = computed(() => this.directionState().directions);
+  readonly directionCandidates = computed(() =>
+    this.directions().flatMap((direction) => {
+      const favoriteCode = direction.favoriteCode;
+      const identity = parseBusDirectionFavorite(favoriteCode ?? '');
+      if (!favoriteCode || !identity || direction.directionId === undefined) {
+        return [];
+      }
+      return [
+        {
+          ...identity,
+          favoriteCode,
+          directionId: direction.directionId,
+          destination: direction.destination ?? direction.longName,
+          sourceAgency: identity.sourceAgency,
+          shortName: identity.shortName,
+          direction,
+        },
+      ];
+    }),
+  );
+  readonly requestedDirection = computed(() => {
+    const favoriteCode = this.dialogData.favoriteCode;
+    if (!favoriteCode || isBusLineFavorite(favoriteCode)) {
+      return undefined;
+    }
+    return matchBusDirectionFavorite(
+      favoriteCode,
+      this.directionCandidates(),
+    );
+  });
+  readonly requestedFavoriteCode = this.dialogData.favoriteCode;
+  readonly requestedFavoriteIsWholeLine = computed(() =>
+    isBusLineFavorite(this.requestedFavoriteCode ?? ''),
+  );
   readonly today = saoPauloServiceDate();
   readonly days = Array.from({ length: 7 }, (_, index) => {
     const date = new Date(`${this.today}T12:00:00Z`);
@@ -201,11 +265,45 @@ export class BusItineraryDialogComponent {
   readonly data = computed(() => this.detailState().data);
   readonly route = computed(() => this.data()?.route);
   readonly patterns = computed(() => this.data()?.patterns ?? []);
-  readonly pattern = computed<ItineraryPattern | undefined>(
-    () =>
-      this.patterns().find((item) => item.id === this.selectedPatternId()) ??
-      this.patterns()[0],
-  );
+  readonly pattern = computed<ItineraryPattern | undefined>(() => {
+    const patterns = this.patterns();
+    const manuallySelected = patterns.find(
+      (item) => item.id === this.selectedPatternId(),
+    );
+    if (manuallySelected) {
+      return manuallySelected;
+    }
+
+    const requestedDirection = this.requestedDirection()?.direction;
+    if (requestedDirection) {
+      const destination = this.normalizeDestination(
+        requestedDirection.destination ?? '',
+      );
+      const destinationMatches = patterns.filter(
+        (item) =>
+          destination.length > 0 &&
+          (this.normalizeDestination(item.headsign) === destination ||
+            this.normalizeDestination(
+              item.stops[item.stops.length - 1]?.name ?? '',
+            ) ===
+              destination),
+      );
+      if (destinationMatches.length === 1) {
+        return destinationMatches[0];
+      }
+
+      const directionMatches = patterns.filter(
+        (item) => item.directionId === requestedDirection.directionId,
+      );
+      if (directionMatches.length === 1) {
+        return directionMatches[0];
+      }
+
+      return undefined;
+    }
+
+    return patterns[0];
+  });
   readonly patternOptions = computed(() =>
     this.patterns().map((pattern, index) => ({
       value: pattern.id,
@@ -310,11 +408,27 @@ export class BusItineraryDialogComponent {
   readonly publishedDirection = computed<PublishedRouteDirection | undefined>(
     () => {
       const directions = this.publishedDay()?.directions ?? [];
-      return (
-        directions.find(
-          (direction) => direction.id === this.publishedDirectionId(),
-        ) ?? directions[0]
+      const manuallySelected = directions.find(
+        (direction) => direction.id === this.publishedDirectionId(),
       );
+      if (manuallySelected) {
+        return manuallySelected;
+      }
+
+      const requestedDirection = this.requestedDirection()?.direction;
+      if (!requestedDirection) {
+        return directions[0];
+      }
+
+      const requestedDestination = this.normalizeDestination(
+        requestedDirection.destination ?? '',
+      );
+      const directionMatches = directions.filter(
+        (direction) =>
+          this.normalizeDestination(direction.headsign) ===
+          requestedDestination,
+      );
+      return directionMatches.length === 1 ? directionMatches[0] : undefined;
     },
   );
   readonly publishedTravelTimes = computed(
@@ -401,7 +515,7 @@ export class BusItineraryDialogComponent {
       : null;
   });
   readonly mapParams = computed(() => ({
-    busRoutes: this.route()?.routeId,
+    busRoutes: this.dialogData.favoriteCode ?? this.route()?.routeId,
     subwayStations: '1',
     subwayRoutes: '1',
     bike: '0',
@@ -409,6 +523,73 @@ export class BusItineraryDialogComponent {
 
   cityPath(path = ''): string {
     return this.cityContext.path(path);
+  }
+
+  isDirectionFavorite(direction: BusRouteGraphQL): boolean {
+    return (
+      this.getSavedDirectionFavoriteCode(direction) !== null ||
+      this.getSavedBusLineFavoriteCode(direction) !== null
+    );
+  }
+
+  isWholeLineFavorite(direction: BusRouteGraphQL): boolean {
+    return this.getSavedBusLineFavoriteCode(direction) !== null;
+  }
+
+  directionFavoriteDisabled(direction: BusRouteGraphQL): boolean {
+    const lineCode = this.getSavedBusLineFavoriteCode(direction);
+    if (!lineCode) {
+      return false;
+    }
+    const directionCount = this.directionCandidates().filter(
+      (candidate) => candidate.direction.routeId === direction.routeId,
+    ).length;
+    return directionCount < 2;
+  }
+
+  directionFavoriteLabel(direction: BusRouteGraphQL): string {
+    const destination = direction.destination || 'destino não informado';
+    if (
+      this.getSavedBusLineFavoriteCode(direction) &&
+      this.directionFavoriteDisabled(direction)
+    ) {
+      return `A linha ${direction.shortName} está salva por inteiro; os sentidos ainda não puderam ser separados`;
+    }
+    return this.isDirectionFavorite(direction)
+      ? `Remover favorito da linha ${direction.shortName}, destino ${destination}`
+      : `Adicionar aos favoritos a linha ${direction.shortName}, destino ${destination}`;
+  }
+
+  directionColor(direction: BusRouteGraphQL): string {
+    return normalizeHexColor(direction.color, '5f6368');
+  }
+
+  directionTextColor(direction: BusRouteGraphQL): string {
+    return normalizeHexColor(
+      direction.textColor,
+      getContrastColor(this.directionColor(direction)),
+    );
+  }
+
+  toggleDirectionFavorite(direction: BusRouteGraphQL): void {
+    const currentCode = this.getSavedDirectionFavoriteCode(direction);
+    if (currentCode) {
+      this.favoritesService.removeFavorite(currentCode, 'busRoute');
+      return;
+    }
+
+    const lineCode = this.getSavedBusLineFavoriteCode(direction);
+    if (lineCode) {
+      void this.expandWholeLineAndToggleDirection(lineCode, direction);
+      return;
+    }
+
+    if (
+      direction.favoriteCode &&
+      isBusDirectionFavorite(direction.favoriteCode)
+    ) {
+      this.favoritesService.addFavorite(direction.favoriteCode, 'busRoute');
+    }
   }
 
   close(): void {
@@ -420,5 +601,102 @@ export class BusItineraryDialogComponent {
     this.selectedPatternId.set('');
     this.showDepartureTimes.set(false);
     this.serviceDate.set(date);
+  }
+
+  private getSavedDirectionFavoriteCode(
+    direction: BusRouteGraphQL,
+  ): string | null {
+    const candidates = this.directionCandidates();
+    const candidate = candidates.find((item) => item.direction === direction);
+    if (!candidate) {
+      return null;
+    }
+
+    const favoriteCodes = this.favoritesService.favorites().busRoute;
+    if (favoriteCodes.includes(candidate.favoriteCode)) {
+      return candidate.favoriteCode;
+    }
+
+    for (const favoriteCode of favoriteCodes) {
+      if (!parseBusDirectionFavorite(favoriteCode)) {
+        continue;
+      }
+      const matched = matchBusDirectionFavorite(favoriteCode, candidates);
+      if (matched?.direction === direction) {
+        return favoriteCode;
+      }
+    }
+
+    return null;
+  }
+
+  private getSavedBusLineFavoriteCode(
+    direction: BusRouteGraphQL,
+  ): string | null {
+    const candidate = this.directionCandidates().find(
+      (item) => item.direction === direction,
+    );
+    if (!candidate) {
+      return null;
+    }
+
+    const favoriteCodes = this.favoritesService.favorites().busRoute;
+    for (const favoriteCode of favoriteCodes) {
+      if (!isBusLineFavorite(favoriteCode)) {
+        continue;
+      }
+      const directionAnchor = getBusLineDirectionAnchor(favoriteCode);
+      if (!directionAnchor) {
+        continue;
+      }
+      const matchedAnchor = matchBusDirectionFavorite(
+        directionAnchor,
+        this.directionCandidates(),
+      );
+      if (matchedAnchor?.direction.routeId === direction.routeId) {
+        return favoriteCode;
+      }
+    }
+
+    return null;
+  }
+
+  private async expandWholeLineAndToggleDirection(
+    lineCode: string,
+    direction: BusRouteGraphQL,
+  ): Promise<void> {
+    const directionCodes = Array.from(
+      new Set(
+        this.directionCandidates()
+          .filter((candidate) => candidate.direction.routeId === direction.routeId)
+          .map((candidate) => candidate.favoriteCode),
+      ),
+    );
+    if (directionCodes.length < 2) {
+      return;
+    }
+
+    const migrated = await this.favoritesService.migrateBusRouteFavorite(
+      lineCode,
+      directionCodes,
+    );
+    const currentFavorites = new Set(this.favoritesService.favorites().busRoute);
+    if (
+      migrated ||
+      (!currentFavorites.has(lineCode) &&
+        directionCodes.every((code) => currentFavorites.has(code)))
+    ) {
+      const currentDirectionCode = direction.favoriteCode;
+      if (currentDirectionCode) {
+        this.favoritesService.removeFavorite(
+          currentDirectionCode,
+          'busRoute',
+        );
+      }
+    }
+  }
+
+  private normalizeDestination(value: string): string {
+    return value.trim().toLocaleLowerCase('pt-BR');
   }
 }

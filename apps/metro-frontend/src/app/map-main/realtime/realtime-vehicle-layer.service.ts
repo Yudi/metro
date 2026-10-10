@@ -175,6 +175,7 @@ export class RealtimeVehicleLayerService {
         this.mapState.selectedRoutes().get(realtimeRouteKey)?.shortName ??
         realtimeRouteKey;
       for (const line of data.l || []) {
+        if (!this.isVehicleDirectionVisible(realtimeRouteKey, line.c, getOlhoVivoDestination(line))) continue;
         for (const vehicle of line.vs || []) {
           // Convert lat/lon to map coordinates
           const coordinates = fromLonLat([vehicle.px, vehicle.py]);
@@ -206,6 +207,7 @@ export class RealtimeVehicleLayerService {
       }
 
       for (const vehicle of data.positions ?? []) {
+        if (!this.isVehicleDirectionVisible(realtimeRouteKey, routeShortName, vehicle.destination)) continue;
         this.addSanitizedVehicleMarker(
           realtimeRouteKey,
           routeShortName,
@@ -241,6 +243,24 @@ export class RealtimeVehicleLayerService {
    */
   clearVehicles(): void {
     this.vehicleSource.clear();
+  }
+
+  private isVehicleDirectionVisible(
+    realtimeRouteKey: string,
+    routeCode: string,
+    destination?: string | null,
+  ): boolean {
+    const selections = [...this.mapState.selectedRoutes().values()].filter((route) =>
+      route.id === realtimeRouteKey || route.routeId === realtimeRouteKey ||
+      route.shortName === realtimeRouteKey || route.shortName === routeCode,
+    );
+    if (selections.length === 0 || selections.some((route) => !route.destination)) return true;
+    const normalize = (value: string) => value.normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim().toUpperCase();
+    const currentDestination = destination ? normalize(destination) : '';
+    return currentDestination.length > 0 && selections.some((route) =>
+      route.destination && normalize(route.destination) === currentDestination,
+    );
   }
 
   private getRouteColor(routeShortName: string, routeCode: string): string {

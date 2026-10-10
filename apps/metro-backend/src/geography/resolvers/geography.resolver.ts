@@ -11,6 +11,7 @@ import {
 import { GraphQLResolveInfo } from 'graphql';
 import { UseGuards, ValidationPipe } from '@nestjs/common';
 import { GeographyServiceOptimized } from '../services/geography-optimized.service';
+import { BusDirectionService } from '../services/bus-direction.service';
 import {
   BusStop,
   BusRoute,
@@ -413,17 +414,34 @@ export class GeographyResolver {
 
 @Resolver(() => StopFullData)
 export class StopFullDataResolver {
-  constructor(private readonly geographyService: GeographyServiceOptimized) {}
+  constructor(
+    private readonly geographyService: GeographyServiceOptimized,
+    private readonly directions: BusDirectionService,
+  ) {}
 
   @ResolveField(() => [RouteFullData])
   async routes(
     @Parent() parent: StopFullDataParent,
     @Info() info: GraphQLResolveInfo,
   ): Promise<RouteFullData[]> {
-    return this.geographyService.getStopRoutesFullData(
+    const routes = await this.geographyService.getStopRoutesFullData(
       parent.stop.stopId,
       requestedRouteFullDataOptions(info),
     );
+    const directions = await this.directions.forRoutes(
+      routes.map(({ route }) => route.routeId),
+      parent.stop.stopId,
+    );
+    return routes.flatMap((data) => {
+      if (data.route.routeType === 1 || data.route.routeType === 2) return [data];
+      const matches = directions.filter((direction) => direction.routeId === data.route.routeId);
+      return matches.length ? matches.map((route) => ({
+        ...data,
+        route,
+        trips: data.trips?.filter((trip) => trip.directionId === route.directionId),
+        shapes: data.shapes?.filter((shape) => route.shapeIds.includes(shape.shapeId)),
+      })) : [data];
+    });
   }
 }
 

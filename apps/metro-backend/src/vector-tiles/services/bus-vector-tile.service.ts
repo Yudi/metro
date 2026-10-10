@@ -1,14 +1,25 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { isBusDirectionFavorite, isBusLineFavorite } from '@metro/shared/utils';
 import { Prisma } from '../../../generated/prisma/client';
+import { BusDirectionService } from '../../geography/services/bus-direction.service';
+import type { BusRouteDirection } from '../../geography/entities/bus-route-direction.entity';
 import { PrismaService } from '../../prisma/prisma.service';
 import { tileToBounds } from '../utils/vector-tile-geometry.util';
 import { VectorTileOptions } from '../vector-tile.types';
+
+interface ResolvedBusFilters {
+  legacyRouteIds: string[];
+  directions: BusRouteDirection[];
+}
 
 @Injectable()
 export class BusVectorTileService {
   private readonly logger = new Logger(BusVectorTileService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly busDirections: BusDirectionService,
+  ) {}
 
   /**
    * Generate MVT tile for selected bus route shapes.
@@ -30,7 +41,24 @@ export class BusVectorTileService {
       );
     }
 
+    const filters = await this.resolveRouteFilters(routeIds);
+    if (
+      filters.legacyRouteIds.length === 0 &&
+      filters.directions.length === 0
+    ) {
+      return null;
+    }
+
     const { minX, minY, maxX, maxY } = tileToBounds(z, x, y);
+    const directionJson = JSON.stringify(
+      filters.directions.map((direction) => ({
+        route_id: direction.routeId,
+        direction_id: direction.directionId,
+        destination: direction.destination,
+        favorite_code: direction.favoriteCode,
+        shape_ids: direction.shapeIds,
+      })),
+    );
 
     try {
       return await this.queryTile(Prisma.sql`
@@ -43,8 +71,19 @@ export class BusVectorTileService {
         selected_routes AS MATERIALIZED (
           SELECT *
           FROM "public"."Gtfs_Route"
-          WHERE route_id = ANY(${routeIds}::text[])
+          WHERE route_id = ANY(${filters.legacyRouteIds}::text[])
             AND NOT (route_type IN (1, 2) OR route_id LIKE 'METRÔ%' OR route_id LIKE 'CPTM%')
+        ),
+        selected_directions AS MATERIALIZED (
+          SELECT direction.route_id, direction.direction_id,
+            direction.destination, direction.favorite_code, direction.shape_ids
+          FROM jsonb_to_recordset(${directionJson}::jsonb) AS direction(
+            route_id text,
+            direction_id integer,
+            destination text,
+            favorite_code text,
+            shape_ids text[]
+          )
         ),
         selected_trips AS MATERIALIZED (
           SELECT DISTINCT route_id, shape_id
@@ -58,16 +97,19 @@ export class BusVectorTileService {
           WHERE shape_id = ANY(ARRAY(SELECT shape_id FROM selected_trips))
             AND geom IS NOT NULL
         ),
-        route_shapes AS (
+        legacy_route_shapes AS (
           SELECT DISTINCT ON (r.route_id, sh.shape_id)
             sh.shape_id,
-            r.route_id,
+            r.route_id AS feature_route_id,
             r.route_short_name,
             r.route_long_name,
             r.route_color,
             r.route_text_color,
             r.source_agency,
             r.source_id,
+            NULL::text AS destination,
+            NULL::text AS favorite_code,
+            NULL::integer AS direction_id,
             (LOWER(COALESCE(r.source_agency, 'sptrans')) = 'sptrans'
               AND NOT (r.route_type IN (1, 2) OR r.route_id LIKE 'METRÔ%' OR r.route_id LIKE 'CPTM%')) AS supports_realtime,
             sh.geom
@@ -76,17 +118,55 @@ export class BusVectorTileService {
           INNER JOIN selected_shapes sh ON sh.shape_id = t.shape_id
           ORDER BY r.route_id, sh.shape_id
         ),
+        direction_route_shapes AS (
+          SELECT DISTINCT ON (direction.favorite_code, shape.shape_id)
+            shape.shape_id,
+            direction.favorite_code AS feature_route_id,
+            route.route_short_name,
+            route.route_long_name,
+            route.route_color,
+            route.route_text_color,
+            route.source_agency,
+            route.source_id,
+            direction.destination,
+            direction.favorite_code,
+            direction.direction_id,
+            (LOWER(COALESCE(route.source_agency, 'sptrans')) = 'sptrans'
+              AND NOT (route.route_type IN (1, 2) OR route.route_id LIKE 'METRÔ%' OR route.route_id LIKE 'CPTM%')) AS supports_realtime,
+            gtfs_shape.geom
+          FROM selected_directions direction
+          INNER JOIN "public"."Gtfs_Route" route
+            ON route.route_id = direction.route_id
+            AND NOT (route.route_type IN (1, 2) OR route.route_id LIKE 'METRÔ%' OR route.route_id LIKE 'CPTM%')
+          CROSS JOIN LATERAL unnest(direction.shape_ids) AS shape(shape_id)
+          INNER JOIN "public"."Gtfs_Trip" trip
+            ON trip.route_id = direction.route_id
+            AND trip.direction_id = direction.direction_id
+            AND trip.shape_id = shape.shape_id
+          INNER JOIN "public"."Gtfs_Shape" gtfs_shape
+            ON gtfs_shape.shape_id = trip.shape_id
+            AND gtfs_shape.geom IS NOT NULL
+          ORDER BY direction.favorite_code, shape.shape_id
+        ),
+        route_shapes AS (
+          SELECT * FROM legacy_route_shapes
+          UNION ALL
+          SELECT * FROM direction_route_shapes
+        ),
         mvtgeom AS (
           SELECT
-            ('x' || substr(md5(route_id || ':' || shape_id), 1, 7))::bit(28)::integer AS id,
+            ('x' || substr(md5(feature_route_id || ':' || shape_id), 1, 7))::bit(28)::integer AS id,
             shape_id,
-            route_id,
+            feature_route_id AS route_id,
             route_short_name,
             route_long_name,
             route_color,
             route_text_color,
             source_agency,
             source_id,
+            destination,
+            favorite_code,
+            direction_id,
             supports_realtime,
             ST_AsMVTGeom(
               ST_Transform(rs.geom, 3857),
@@ -138,12 +218,30 @@ export class BusVectorTileService {
     const { minX, minY, maxX, maxY } = tileToBounds(z, x, y);
 
     try {
-      const hasRouteFilter = routeIds.length > 0;
+      const filters = await this.resolveRouteFilters(routeIds);
       const hasStopFilter = stopIds.length > 0;
       const hasNearbyFilter = nearby !== null;
+      const hasRouteFilter = routeIds.length > 0;
       const nearbyLatitude = nearby?.latitude ?? 0;
       const nearbyLongitude = nearby?.longitude ?? 0;
       const nearbyRadiusMeters = nearby?.radiusMeters ?? 0;
+      const directionJson = JSON.stringify(
+        filters.directions.map((direction) => ({
+          route_id: direction.routeId,
+          direction_id: direction.directionId,
+          shape_ids: direction.shapeIds,
+        })),
+      );
+
+      if (
+        hasRouteFilter &&
+        filters.legacyRouteIds.length === 0 &&
+        filters.directions.length === 0 &&
+        !hasStopFilter &&
+        !hasNearbyFilter
+      ) {
+        return null;
+      }
 
       return await this.queryTile(Prisma.sql`
         WITH bounds AS (
@@ -152,16 +250,38 @@ export class BusVectorTileService {
             4326
           ) AS geom
         ),
-        selected_bus_trips AS MATERIALIZED (
-          SELECT trip_id
-          FROM "public"."Gtfs_Trip" trip
+        selected_directions AS MATERIALIZED (
+          SELECT direction.route_id, direction.direction_id, direction.shape_ids
+          FROM jsonb_to_recordset(${directionJson}::jsonb) AS direction(
+            route_id text,
+            direction_id integer,
+            shape_ids text[]
+          )
+        ),
+        selected_bus_routes AS MATERIALIZED (
+          SELECT route.route_id, TRUE AS all_directions,
+            NULL::integer AS direction_id, NULL::text[] AS shape_ids
+          FROM "public"."Gtfs_Route" route
           WHERE ${hasRouteFilter}
-            AND trip.route_id = ANY(${routeIds}::text[])
-            AND EXISTS (
-              SELECT 1
-              FROM "public"."Gtfs_Route" route
-              WHERE route.route_id = trip.route_id
-                AND NOT (route.route_type IN (1, 2) OR route.route_id LIKE 'METRÔ%' OR route.route_id LIKE 'CPTM%')
+            AND route.route_id = ANY(${filters.legacyRouteIds}::text[])
+            AND NOT (route.route_type IN (1, 2) OR route.route_id LIKE 'METRÔ%' OR route.route_id LIKE 'CPTM%')
+          UNION ALL
+          SELECT route.route_id, FALSE AS all_directions,
+            direction.direction_id, direction.shape_ids
+          FROM selected_directions direction
+          INNER JOIN "public"."Gtfs_Route" route
+            ON route.route_id = direction.route_id
+            AND NOT (route.route_type IN (1, 2) OR route.route_id LIKE 'METRÔ%' OR route.route_id LIKE 'CPTM%')
+        ),
+        selected_bus_trips AS MATERIALIZED (
+          SELECT DISTINCT trip.trip_id
+          FROM "public"."Gtfs_Trip" trip
+          INNER JOIN selected_bus_routes selected_route
+            ON selected_route.route_id = trip.route_id
+          WHERE selected_route.all_directions
+            OR (
+              trip.direction_id = selected_route.direction_id
+              AND trip.shape_id = ANY(selected_route.shape_ids)
             )
         ),
         selected_route_stops AS MATERIALIZED (
@@ -326,6 +446,26 @@ export class BusVectorTileService {
     }
 
     return Array.from(new Set(normalized));
+  }
+
+  private async resolveRouteFilters(
+    routeIds: string[],
+  ): Promise<ResolvedBusFilters> {
+    const directionCodes = routeIds.filter((id) => id.startsWith('bus:'));
+    const validDirectionCodes = directionCodes.filter((id) => isBusDirectionFavorite(id) || isBusLineFavorite(id));
+    const legacyRouteIds = routeIds.filter(
+      (id) => !id.startsWith('bus:'),
+    );
+
+    return {
+      legacyRouteIds,
+      directions: validDirectionCodes.length
+        ? (await this.busDirections.forFavorites(validDirectionCodes)).map((direction) => ({
+            ...direction,
+            favoriteCode: isBusLineFavorite(direction.requestedCode) ? direction.requestedCode : direction.favoriteCode,
+          }))
+        : [],
+    };
   }
 
   normalizeNearby(

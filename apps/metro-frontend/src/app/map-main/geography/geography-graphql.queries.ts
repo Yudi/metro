@@ -15,6 +15,10 @@ export const STOP_FIELDS = `
   `;
 
 export const ROUTE_FIELDS = `
+    favoriteCode
+    requestedCode
+    destination
+    directionId
     id
     routeId
     shortName

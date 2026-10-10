@@ -122,14 +122,22 @@ export class BusDirectionService {
       ),
       trip_summaries AS MATERIALIZED (
         SELECT trip.route_id, trip.direction_id, trip.trip_headsign, trip.shape_id, trip.trip_id,
-          COUNT(stop_time.stop_sequence) AS stop_count,
-          (ARRAY_AGG(stop_time.stop_id ORDER BY stop_time.stop_sequence))[1] AS origin_stop_id,
-          (ARRAY_AGG(stop_time.stop_id ORDER BY stop_time.stop_sequence))[COUNT(stop_time.stop_sequence)::int] AS destination_stop_id,
-          BOOL_OR(stop_time.stop_id IN (SELECT stop_id FROM requested_source_stops)) AS serves_stop
+          itinerary.stop_count,
+          itinerary.stop_ids[1] AS origin_stop_id,
+          itinerary.stop_ids[itinerary.stop_count::int] AS destination_stop_id,
+          itinerary.serves_stop
         FROM "public"."Gtfs_Trip" trip
         INNER JOIN selected_routes route ON route.route_id = trip.route_id
-        INNER JOIN "public"."Gtfs_StopTime" stop_time ON stop_time.trip_id = trip.trip_id
-        GROUP BY trip.route_id, trip.direction_id, trip.trip_headsign, trip.shape_id, trip.trip_id
+        -- Aggregate per selected trip so the feed-view branches can use their
+        -- trip indexes instead of joining and sorting the entire stop-time feed.
+        CROSS JOIN LATERAL (
+          SELECT COUNT(stop_time.stop_sequence) AS stop_count,
+            ARRAY_AGG(stop_time.stop_id ORDER BY stop_time.stop_sequence) AS stop_ids,
+            BOOL_OR(stop_time.stop_id IN (SELECT stop_id FROM requested_source_stops)) AS serves_stop
+          FROM "public"."Gtfs_StopTime" stop_time
+          WHERE stop_time.trip_id = trip.trip_id
+          HAVING COUNT(stop_time.stop_sequence) > 0
+        ) itinerary
       ),
       patterns AS MATERIALIZED (
         SELECT DISTINCT ON (route_id, direction_id, trip_headsign, shape_id, origin_stop_id, destination_stop_id)

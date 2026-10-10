@@ -2,6 +2,8 @@ import { ServiceUnavailableException } from '@nestjs/common';
 import { SearchResolver } from './search.resolver';
 import type { TypesenseService } from '../services/typesense.service';
 import type { SearchService } from '../services/search.service';
+import type { GraphQLLoaders } from '../../common/graphql/loaders.service';
+import type { SearchBusStop } from '../entities/search.entity';
 import {
   busRouteSearchResult,
   busStopSearchResult,
@@ -10,6 +12,60 @@ import {
 } from '../testing/search.fixtures';
 
 describe('SearchResolver', () => {
+  it('returns mixed search results when bus direction enrichment times out', async () => {
+    const forRoutes = jest.fn().mockRejectedValue(new Error('statement timeout'));
+    const resolver = new SearchResolver(
+      {
+        search: jest.fn().mockResolvedValue([
+          busRouteSearchResult({ route_id: 'route-1' }),
+          railStationSearchResult({ station_code: 'station-1' }),
+        ]),
+      } as unknown as TypesenseService,
+      {} as SearchService,
+      { forRoutes } as never,
+    );
+
+    const results = await resolver.search({ query: 'Terminal' });
+
+    expect(results).toHaveLength(2);
+    expect(results).toContainEqual(expect.objectContaining({
+      id: 'route-1', route_id: 'route-1', type: 'busRoute',
+    }));
+    expect(results).toContainEqual(expect.objectContaining({ id: 'station-1' }));
+    expect(results.find((result) => result.id === 'route-1')).not.toHaveProperty('favoriteCode');
+  });
+
+  it('keeps a stop\'s base routes when direction enrichment times out', async () => {
+    const forRoutes = jest.fn().mockRejectedValue(new Error('statement timeout'));
+    const resolver = new SearchResolver(
+      {} as TypesenseService,
+      {} as SearchService,
+      { forRoutes } as never,
+    );
+    const routes = [{ id: 'route-1', route_id: 'route-1' }];
+    const loaders = {
+      routesLoader: { load: jest.fn().mockResolvedValue(routes) },
+    } as unknown as GraphQLLoaders;
+
+    await expect(resolver.routes(
+      { stop_id: 'stop-1' } as SearchBusStop,
+      loaders,
+    )).resolves.toEqual(routes);
+    expect(forRoutes).toHaveBeenCalledWith(['route-1'], 'stop-1');
+  });
+
+  it('does not load bus directions for a rail-only result set', async () => {
+    const forRoutes = jest.fn();
+    const resolver = new SearchResolver(
+      { search: jest.fn().mockResolvedValue([railStationSearchResult()]) } as unknown as TypesenseService,
+      {} as SearchService,
+      { forRoutes } as never,
+    );
+
+    await expect(resolver.search({ query: 'Sé' })).resolves.toHaveLength(1);
+    expect(forRoutes).not.toHaveBeenCalled();
+  });
+
   it('preserves a typed search-unavailable error', async () => {
     const unavailable = new ServiceUnavailableException(
       'Search service is temporarily unavailable',

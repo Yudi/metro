@@ -100,7 +100,7 @@ export class SearchResolver {
         types.push('bikeStation');
       }
 
-      // Search in parallel: Typesense (bus routes/stops), GeoSampa rail stations, and rail lines
+      // Typesense provides the base results; directions are optional enrichment.
       const typesenseResults = await (types.length > 0
         ? this.typesenseService.search(input.query, types, input.limit ?? 10)
         : Promise.resolve([]));
@@ -110,7 +110,7 @@ export class SearchResolver {
       );
 
       const hits = sortedByRelevance.slice(0, input.limit ?? 10);
-      const directions = await this.directions.forRoutes(
+      const directions = await this.getSearchDirections(
         hits.flatMap((hit) => hit.type === 'busRoute' ? [(hit.document as RouteDocument).route_id] : []),
       );
       return hits.flatMap((hit) => {
@@ -153,7 +153,7 @@ export class SearchResolver {
     }
 
     const routes = await loaders.routesLoader.load(stop.stop_id);
-    const directions = await this.directions.forRoutes(routes.map((route) => route.route_id), stopId);
+    const directions = await this.getSearchDirections(routes.map((route) => route.route_id), stopId);
     return routes.flatMap((route) => {
       const matches = directions.filter((direction) => direction.routeId === route.route_id);
       return matches.length ? matches.map((direction) => ({
@@ -164,6 +164,17 @@ export class SearchResolver {
         directionId: direction.directionId,
       })) : [route];
     });
+  }
+
+  private async getSearchDirections(routeIds: string[], stopId?: string) {
+    if (routeIds.length === 0) return [];
+
+    try {
+      return await this.directions.forRoutes([...new Set(routeIds)], stopId);
+    } catch {
+      this.logger.warn('Bus directions unavailable; returning base search routes');
+      return [];
+    }
   }
 
   @Mutation(() => Boolean)

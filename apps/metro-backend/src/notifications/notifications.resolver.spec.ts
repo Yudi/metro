@@ -9,6 +9,7 @@ describe('NotificationsResolver', () => {
   let settings: {
     getConfiguration: jest.Mock;
     getTargets: jest.Mock;
+    getStopRoutes: jest.Mock;
     saveTrigger: jest.Mock;
     deleteTrigger: jest.Mock;
     registerDevice: jest.Mock;
@@ -19,6 +20,7 @@ describe('NotificationsResolver', () => {
     settings = {
       getConfiguration: jest.fn().mockResolvedValue({ available: false }),
       getTargets: jest.fn().mockResolvedValue([]),
+      getStopRoutes: jest.fn().mockResolvedValue([]),
       saveTrigger: jest.fn().mockResolvedValue({ id: 'trigger' }),
       deleteTrigger: jest.fn().mockResolvedValue(true),
       registerDevice: jest.fn().mockResolvedValue('device'),
@@ -66,6 +68,14 @@ describe('NotificationsResolver', () => {
       endpoint: 'endpoint',
     });
     expect(settings.removeDevice).toHaveBeenCalledWith('user-id', 'device-id');
+  });
+
+  it('delegates stop route lookup to the notification catalog', async () => {
+    const stopTargetId = '018f3a37-9c5e-7a8b-8c2d-000000000001';
+
+    await resolver.getStopRoutes(stopTargetId);
+
+    expect(settings.getStopRoutes).toHaveBeenCalledWith(stopTargetId);
   });
 
   it('rejects an empty device id before calling the service', async () => {

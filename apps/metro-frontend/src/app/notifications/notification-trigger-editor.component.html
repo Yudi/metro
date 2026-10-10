@@ -125,68 +125,81 @@
       <div class="section-heading">
         <div>
           <h3 id="targets-title">{{ targetKindLabel() | titlecase }}</h3>
-          <p>Busque pelo nome dos destinos disponíveis.</p>
+          <p>
+            @if (showTargetSearch()) {
+              Escolha um favorito ou busque pelo nome.
+            } @else {
+              Escolha quais linhas acompanhar em cada ponto.
+            }
+          </p>
         </div>
       </div>
 
-      <mat-form-field appearance="outline" class="target-search-field">
-        <mat-label>Buscar {{ targetKindLabel() }}</mat-label>
-        <input
-          matInput
-          type="search"
-          autocomplete="off"
-          placeholder="Digite um nome"
-          [value]="targetSearch()"
-          (input)="onTargetSearch($event)"
-        />
-        @if (targetLoading()) {
-          <mat-spinner matSuffix diameter="18"></mat-spinner>
-        } @else {
-          <mat-icon matSuffix>search</mat-icon>
-        }
-      </mat-form-field>
-
-      @if (targetError()) {
-        <p class="target-message" role="alert">
-          Não foi possível buscar os destinos. Tente novamente.
-        </p>
-      } @else if (
-        targetSearch().trim() &&
-        !targetLoading() &&
-        targetResults().length === 0
-      ) {
-        <p class="target-message">Nenhum destino encontrado.</p>
-      } @else if (!targetSearch().trim()) {
-        <p class="target-message">
-          Digite para buscar {{ targetKindLabel() }} disponíveis.
-        </p>
-      }
-
-      @if (targetResults().length > 0) {
-        <div
-          class="target-results"
-          role="listbox"
-          aria-label="Resultados da busca"
-        >
-          @for (target of targetResults(); track target.id) {
-            <button
-              type="button"
-              class="target-result"
-              [disabled]="!target.available || isTargetSelected(target.id)"
-              [attr.aria-label]="target.label"
-              (click)="selectTarget(target)"
-            >
-              <span class="target-copy">
-                <app-notification-target-identity [target]="target" />
-              </span>
-              @if (isTargetSelected(target.id)) {
-                <mat-icon aria-hidden="true">check</mat-icon>
-              } @else if (!target.available) {
-                <small>Indisponível</small>
-              }
-            </button>
+      @if (showTargetSearch()) {
+        <mat-form-field appearance="outline" class="target-search-field">
+          <mat-label>Buscar {{ targetKindLabel() }}</mat-label>
+          <input
+            matInput
+            type="search"
+            autocomplete="off"
+            placeholder="Digite um nome"
+            [value]="targetSearch()"
+            (input)="onTargetSearch($event)"
+          />
+          @if (targetLoading()) {
+            <mat-spinner matSuffix diameter="18"></mat-spinner>
+          } @else {
+            <mat-icon matSuffix>search</mat-icon>
           }
-        </div>
+        </mat-form-field>
+
+        @if (targetError()) {
+          <p class="target-message" role="alert">
+            Não foi possível carregar os destinos.
+          </p>
+          <button mat-stroked-button type="button" (click)="retryTargetSearch()">Tentar novamente</button>
+        } @else if (
+          targetSearch().trim() &&
+          !targetLoading() &&
+          targetResults().length === 0
+        ) {
+          <p class="target-message">Nenhum destino encontrado.</p>
+        } @else if (!targetSearch().trim()) {
+          <p class="target-message">
+            @if (targetResults().length > 0) {
+              Favoritos
+            } @else if (!targetLoading()) {
+              Nenhum favorito disponível. Digite para buscar {{ targetKindLabel() }}.
+            }
+          </p>
+        }
+
+        @if (targetResults().length > 0) {
+          <div
+            class="target-results"
+            role="group"
+            [attr.aria-label]="targetSearch().trim() ? 'Resultados da busca' : 'Favoritos sugeridos'"
+          >
+            @for (target of targetResults(); track target.id) {
+              <button
+                type="button"
+                class="target-result"
+                [disabled]="!target.available || isTargetSelected(target.id)"
+                [attr.aria-label]="target.label"
+                (click)="selectTarget(target)"
+              >
+                <span class="target-copy">
+                  <app-notification-target-identity [target]="target" />
+                </span>
+                @if (isTargetSelected(target.id)) {
+                  <mat-icon aria-hidden="true">check</mat-icon>
+                } @else if (!target.available) {
+                  <small>Indisponível</small>
+                }
+              </button>
+            }
+          </div>
+        }
       }
 
       <div class="selected-targets" aria-label="Destinos selecionados">
@@ -209,6 +222,57 @@
           }
         }
       </div>
+      @if (selectedKind() === 'bus_arrivals' && selectedTargets().length > 0) {
+        @for (stop of sortedSelectedTargets(); track stop.id) {
+          <section class="stop-lines" [attr.aria-label]="'Linhas em ' + stop.label">
+            <div class="section-heading">
+              <div>
+                <h4>Linhas em {{ stop.label }}</h4>
+                <p>
+                  @if ((busStopRouteIds()[stop.id] ?? []).length === 0) {
+                    Todas as linhas deste ponto. Selecione para receber apenas as escolhidas.
+                  } @else {
+                    {{ busStopRouteIds()[stop.id].length }}
+                    {{ busStopRouteIds()[stop.id].length === 1 ? 'linha selecionada.' : 'linhas selecionadas.' }}
+                  }
+                </p>
+              </div>
+              @if ((busStopRouteIds()[stop.id] ?? []).length > 0) {
+                <button mat-button type="button" (click)="clearStopRoutes(stop.id)">Todas as linhas</button>
+              }
+            </div>
+            @if (stopRoutesLoading()) {
+              <div class="line-loading" role="status">
+                <mat-spinner diameter="20" />
+                <span>Carregando linhas do ponto...</span>
+              </div>
+            } @else if (stopRouteErrors().includes(stop.id)) {
+              <p class="target-message" role="alert">Não foi possível carregar as linhas deste ponto.</p>
+              <button mat-stroked-button type="button" (click)="loadStopRoutes()">Tentar novamente</button>
+            } @else {
+              @if (missingStopRouteCount(stop.id) > 0) {
+                <p class="target-message" role="status">{{ missingStopRouteCount(stop.id) }} linha(s) selecionada(s) indisponível(is). Use “Todas as linhas” para limpar a seleção.</p>
+              }
+              <div class="stop-line-list">
+                @for (route of stopRoutes()[stop.id] ?? []; track route.id) {
+                  <mat-checkbox
+                    [checked]="isStopRouteSelected(stop.id, route.id)"
+                    [disabled]="!route.available && !isStopRouteSelected(stop.id, route.id)"
+                    (change)="toggleStopRoute(stop.id, route.id)"
+                  >
+                    <app-notification-target-identity [target]="route" />
+                  </mat-checkbox>
+                } @empty {
+                  <p class="target-message">Nenhuma linha disponível no momento. Suas preferências serão mantidas.</p>
+                }
+              </div>
+            }
+          </section>
+        }
+        <button mat-stroked-button type="button" (click)="addAnotherStop()">
+          <mat-icon>add</mat-icon>Adicionar outro ponto
+        </button>
+      }
     </section>
 
     @if (isArrivalKind()) {

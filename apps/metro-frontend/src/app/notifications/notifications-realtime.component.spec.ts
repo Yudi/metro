@@ -24,6 +24,9 @@ describe('notification page realtime consistency', () => {
   let events: Subject<NotificationConfigurationRealtimeEvent>;
   let api: {
     getConfiguration: jest.Mock;
+    getFavoriteTargets: jest.Mock;
+    getStopRoutes: jest.Mock;
+    getTargets: jest.Mock;
     saveTrigger: jest.Mock;
     registerDevice: jest.Mock;
   };
@@ -87,6 +90,9 @@ describe('notification page realtime consistency', () => {
       connected: signal(true),
     };
     api = {
+      getFavoriteTargets: jest.fn(() => of([])),
+      getStopRoutes: jest.fn(() => of([])),
+      getTargets: jest.fn(() => of([])),
       getConfiguration: jest.fn().mockReturnValue(of(configuration)),
       saveTrigger: jest.fn(),
       registerDevice: jest.fn(),

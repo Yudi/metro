@@ -16,6 +16,7 @@ import { NotificationTargetsService } from './notification-targets.service';
 const targetId = '018f3a37-9c5e-7a8b-8c2d-000000000001';
 const triggerId = '018f3a37-9c5e-7a8b-8c2d-000000000002';
 const deviceId = '018f3a37-9c5e-7a8b-8c2d-000000000003';
+const busRouteTargetId = '018f3a37-9c5e-7a8b-8c2d-000000000004';
 const validP256dh = Buffer.alloc(65, 1).toString('base64url');
 const validAuth = Buffer.alloc(16, 2).toString('base64url');
 
@@ -63,7 +64,11 @@ interface MockPrisma {
 describe('NotificationSettingsService', () => {
   let service: NotificationSettingsService;
   let prisma: MockPrisma;
-  let targets: { search: jest.Mock };
+  let targets: {
+    search: jest.Mock;
+    getRoutesForStop: jest.Mock;
+    getRouteTargetIdsForStop: jest.Mock;
+  };
 
   beforeEach(() => {
     prisma = {
@@ -105,7 +110,11 @@ describe('NotificationSettingsService', () => {
       async (callback: (transaction: MockPrisma) => unknown) =>
         callback(prisma),
     );
-    targets = { search: jest.fn().mockResolvedValue([]) };
+    targets = {
+      search: jest.fn().mockResolvedValue([]),
+      getRoutesForStop: jest.fn().mockResolvedValue([]),
+      getRouteTargetIdsForStop: jest.fn().mockResolvedValue([]),
+    };
     service = new NotificationSettingsService(
       prisma as unknown as PrismaService,
       new ConfigService({
@@ -135,6 +144,157 @@ describe('NotificationSettingsService', () => {
         where: expect.objectContaining({ kind: 'rail_line' }),
       }),
     );
+  });
+
+  it('persists bus route selections by stop and checks that each route serves that stop', async () => {
+    const stop = {
+      id: targetId,
+      kind: 'bus_stop',
+      label: 'Praça da Sé',
+      available: true,
+      descriptor: {
+        name: 'Praça da Sé',
+        description: '',
+        latitude: -23.55,
+        longitude: -46.63,
+        platformCode: '',
+      },
+    };
+    const route = {
+      id: busRouteTargetId,
+      kind: 'bus_route',
+      label: '702P-10',
+      available: true,
+      descriptor: { routeName: '702P-10', agency: 'sptrans' },
+    };
+    const input: NotificationTriggerInput = {
+      ...triggerInput,
+      kind: 'bus_arrivals',
+      targetIds: [targetId],
+      busStopRouteIds: { [targetId]: [busRouteTargetId] },
+    };
+    prisma.notificationTarget.findMany
+      .mockResolvedValueOnce([stop])
+      .mockResolvedValueOnce([route]);
+    targets.getRouteTargetIdsForStop.mockResolvedValueOnce([busRouteTargetId]);
+    prisma.notificationTrigger.create.mockImplementationOnce(
+      async ({ data }: { data: { config: unknown } }) => ({
+        id: triggerId,
+        revision: 0,
+        config: data.config,
+        targets: [{ target: stop }],
+      }),
+    );
+
+    const saved = await service.saveTrigger('user-id', input);
+
+    expect(saved.busStopRouteIds).toEqual({ [targetId]: [busRouteTargetId] });
+    expect(prisma.notificationTrigger.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          config: expect.objectContaining({
+            busStopRouteIds: { [targetId]: [busRouteTargetId] },
+          }),
+        }),
+      }),
+    );
+    expect(targets.getRouteTargetIdsForStop).toHaveBeenCalledWith(targetId);
+  });
+
+  it('rejects a valid bus route target when it does not serve the selected stop', async () => {
+    const otherRouteId = '018f3a37-9c5e-7a8b-8c2d-000000000005';
+    const input: NotificationTriggerInput = {
+      ...triggerInput,
+      kind: 'bus_arrivals',
+      targetIds: [targetId],
+      busStopRouteIds: { [targetId]: [busRouteTargetId] },
+    };
+    prisma.notificationTarget.findMany
+      .mockResolvedValueOnce([
+        {
+          id: targetId,
+          kind: 'bus_stop',
+          label: 'Praça da Sé',
+          available: true,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: busRouteTargetId,
+          kind: 'bus_route',
+          label: '702P-10',
+          available: true,
+        },
+      ]);
+    targets.getRouteTargetIdsForStop.mockResolvedValueOnce([otherRouteId]);
+
+    await expect(service.saveTrigger('user-id', input)).rejects.toThrow(
+      'não atendem ao ponto selecionado',
+    );
+    expect(prisma.notificationTrigger.create).not.toHaveBeenCalled();
+  });
+
+  it('treats an empty per-stop route selection as all routes in saved configuration', async () => {
+    const stop = {
+      id: targetId,
+      kind: 'bus_stop',
+      label: 'Praça da Sé',
+      available: true,
+    };
+    const input: NotificationTriggerInput = {
+      ...triggerInput,
+      kind: 'bus_arrivals',
+      targetIds: [targetId],
+      busStopRouteIds: { [targetId]: [] },
+    };
+    prisma.notificationTarget.findMany.mockResolvedValueOnce([stop]);
+    prisma.notificationTrigger.create.mockImplementationOnce(
+      async ({ data }: { data: { config: unknown } }) => ({
+        id: triggerId,
+        revision: 0,
+        config: data.config,
+        targets: [{ target: stop }],
+      }),
+    );
+
+    const saved = await service.saveTrigger('user-id', input);
+
+    expect(saved).not.toHaveProperty('busStopRouteIds');
+    expect(prisma.notificationTarget.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('restores per-stop bus route selections from the persisted JSON configuration', async () => {
+    const input: NotificationTriggerInput = {
+      ...triggerInput,
+      kind: 'bus_arrivals',
+      targetIds: [targetId],
+      busStopRouteIds: { [targetId]: [busRouteTargetId] },
+    };
+    prisma.notificationTrigger.findMany.mockResolvedValueOnce([
+      {
+        id: triggerId,
+        revision: 3,
+        config: input,
+        targets: [
+          {
+            target: {
+              id: targetId,
+              kind: 'bus_stop',
+              label: 'Praça da Sé',
+              available: true,
+            },
+          },
+        ],
+      },
+    ]);
+    prisma.pushSubscription.findMany.mockResolvedValueOnce([]);
+
+    const configuration = await service.getConfiguration('user-id');
+
+    expect(configuration.triggers[0]).toMatchObject({
+      revision: 3,
+      busStopRouteIds: { [targetId]: [busRouteTargetId] },
+    });
   });
 
   it('allows a disabled trigger to retain an unavailable target', async () => {
@@ -220,6 +380,53 @@ describe('NotificationSettingsService', () => {
     await expect(
       service.saveTrigger('user-id', triggerInput, triggerId, 4),
     ).resolves.toMatchObject({ id: triggerId, revision: 5 });
+    expect(prisma.notificationTrigger.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: triggerId, userId: 'user-id', revision: 4 },
+        data: expect.objectContaining({ revision: { increment: 1 } }),
+      }),
+    );
+  });
+
+  it('increments the optimistic revision when per-stop route selections change', async () => {
+    const stop = {
+      id: targetId,
+      kind: 'bus_stop',
+      label: 'Praça da Sé',
+      available: true,
+    };
+    const route = {
+      id: busRouteTargetId,
+      kind: 'bus_route',
+      label: '702P-10',
+      available: true,
+    };
+    const input: NotificationTriggerInput = {
+      ...triggerInput,
+      kind: 'bus_arrivals',
+      targetIds: [targetId],
+      busStopRouteIds: { [targetId]: [busRouteTargetId] },
+    };
+    prisma.notificationTarget.findMany
+      .mockResolvedValueOnce([stop])
+      .mockResolvedValueOnce([route]);
+    targets.getRouteTargetIdsForStop.mockResolvedValueOnce([busRouteTargetId]);
+    prisma.notificationTrigger.findFirst
+      .mockResolvedValueOnce({ revision: 4 })
+      .mockResolvedValueOnce({
+        id: triggerId,
+        revision: 5,
+        config: input,
+        targets: [{ target: stop }],
+      });
+
+    await expect(
+      service.saveTrigger('user-id', input, triggerId, 4),
+    ).resolves.toMatchObject({
+      id: triggerId,
+      revision: 5,
+      busStopRouteIds: { [targetId]: [busRouteTargetId] },
+    });
     expect(prisma.notificationTrigger.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: triggerId, userId: 'user-id', revision: 4 },

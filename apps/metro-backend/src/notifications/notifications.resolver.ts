@@ -40,6 +40,17 @@ export class NotificationsResolver {
     return this.notificationSettings.getTargets(kind, search);
   }
 
+  @Query(() => GraphQLJSON, {
+    name: 'notificationStopRoutes',
+    description:
+      'Return realtime bus-route targets available at a selected notification stop.',
+  })
+  getStopRoutes(
+    @Args('stopId', { type: () => String }) stopId: string,
+  ): Promise<NotificationTarget[]> {
+    return this.notificationSettings.getStopRoutes(stopId);
+  }
+
   @Mutation(() => GraphQLJSON, {
     name: 'saveNotificationTrigger',
     description:

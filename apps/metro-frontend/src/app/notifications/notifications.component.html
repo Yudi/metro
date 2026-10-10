@@ -284,6 +284,9 @@
                             <app-notification-target-identity
                               [target]="target"
                             />
+                            @if (trigger.kind === 'bus_arrivals') {
+                              <span>{{ busStopRouteSummary(trigger, target.id) }}</span>
+                            }
                           }
                         }
                       </span>

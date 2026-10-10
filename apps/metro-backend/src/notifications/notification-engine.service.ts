@@ -20,6 +20,7 @@ import {
   notificationHash,
   railNotificationStateScope,
   readDeliveredRailStates,
+  type NotificationSnapshot,
   type NotificationRailStatusEntry,
   type NotificationRailStatusTarget,
 } from './notification-message';
@@ -101,6 +102,10 @@ export class NotificationEngineService {
             if (validateNotificationTrigger(trigger.config)) return;
             const config =
               trigger.config as unknown as NotificationTriggerInput;
+            const busStopRouteNames =
+              config.kind === 'bus_arrivals'
+                ? await this.loadBusStopRouteNames(config)
+                : new Map<string, string>();
             nextEvaluationAt = nextNotificationEvaluation(config, now);
             if (!notificationEligibility(config, now, true)) return;
             const subscriptions = await this.prisma.pushSubscription.findMany({
@@ -117,11 +122,26 @@ export class NotificationEngineService {
             const railStatusEntries: NotificationRailStatusEntry[] = [];
             for (const { target } of trigger.targets) {
               try {
-                const snapshots = await this.snapshots.readMany(
+                const selectedRouteIds = config.busStopRouteIds?.[target.id];
+                const selectedRouteNames = selectedRouteIds?.length
+                  ? new Set(
+                      selectedRouteIds
+                        .map((routeId) => busStopRouteNames.get(routeId))
+                        .filter((routeName): routeName is string => !!routeName),
+                    )
+                  : null;
+                const observations = await this.snapshots.readMany(
                   config.kind,
                   target,
                   now,
                 );
+                const snapshots = selectedRouteNames
+                  ? observations
+                      .map((snapshot) =>
+                        this.filterBusArrivalRoutes(snapshot, selectedRouteNames),
+                      )
+                      .filter((snapshot) => snapshot !== null)
+                  : observations;
                 if (aggregateRailStatuses) {
                   railStatusEntries.push(
                     ...snapshots.map((snapshot) => ({
@@ -366,6 +386,59 @@ export class NotificationEngineService {
     });
   }
 
+  private async loadBusStopRouteNames(
+    config: NotificationTriggerInput,
+  ): Promise<Map<string, string>> {
+    const routeIds = [
+      ...new Set(Object.values(config.busStopRouteIds ?? {}).flat()),
+    ];
+    if (!routeIds.length) {
+      return new Map();
+    }
+
+    try {
+      const targets = await this.prisma.notificationTarget.findMany({
+        where: { id: { in: routeIds }, kind: 'bus_route' },
+        select: { id: true, descriptor: true },
+      });
+      return new Map(
+        targets.flatMap((target) => {
+          const descriptor = readRecord(target.descriptor);
+          const agency = readNonEmptyText(descriptor?.['agency'])?.toLowerCase();
+          const routeName = readNonEmptyText(
+            descriptor?.['routeName'],
+          )?.toUpperCase();
+          return agency === 'sptrans' &&
+            routeName &&
+            /^[0-9A-Z]{4}-\d{2}$/.test(routeName)
+            ? [[target.id, routeName]]
+            : [];
+        }),
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Notification route filters unavailable: ${error instanceof Error ? error.name : 'unknown'}`,
+      );
+      // An unreadable selection must not widen a filtered stop to every route.
+      return new Map();
+    }
+  }
+
+  private filterBusArrivalRoutes(
+    snapshot: NotificationSnapshot,
+    routeNames: ReadonlySet<string>,
+  ): NotificationSnapshot | null {
+    if (!snapshot.arrivals) {
+      return null;
+    }
+    const arrivals = snapshot.arrivals.filter(
+      (arrival) =>
+        typeof arrival.route === 'string' &&
+        routeNames.has(arrival.route.trim().toUpperCase()),
+    );
+    return arrivals.length ? { ...snapshot, arrivals } : null;
+  }
+
   /** Called only while holding the account row lock, before reserving incident receipts. */
   private async hasDeliveryBudget(
     tx: Prisma.TransactionClient,
@@ -404,4 +477,14 @@ export class NotificationEngineService {
       },
     });
   }
+}
+
+function readRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function readNonEmptyText(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
 }

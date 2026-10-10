@@ -1,7 +1,7 @@
 import { applicationConfig, Meta, StoryObj } from '@storybook/angular';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { NotificationApiService } from '@metro/shared/api';
-import type { NotificationTrigger } from '@metro/shared/notification-contracts';
+import type { NotificationTrigger, NotificationTargetKind } from '@metro/shared/notification-contracts';
 import { NotificationTriggerEditorComponent } from './notification-trigger-editor.component';
 
 const destination = {
@@ -21,6 +21,32 @@ const busDestination = {
   busRouteColor: '#0066cc',
   busRouteTextColor: '#ffffff',
 };
+
+const busStop = {
+  id: 'stop-se',
+  kind: 'bus_stop' as const,
+  label: 'Praça da Sé',
+  available: true,
+};
+const stopRoutes = [
+  busDestination,
+  {
+    ...busDestination,
+    id: 'route-8000-10',
+    label: '8000-10 (Terminal Lapa)',
+    busRouteShortName: '8000-10',
+  },
+];
+
+function targetsForKind(kind: NotificationTargetKind) {
+  switch (kind) {
+    case 'bus_route': return [busDestination];
+    case 'bus_stop': return [busStop];
+    case 'rail_station': return [destination];
+    case 'rail_line': return [{ ...destination, id: 'line-9', kind, label: 'Linha 9 - Esmeralda' }];
+    case 'special_line': return [{ id: 'special-ea', kind, label: 'Expresso Aeroporto', available: true }];
+  }
+}
 
 const trigger: NotificationTrigger & { arrivalLeadMinutes: number } = {
   id: 'editor-story-trigger',
@@ -51,14 +77,9 @@ const meta: Meta<NotificationTriggerEditorComponent> = {
         {
           provide: NotificationApiService,
           useValue: {
-            getTargets: (
-              kind:
-                | 'rail_line'
-                | 'rail_station'
-                | 'bus_route'
-                | 'bus_stop'
-                | 'special_line',
-            ) => of(kind === 'bus_route' ? [busDestination] : [destination]),
+            getFavoriteTargets: (kind: NotificationTargetKind) => of(targetsForKind(kind)),
+            getStopRoutes: () => of(stopRoutes),
+            getTargets: (kind: NotificationTargetKind) => of(targetsForKind(kind)),
           },
         },
       ],
@@ -134,4 +155,39 @@ export const StatusDeVariasLinhas: Story = {
       })),
     },
   },
+};
+
+const busArrivalTrigger: NotificationTrigger = {
+  ...trigger,
+  kind: 'bus_arrivals',
+  name: 'Meu ônibus',
+  targetIds: [busStop.id],
+  targets: [busStop],
+  busStopRouteIds: { [busStop.id]: [busDestination.id] },
+};
+
+export const LinhasDoPonto: Story = {
+  args: { trigger: busArrivalTrigger },
+};
+
+export const TodasAsLinhasDoPonto: Story = {
+  args: {
+    trigger: { ...busArrivalTrigger, busStopRouteIds: {} },
+  },
+};
+
+export const FalhaAoCarregarLinhas: Story = {
+  args: { trigger: busArrivalTrigger },
+  decorators: [
+    applicationConfig({
+      providers: [{
+        provide: NotificationApiService,
+        useValue: {
+          getFavoriteTargets: (kind: NotificationTargetKind) => of(targetsForKind(kind)),
+          getTargets: (kind: NotificationTargetKind) => of(targetsForKind(kind)),
+          getStopRoutes: () => throwError(() => new Error('Falha de conexão')),
+        },
+      }],
+    }),
+  ],
 };

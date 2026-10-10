@@ -150,6 +150,9 @@ function storyProviders(
       };
       return of(saved);
     },
+    getFavoriteTargets: (kind: NotificationTrigger['targets'][number]['kind']) =>
+      of(storyTargets.filter((target) => target.kind === kind)),
+    getStopRoutes: () => of(storyTargets.filter((target) => target.kind === 'bus_route')),
     getTargets: (kind: NotificationTrigger['targets'][number]['kind']) =>
       of(storyTargets.filter((target) => target.kind === kind)),
     deleteTrigger: (id: string) => {

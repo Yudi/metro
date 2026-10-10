@@ -28,6 +28,9 @@ describe('NotificationsComponent', () => {
   let component: NotificationsComponent;
   let api: {
     getConfiguration: jest.Mock;
+    getFavoriteTargets: jest.Mock;
+    getStopRoutes: jest.Mock;
+    getTargets: jest.Mock;
     saveTrigger: jest.Mock;
     deleteTrigger: jest.Mock;
     registerDevice: jest.Mock;
@@ -78,6 +81,9 @@ describe('NotificationsComponent', () => {
     firebaseIdToken.set('token-a');
 
     api = {
+      getFavoriteTargets: jest.fn(() => of([])),
+      getStopRoutes: jest.fn(() => of([])),
+      getTargets: jest.fn(() => of([])),
       getConfiguration: jest.fn().mockReturnValue(of(configuration)),
       saveTrigger: jest.fn(),
       deleteTrigger: jest.fn(),

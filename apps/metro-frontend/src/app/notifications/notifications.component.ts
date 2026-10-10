@@ -525,6 +525,12 @@ export class NotificationsComponent {
     return this.deviceId() === device.id;
   }
 
+  busStopRouteSummary(trigger: NotificationTrigger, stopId: string): string {
+    const count = trigger.busStopRouteIds?.[stopId]?.length ?? 0;
+    if (count === 0) return 'Todas as linhas';
+    return count === 1 ? '1 linha selecionada' : `${count} linhas selecionadas`;
+  }
+
   kindLabel(kind: NotificationKind): string {
     return KIND_LABELS[kind];
   }

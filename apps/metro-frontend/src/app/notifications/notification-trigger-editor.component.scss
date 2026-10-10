@@ -356,3 +356,39 @@
     margin-top: 4px;
   }
 }
+
+.stop-lines {
+  min-width: 0;
+  padding-block: 12px;
+  border-top: 1px solid var(--mat-sys-outline-variant);
+}
+
+.stop-lines h4 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.stop-line-list {
+  display: grid;
+  gap: 4px;
+  max-height: 300px;
+  overflow: auto;
+}
+
+.stop-line-list mat-checkbox {
+  overflow-wrap: anywhere;
+}
+
+.line-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-block: 12px;
+}
+
+.target-result:focus-visible,
+.target-chip button:focus-visible,
+.day-option:focus-visible {
+  outline: 2px solid var(--mat-sys-primary);
+  outline-offset: 2px;
+}

@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AuthService } from '../user/auth.service';
 import { SaoPauloTransitModule } from '../cities/sp/sp-transit.module';
+import { NotificationFavoriteTargetsResolver } from './notification-favorite-targets.resolver';
+import { NotificationFavoriteTargetsService } from './notification-favorite-targets.service';
 import { NotificationTargetsService } from './notification-targets.service';
 import { NotificationSettingsService } from './notification-settings.service';
 import { NotificationsResolver } from './notifications.resolver';
@@ -21,9 +23,11 @@ import { WsThrottlerGuard } from '../common/guards/ws-throttler.guard';
     NotificationRetentionService,
     AuthService,
     WsThrottlerGuard,
+    NotificationFavoriteTargetsService,
     NotificationTargetsService,
     NotificationRealtimeService,
     NotificationSettingsService,
+    NotificationFavoriteTargetsResolver,
     NotificationsResolver,
     NotificationsGateway,
     NotificationSnapshotService,

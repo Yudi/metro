@@ -86,6 +86,39 @@ describe('notification schedules', () => {
     expect(validateNotificationTrigger({ ...trigger, intervalMinutes: 5, targetIds: Array.from({ length: 20 }, (_, index) => `target-${index}`) })).toBeNull();
     expect(validateNotificationTrigger({ ...trigger, targetIds: Array.from({ length: 21 }, (_, index) => `target-${index}`) })).not.toBeNull();
   });
+  it('accepts per-stop bus route filters and treats empty selections as all routes', () => {
+    const busArrivals = { ...trigger, kind: 'bus_arrivals' as const };
+    expect(
+      validateNotificationTrigger({
+        ...busArrivals,
+        busStopRouteIds: { 'target-1': ['route-1', 'route-2'] },
+      }),
+    ).toBeNull();
+    expect(
+      validateNotificationTrigger({
+        ...busArrivals,
+        busStopRouteIds: { 'target-1': [] },
+      }),
+    ).toBeNull();
+    expect(
+      validateNotificationTrigger({
+        ...busArrivals,
+        busStopRouteIds: { 'other-stop': ['route-1'] },
+      }),
+    ).not.toBeNull();
+    expect(
+      validateNotificationTrigger({
+        ...busArrivals,
+        busStopRouteIds: { 'target-1': ['route-1', 'route-1'] },
+      }),
+    ).not.toBeNull();
+    expect(
+      validateNotificationTrigger({
+        ...trigger,
+        busStopRouteIds: { 'target-1': ['route-1'] },
+      }),
+    ).not.toBeNull();
+  });
   it('rejects other time zones', () => {
     expect(
       validateNotificationTrigger({ ...trigger, timezone: 'America/New_York' }),

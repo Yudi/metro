@@ -178,6 +178,11 @@ export class NotificationSettingsService {
       .filter((target): target is NotificationTarget => target !== null);
   }
 
+  async getStopRoutes(stopTargetId: string): Promise<NotificationTarget[]> {
+    const id = normalizeRequiredId(stopTargetId, 'Identificador do ponto');
+    return this.notificationTargets.getRoutesForStop(id);
+  }
+
   async saveTrigger(
     userId: string,
     value: unknown,
@@ -204,6 +209,7 @@ export class NotificationSettingsService {
         async (tx) => {
           await this.ensureAndLockUser(tx, userId);
           const targets = await this.findAvailableTargets(tx, normalized);
+          await this.findAvailableBusStopRouteTargets(tx, normalized);
           const config = {
             ...normalized,
             targetIds: targets.map((target) => target.id),
@@ -565,6 +571,55 @@ export class NotificationSettingsService {
     );
   }
 
+  private async findAvailableBusStopRouteTargets(
+    tx: TransactionClient,
+    input: NotificationTriggerInput,
+  ): Promise<void> {
+    const routeIds = [
+      ...new Set(Object.values(input.busStopRouteIds ?? {}).flat()),
+    ];
+    if (!routeIds.length) {
+      return;
+    }
+    if (routeIds.some((routeId) => !UUID_PATTERN.test(routeId))) {
+      throw new BadRequestException('Selecione linhas de ônibus válidas.');
+    }
+
+    const records = await tx.notificationTarget.findMany({
+      where: { id: { in: routeIds }, kind: 'bus_route' },
+      select: { id: true },
+    });
+    const byId = new Map(records.map((record) => [record.id, record]));
+    if (routeIds.some((routeId) => !byId.has(routeId))) {
+      throw new BadRequestException(
+        'Uma ou mais linhas de ônibus são inválidas ou estão indisponíveis.',
+      );
+    }
+    if (input.enabled) {
+      for (const [stopId, selectedRouteIds] of Object.entries(
+        input.busStopRouteIds ?? {},
+      )) {
+        if (!selectedRouteIds.length) {
+          continue;
+        }
+        const availableRouteIds =
+          await this.notificationTargets.getRouteTargetIdsForStop(
+            stopId,
+          );
+        const routeIdsAvailableAtStop = new Set(availableRouteIds);
+        if (
+          selectedRouteIds.some(
+            (routeId) => !routeIdsAvailableAtStop.has(routeId),
+          )
+        ) {
+          throw new BadRequestException(
+            'Uma ou mais linhas não atendem ao ponto selecionado.',
+          );
+        }
+      }
+    }
+  }
+
   private async ensureUser(
     client: DatabaseClient,
     userId: string,
@@ -754,6 +809,11 @@ function parseTriggerInput(value: unknown): NotificationTriggerInput {
     throw new BadRequestException(validationError);
   }
   const input = value as NotificationTriggerInput;
+  const busStopRouteIds = Object.fromEntries(
+    Object.entries(input.busStopRouteIds ?? {}).filter(
+      ([, routeIds]) => routeIds.length > 0,
+    ),
+  );
   return {
     name: input.name.trim(),
     enabled: input.enabled,
@@ -771,6 +831,7 @@ function parseTriggerInput(value: unknown): NotificationTriggerInput {
     arrivalLeadMinutes: input.arrivalLeadMinutes ?? 5,
     kind: input.kind,
     targetIds: [...input.targetIds],
+    ...(Object.keys(busStopRouteIds).length ? { busStopRouteIds } : {}),
     statusMode: input.statusMode,
     lineNameFormat: input.lineNameFormat ?? 'code',
   };

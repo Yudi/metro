@@ -65,6 +65,32 @@ export class NotificationApiService {
     );
   }
 
+  getStopRoutes(stopId: string): Observable<NotificationTarget[]> {
+    return this.request<NotificationTarget[]>(
+      `
+        query NotificationStopRoutes($stopId: String!) {
+          notificationStopRoutes(stopId: $stopId)
+        }
+      `,
+      { stopId },
+      'notificationStopRoutes',
+    );
+  }
+
+  getFavoriteTargets(
+    kind: NotificationTargetKind,
+  ): Observable<NotificationTarget[]> {
+    return this.request<NotificationTarget[]>(
+      `
+        query NotificationFavoriteTargets($kind: String!) {
+          notificationFavoriteTargets(kind: $kind)
+        }
+      `,
+      { kind },
+      'notificationFavoriteTargets',
+    );
+  }
+
   saveTrigger(
     input: NotificationTriggerInput,
     id?: string,

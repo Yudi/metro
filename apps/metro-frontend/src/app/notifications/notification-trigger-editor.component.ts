@@ -19,6 +19,7 @@ import {
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -49,7 +50,8 @@ import type {
 import {
   Subject,
   catchError,
-  distinctUntilChanged,
+  forkJoin,
+  map,
   of,
   switchMap,
   timer,
@@ -176,6 +178,7 @@ function isExplicitTargetSearch(
     CommonModule,
     ReactiveFormsModule,
     MatButtonModule,
+    MatCheckboxModule,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
@@ -201,6 +204,15 @@ export class NotificationTriggerEditorComponent implements OnChanges {
   readonly kindLabels = KIND_LABELS;
   readonly selectedKind = signal<NotificationKind>(DEFAULT_TRIGGER.kind);
   readonly targetSearch = signal('');
+  readonly addingStop = signal(false);
+  readonly busStopRouteIds = signal<Record<string, string[]>>({});
+  readonly stopRoutes = signal<Record<string, NotificationTarget[]>>({});
+  readonly stopRoutesLoading = signal(false);
+  readonly stopRouteErrors = signal<string[]>([]);
+  readonly showTargetSearch = computed(() =>
+    this.selectedKind() !== 'bus_arrivals' ||
+    this.selectedTargets().length === 0 || this.addingStop(),
+  );
   private readonly rawTargetResults = signal<NotificationTarget[]>([]);
   readonly targetResults = computed(() => {
     const search = this.targetSearch();
@@ -262,11 +274,23 @@ export class NotificationTriggerEditorComponent implements OnChanges {
           title: `Próximos trens - ${station} - ${lineName}`,
           body: 'Jabaquara: na plataforma\nTucuruvi: em 2 min (08:02)',
         };
-      case 'bus_arrivals':
+      case 'bus_arrivals': {
+        const selectedRouteIds = this.busStopRouteIds()[target?.id ?? ''] ?? [];
+        const routes = (this.stopRoutes()[target?.id ?? ''] ?? []).filter(
+          (route) => selectedRouteIds.length === 0 || selectedRouteIds.includes(route.id),
+        );
+        const body = routes.length > 0
+          ? routes.slice(0, 2).map((route, index) =>
+              `${route.label}: em ${2 + index * 2} min (08:0${2 + index * 2})`,
+            ).join('\n')
+          : selectedRouteIds.length > 0
+            ? 'Linha selecionada: em 2 min (08:02)'
+            : '8000-10 - Terminal Lapa: em 2 min (08:02)\n702P-10 - Metrô Belém: em 4 min (08:04)';
         return {
           title: `Chegadas de ônibus - ${target?.label ?? 'Praça da Sé'}`,
-          body: '8000-10 - Terminal Lapa: em 2 min (08:02)\n702P-10 - Metrô Belém: em 4 min (08:04)',
+          body,
         };
+      }
       case 'bus_notices':
         return {
           title: `Ônibus ${target?.busRouteShortName ?? '702P-10'} - Desvio de itinerário`,
@@ -347,6 +371,7 @@ export class NotificationTriggerEditorComponent implements OnChanges {
     kind: NotificationTargetKind;
     search: string;
   }>();
+  private readonly stopRoutesSubject = new Subject<string[]>();
   private initializedKey: string | null = null;
   private baselineId: string | undefined;
   private baselineRevision: number | undefined;
@@ -370,6 +395,9 @@ export class NotificationTriggerEditorComponent implements OnChanges {
           this.form.controls.smart.setValue(true, { emitEvent: false });
         }
         this.selectedTargets.set([]);
+        this.busStopRouteIds.set({});
+        this.stopRoutesSubject.next([]);
+        this.addingStop.set(false);
         this.rawTargetResults.set([]);
         this.form.controls.targetIds.setValue([]);
         this.updateTargetSearch('');
@@ -377,16 +405,17 @@ export class NotificationTriggerEditorComponent implements OnChanges {
 
     this.targetSearchSubject
       .pipe(
-        distinctUntilChanged(
-          (previous, current) =>
-            previous.kind === current.kind &&
-            previous.search === current.search,
-        ),
         switchMap(({ kind, search }) => {
           if (!search) {
             this.targetLoading.set(false);
             this.targetError.set(false);
-            return of<NotificationTarget[] | null>([]);
+            this.targetLoading.set(true);
+            return this.api.getFavoriteTargets(kind).pipe(
+              catchError(() => {
+                this.targetError.set(true);
+                return of<NotificationTarget[] | null>(null);
+              }),
+            );
           }
 
           this.targetLoading.set(true);
@@ -419,6 +448,41 @@ export class NotificationTriggerEditorComponent implements OnChanges {
 
         this.rawTargetResults.set([...byId.values()]);
       });
+
+    this.stopRoutesSubject
+      .pipe(
+        switchMap((ids) => {
+          this.stopRoutesLoading.set(ids.length > 0);
+          this.stopRouteErrors.set([]);
+          if (ids.length === 0) {
+            return of([]);
+          }
+
+          return forkJoin(
+            ids.map((id) =>
+              this.api.getStopRoutes(id).pipe(
+                map((routes) => ({ id, routes, failed: false })),
+                catchError(() =>
+                  of({ id, routes: [] as NotificationTarget[], failed: true }),
+                ),
+              ),
+            ),
+          );
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((results) => {
+        this.stopRoutes.set(
+          Object.fromEntries(
+            results.map(({ id, routes }) => [id, sortNotificationTargets(routes)]),
+          ),
+        );
+        this.stopRouteErrors.set(
+          results.filter((result) => result.failed).map(({ id }) => id),
+        );
+        this.stopRoutesLoading.set(false);
+      });
+    this.updateTargetSearch('');
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -495,6 +559,10 @@ export class NotificationTriggerEditorComponent implements OnChanges {
     this.updateTargetSearch(query);
   }
 
+  retryTargetSearch(): void {
+    this.updateTargetSearch(this.targetSearch());
+  }
+
   private updateTargetSearch(query: string): void {
     this.targetSearch.set(query);
     this.rawTargetResults.set([]);
@@ -517,8 +585,11 @@ export class NotificationTriggerEditorComponent implements OnChanges {
     this.selectedTargets.set(selected);
     this.form.controls.targetIds.setValue(selected.map((item) => item.id));
     this.form.controls.targetIds.markAsDirty();
+    this.addingStop.set(false);
     this.updateTargetSearch('');
-    this.rawTargetResults.set([]);
+    if (target.kind === 'bus_stop') {
+      this.loadStopRoutes();
+    }
   }
 
   removeTarget(target: NotificationTarget): void {
@@ -528,6 +599,58 @@ export class NotificationTriggerEditorComponent implements OnChanges {
     this.selectedTargets.set(selected);
     this.form.controls.targetIds.setValue(selected.map((item) => item.id));
     this.form.controls.targetIds.markAsDirty();
+    this.busStopRouteIds.update((filters) => {
+      const remaining = { ...filters };
+      delete remaining[target.id];
+      return remaining;
+    });
+    if (target.kind === 'bus_stop') {
+      this.loadStopRoutes();
+    }
+  }
+
+  addAnotherStop(): void {
+    this.addingStop.set(true);
+    this.updateTargetSearch('');
+  }
+
+  loadStopRoutes(): void {
+    this.stopRoutesSubject.next(
+      this.selectedTargets()
+        .filter((target) => target.kind === 'bus_stop')
+        .map((target) => target.id),
+    );
+  }
+
+  isStopRouteSelected(stopId: string, routeId: string): boolean {
+    return this.busStopRouteIds()[stopId]?.includes(routeId) ?? false;
+  }
+
+  toggleStopRoute(stopId: string, routeId: string): void {
+    this.busStopRouteIds.update((filters) => {
+      const selected = filters[stopId] ?? [];
+      return {
+        ...filters,
+        [stopId]: selected.includes(routeId)
+          ? selected.filter((id) => id !== routeId)
+          : [...selected, routeId],
+      };
+    });
+    this.form.markAsDirty();
+  }
+
+  missingStopRouteCount(stopId: string): number {
+    const available = new Set(
+      (this.stopRoutes()[stopId] ?? []).map((route) => route.id),
+    );
+    return (this.busStopRouteIds()[stopId] ?? []).filter(
+      (id) => !available.has(id),
+    ).length;
+  }
+
+  clearStopRoutes(stopId: string): void {
+    this.busStopRouteIds.update((filters) => ({ ...filters, [stopId]: [] }));
+    this.form.markAsDirty();
   }
 
   isTargetSelected(targetId: string): boolean {
@@ -560,6 +683,8 @@ export class NotificationTriggerEditorComponent implements OnChanges {
       intervalMinutes: value.intervalMinutes,
       kind: value.kind,
       targetIds: [...value.targetIds],
+      busStopRouteIds:
+        value.kind === 'bus_arrivals' ? this.busStopRouteIds() : undefined,
       statusMode: value.statusMode,
       lineNameFormat: value.lineNameFormat,
     };
@@ -612,10 +737,18 @@ export class NotificationTriggerEditorComponent implements OnChanges {
     );
     this.updateIntervalValidators(value.kind, value.kind);
     this.selectedTargets.set(targets);
+    this.busStopRouteIds.set(
+      Object.fromEntries(
+        Object.entries(trigger?.busStopRouteIds ?? {}).map(([id, routes]) => [
+          id,
+          [...routes],
+        ]),
+      ),
+    );
+    this.addingStop.set(false);
+    this.loadStopRoutes();
     this.rawTargetResults.set([]);
     this.updateTargetSearch('');
-    this.targetError.set(false);
-    this.targetLoading.set(false);
     this.formError.set(null);
     this.submitted.set(false);
     this.form.markAsPristine();

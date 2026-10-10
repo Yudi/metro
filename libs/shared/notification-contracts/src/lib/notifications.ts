@@ -9,6 +9,7 @@ export const NOTIFICATION_KINDS = [
 export const MAX_NOTIFICATION_TRIGGERS_PER_USER = 25;
 export const MAX_NOTIFICATION_DEVICES_PER_USER = 10;
 export const MAX_NOTIFICATION_TARGETS_PER_TRIGGER = 20;
+export const MAX_NOTIFICATION_BUS_STOP_ROUTES_PER_STOP = 100;
 export const MIN_NOTIFICATION_INTERVAL_MINUTES = 5;
 export const MAX_NOTIFICATION_INTERVAL_MINUTES = 120;
 export const NOTIFICATION_TIMEZONE = 'America/Sao_Paulo';
@@ -60,6 +61,8 @@ export interface NotificationTriggerInput {
   arrivalLeadMinutes?: number;
   kind: NotificationKind;
   targetIds: string[];
+  /** Bus-arrival filters keyed by bus-stop target ID; missing or empty means all routes. */
+  busStopRouteIds?: Record<string, string[]>;
   statusMode: 'all' | 'abnormal';
   lineNameFormat?: NotificationLineNameFormat;
 }
@@ -199,6 +202,30 @@ export function validateNotificationTrigger(value: unknown): string | null {
     )
   )
     return `Selecione de 1 a ${MAX_NOTIFICATION_TARGETS_PER_TRIGGER} linhas, estações ou pontos.`;
+  if (v.busStopRouteIds !== undefined) {
+    if (
+      v.kind !== 'bus_arrivals' ||
+      !v.busStopRouteIds ||
+      typeof v.busStopRouteIds !== 'object' ||
+      Array.isArray(v.busStopRouteIds)
+    )
+      return 'Selecione linhas válidas para os pontos de ônibus.';
+    const routeFilters = Object.entries(v.busStopRouteIds);
+    if (
+      routeFilters.length > MAX_NOTIFICATION_TARGETS_PER_TRIGGER ||
+      routeFilters.some(
+        ([stopId, routeIds]) =>
+          !(v.targetIds ?? []).includes(stopId) ||
+          !Array.isArray(routeIds) ||
+          routeIds.length > MAX_NOTIFICATION_BUS_STOP_ROUTES_PER_STOP ||
+          new Set(routeIds).size !== routeIds.length ||
+          routeIds.some(
+            (id) => typeof id !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(id),
+          ),
+      )
+    )
+      return 'Selecione linhas válidas para os pontos de ônibus.';
+  }
   if (v.statusMode !== 'all' && v.statusMode !== 'abnormal')
     return 'Selecione quando avisar sobre a operação.';
   if (

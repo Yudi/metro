@@ -80,6 +80,48 @@ describe('NotificationApiService', () => {
     ]);
   });
 
+  it('loads routes attached to a selected bus stop target', () => {
+    const result = jest.fn();
+    service.getStopRoutes('stop-target-id').subscribe(result);
+
+    const request = httpTesting.expectOne('/api/graphql');
+    expect(request.request.body.query).toContain('notificationStopRoutes');
+    expect(request.request.body.variables).toEqual({
+      stopId: 'stop-target-id',
+    });
+    request.flush({
+      data: {
+        notificationStopRoutes: [
+          {
+            id: 'route-target-id',
+            kind: 'bus_route',
+            label: '702P-10 (Metrô Belém)',
+            available: true,
+            busRouteShortName: '702P-10',
+          },
+        ],
+      },
+    });
+
+    expect(result).toHaveBeenCalledWith([
+      expect.objectContaining({ busRouteShortName: '702P-10' }),
+    ]);
+  });
+
+  it('loads favorite notification targets by kind', () => {
+    const result = jest.fn();
+    service.getFavoriteTargets('bus_stop').subscribe(result);
+
+    const request = httpTesting.expectOne('/api/graphql');
+    expect(request.request.body.query).toContain(
+      'notificationFavoriteTargets',
+    );
+    expect(request.request.body.variables).toEqual({ kind: 'bus_stop' });
+    request.flush({ data: { notificationFavoriteTargets: [] } });
+
+    expect(result).toHaveBeenCalledWith([]);
+  });
+
   it('serializes trigger and device CRUD with the agreed mutations', () => {
     const input: NotificationTriggerInput = {
       name: 'Ida',

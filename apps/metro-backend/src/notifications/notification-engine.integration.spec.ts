@@ -29,6 +29,7 @@ describe('notification evaluation to durable outbox integration', () => {
       findMany: jest.fn().mockResolvedValue([{ id: 'device' }]),
     },
     notificationTarget: {
+      findMany: jest.fn().mockResolvedValue([]),
       findUniqueOrThrow: jest.fn().mockResolvedValue({
         observationClass: 'incident',
         observationEpisode: 'episode',
@@ -356,6 +357,118 @@ describe('notification evaluation to durable outbox integration', () => {
     expect(prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
       prisma.notificationDelivery.findFirst.mock.invocationCallOrder[0],
     );
+  });
+  it('delivers only selected bus routes for a stop and all routes for an empty selection', async () => {
+    const arrivalSnapshot = {
+      title: 'Chegadas de ônibus em Praça da Sé',
+      body: '702P-10 para Centro\n875A-10 para Vila Mariana',
+      fingerprint: 'bus-arrivals',
+      important: false,
+      normal: true,
+      observedAt: now,
+      url: '/',
+      arrivals: [
+        {
+          route: '702P-10',
+          destination: 'Centro',
+          expectedAt: now.getTime() + 120_000,
+        },
+        {
+          route: '875A-10',
+          destination: 'Vila Mariana',
+          expectedAt: now.getTime() + 180_000,
+        },
+      ],
+    };
+    const busConfig = {
+      ...config,
+      kind: 'bus_arrivals',
+      intervalMinutes: 5,
+      targetIds: ['stop-target'],
+      busStopRouteIds: { 'stop-target': ['route-target'] },
+    };
+    const busRow = {
+      id: 'trigger',
+      userId: 'user',
+      user: { last_login: now, notificationTriggers: [{ id: 'trigger' }] },
+      revision: 1,
+      config: busConfig,
+      targets: [{ target: { id: 'stop-target', available: true } }],
+    };
+    findMany.mockResolvedValue([busRow]);
+    prisma.notificationTarget.findMany.mockResolvedValueOnce([
+      {
+        id: 'route-target',
+        descriptor: { routeName: '702P-10', agency: 'sptrans' },
+      },
+    ]);
+    read.mockResolvedValue([arrivalSnapshot]);
+
+    await engine.evaluateDue(now);
+
+    const selectedBody = createMany.mock.calls[0][0].data[0].payload.notification
+      .body as string;
+    expect(selectedBody).toContain('702P-10 - Centro');
+    expect(selectedBody).not.toContain('875A-10');
+
+    createMany.mockClear();
+    prisma.notificationDelivery.findFirst.mockResolvedValue(null);
+    findMany.mockResolvedValue([
+      {
+        ...busRow,
+        config: { ...busConfig, busStopRouteIds: { 'stop-target': [] } },
+      },
+    ]);
+    read.mockResolvedValue([arrivalSnapshot]);
+
+    await engine.evaluateDue(now);
+
+    const allRoutesBody = createMany.mock.calls[0][0].data[0].payload
+      .notification.body as string;
+    expect(allRoutesBody).toContain('702P-10 - Centro');
+    expect(allRoutesBody).toContain('875A-10 - Vila Mariana');
+  });
+  it('fails closed when a saved bus route target can no longer be resolved', async () => {
+    const busConfig = {
+      ...config,
+      kind: 'bus_arrivals',
+      intervalMinutes: 5,
+      targetIds: ['stop-target'],
+      busStopRouteIds: { 'stop-target': ['missing-route-target'] },
+    };
+    findMany.mockResolvedValue([
+      {
+        id: 'trigger',
+        userId: 'user',
+        user: { last_login: now, notificationTriggers: [{ id: 'trigger' }] },
+        revision: 1,
+        config: busConfig,
+        targets: [{ target: { id: 'stop-target', available: true } }],
+      },
+    ]);
+    prisma.notificationTarget.findMany.mockResolvedValueOnce([]);
+    read.mockResolvedValue([
+      {
+        title: 'Chegadas de ônibus',
+        body: '702P-10 para Centro',
+        fingerprint: 'bus-arrivals',
+        important: false,
+        normal: true,
+        observedAt: now,
+        url: '/',
+        arrivals: [
+          {
+            route: '702P-10',
+            destination: 'Centro',
+            expectedAt: now.getTime() + 120_000,
+          },
+        ],
+      },
+    ]);
+
+    await engine.evaluateDue(now);
+
+    expect(createMany).not.toHaveBeenCalled();
   });
   it('bounds a maximum-valid arrival account across repeated scheduler ticks', async () => {
     const ids = Array.from({ length: 25 }, (_, index) => `trigger-${index}`);

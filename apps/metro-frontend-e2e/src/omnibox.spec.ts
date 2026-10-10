@@ -56,6 +56,13 @@ async function installTransitGraphQL(
       return;
     }
 
+    if (query.includes('busRouteDirections(ids: $ids')) {
+      await route.fulfill({
+        json: { data: { busRouteDirections: [] } },
+      });
+      return;
+    }
+
     if (query.includes('busPublishedRouteInformation')) {
       await route.fulfill({
         json: { data: { busPublishedRouteInformation: SPTRANS_PUBLISHED } },

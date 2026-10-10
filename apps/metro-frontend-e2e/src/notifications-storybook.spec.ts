@@ -101,15 +101,21 @@ test('hides selected lines from general results and reveals an exact search', as
   await page
     .getByRole('button', { name: 'Editar Minha ida para a faculdade' })
     .click();
-  const results = page.getByRole('listbox', { name: 'Resultados da busca' });
+  const lines = page.getByRole('region', { name: 'Linhas', exact: true });
+  await expect(lines).toBeVisible();
   await expect(
-    results.getByRole('button', { name: 'Linha 9 - Esmeralda', exact: true }),
+    lines.getByRole('button', { name: 'Linha 9 - Esmeralda', exact: true }),
   ).toHaveCount(0);
   await page.getByLabel('Buscar linhas', { exact: true }).fill('9');
+  const results = page.getByRole('group', { name: 'Resultados da busca' });
+  await expect(results).toBeVisible();
   await expect(
     results.getByRole('button', { name: 'Linha 9 - Esmeralda', exact: true }),
   ).toBeDisabled();
   await page.getByLabel('Buscar linhas', { exact: true }).fill('linha');
+  await expect(
+    lines.getByText('Nenhum destino encontrado.', { exact: true }),
+  ).toBeVisible();
   await expect(
     results.getByRole('button', { name: 'Linha 9 - Esmeralda', exact: true }),
   ).toHaveCount(0);

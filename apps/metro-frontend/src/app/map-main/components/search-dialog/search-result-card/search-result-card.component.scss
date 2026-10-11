@@ -88,10 +88,16 @@
         color: var(--mat-sys-on-surface);
       }
 
+      .result-direction,
       .result-type {
         margin: 0;
         font-size: 0.8125rem;
         color: var(--mat-sys-on-surface-variant);
+      }
+
+      .result-direction {
+        margin-bottom: 2px;
+        overflow-wrap: anywhere;
       }
 
       .agency-identity {

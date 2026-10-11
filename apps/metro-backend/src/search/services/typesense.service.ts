@@ -43,10 +43,27 @@ import {
   isTypesenseAvailabilityError,
   isTypesenseNotFoundError,
 } from './typesense-error.utils';
-import { searchNearbyStops, searchTypesense } from './typesense-search.utils';
+import {
+  normalizeSearchLimit,
+  searchNearbyStops,
+  searchTypesense,
+} from './typesense-search.utils';
 import { TypesenseIndexingFacade } from './typesense-indexing.facade';
 import { TypesenseCollectionFacade } from './typesense-collection.facade';
 import { getConfiguredNumber } from './typesense-config.utils';
+import { AsyncTtlCache } from '../../common/cache/async-ttl-cache';
+
+const TEXT_SEARCH_CACHE_TTL_MS = 5_000;
+const TEXT_SEARCH_CACHE_MAX_ENTRIES = 128;
+
+const TEXT_SEARCH_COLLECTIONS: ReadonlyArray<readonly [SearchTypes, string]> =
+  [
+    [SearchTypesEnum.RailLine, GPKG_LINES_COLLECTION_NAME],
+    [SearchTypesEnum.RailStation, GPKG_STATIONS_COLLECTION_NAME],
+    [SearchTypesEnum.BusRoute, GTFS_ROUTES_COLLECTION_NAME],
+    [SearchTypesEnum.BusStop, GTFS_STOPS_COLLECTION_NAME],
+    [SearchTypesEnum.BikeStation, BIKE_STATIONS_COLLECTION_NAME],
+  ];
 
 export type {
   BikeStationDocument,
@@ -75,6 +92,10 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
   private readonly recoveryIntervalMs: number;
   private readonly indexing: TypesenseIndexingFacade;
   private readonly collections: TypesenseCollectionFacade;
+  private readonly textSearchCache = new AsyncTtlCache<SearchResult[]>(
+    TEXT_SEARCH_CACHE_TTL_MS,
+    TEXT_SEARCH_CACHE_MAX_ENTRIES,
+  );
 
   constructor(private configService: ConfigService) {
     const connectionTimeoutSeconds = getConfiguredNumber(
@@ -179,6 +200,10 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
           this.liveCollectionTargets.set(collectionName, collectionName);
         }
       }
+
+      // Recovery can observe an alias promoted by another process while this
+      // instance was unavailable. Do not retain results from its old targets.
+      this.textSearchCache.clear();
 
       // Unaliased rebuilds may still belong to another active process.
       // Only discard staging collections created by this instance's rebuild.
@@ -348,6 +373,7 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
       }
       this.rebuildCollectionTargets.clear();
       this.rebuildExpectedCounts.clear();
+      this.textSearchCache.clear();
     } catch (error) {
       // Restore aliases already swapped in this attempt.  The previous
       // physical collections remain untouched and therefore continue serving
@@ -412,32 +438,45 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    const response = await this.client
-      .collections(this.getWriteCollectionName(baseName))
-      .documents()
-      .import(documents, { action: 'upsert' });
-    const outcomes = Array.isArray(response) ? response : [response];
-    const failures = outcomes.filter(
-      (outcome) =>
-        outcome && typeof outcome === 'object' && outcome.success === false,
-    ) as Array<{ id?: string; error?: string }>;
-    if (failures.length > 0) {
-      const details = failures
-        .slice(0, 10)
-        .map(
-          (failure) =>
-            `${failure.id ?? 'unknown'}: ${failure.error ?? 'unknown error'}`,
-        )
-        .join('; ');
-      const message = `Typesense rejected ${failures.length} malformed ${baseName} document${failures.length === 1 ? '' : 's'}: ${details}`;
-      throw new Error(message);
+    const writeCollectionName = this.getWriteCollectionName(baseName);
+    const affectsLiveSearch =
+      writeCollectionName === this.getReadCollectionName(baseName);
+    if (affectsLiveSearch) {
+      this.textSearchCache.clear();
     }
 
-    if (this.rebuildCollectionTargets.has(baseName)) {
-      this.rebuildExpectedCounts.set(
-        baseName,
-        documents.length - failures.length,
-      );
+    try {
+      const response = await this.client
+        .collections(writeCollectionName)
+        .documents()
+        .import(documents, { action: 'upsert' });
+      const outcomes = Array.isArray(response) ? response : [response];
+      const failures = outcomes.filter(
+        (outcome) =>
+          outcome && typeof outcome === 'object' && outcome.success === false,
+      ) as Array<{ id?: string; error?: string }>;
+      if (failures.length > 0) {
+        const details = failures
+          .slice(0, 10)
+          .map(
+            (failure) =>
+              `${failure.id ?? 'unknown'}: ${failure.error ?? 'unknown error'}`,
+          )
+          .join('; ');
+        const message = `Typesense rejected ${failures.length} malformed ${baseName} document${failures.length === 1 ? '' : 's'}: ${details}`;
+        throw new Error(message);
+      }
+
+      if (this.rebuildCollectionTargets.has(baseName)) {
+        this.rebuildExpectedCounts.set(
+          baseName,
+          documents.length - failures.length,
+        );
+      }
+    } finally {
+      if (affectsLiveSearch) {
+        this.textSearchCache.clear();
+      }
     }
   }
 
@@ -446,7 +485,15 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
   }
 
   async clearRoutes(): Promise<void> {
-    return this.indexing.clearRoutes();
+    return this.withTextSearchInvalidation(
+      [
+        {
+          baseName: GTFS_ROUTES_COLLECTION_NAME,
+          collectionName: GTFS_ROUTES_COLLECTION_NAME,
+        },
+      ],
+      () => this.indexing.clearRoutes(),
+    );
   }
 
   async indexRoutes(routes: RouteDocument[]): Promise<void> {
@@ -454,7 +501,15 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
   }
 
   async clearStops(): Promise<void> {
-    return this.indexing.clearStops();
+    return this.withTextSearchInvalidation(
+      [
+        {
+          baseName: GTFS_STOPS_COLLECTION_NAME,
+          collectionName: GTFS_STOPS_COLLECTION_NAME,
+        },
+      ],
+      () => this.indexing.clearStops(),
+    );
   }
 
   async indexStops(stops: StopDocument[]): Promise<void> {
@@ -466,16 +521,37 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
     types: SearchTypes[],
     limit = 10,
   ): Promise<SearchResult[]> {
-    return searchTypesense(
-      {
-        client: this.client,
-        getReadCollectionName: this.getReadCollectionName.bind(this),
-        assertAvailable: this.assertAvailable.bind(this),
-        throwSearchFailure: this.throwSearchFailure.bind(this),
-      },
+    const searchableTypes = TEXT_SEARCH_COLLECTIONS.filter(([type]) =>
+      types.includes(type),
+    ).map(([type]) => type);
+    const context = {
+      client: this.client,
+      getReadCollectionName: this.getReadCollectionName.bind(this),
+      assertAvailable: this.assertAvailable.bind(this),
+      throwSearchFailure: this.throwSearchFailure.bind(this),
+    };
+
+    if (searchableTypes.length === 0) {
+      return searchTypesense(context, query, types, limit);
+    }
+
+    const safeLimit = normalizeSearchLimit(limit);
+    this.assertAvailable();
+    const collectionIdentities = TEXT_SEARCH_COLLECTIONS.filter(([type]) =>
+      searchableTypes.includes(type),
+    ).map(([type, baseName]) => [
+      type,
+      this.getReadCollectionName(baseName),
+    ]);
+    const key = JSON.stringify([
       query,
-      types,
-      limit,
+      searchableTypes,
+      safeLimit,
+      collectionIdentities,
+    ]);
+
+    return this.textSearchCache.getOrLoad(key, () =>
+      searchTypesense(context, query, searchableTypes, safeLimit),
     );
   }
 
@@ -506,11 +582,29 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
   }
 
   async deleteRoute(routeId: string): Promise<void> {
-    return this.indexing.deleteRoute(routeId);
+    const baseName = GTFS_ROUTES_COLLECTION_NAME;
+    return this.withTextSearchInvalidation(
+      [
+        {
+          baseName,
+          collectionName: this.getWriteCollectionName(baseName),
+        },
+      ],
+      () => this.indexing.deleteRoute(routeId),
+    );
   }
 
   async deleteStop(stopId: string): Promise<void> {
-    return this.indexing.deleteStop(stopId);
+    const baseName = GTFS_STOPS_COLLECTION_NAME;
+    return this.withTextSearchInvalidation(
+      [
+        {
+          baseName,
+          collectionName: this.getWriteCollectionName(baseName),
+        },
+      ],
+      () => this.indexing.deleteStop(stopId),
+    );
   }
 
   async indexBikeStations(stations: BikeStationDocument[]): Promise<void> {
@@ -526,7 +620,13 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
   }
 
   async clearIndex(): Promise<void> {
-    return this.indexing.clearIndex();
+    return this.withTextSearchInvalidation(
+      TYPESENSE_BASE_COLLECTION_NAMES.map((baseName) => ({
+        baseName,
+        collectionName: baseName,
+      })),
+      () => this.indexing.clearIndex(),
+    );
   }
 
   private async recreateCollection(
@@ -534,5 +634,26 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
     schema: unknown,
   ): Promise<void> {
     return this.collections.recreateCollection(name, schema);
+  }
+
+  private async withTextSearchInvalidation<T>(
+    writes: ReadonlyArray<{ baseName: string; collectionName: string }>,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    const affectsLiveSearch = writes.some(
+      ({ baseName, collectionName }) =>
+        collectionName === this.getReadCollectionName(baseName),
+    );
+    if (affectsLiveSearch) {
+      this.textSearchCache.clear();
+    }
+
+    try {
+      return await operation();
+    } finally {
+      if (affectsLiveSearch) {
+        this.textSearchCache.clear();
+      }
+    }
   }
 }

@@ -13,6 +13,10 @@ import {
   jest,
 } from '@jest/globals';
 import { LoggerService } from '@metro/shared/api';
+import {
+  TYPESENSE_NEARBY_STOPS_QUERY,
+  TYPESENSE_SEARCH_QUERY,
+} from './typesense-search.queries';
 import { TypesenseSearchService } from './typesense-search.service';
 
 describe('TypesenseSearchService', () => {
@@ -31,7 +35,10 @@ describe('TypesenseSearchService', () => {
     http = TestBed.inject(HttpTestingController);
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    http.verify();
+    jest.useRealTimers();
+  });
 
   it('passes the selected search types and preserves the server relevance order', () => {
     const received = jest.fn();
@@ -85,6 +92,11 @@ describe('TypesenseSearchService', () => {
     );
   });
 
+  it('omits nested stop routes from search and nearby GraphQL selections', () => {
+    expect(TYPESENSE_SEARCH_QUERY).not.toContain('routes {');
+    expect(TYPESENSE_NEARBY_STOPS_QUERY).not.toContain('routes {');
+  });
+
   it('returns a failed search result for GraphQL errors with HTTP 200', () => {
     const received = jest.fn();
     service.search('Terminal').subscribe(received);
@@ -100,6 +112,139 @@ describe('TypesenseSearchService', () => {
         message: 'Search failed',
       }),
     );
+
+    const retried = jest.fn();
+    service.search('Terminal').subscribe(retried);
+    http.expectOne('/api/graphql').flush({ data: { search: [] } });
+    expect(retried).toHaveBeenCalledWith(
+      expect.objectContaining({ success: true, results: [] }),
+    );
+  });
+
+  it('caches successful results by trimmed query and canonical type set', () => {
+    const first = jest.fn();
+    service.search(' 477A ', ['railStation', 'busRoute']).subscribe(first);
+    http.expectOne('/api/graphql').flush({
+      data: {
+        search: [
+          {
+            __typename: 'SearchBusRoute',
+            route_id: '477A',
+            route_short_name: '477A',
+            route_long_name: 'Terminal Interlagos',
+          },
+        ],
+      },
+    });
+
+    const cached = jest.fn();
+    service.search('477A', ['busRoute', 'railStation']).subscribe(cached);
+    expect(cached).toHaveBeenCalledWith(
+      expect.objectContaining({ query: '477A', total: 1 }),
+    );
+    http.expectNone('/api/graphql');
+
+    const differentTypes = jest.fn();
+    service.search('477A', ['busRoute']).subscribe(differentTypes);
+    http.expectOne('/api/graphql').flush({ data: { search: [] } });
+    expect(differentTypes).toHaveBeenCalledWith(
+      expect.objectContaining({ query: '477A', total: 0 }),
+    );
+  });
+
+  it('shares simultaneous searches while preserving each caller query', () => {
+    const first = jest.fn();
+    const second = jest.fn();
+    service.search(' Terminal ', ['busStop']).subscribe(first);
+    service.search('Terminal', ['busStop']).subscribe(second);
+
+    http.expectOne('/api/graphql').flush({ data: { search: [] } });
+
+    expect(first).toHaveBeenCalledWith(
+      expect.objectContaining({ query: ' Terminal ' }),
+    );
+    expect(second).toHaveBeenCalledWith(
+      expect.objectContaining({ query: 'Terminal' }),
+    );
+  });
+
+  it('maps stop results when nested routes are not returned', () => {
+    const received = jest.fn();
+    service.search('Central').subscribe(received);
+    http.expectOne('/api/graphql').flush({
+      data: {
+        search: [
+          {
+            __typename: 'SearchBusStop',
+            stop_id: 'stop-1',
+            stop_name: 'Central',
+            stop_lat: -23.5,
+            stop_lon: -46.6,
+          },
+        ],
+      },
+    });
+
+    expect(received).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: true,
+        results: [
+          expect.objectContaining({
+            document: expect.objectContaining({
+              routes: [],
+            }),
+          }),
+        ],
+      }),
+    );
+  });
+
+  it('expires cached results after the TTL', () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-10-10T00:00:00.000Z'));
+
+    service.search('Terminal').subscribe();
+    http.expectOne('/api/graphql').flush({ data: { search: [] } });
+
+    jest.advanceTimersByTime(30_001);
+    service.search('Terminal').subscribe();
+    http.expectOne('/api/graphql').flush({ data: { search: [] } });
+  });
+
+  it('bounds the cache and evicts the least recently used search', () => {
+    for (let index = 0; index < 101; index++) {
+      service.search(`query-${index}`, []).subscribe();
+      http.expectOne('/api/graphql').flush({ data: { search: [] } });
+    }
+
+    service.search('query-0', []).subscribe();
+    http.expectOne('/api/graphql').flush({ data: { search: [] } });
+
+    service.search('query-100', []).subscribe();
+    http.expectNone('/api/graphql');
+  });
+
+  it('cancels an in-flight request when its last subscriber unsubscribes', () => {
+    const subscription = service.search('cancel me').subscribe();
+    subscription.unsubscribe();
+
+    const cancelledRequests = http.match('/api/graphql');
+    expect(cancelledRequests).toHaveLength(1);
+    expect(cancelledRequests[0].cancelled).toBe(true);
+
+    service.search('cancel me').subscribe();
+    http.expectOne('/api/graphql').flush({ data: { search: [] } });
+  });
+
+  it('clears cached searches after successful reindexing', () => {
+    service.search('Terminal').subscribe();
+    http.expectOne('/api/graphql').flush({ data: { search: [] } });
+
+    service.reindexData().subscribe();
+    http.expectOne('/api/graphql').flush({ data: { reindexSearch: true } });
+
+    service.search('Terminal').subscribe();
+    http.expectOne('/api/graphql').flush({ data: { search: [] } });
   });
 
   it('keeps a valid empty search distinct from a GraphQL failure', () => {

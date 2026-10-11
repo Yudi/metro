@@ -21,6 +21,18 @@
           @for (route of routes; track route.id) {
             <mat-chip
               class="route-chip"
+              [class.interactive-route]="canAddOppositeDirection(route)"
+              [title]="getRouteDisplayName(route)"
+              [matTooltip]="
+                canAddOppositeDirection(route)
+                  ? 'Adicionar sentido oposto, se disponível'
+                  : ''
+              "
+              [attr.role]="canAddOppositeDirection(route) ? 'button' : null"
+              [tabIndex]="canAddOppositeDirection(route) ? 0 : -1"
+              (click)="onRouteClick(route)"
+              (keydown.enter)="$event.preventDefault(); onRouteClick(route)"
+              (keydown.space)="$event.preventDefault(); onRouteClick(route)"
               removable
               (removed)="removeRoute.emit(route.id)"
             >
@@ -32,15 +44,19 @@
                 >
                   {{ route.shortName }}
                 </span>
-                @if (route.destination) {
+                @if (route.destination?.trim(); as destination) {
                   <span
                     class="route-direction"
-                    [title]="'Sentido ' + route.destination"
+                    [title]="'Sentido ' + destination"
                   >
                     <span class="route-direction-label">Sentido</span>
                     <span class="route-direction-destination">
-                      {{ route.destination }}
+                      {{ destination }}
                     </span>
+                  </span>
+                } @else if (route.longName) {
+                  <span class="route-direction-destination">
+                    {{ route.longName }}
                   </span>
                 }
                 @if (getAgencyIdentity(route); as agency) {
@@ -65,10 +81,11 @@
               </span>
               <button
                 matChipRemove
+                (click)="$event.stopPropagation()"
+                (keydown)="$event.stopPropagation()"
                 [attr.aria-label]="
                   'Remover rota ' +
-                  route.shortName +
-                  (route.destination ? ' no sentido ' + route.destination : '')
+                  getRouteDisplayName(route)
                 "
               >
                 <mat-icon>cancel</mat-icon>
@@ -88,7 +105,11 @@
             <mat-chip removable (removed)="removeStop.emit(stop.id)">
               <mat-icon matChipAvatar>place</mat-icon>
               {{ stop.name }}
-              <button matChipRemove aria-label="Remover parada {{ stop.name }}">
+              <button
+                matChipRemove
+                (click)="$event.stopPropagation()"
+                aria-label="Remover parada {{ stop.name }}"
+              >
                 <mat-icon>cancel</mat-icon>
               </button>
             </mat-chip>
@@ -112,6 +133,7 @@
               <button
                 matChipRemove
                 aria-label="Remover estação {{ station.name }}"
+                (click)="$event.stopPropagation()"
               >
                 <mat-icon>cancel</mat-icon>
               </button>

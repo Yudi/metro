@@ -26,11 +26,14 @@
       <div class="result-info">
         <h4 class="result-title">
           @if (result().type === "route" && result().routeData; as route) {
-            {{ route.destination ? "Sentido " + route.destination : route.route_long_name }}
+            {{ route.route_long_name }}
           } @else {
             {{ result().name }}
           }
         </h4>
+        @if (result().type === "route" && result().routeData?.destination; as destination) {
+          <p class="result-direction">Sentido {{ destination }}</p>
+        }
         <p class="result-type">{{ formatResultType() }}</p>
         @if (routeAgency(); as agency) {
           <div class="agency-identity">

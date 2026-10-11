@@ -365,6 +365,10 @@ export class MapComponent implements AfterViewInit, OnDestroy {
     this.interactionService.removeRouteFromSelection(routeId);
   }
 
+  addOppositeDirectionToSelection(routeId: string): void {
+    void this.interactionService.addOppositeDirectionToSelection(routeId);
+  }
+
   removeStopFromSelection(stopId: string): void {
     this.interactionService.removeStopFromSelection(stopId);
   }

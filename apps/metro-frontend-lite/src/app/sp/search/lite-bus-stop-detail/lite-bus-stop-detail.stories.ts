@@ -36,6 +36,8 @@ const routes: LiteBusRoute[] = [
     routeId: '847P-10',
     shortName: '847P-10',
     longName: 'Term. Pirituba - Vl. Olímpia',
+    destination: 'Vl. Olímpia',
+    directionId: 0,
     color: '006341',
     textColor: 'ffffff',
   },

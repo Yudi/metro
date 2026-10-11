@@ -29,6 +29,17 @@ export function requestedRouteFullDataOptions(
   );
 }
 
+/** Includes aliases, fragments and conditional selections at this field level. */
+export function requestsAnyField(
+  info: GraphQLResolveInfo,
+  fieldNames: readonly string[],
+): boolean {
+  const names = new Set(fieldNames);
+  return info.fieldNodes.some((fieldNode) => selectionSetHasAnyField(
+    fieldNode.selectionSet, names, info.fragments, info.variableValues,
+  ));
+}
+
 export function validateIdentifiers(
   values: string[],
   argumentName: string,

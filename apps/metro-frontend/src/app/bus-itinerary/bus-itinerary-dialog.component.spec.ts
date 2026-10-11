@@ -303,6 +303,25 @@ describe('BusItineraryDialogComponent', () => {
     expect(addFavorite).toHaveBeenCalledWith(directionFavoriteCode, 'busRoute');
   });
 
+  it('keeps the full line name and shows the requested direction underneath', async () => {
+    dialogData.favoriteCode = directionFavoriteCode;
+    const fixture = TestBed.createComponent(BusItineraryDialogComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(
+      fixture.nativeElement
+        .querySelector('.route-heading .route-name')
+        ?.textContent?.trim(),
+    ).toBe(SPTRANS_ROUTE.route_long_name);
+    expect(
+      fixture.nativeElement
+        .querySelector('.route-heading .route-direction')
+        ?.textContent?.trim(),
+    ).toBe('Sentido Pinheiros');
+  });
+
   it('expands a saved whole-line favorite before removing one destination', async () => {
     const wholeLineCode = encodeBusLineFavorite(directionFavoriteCode);
     if (!wholeLineCode) throw new Error('Test whole-line key was invalid');

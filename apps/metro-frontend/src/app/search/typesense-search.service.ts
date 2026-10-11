@@ -1,12 +1,22 @@
 import { Service, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, catchError, map, of } from 'rxjs';
+import {
+  Observable,
+  catchError,
+  defer,
+  finalize,
+  map,
+  of,
+  shareReplay,
+  tap,
+} from 'rxjs';
 import { LoggerService } from '@metro/shared/api';
 import { SearchTypes } from '@metro/shared/utils';
 
 import type {
   NearbyGraphQLResponse,
   NearbyStopsResponse,
+  SearchGraphQLResult,
   SearchGraphQLResponse,
   TypesenseSearchResponse,
   TypesenseStop,
@@ -25,10 +35,24 @@ export type {
   TypesenseStop,
 } from './typesense-search.types';
 
+const SEARCH_CACHE_TTL_MS = 30_000;
+const SEARCH_CACHE_MAX_ENTRIES = 100;
+
+interface CachedSearchResults {
+  expiresAt: number;
+  results: SearchGraphQLResult[];
+}
+
 @Service()
 export class TypesenseSearchService {
   private http = inject(HttpClient);
   private logger = inject(LoggerService);
+  private readonly searchCache = new Map<string, CachedSearchResults>();
+  private readonly inFlightSearches = new Map<
+    string,
+    Observable<SearchGraphQLResult[]>
+  >();
+  private searchCacheGeneration = 0;
 
   /**
    * Search for routes and stops with typo tolerance
@@ -37,21 +61,54 @@ export class TypesenseSearchService {
     query: string,
     types: SearchTypes[] = [...SearchTypes],
   ): Observable<TypesenseSearchResponse> {
-    if (!query || query.trim().length < 1) {
-      return of({
-        success: true,
-        query: '',
-        results: [],
-        total: 0,
-      });
-    }
+    return defer(() => {
+      const trimmedQuery = query.trim();
+      if (!trimmedQuery) {
+        return of({
+          success: true,
+          query: '',
+          results: [],
+          total: 0,
+        });
+      }
 
-    return this.http
+      const canonicalTypes = SearchTypes.filter((type) => types.includes(type));
+      const cacheKey = JSON.stringify([trimmedQuery, canonicalTypes]);
+
+      return this.getSearchResults(cacheKey, trimmedQuery, canonicalTypes).pipe(
+        map((results) => mapTypesenseSearchResponse(query, results)),
+        catchError((error) => {
+          this.logger.error('Search error', error);
+          return of({
+            success: false,
+            query,
+            results: [],
+            total: 0,
+            message: 'Search failed',
+          });
+        }),
+      );
+    });
+  }
+
+  private getSearchResults(
+    cacheKey: string,
+    query: string,
+    types: SearchTypes[],
+  ): Observable<SearchGraphQLResult[]> {
+    const cachedResults = this.getCachedSearchResults(cacheKey);
+    if (cachedResults) return of(cachedResults);
+
+    const existingSearch = this.inFlightSearches.get(cacheKey);
+    if (existingSearch) return existingSearch;
+
+    const generation = this.searchCacheGeneration;
+    const sharedSearch = this.http
       .post<SearchGraphQLResponse>('/api/graphql', {
         query: TYPESENSE_SEARCH_QUERY,
         variables: {
           input: {
-            query: query.trim(),
+            query,
             includeBusRoutes: types.includes('busRoute'),
             includeBusStops: types.includes('busStop'),
             includeRailLines: types.includes('railLine'),
@@ -69,19 +126,62 @@ export class TypesenseSearchService {
             throw new Error('Search failed');
           }
 
-          return mapTypesenseSearchResponse(query, response.data.search);
+          return response.data.search;
         }),
-        catchError((error) => {
-          this.logger.error('Search error', error);
-          return of({
-            success: false,
-            query,
-            results: [],
-            total: 0,
-            message: 'Search failed',
-          });
+        tap((results) => {
+          if (generation === this.searchCacheGeneration) {
+            this.cacheSearchResults(cacheKey, results);
+          }
         }),
+        finalize(() => {
+          if (this.inFlightSearches.get(cacheKey) === sharedSearch) {
+            this.inFlightSearches.delete(cacheKey);
+          }
+        }),
+        shareReplay({ bufferSize: 1, refCount: true }),
       );
+
+    this.inFlightSearches.set(cacheKey, sharedSearch);
+    return sharedSearch;
+  }
+
+  private getCachedSearchResults(
+    cacheKey: string,
+  ): SearchGraphQLResult[] | undefined {
+    const cached = this.searchCache.get(cacheKey);
+    if (!cached) return undefined;
+    if (cached.expiresAt <= Date.now()) {
+      this.searchCache.delete(cacheKey);
+      return undefined;
+    }
+
+    // Refresh insertion order so the map evicts the least recently used entry.
+    this.searchCache.delete(cacheKey);
+    this.searchCache.set(cacheKey, cached);
+    return cached.results;
+  }
+
+  private cacheSearchResults(
+    cacheKey: string,
+    results: SearchGraphQLResult[],
+  ): void {
+    this.searchCache.delete(cacheKey);
+    this.searchCache.set(cacheKey, {
+      expiresAt: Date.now() + SEARCH_CACHE_TTL_MS,
+      results,
+    });
+
+    while (this.searchCache.size > SEARCH_CACHE_MAX_ENTRIES) {
+      const oldestKey = this.searchCache.keys().next().value;
+      if (oldestKey === undefined) return;
+      this.searchCache.delete(oldestKey);
+    }
+  }
+
+  private clearSearchCache(): void {
+    this.searchCacheGeneration++;
+    this.searchCache.clear();
+    this.inFlightSearches.clear();
   }
 
   /**
@@ -156,6 +256,7 @@ export class TypesenseSearchService {
       .pipe(
         map((response) => {
           const success = response.data?.reindexSearch === true;
+          if (success) this.clearSearchCache();
           return {
             success,
             message: success

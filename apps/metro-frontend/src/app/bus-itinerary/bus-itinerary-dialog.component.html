@@ -41,8 +41,11 @@
                 [style.color]="routeTextColor()"
                 >{{ route.shortName }}</span
               >
-              <span class="route-name">
-                {{ requestedDirection()?.direction.destination || route.longName }}
+              <span class="route-identification">
+                <span class="route-name">{{ route.longName }}</span>
+                @if (requestedDirection()?.direction.destination; as destination) {
+                  <span class="route-direction">Sentido {{ destination }}</span>
+                }
               </span>
             </h2>
             <p class="agency">

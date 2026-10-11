@@ -263,7 +263,7 @@ export class SubwayStationDialogComponent implements OnInit, OnDestroy {
         case StationBathroomStatus.PaidAndFreeAreas:
           return 'áreas paga e livre';
         case StationBathroomStatus.AvailableLocationUnknown:
-          return 'possui sanitários';
+          return 'possui';
         case StationBathroomStatus.Unavailable:
           return 'não possui';
       }

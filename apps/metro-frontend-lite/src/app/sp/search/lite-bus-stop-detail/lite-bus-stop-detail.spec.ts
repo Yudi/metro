@@ -84,6 +84,25 @@ describe('LiteBusStopDetail', () => {
     expect(destination.textContent).not.toContain('VL. OLÍMPIA');
   });
 
+  it('keeps the full line name and displays the direction underneath', () => {
+    fixture.componentRef.setInput('stop', {
+      ...stop,
+      routes: [{ ...route, destination: 'Vl. Olímpia', directionId: 0 }],
+    });
+    fixture.detectChanges();
+
+    expect(
+      fixture.nativeElement
+        .querySelector('.route-name')
+        ?.textContent?.trim(),
+    ).toBe(route.longName);
+    expect(
+      fixture.nativeElement
+        .querySelector('.route-direction')
+        ?.textContent?.trim(),
+    ).toBe('Sentido Vl. Olímpia');
+  });
+
   it('uses the numeric direction when both rail directions are available', () => {
     const stationNames = fixture.componentInstance
       .getLineRailStations(line)

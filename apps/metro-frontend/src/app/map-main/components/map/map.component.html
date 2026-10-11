@@ -91,6 +91,7 @@
         [selectedStops]="selectedStops()"
         [selectedBikeStations]="selectedBikeStations()"
         (removeRoute)="removeRouteFromSelection($event)"
+        (addOppositeDirection)="addOppositeDirectionToSelection($event)"
         (removeStop)="removeStopFromSelection($event)"
         (removeBikeStation)="removeBikeStationFromSelection($event)"
         (clearAll)="clearAllSelections()"

@@ -7,6 +7,8 @@ export const ROUTE_RAIL_CONNECTION_RADIUS_METERS = 200;
 
 const GTFS_STOP_SUMMARY_STATE_KEY = 'gtfs-stop-service-summary';
 const GTFS_STOP_SUMMARY_VERSION = 2;
+const STOP_ROUTE_MEMBERSHIP_STATE_KEY = 'stop-route-membership';
+const STOP_ROUTE_MEMBERSHIP_VERSION = 1;
 const BUS_DIRECTION_PATTERNS_STATE_KEY = 'bus-direction-patterns';
 const BUS_DIRECTION_PATTERNS_VERSION = 1;
 const ROUTE_RAIL_CONNECTION_STATE_KEY = 'route-rail-connections';
@@ -23,6 +25,7 @@ const ROUTE_RAIL_GTFS_FILES = [
 
 type PrecomputedView =
   | 'gtfs_stop_service_summary'
+  | 'stop_route_membership'
   | 'bus_direction_patterns'
   | 'route_rail_connection_hits';
 
@@ -71,6 +74,13 @@ export class TransitDataPrecomputeService {
       GTFS_STOP_SUMMARY_STATE_KEY,
       summarySignature,
       'gtfs_stop_service_summary',
+    );
+    await this.refreshMaterializedViewIfNeeded(
+      STOP_ROUTE_MEMBERSHIP_STATE_KEY,
+      gtfsSignature
+        ? `v${STOP_ROUTE_MEMBERSHIP_VERSION}:${gtfsSignature}`
+        : null,
+      'stop_route_membership',
     );
     await this.physicalStops.refresh(gtfsSignature);
     await this.refreshMaterializedViewIfNeeded(
@@ -126,6 +136,16 @@ export class TransitDataPrecomputeService {
   }
 
   private async refreshMaterializedView(view: PrecomputedView): Promise<void> {
+    if (view === 'stop_route_membership') {
+      await this.prisma.$executeRawUnsafe(
+        'REFRESH MATERIALIZED VIEW CONCURRENTLY "public"."stop_route_membership"',
+      );
+      await this.prisma.$executeRawUnsafe(
+        'ANALYZE "public"."stop_route_membership"',
+      );
+      return;
+    }
+
     if (view === 'bus_direction_patterns') {
       await this.prisma.$executeRawUnsafe(
         'REFRESH MATERIALIZED VIEW CONCURRENTLY "public"."bus_direction_patterns"',

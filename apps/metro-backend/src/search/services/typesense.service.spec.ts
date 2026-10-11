@@ -10,6 +10,7 @@ import {
 import {
   GPKG_LINES_COLLECTION_NAME,
   GPKG_STATIONS_COLLECTION_NAME,
+  GTFS_ROUTES_COLLECTION_NAME,
   TYPESENSE_COLLECTION_SCHEMAS,
 } from './typesense-schemas';
 
@@ -88,33 +89,47 @@ describe('TypesenseService', () => {
       .mockResolvedValue({ num_documents: 0 });
     const deleteCollection = jest.fn().mockResolvedValue(undefined);
     const upsertAlias = jest.fn().mockResolvedValue(undefined);
+    const perform = jest.fn().mockResolvedValue({ results: [{ hits: [] }] });
     const collections = jest.fn((name?: string) =>
       name
         ? { retrieve: retrieveCollection, delete: deleteCollection }
         : { create: createCollection },
     );
     const service = new TypesenseService(new ConfigService());
+    (service as never as { initialized: boolean }).initialized = true;
     (service as never as { client: unknown }).client = {
       collections,
       aliases: jest.fn(() => ({ upsert: upsertAlias })),
+      multiSearch: { perform },
     };
 
+    await service.search('Central', ['busRoute']);
+
     await service.beginFullRebuild([
+      GTFS_ROUTES_COLLECTION_NAME,
       GPKG_LINES_COLLECTION_NAME,
       GPKG_STATIONS_COLLECTION_NAME,
     ]);
 
     expect(createdSchemas.map((schema) => schema['name'])).toEqual([
+      expect.stringMatching(/^metro-sptrans-gtfs-routes__rebuild_/),
       expect.stringMatching(/^metro-rail-lines__rebuild_/),
       expect.stringMatching(/^metro-rail-stations__rebuild_/),
     ]);
 
     await service.finishFullRebuild();
 
+    await service.search('Central', ['busRoute']);
+
     expect(upsertAlias.mock.calls.map(([name]) => name)).toEqual([
+      `${GTFS_ROUTES_COLLECTION_NAME}__live`,
       `${GPKG_LINES_COLLECTION_NAME}__live`,
       `${GPKG_STATIONS_COLLECTION_NAME}__live`,
     ]);
+    expect(perform).toHaveBeenCalledTimes(2);
+    expect(perform.mock.calls[1][0].searches[0].collection).toBe(
+      createdSchemas[0]['name'],
+    );
     service.onModuleDestroy();
   });
 
@@ -226,6 +241,50 @@ describe('TypesenseService', () => {
     service.onModuleDestroy();
   });
 
+  it('coalesces text searches with safely equivalent type sets', async () => {
+    const perform = jest.fn(async ({ searches }: { searches: unknown[] }) => ({
+      results: searches.map(() => ({ hits: [] })),
+    }));
+    const service = new TypesenseService(new ConfigService());
+    (service as never as { client: unknown }).client = {
+      multiSearch: { perform },
+    };
+    (service as never as { initialized: boolean }).initialized = true;
+
+    await Promise.all([
+      service.search('Central', ['busRoute', 'busStop'], 3),
+      service.search('Central', ['busStop', 'busRoute'], 3),
+    ]);
+    await service.search('Central', ['busStop', 'busRoute'], 3);
+
+    expect(perform).toHaveBeenCalledTimes(1);
+    expect(perform.mock.calls[0][0].searches).toHaveLength(2);
+    service.onModuleDestroy();
+  });
+
+  it('keeps query casing and limit distinct in the text search cache key', async () => {
+    const perform = jest.fn().mockResolvedValue({ results: [{ hits: [] }] });
+    const service = new TypesenseService(new ConfigService());
+    (service as never as { client: unknown }).client = {
+      multiSearch: { perform },
+    };
+    (service as never as { initialized: boolean }).initialized = true;
+
+    await service.search('Central', ['busStop'], 3);
+    await service.search('central', ['busStop'], 3);
+    await service.search('Central', ['busStop'], 4);
+
+    expect(perform).toHaveBeenCalledTimes(3);
+    expect(perform.mock.calls.map(([request]) => request.searches[0])).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ q: 'Central', per_page: 3 }),
+        expect.objectContaining({ q: 'central', per_page: 3 }),
+        expect.objectContaining({ q: 'Central', per_page: 4 }),
+      ]),
+    );
+    service.onModuleDestroy();
+  });
+
   it('finds Artesp routes when users search for EMTU or Artesp', async () => {
     const perform = jest.fn().mockResolvedValue({ results: [{ hits: [] }] });
     const service = new TypesenseService(new ConfigService());
@@ -246,13 +305,12 @@ describe('TypesenseService', () => {
   });
 
   it('rejects partial search results when a multi-search collection fails', async () => {
-    const route = busRouteSearchResult();
-    const perform = jest.fn().mockResolvedValue({
-      results: [
-        { hits: [{ document: route.document }] },
-        { error: 'Invalid stop search field', code: 400 },
-      ],
-    });
+    const perform = jest
+      .fn()
+      .mockResolvedValueOnce({
+        results: [{ error: 'Invalid stop search field', code: 400 }],
+      })
+      .mockResolvedValueOnce({ results: [{ hits: [] }] });
     const service = new TypesenseService(new ConfigService());
     (service as never as { client: unknown }).client = {
       multiSearch: { perform },
@@ -262,6 +320,40 @@ describe('TypesenseService', () => {
     await expect(
       service.search('Interlagos', ['busRoute', 'busStop']),
     ).rejects.toThrow('Invalid stop search field');
+    await expect(
+      service.search('Interlagos', ['busRoute', 'busStop']),
+    ).resolves.toEqual([]);
+    expect(perform).toHaveBeenCalledTimes(2);
+    service.onModuleDestroy();
+  });
+
+  it('invalidates cached text results when live documents are indexed', async () => {
+    const perform = jest.fn().mockResolvedValue({ results: [{ hits: [] }] });
+    const importDocuments = jest.fn().mockResolvedValue([{ success: true }]);
+    const service = new TypesenseService(new ConfigService());
+    (service as never as { client: unknown }).client = {
+      multiSearch: { perform },
+      collections: jest.fn(() => ({
+        documents: jest.fn(() => ({ import: importDocuments })),
+      })),
+    };
+    (service as never as { initialized: boolean }).initialized = true;
+
+    await service.search('Central', ['busStop']);
+    await service.indexStops([
+      {
+        id: 'stop-1',
+        stop_id: 'stop-1',
+        stop_name: 'Central',
+        stop_lat: -23.55,
+        stop_lon: -46.63,
+        is_subway_station: false,
+      },
+    ]);
+    await service.search('Central', ['busStop']);
+
+    expect(perform).toHaveBeenCalledTimes(2);
+    expect(importDocuments).toHaveBeenCalledTimes(1);
     service.onModuleDestroy();
   });
 

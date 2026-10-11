@@ -4,6 +4,8 @@ import type { TypesenseService } from '../services/typesense.service';
 import type { SearchService } from '../services/search.service';
 import type { GraphQLLoaders } from '../../common/graphql/loaders.service';
 import type { SearchBusStop } from '../entities/search.entity';
+import { Kind, parse } from 'graphql';
+import type { FragmentDefinitionNode, GraphQLResolveInfo } from 'graphql';
 import {
   busRouteSearchResult,
   busStopSearchResult,
@@ -12,6 +14,59 @@ import {
 } from '../testing/search.fixtures';
 
 describe('SearchResolver', () => {
+  function routeInfo(selection: string, variables: Record<string, unknown> = {}): GraphQLResolveInfo {
+    const document = parse(`query { routes { ${selection} } } fragment Direction on SearchBusRoute { destination }`);
+    const operation = document.definitions.find((definition) =>
+      definition.kind === Kind.OPERATION_DEFINITION,
+    );
+    if (!operation || operation.kind !== Kind.OPERATION_DEFINITION) {
+      throw new Error('Missing test operation');
+    }
+    const fragments: Record<string, FragmentDefinitionNode> = {};
+    for (const definition of document.definitions) {
+      if (definition.kind === Kind.FRAGMENT_DEFINITION) {
+        fragments[definition.name.value] = definition;
+      }
+    }
+    return {
+      fieldNodes: operation.selectionSet.selections,
+      fragments,
+      variableValues: variables,
+    } as unknown as GraphQLResolveInfo;
+  }
+
+  it.each(['route_short_name', 'destination @skip(if: true)', '...Direction @include(if: $show)'])(
+    'skips direction work for a stop selection that does not need it: %s',
+    async (selection) => {
+      const forRoutes = jest.fn();
+      const resolver = new SearchResolver({} as TypesenseService, {} as SearchService, { forRoutes } as never);
+      const routes = [{ id: 'route-1', route_id: 'route-1' }];
+      const loaders = {
+        routesLoader: { load: jest.fn().mockResolvedValue(routes) },
+      } as unknown as GraphQLLoaders;
+      await expect(resolver.routes(
+        { stop_id: 'stop-1' } as SearchBusStop, loaders, routeInfo(selection, { show: false }),
+      )).resolves.toEqual(routes);
+      expect(forRoutes).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['terminal: destination', '...Direction', '... on SearchBusRoute { favoriteCode }'])(
+    'retains requested stop direction enrichment through aliases and fragments: %s',
+    async (selection) => {
+      const forRoutes = jest.fn().mockResolvedValue([
+        { routeId: 'route-1', favoriteCode: 'outbound', destination: 'Terminal B', directionId: 0 },
+      ]);
+      const resolver = new SearchResolver({} as TypesenseService, {} as SearchService, { forRoutes } as never);
+      const loaders = {
+        routesLoader: { load: jest.fn().mockResolvedValue([{ id: 'route-1', route_id: 'route-1' }]) },
+      } as unknown as GraphQLLoaders;
+      await expect(resolver.routes(
+        { stop_id: 'stop-1' } as SearchBusStop, loaders, routeInfo(selection),
+      )).resolves.toEqual([expect.objectContaining({ favoriteCode: 'outbound', destination: 'Terminal B' })]);
+    },
+  );
+
   it('returns mixed search results when bus direction enrichment times out', async () => {
     const forRoutes = jest.fn().mockRejectedValue(new Error('statement timeout'));
     const resolver = new SearchResolver(

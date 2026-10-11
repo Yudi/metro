@@ -8,15 +8,37 @@ import { CptmVehicleLayerService } from '../../realtime/cptm-vehicle-layer.servi
 import { RealtimeWebsocketService } from '../../realtime/realtime-websocket.service';
 import { VectorTileLayerService } from './vector-tiles/vector-tile-layer.service';
 import { GeographyCacheService } from '../../geography/geography-cache.service';
+import { GeographyGraphQLService } from '../../geography/geography-graphql.service';
+import type { BusRouteGraphQL } from '../../geography/geography-graphql.service';
 import { MapDataLoaderService } from './map-data-loader.service';
 import { MapDisplayService } from './map-display.service';
 import { MapSelectionService } from './map-selection.service';
 import { MapStateService } from './map-state.service';
 
+function createBusDirection(
+  favoriteCode: string,
+  directionId: number,
+  destination: string,
+): BusRouteGraphQL {
+  return {
+    id: 'gtfs:100',
+    routeId: 'gtfs:100',
+    favoriteCode,
+    directionId,
+    destination,
+    shortName: '100',
+    longName: 'Terminal A - Terminal B',
+    color: '112233',
+    textColor: 'FFFFFF',
+    sourceAgency: 'sptrans',
+  };
+}
+
 describe('MapSelectionService', () => {
   let service: MapSelectionService;
   let mapState: MapStateService;
   let cache: { getRoute: jest.Mock };
+  let geography: { getBusRouteDirections: jest.Mock };
   let dataLoader: {
     syncVectorTileFilters: jest.Mock;
     loadRouteData: jest.Mock;
@@ -37,6 +59,9 @@ describe('MapSelectionService', () => {
   beforeEach(() => {
     cache = {
       getRoute: jest.fn(() => of(null)),
+    };
+    geography = {
+      getBusRouteDirections: jest.fn(() => of([])),
     };
     dataLoader = {
       syncVectorTileFilters: jest.fn(),
@@ -62,6 +87,7 @@ describe('MapSelectionService', () => {
         MapSelectionService,
         MapStateService,
         { provide: GeographyCacheService, useValue: cache },
+        { provide: GeographyGraphQLService, useValue: geography },
         { provide: MapDataLoaderService, useValue: dataLoader },
         {
           provide: MapDisplayService,
@@ -260,6 +286,316 @@ describe('MapSelectionService', () => {
       inboundCode,
       false,
     );
+  });
+
+  it('adds the unique reverse-endpoint direction once for repeated clicks', async () => {
+    const outboundCode = encodeBusDirectionFavorite({
+      sourceAgency: 'sptrans',
+      shortName: '100',
+      originLatitude: -23.5,
+      originLongitude: -46.6,
+      viaLatitude: -23.51,
+      viaLongitude: -46.61,
+      destinationLatitude: -23.52,
+      destinationLongitude: -46.62,
+    });
+    const inboundCode = encodeBusDirectionFavorite({
+      sourceAgency: 'sptrans',
+      shortName: '100',
+      originLatitude: -23.52,
+      originLongitude: -46.62,
+      viaLatitude: -23.515,
+      viaLongitude: -46.61,
+      destinationLatitude: -23.5,
+      destinationLongitude: -46.6,
+    });
+    if (!outboundCode || !inboundCode) throw new Error('Invalid fixtures');
+
+    mapState.addRouteToSelection({
+      id: outboundCode,
+      routeId: 'gtfs:100',
+      shortName: '100',
+      longName: 'Terminal A - Terminal B',
+      destination: 'Terminal B',
+      directionId: 0,
+    });
+    geography.getBusRouteDirections.mockReturnValue(
+      of([
+        createBusDirection(outboundCode, 0, 'Terminal B'),
+        createBusDirection(inboundCode, 1, 'Terminal A'),
+      ]),
+    );
+    cache.getRoute.mockImplementation((favoriteCode: string) =>
+      of({
+        routeId: 'gtfs:100',
+        favoriteCode,
+        directionId: 1,
+        destination: 'Terminal A',
+        shortName: '100',
+        longName: 'Terminal B - Terminal A',
+        sourceAgency: 'sptrans',
+        supportsRealtime: true,
+      }),
+    );
+
+    const firstClick = service.addOppositeDirectionToSelection(outboundCode);
+    const repeatedClick = service.addOppositeDirectionToSelection(outboundCode);
+    await Promise.all([firstClick, repeatedClick]);
+    await service.addOppositeDirectionToSelection(outboundCode);
+
+    expect(geography.getBusRouteDirections).toHaveBeenCalledTimes(2);
+    expect(geography.getBusRouteDirections).toHaveBeenCalledWith(['gtfs:100']);
+    expect(cache.getRoute).toHaveBeenCalledWith(inboundCode);
+    expect(cache.getRoute).toHaveBeenCalledTimes(2);
+    expect(Array.from(mapState.selectedRoutes().keys())).toEqual([
+      outboundCode,
+      inboundCode,
+    ]);
+    expect(dataLoader.loadRouteData).toHaveBeenCalledTimes(1);
+    expect(dataLoader.loadRouteData).toHaveBeenCalledWith(inboundCode, false);
+    expect(snackBar.open).not.toHaveBeenCalled();
+  });
+
+  it('adds the other unambiguous direction of a circular service', async () => {
+    const firstCode = encodeBusDirectionFavorite({
+      sourceAgency: 'sptrans',
+      shortName: '100',
+      originLatitude: -23.5,
+      originLongitude: -46.6,
+      viaLatitude: -23.51,
+      viaLongitude: -46.61,
+      destinationLatitude: -23.5,
+      destinationLongitude: -46.6,
+    });
+    const secondCode = encodeBusDirectionFavorite({
+      sourceAgency: 'sptrans',
+      shortName: '100',
+      originLatitude: -23.5,
+      originLongitude: -46.6,
+      viaLatitude: -23.49,
+      viaLongitude: -46.59,
+      destinationLatitude: -23.5,
+      destinationLongitude: -46.6,
+    });
+    if (!firstCode || !secondCode) throw new Error('Invalid fixtures');
+
+    mapState.addRouteToSelection({
+      id: firstCode,
+      routeId: 'gtfs:100',
+      shortName: '100',
+      longName: 'Circular service',
+      destination: 'Circular service',
+      directionId: 0,
+    });
+    geography.getBusRouteDirections.mockReturnValue(
+      of([
+        createBusDirection(firstCode, 0, 'Circular service'),
+        createBusDirection(secondCode, 1, 'Circular service'),
+      ]),
+    );
+    cache.getRoute.mockImplementation((favoriteCode: string) =>
+      of({
+        routeId: 'gtfs:100',
+        favoriteCode,
+        directionId: 1,
+        destination: 'Circular service',
+        shortName: '100',
+        longName: 'Circular service',
+        sourceAgency: 'sptrans',
+      }),
+    );
+
+    await service.addOppositeDirectionToSelection(firstCode);
+
+    expect(Array.from(mapState.selectedRoutes().keys())).toEqual([
+      firstCode,
+      secondCode,
+    ]);
+  });
+
+  it('does not guess when more than one direction reverses the selected endpoints', async () => {
+    const outboundCode = encodeBusDirectionFavorite({
+      sourceAgency: 'sptrans',
+      shortName: '100',
+      originLatitude: -23.5,
+      originLongitude: -46.6,
+      viaLatitude: -23.51,
+      viaLongitude: -46.61,
+      destinationLatitude: -23.52,
+      destinationLongitude: -46.62,
+    });
+    const inboundCode = encodeBusDirectionFavorite({
+      sourceAgency: 'sptrans',
+      shortName: '100',
+      originLatitude: -23.52,
+      originLongitude: -46.62,
+      viaLatitude: -23.515,
+      viaLongitude: -46.61,
+      destinationLatitude: -23.5,
+      destinationLongitude: -46.6,
+    });
+    const secondInboundCode = encodeBusDirectionFavorite({
+      sourceAgency: 'sptrans',
+      shortName: '100',
+      originLatitude: -23.52,
+      originLongitude: -46.62,
+      viaLatitude: -23.513,
+      viaLongitude: -46.608,
+      destinationLatitude: -23.5,
+      destinationLongitude: -46.6,
+    });
+    if (!outboundCode || !inboundCode || !secondInboundCode) {
+      throw new Error('Invalid fixtures');
+    }
+
+    mapState.addRouteToSelection({
+      id: outboundCode,
+      routeId: 'gtfs:100',
+      shortName: '100',
+      longName: 'Terminal A - Terminal B',
+      destination: 'Terminal B',
+      directionId: 0,
+    });
+    geography.getBusRouteDirections.mockReturnValue(
+      of([
+        createBusDirection(outboundCode, 0, 'Terminal B'),
+        createBusDirection(inboundCode, 1, 'Terminal A'),
+        createBusDirection(secondInboundCode, 2, 'Terminal A'),
+      ]),
+    );
+
+    await service.addOppositeDirectionToSelection(outboundCode);
+
+    expect(mapState.selectedRoutes().size).toBe(1);
+    expect(cache.getRoute).not.toHaveBeenCalled();
+    expect(snackBar.open).toHaveBeenCalledWith(
+      'Não foi possível identificar um único sentido oposto',
+      'Fechar',
+      { duration: 2500 },
+    );
+  });
+
+  it('reports when no reverse-endpoint direction is available', async () => {
+    const selectedCode = encodeBusDirectionFavorite({
+      sourceAgency: 'sptrans',
+      shortName: '100',
+      originLatitude: -23.5,
+      originLongitude: -46.6,
+      viaLatitude: -23.51,
+      viaLongitude: -46.61,
+      destinationLatitude: -23.52,
+      destinationLongitude: -46.62,
+    });
+    if (!selectedCode) throw new Error('Invalid fixture');
+
+    mapState.addRouteToSelection({
+      id: selectedCode,
+      routeId: 'gtfs:100',
+      shortName: '100',
+      longName: 'Terminal A - Terminal B',
+      destination: 'Terminal B',
+      directionId: 0,
+    });
+    geography.getBusRouteDirections.mockReturnValue(
+      of([createBusDirection(selectedCode, 0, 'Terminal B')]),
+    );
+
+    await service.addOppositeDirectionToSelection(selectedCode);
+
+    expect(cache.getRoute).not.toHaveBeenCalled();
+    expect(snackBar.open).toHaveBeenCalledWith(
+      'Sentido oposto não encontrado',
+      'Fechar',
+      { duration: 2500 },
+    );
+  });
+
+  it('does not add a direction after its selected source is removed during lookup', async () => {
+    const selectedCode = encodeBusDirectionFavorite({
+      sourceAgency: 'sptrans',
+      shortName: '100',
+      originLatitude: -23.5,
+      originLongitude: -46.6,
+      viaLatitude: -23.51,
+      viaLongitude: -46.61,
+      destinationLatitude: -23.52,
+      destinationLongitude: -46.62,
+    });
+    if (!selectedCode) throw new Error('Invalid fixture');
+    const directions = new Subject<BusRouteGraphQL[]>();
+    mapState.addRouteToSelection({
+      id: selectedCode,
+      routeId: 'gtfs:100',
+      shortName: '100',
+      longName: 'Terminal A - Terminal B',
+      destination: 'Terminal B',
+      directionId: 0,
+    });
+    geography.getBusRouteDirections.mockReturnValue(directions.asObservable());
+
+    const pending = service.addOppositeDirectionToSelection(selectedCode);
+    service.removeRouteFromSelection(selectedCode, false);
+    directions.next([
+      createBusDirection(selectedCode, 0, 'Terminal B'),
+    ]);
+    await pending;
+
+    expect(mapState.selectedRoutes().size).toBe(0);
+    expect(cache.getRoute).not.toHaveBeenCalled();
+    expect(snackBar.open).not.toHaveBeenCalled();
+  });
+
+  it('does not restore the opposite direction when selections clear after cache emits', async () => {
+    const selectedCode = encodeBusDirectionFavorite({
+      sourceAgency: 'sptrans',
+      shortName: '100',
+      originLatitude: -23.5,
+      originLongitude: -46.6,
+      viaLatitude: -23.51,
+      viaLongitude: -46.61,
+      destinationLatitude: -23.52,
+      destinationLongitude: -46.62,
+    });
+    const oppositeCode = encodeBusDirectionFavorite({
+      sourceAgency: 'sptrans',
+      shortName: '100',
+      originLatitude: -23.52,
+      originLongitude: -46.62,
+      viaLatitude: -23.515,
+      viaLongitude: -46.61,
+      destinationLatitude: -23.5,
+      destinationLongitude: -46.6,
+    });
+    if (!selectedCode || !oppositeCode) throw new Error('Invalid fixtures');
+
+    mapState.addRouteToSelection({
+      id: selectedCode,
+      routeId: 'gtfs:100',
+      shortName: '100',
+      longName: 'Terminal A - Terminal B',
+      destination: 'Terminal B',
+      directionId: 0,
+    });
+    geography.getBusRouteDirections.mockReturnValue(
+      of([
+        createBusDirection(selectedCode, 0, 'Terminal B'),
+        createBusDirection(oppositeCode, 1, 'Terminal A'),
+      ]),
+    );
+    const routeLookup = new Subject<BusRouteGraphQL | null>();
+    cache.getRoute.mockReturnValue(routeLookup.asObservable());
+
+    const pending = service.addOppositeDirectionToSelection(selectedCode);
+    await Promise.resolve();
+    expect(cache.getRoute).toHaveBeenCalledWith(oppositeCode);
+
+    routeLookup.next(createBusDirection(oppositeCode, 1, 'Terminal A'));
+    service.clearAllSelections(false);
+    await pending;
+
+    expect(mapState.selectedRoutes().size).toBe(0);
+    expect(dataLoader.loadRouteData).not.toHaveBeenCalled();
+    expect(snackBar.open).not.toHaveBeenCalled();
   });
 
   it('uses the full-data response to populate the selection before updating filters', async () => {

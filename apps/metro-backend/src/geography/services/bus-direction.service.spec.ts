@@ -26,6 +26,32 @@ function setup(rows = [row(), row(1)]) {
 }
 
 describe('BusDirectionService favorites', () => {
+  it('coalesces identical route catalogs but partitions physical-stop directions', async () => {
+    const { service, prisma } = setup();
+    await Promise.all([
+      service.forRoutes(['new-feed-id', 'other']),
+      service.forRoutes(['other', 'new-feed-id', 'other']),
+    ]);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    await service.forRoutes(['other', 'new-feed-id']);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    await service.forRoutes(['new-feed-id', 'other'], 'physical-stop');
+    expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+  });
+
+  it('reloads direction snapshots after their short TTL', async () => {
+    const now = jest.spyOn(Date, 'now').mockReturnValue(0);
+    try {
+      const { service, prisma } = setup();
+      await service.forRoutes(['new-feed-id']);
+      now.mockReturnValue(30_000);
+      await service.forRoutes(['new-feed-id']);
+      expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
   it('expands a legacy route into separately saved destinations and retains fares', async () => {
     const { service } = setup();
     const directions = await service.forFavorites(['new-feed-id']);
@@ -79,7 +105,9 @@ describe('BusDirectionService favorites', () => {
     const result = await service.forRoutes(['new-feed-id']);
     expect(result).toHaveLength(1);
     expect(result[0].shapeIds).toEqual(['outbound-shape', 'variant-shape']);
-    expect(tx.$executeRaw).toHaveBeenCalled();
+    expect(tx.$executeRaw.mock.calls.map(([sql]) => sql.join(''))).toEqual([
+      "SET LOCAL statement_timeout = '5s'", 'SET LOCAL jit = off',
+    ]);
   });
 
   it('does not query for an empty or malformed versioned favorite set', async () => {

@@ -34,6 +34,10 @@ export class MapInteractionService {
     );
   }
 
+  addOppositeDirectionToSelection(routeId: string): Promise<void> {
+    return this.selectionService.addOppositeDirectionToSelection(routeId);
+  }
+
   addRailLineToSelection(lineId: string, shouldDisplaySnackbar = true): void {
     this.selectionService.addRailLineToSelection(lineId, shouldDisplaySnackbar);
   }

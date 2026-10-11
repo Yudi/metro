@@ -20,7 +20,11 @@ import {
   VectorTileLayerType,
 } from './vector-tiles/vector-tile-layer.service';
 import { GeographyCacheService } from '../../geography/geography-cache.service';
-import type { StopFullDataSnapshot } from '../../geography/geography-graphql.service';
+import { GeographyGraphQLService } from '../../geography/geography-graphql.service';
+import type {
+  BusRouteGraphQL,
+  StopFullDataSnapshot,
+} from '../../geography/geography-graphql.service';
 import { MapDataLoaderService } from './map-data-loader.service';
 import { MapDisplayService } from './map-display.service';
 import { MapStateService } from './map-state.service';
@@ -28,6 +32,21 @@ import { SelectedRoute, SelectedStop } from './map.types';
 
 interface PendingStopSelection {
   canonicalStopId?: string;
+}
+
+interface BusDirectionCandidate {
+  favoriteCode: string;
+  directionId: number;
+  destination: string;
+  sourceAgency: string;
+  shortName: string;
+  originLatitude: number;
+  originLongitude: number;
+  viaLatitude: number;
+  viaLongitude: number;
+  destinationLatitude: number;
+  destinationLongitude: number;
+  route: BusRouteGraphQL;
 }
 
 @Service()
@@ -39,6 +58,7 @@ export class MapSelectionService {
   private readonly logger = inject(LoggerService);
   private readonly bikeStationsService = inject(BikeStationsService);
   private readonly cache = inject(GeographyCacheService);
+  private readonly geography = inject(GeographyGraphQLService);
   private readonly realtimeService = inject(RealtimeWebsocketService);
   private readonly cptmVehicleLayer = inject(CptmVehicleLayerService);
   private readonly vectorTileService = inject(VectorTileLayerService);
@@ -47,10 +67,12 @@ export class MapSelectionService {
     PendingStopSelection
   >();
   private readonly pendingRouteSelections = new Map<string, object>();
+  private readonly pendingOppositeDirectionSelections = new Map<string, object>();
 
   async addRouteToSelection(
     routeId: string,
     shouldDisplaySnackbar: boolean,
+    shouldContinue?: () => boolean,
   ): Promise<void> {
     this.logger.debug('Adding route to selection', { routeId });
     const request = {};
@@ -58,19 +80,25 @@ export class MapSelectionService {
 
     const routeResult = await firstValueFrom(this.cache.getRoute(routeId)).then(
       (route) => ({ success: true as const, route }),
-      (error: unknown) => {
-        this.logger.error('Failed to load route selection', error);
-        if (shouldDisplaySnackbar) {
-          this.snackBar.open('Não foi possível carregar a rota', 'Fechar', {
-            duration: 3000,
-          });
-        }
-        return { success: false as const };
-      },
+      (error: unknown) => ({ success: false as const, error }),
     );
-    if (this.pendingRouteSelections.get(routeId) !== request) return;
+    if (
+      this.pendingRouteSelections.get(routeId) !== request ||
+      shouldContinue?.() === false
+    ) {
+      if (this.pendingRouteSelections.get(routeId) === request) {
+        this.pendingRouteSelections.delete(routeId);
+      }
+      return;
+    }
     this.pendingRouteSelections.delete(routeId);
     if (!routeResult.success) {
+      this.logger.error('Failed to load route selection', routeResult.error);
+      if (shouldDisplaySnackbar) {
+        this.snackBar.open('Não foi possível carregar a rota', 'Fechar', {
+          duration: 3000,
+        });
+      }
       return;
     }
 
@@ -133,6 +161,98 @@ export class MapSelectionService {
 
     if (shouldDisplaySnackbar) {
       this.snackBar.open(`Rota adicionada`, 'Fechar', { duration: 2000 });
+    }
+  }
+
+  async addOppositeDirectionToSelection(routeId: string): Promise<void> {
+    const selectedRoute = this.mapState.selectedRoutes().get(routeId);
+    if (
+      !selectedRoute?.routeId ||
+      !parseBusDirectionFavorite(selectedRoute.id) ||
+      this.pendingOppositeDirectionSelections.has(routeId)
+    ) {
+      return;
+    }
+
+    const request = {};
+    this.pendingOppositeDirectionSelections.set(routeId, request);
+    try {
+      let directions: BusRouteGraphQL[];
+      try {
+        directions = await firstValueFrom(
+          this.geography.getBusRouteDirections([selectedRoute.routeId]),
+        );
+      } catch (error: unknown) {
+        if (!this.isCurrentOppositeDirectionSelection(routeId, selectedRoute, request)) {
+          return;
+        }
+        this.logger.error('Failed to load opposite bus direction', error);
+        this.snackBar.open('Não foi possível carregar o sentido oposto', 'Fechar', {
+          duration: 3000,
+        });
+        return;
+      }
+
+      if (!this.isCurrentOppositeDirectionSelection(routeId, selectedRoute, request)) {
+        return;
+      }
+
+      const candidates = directions.flatMap((direction) => {
+        const favoriteCode = direction.favoriteCode;
+        const identity = parseBusDirectionFavorite(favoriteCode ?? '');
+        if (!favoriteCode || !identity || direction.routeId !== selectedRoute.routeId || direction.directionId === undefined) {
+          return [];
+        }
+
+        return [
+          {
+            ...identity,
+            favoriteCode,
+            directionId: direction.directionId,
+            destination: direction.destination ?? direction.longName,
+            sourceAgency: identity.sourceAgency,
+            shortName: identity.shortName,
+            route: direction,
+          },
+        ];
+      });
+
+      const selectedDirection = matchBusDirectionFavorite(
+        selectedRoute.id,
+        candidates,
+      );
+      const oppositeDirections = selectedDirection
+        ? candidates.filter((candidate) =>
+            candidate.favoriteCode !== selectedDirection.favoriteCode &&
+            areOppositeBusDirections(selectedDirection, candidate),
+          )
+        : [];
+
+      if (oppositeDirections.length !== 1) {
+        this.snackBar.open(
+          oppositeDirections.length === 0
+            ? 'Sentido oposto não encontrado'
+            : 'Não foi possível identificar um único sentido oposto',
+          'Fechar',
+          { duration: 2500 },
+        );
+        return;
+      }
+
+      await this.addRouteToSelection(
+        oppositeDirections[0].favoriteCode,
+        false,
+        () =>
+          this.isCurrentOppositeDirectionSelection(
+            routeId,
+            selectedRoute,
+            request,
+          ),
+      );
+    } finally {
+      if (this.pendingOppositeDirectionSelections.get(routeId) === request) {
+        this.pendingOppositeDirectionSelections.delete(routeId);
+      }
     }
   }
 
@@ -280,6 +400,7 @@ export class MapSelectionService {
 
   removeRouteFromSelection(routeId: string, shouldDisplaySnackbar = true): void {
     this.pendingRouteSelections.delete(routeId);
+    this.pendingOppositeDirectionSelections.delete(routeId);
     const route = this.mapState.selectedRoutes().get(routeId);
     this.unsubscribeFromRouteRealtime(route);
 
@@ -341,6 +462,7 @@ export class MapSelectionService {
 
   clearAllSelections(shouldDisplaySnackbar = true): void {
     this.pendingRouteSelections.clear();
+    this.pendingOppositeDirectionSelections.clear();
     for (const route of this.mapState.selectedRoutes().values()) {
       this.unsubscribeFromRouteRealtime(route);
     }
@@ -366,6 +488,17 @@ export class MapSelectionService {
     request: PendingStopSelection,
   ): boolean {
     return this.pendingStopSelections.get(stopId) === request;
+  }
+
+  private isCurrentOppositeDirectionSelection(
+    routeId: string,
+    selectedRoute: SelectedRoute,
+    request: object,
+  ): boolean {
+    return (
+      this.pendingOppositeDirectionSelections.get(routeId) === request &&
+      this.mapState.selectedRoutes().get(routeId) === selectedRoute
+    );
   }
 
   private subscribeToRouteRealtime(
@@ -469,5 +602,54 @@ function isRailRouteReference(shortName: string): boolean {
     shortName.startsWith('METRÔ') ||
     shortName.startsWith('CPTM') ||
     /(?:^|[^A-Za-z0-9])L(?:[1-9]|1[0-7])(?=$|[^A-Za-z0-9])/i.test(shortName)
+  );
+}
+
+function areOppositeBusDirections(
+  first: BusDirectionCandidate,
+  second: BusDirectionCandidate,
+): boolean {
+  return (
+    first.route.routeId === second.route.routeId &&
+    first.directionId !== second.directionId &&
+    first.sourceAgency === second.sourceAgency &&
+    first.shortName === second.shortName &&
+    distanceInMeters(
+      first.originLatitude,
+      first.originLongitude,
+      second.destinationLatitude,
+      second.destinationLongitude,
+    ) <= MAX_REVERSED_ENDPOINT_DISTANCE_METERS &&
+    distanceInMeters(
+      first.destinationLatitude,
+      first.destinationLongitude,
+      second.originLatitude,
+      second.originLongitude,
+    ) <= MAX_REVERSED_ENDPOINT_DISTANCE_METERS
+  );
+}
+
+const MAX_REVERSED_ENDPOINT_DISTANCE_METERS = 1_500;
+const EARTH_RADIUS_METERS = 6_371_000;
+
+function distanceInMeters(
+  firstLatitude: number,
+  firstLongitude: number,
+  secondLatitude: number,
+  secondLongitude: number,
+): number {
+  const radians = Math.PI / 180;
+  const latitudeDelta = (secondLatitude - firstLatitude) * radians;
+  const longitudeDelta = (secondLongitude - firstLongitude) * radians;
+  const firstLatitudeRadians = firstLatitude * radians;
+  const secondLatitudeRadians = secondLatitude * radians;
+  const haversine =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(firstLatitudeRadians) *
+      Math.cos(secondLatitudeRadians) *
+      Math.sin(longitudeDelta / 2) ** 2;
+
+  return (
+    2 * EARTH_RADIUS_METERS * Math.asin(Math.sqrt(Math.min(1, haversine)))
   );
 }

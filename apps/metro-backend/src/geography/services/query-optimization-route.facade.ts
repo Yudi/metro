@@ -2,9 +2,17 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { BusFare, BusRoute } from '../entities/geography.entity';
 import { BusRouteRow, mapBusRoute, parseBusFares } from './bus-catalog.utils';
 import { compareBusRoutes, uniqueIds } from './query-optimization.utils';
+import { AsyncTtlCache } from '../../common/cache/async-ttl-cache';
 
 /** Query facade for route-centric catalog reads and fare projections. */
 export class QueryOptimizationRouteFacade {
+  private readonly stopRoutes = new AsyncTtlCache<Map<string, BusRoute[]>>(
+    30_000, 128,
+  );
+  private readonly stopRouteNames = new AsyncTtlCache<Map<string, string[]>>(
+    30_000, 128,
+  );
+
   constructor(private readonly prisma: PrismaService) {}
 
   async getRoutesForMultipleStops(
@@ -15,6 +23,15 @@ export class QueryOptimizationRouteFacade {
       return new Map();
     }
 
+    return this.stopRoutes.getOrLoad(
+      JSON.stringify([...uniqueStopIds].sort()),
+      () => this.loadRoutesForStops(uniqueStopIds),
+    );
+  }
+
+  private async loadRoutesForStops(
+    uniqueStopIds: string[],
+  ): Promise<Map<string, BusRoute[]>> {
     const routes = await this.prisma.$queryRaw<
       Array<BusRouteRow & { requested_stop_id: string }>
     >`
@@ -30,7 +47,7 @@ export class QueryOptimizationRouteFacade {
         LEFT JOIN "public"."physical_stop_members" member
           ON member.source_stop_id = requested.requested_stop_id
       ),
-      -- Keep the expanded source-stop set small for indexed stop-time lookups.
+      -- Resolve aliases before using the indexed, precomputed membership.
       expanded_stops AS MATERIALIZED (
         SELECT DISTINCT
           resolved.requested_stop_id,
@@ -53,15 +70,10 @@ export class QueryOptimizationRouteFacade {
           route.source_agency,
           route.source_id
         FROM expanded_stops expanded
-        CROSS JOIN LATERAL (
-          SELECT DISTINCT stop_time.trip_id
-          FROM "public"."Gtfs_StopTime" stop_time
-          WHERE stop_time.stop_id = expanded.source_stop_id
-        ) stop_time
-        INNER JOIN "public"."Gtfs_Trip" trip
-          ON trip.trip_id = stop_time.trip_id
+        INNER JOIN "public"."stop_route_membership" membership
+          ON membership.stop_id = expanded.source_stop_id
         INNER JOIN "public"."Gtfs_Route" route
-          ON route.route_id = trip.route_id
+          ON route.route_id = membership.route_id
         ORDER BY
           expanded.requested_stop_id,
           route.route_id,
@@ -179,6 +191,15 @@ export class QueryOptimizationRouteFacade {
       return new Map();
     }
 
+    return this.stopRouteNames.getOrLoad(
+      JSON.stringify([...uniqueStopIds].sort()),
+      () => this.loadRouteNamesForStops(uniqueStopIds),
+    );
+  }
+
+  private async loadRouteNamesForStops(
+    uniqueStopIds: string[],
+  ): Promise<Map<string, string[]>> {
     const rows = await this.prisma.$queryRaw<
       Array<{ requested_stop_id: string; route_short_name: string }>
     >`
@@ -204,12 +225,10 @@ export class QueryOptimizationRouteFacade {
       )
       SELECT DISTINCT expanded.requested_stop_id, route.route_short_name
       FROM expanded_stops expanded
-      INNER JOIN "public"."Gtfs_StopTime" stop_time
-        ON stop_time.stop_id = expanded.source_stop_id
-      INNER JOIN "public"."Gtfs_Trip" trip
-        ON trip.trip_id = stop_time.trip_id
+      INNER JOIN "public"."stop_route_membership" membership
+        ON membership.stop_id = expanded.source_stop_id
       INNER JOIN "public"."Gtfs_Route" route
-        ON route.route_id = trip.route_id
+        ON route.route_id = membership.route_id
       ORDER BY expanded.requested_stop_id, route.route_short_name
     `;
 

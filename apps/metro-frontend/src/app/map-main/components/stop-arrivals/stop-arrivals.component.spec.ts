@@ -126,6 +126,24 @@ describe('StopArrivalsComponent', () => {
     expect(fixture.componentInstance.arrivalLines()).toHaveLength(1);
   });
 
+  it('keeps the full line name and displays the direction underneath in the route list', () => {
+    fixture.componentRef.setInput('routes', [
+      { ...route, destination: 'Term. Pirituba', directionId: 0 },
+    ]);
+    fixture.detectChanges();
+
+    expect(
+      fixture.nativeElement
+        .querySelector('.route-label .route-line-name')
+        ?.textContent?.trim(),
+    ).toBe(route.longName);
+    expect(
+      fixture.nativeElement
+        .querySelector('.route-label .route-direction')
+        ?.textContent?.trim(),
+    ).toBe('Sentido Term. Pirituba');
+  });
+
   it('places a warning only under the matching arrival item and does not refetch on arrival updates', () => {
     const api = TestBed.inject(BusInformationService);
     const query = api.notices as jest.Mock;

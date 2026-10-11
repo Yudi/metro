@@ -330,7 +330,12 @@
                     [style.color]="'#' + route.textColor"
                     >{{ route.shortName }}</span
                   >
-                  <span class="route-label">{{ route.destination ? "Sentido " + route.destination : route.longName }}</span>
+                  <span class="route-label">
+                    <span class="route-line-name">{{ route.longName }}</span>
+                    @if (route.destination) {
+                      <span class="route-direction">Sentido {{ route.destination }}</span>
+                    }
+                  </span>
                   <span class="route-meta">
                     <span class="agency-identity">
                       @if (route.agencyLogo; as logo) {

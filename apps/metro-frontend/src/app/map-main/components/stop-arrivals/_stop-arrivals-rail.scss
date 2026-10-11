@@ -138,10 +138,19 @@
 }
 
 .route-label {
+  display: grid;
   min-width: 0;
+  gap: 0.125rem;
   font-size: 13px;
   font-weight: 650;
   overflow-wrap: anywhere;
+}
+
+.route-direction {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
 }
 
 .rail-count {

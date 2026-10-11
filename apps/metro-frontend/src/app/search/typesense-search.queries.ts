@@ -29,24 +29,6 @@ export const TYPESENSE_SEARCH_QUERY = `
           sourceId
           platformCode
           mergedStopIds
-          routes {
-            favoriteCode
-            destination
-            directionId
-            id
-            route_id
-            route_short_name
-            route_long_name
-            route_color
-            route_text_color
-            sourceAgency
-            sourceId
-            supportsRealtime
-            fares {
-              price
-              currency
-            }
-          }
         }
         ... on SearchRailLine {
           line_code
@@ -83,24 +65,6 @@ export const TYPESENSE_NEARBY_STOPS_QUERY = `
           sourceId
           platformCode
           mergedStopIds
-          routes {
-            favoriteCode
-            destination
-            directionId
-            id
-            route_id
-            route_short_name
-            route_long_name
-            route_color
-            route_text_color
-            sourceAgency
-            sourceId
-            supportsRealtime
-            fares {
-              price
-              currency
-            }
-          }
         }
         ... on SearchRailStation {
           station_code

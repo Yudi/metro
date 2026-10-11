@@ -9,6 +9,7 @@ import {
   Mutation,
   ResolveField,
   Parent,
+  Info,
 } from '@nestjs/graphql';
 import {
   InternalServerErrorException,
@@ -38,6 +39,8 @@ import { DevelopmentOnlyGuard } from '../../common/guards/development-only.guard
 import { DevOnly } from '../../common/decorators/development-only.decorator';
 import type { GraphQLLoaders } from '../../common/graphql/loaders.service';
 import { Loaders } from '../../common/graphql/loaders.decorator';
+import type { GraphQLResolveInfo } from 'graphql';
+import { requestsAnyField } from '../../geography/resolvers/geography-resolver.utils';
 import {
   RAIL_LINES,
   getRailLineByCode,
@@ -145,6 +148,7 @@ export class SearchResolver {
   async routes(
     @Parent() stop: SearchBusStop,
     @Loaders() loaders: GraphQLLoaders,
+    @Info() info?: GraphQLResolveInfo,
   ): Promise<SearchBusRoute[]> {
     const stopId = stop.stop_id;
 
@@ -153,6 +157,9 @@ export class SearchResolver {
     }
 
     const routes = await loaders.routesLoader.load(stop.stop_id);
+    if (info && !requestsAnyField(info, ['favoriteCode', 'destination', 'directionId'])) {
+      return routes;
+    }
     const directions = await this.getSearchDirections(routes.map((route) => route.route_id), stopId);
     return routes.flatMap((route) => {
       const matches = directions.filter((direction) => direction.routeId === route.route_id);

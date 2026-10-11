@@ -10,6 +10,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { BusRouteDirection } from '../entities/bus-route-direction.entity';
 import { GeometryData } from '../entities/geography.entity';
 import { BusRouteRow, mapBusRoute } from './bus-catalog.utils';
+import { AsyncTtlCache } from '../../common/cache/async-ttl-cache';
 
 interface DirectionRow extends BusRouteRow {
   direction_id: number | null;
@@ -22,6 +23,8 @@ interface DirectionRow extends BusRouteRow {
 /** Resolve a saved geographic direction against the current feed, never its IDs. */
 @Injectable()
 export class BusDirectionService {
+  private readonly catalog = new AsyncTtlCache<BusRouteDirection[]>(30_000, 128);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async geometry(direction: BusRouteDirection): Promise<GeometryData | null> {
@@ -100,8 +103,29 @@ export class BusDirectionService {
     shortNames: string[],
     stopId?: string,
   ): Promise<BusRouteDirection[]> {
+    const identities = agencies.map((agency, index) =>
+      JSON.stringify([agency, shortNames[index]]),
+    ).sort();
+    const key = JSON.stringify([
+      [...new Set(routeIds)].sort(),
+      identities,
+      stopId ?? '',
+    ]);
+    return this.catalog.getOrLoad(key, () => this.queryDirections(
+      routeIds, agencies, shortNames, stopId,
+    ));
+  }
+
+  private async queryDirections(
+    routeIds: string[],
+    agencies: string[],
+    shortNames: string[],
+    stopId?: string,
+  ): Promise<BusRouteDirection[]> {
     const rows = await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SET LOCAL statement_timeout = '5s'`;
+      // Compiling the normalized feed joins costs more than this small lookup.
+      await tx.$executeRaw`SET LOCAL jit = off`;
       return tx.$queryRaw<DirectionRow[]>`
       WITH selected_routes AS MATERIALIZED (
         SELECT route.*

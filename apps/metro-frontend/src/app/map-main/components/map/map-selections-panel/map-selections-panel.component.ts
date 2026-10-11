@@ -8,6 +8,7 @@ import {
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { SelectedRoute, SelectedStop, SelectedBikeStation } from '../map.types';
 import {
   formatBusFare,
@@ -25,7 +26,7 @@ interface AgencyIdentity {
 
 @Component({
   selector: 'app-map-selections-panel',
-  imports: [MatIconModule, MatButtonModule, MatChipsModule, NgOptimizedImage],
+  imports: [MatIconModule, MatButtonModule, MatChipsModule, MatTooltipModule, NgOptimizedImage],
   templateUrl: './map-selections-panel.component.html',
   styleUrl: './map-selections-panel.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -38,6 +39,7 @@ export class MapSelectionsPanelComponent {
   );
 
   readonly removeRoute = output<string>();
+  readonly addOppositeDirection = output<string>();
   readonly removeStop = output<string>();
   readonly removeBikeStation = output<string>();
   readonly clearAll = output<void>();
@@ -76,7 +78,25 @@ export class MapSelectionsPanelComponent {
   }
 
   getRouteDisplayName(route: SelectedRoute): string {
+    const destination = route.destination?.trim();
+    if (destination) {
+      return `${route.shortName}, sentido ${destination}`;
+    }
     return `${route.shortName} - ${route.longName}`;
+  }
+
+  canAddOppositeDirection(route: SelectedRoute): boolean {
+    return Boolean(
+      route.routeId &&
+      route.destination?.trim() &&
+      route.directionId !== undefined,
+    );
+  }
+
+  onRouteClick(route: SelectedRoute): void {
+    if (this.canAddOppositeDirection(route)) {
+      this.addOppositeDirection.emit(route.id);
+    }
   }
 
   routeColor(route: SelectedRoute): string {

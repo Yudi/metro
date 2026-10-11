@@ -143,6 +143,14 @@ export const SingleLineOneVehicle: Story = {
   ],
 };
 
+export const DirectionSplitRoute: Story = {
+  ...WithArrivals,
+  args: {
+    ...WithArrivals.args,
+    routes: [{ ...ROUTE_477A, destination: 'Terminal Pinheiros' }],
+  },
+};
+
 /**
  * Many vehicles approaching (busy stop).
  */

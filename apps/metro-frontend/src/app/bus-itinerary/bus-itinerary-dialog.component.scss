@@ -119,6 +119,19 @@ dt,
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
+.route-identification {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 0.125rem;
+}
+.route-direction {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
 .controls {
   display: flex;
   gap: 1rem;

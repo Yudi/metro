@@ -95,4 +95,15 @@ export const SeparateDestinations: Story = {
       template: `<app-search-result-card [result]="outbound" /><app-search-result-card [result]="inbound" />`,
     };
   },
+  play: async ({ canvasElement }) => {
+    const titles = [...canvasElement.querySelectorAll('.result-title')];
+    if (titles.length !== 2 || titles.some((title) => title.textContent?.trim() !== ROUTE_ARTESP_001.longName)) {
+      throw new Error('Both directions must retain the full line name');
+    }
+    const directions = [...canvasElement.querySelectorAll('.result-direction')]
+      .map((direction) => direction.textContent?.trim());
+    if (!directions.includes('Sentido Terminal Central') || !directions.includes('Sentido Terminal Bairro')) {
+      throw new Error('Destinations must appear separately below the line names');
+    }
+  },
 };

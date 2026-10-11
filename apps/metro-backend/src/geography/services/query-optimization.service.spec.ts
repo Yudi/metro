@@ -33,7 +33,7 @@ describe('QueryOptimizationService precomputed stop service data', () => {
     });
   });
 
-  it('uses stop-indexed normalized lookups and deduplicates routes before fares', async () => {
+  it('uses precomputed membership and deduplicates physical-stop routes before fares', async () => {
     const prisma = {
       $queryRaw: jest.fn().mockResolvedValue([
         {
@@ -108,15 +108,13 @@ describe('QueryOptimizationService precomputed stop service data', () => {
     const sql = (
       prisma.$queryRaw.mock.calls[0][0] as TemplateStringsArray
     ).join('?');
-    expect(sql).toContain('Gtfs_StopTime');
-    expect(sql).toContain('Gtfs_Trip');
+    expect(sql).not.toContain('Gtfs_StopTime');
+    expect(sql).not.toContain('Gtfs_Trip');
+    expect(sql).toContain('stop_route_membership');
     expect(sql).toContain('Gtfs_Route');
     expect(sql).toContain('physical_stop_members');
     expect(sql).toMatch(/expanded_stops AS MATERIALIZED\s*\(/);
-    expect(sql).toMatch(
-      /CROSS JOIN LATERAL\s*\(\s*SELECT DISTINCT stop_time\.trip_id/,
-    );
-    expect(sql).toContain('WHERE stop_time.stop_id = expanded.source_stop_id');
+    expect(sql).toContain('ON membership.stop_id = expanded.source_stop_id');
     expect(sql).toContain(
       'COALESCE(member.source_stop_id, resolved.physical_stop_id) AS source_stop_id',
     );
@@ -127,6 +125,56 @@ describe('QueryOptimizationService precomputed stop service data', () => {
     );
     expect(sql).toContain('WHERE rule.route_id = unique_routes.route_id');
     expect(sql).toContain('ORDER BY fare.price, fare.currency_type');
+  });
+
+  it('coalesces repeated stop batches while keeping separate stops isolated', async () => {
+    const prisma = { $queryRaw: jest.fn().mockResolvedValue([]) };
+    const service = new QueryOptimizationService(prisma as never);
+    const results = await Promise.all([
+      service.getRoutesForMultipleStops(['a', 'b', 'a']),
+      service.getRoutesForMultipleStops(['b', 'a']),
+    ]);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(results[0].get('a')).toEqual([]);
+    await service.getRoutesForMultipleStops(['c']);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+  });
+
+  it('expires stop membership results and retries failed loads', async () => {
+    const now = jest.spyOn(Date, 'now').mockReturnValue(0);
+    try {
+      const prisma = { $queryRaw: jest.fn().mockResolvedValue([]) };
+      const service = new QueryOptimizationService(prisma as never);
+      await service.getRoutesForMultipleStops(['a']);
+      await service.getRoutesForMultipleStops(['a']);
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+      now.mockReturnValue(30_000);
+      prisma.$queryRaw.mockRejectedValueOnce(new Error('unavailable'));
+      await expect(service.getRoutesForMultipleStops(['a'])).rejects.toThrow('unavailable');
+      await service.getRoutesForMultipleStops(['a']);
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(3);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it('shares repeated map line-name lookups without loading the timetable', async () => {
+    const prisma = {
+      $queryRaw: jest.fn().mockResolvedValue([
+        { requested_stop_id: 'a', route_short_name: '001' },
+      ]),
+    };
+    const service = new QueryOptimizationService(prisma as never);
+    const results = await Promise.all([
+      service.getBatchRoutesForStops(['a', 'b']),
+      service.getBatchRoutesForStops(['b', 'a']),
+    ]);
+    expect(results[0]).toEqual(new Map([['a', ['001']], ['b', []]]));
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    const sql = (prisma.$queryRaw.mock.calls[0][0] as TemplateStringsArray).join('?');
+    expect(sql).toContain('stop_route_membership');
+    expect(sql).not.toContain('Gtfs_StopTime');
+    expect(sql).not.toContain('Gtfs_Trip');
   });
 
   it('returns correct precomputed classification from the multiple-stop path', async () => {

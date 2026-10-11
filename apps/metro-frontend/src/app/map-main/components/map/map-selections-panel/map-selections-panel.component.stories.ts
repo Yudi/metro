@@ -27,6 +27,7 @@ const meta: Meta<MapSelectionsPanelComponent> = {
   argTypes: {
     // Map outputs to Storybook actions so they appear in the Actions panel
     removeRoute: { action: 'removeRoute' },
+    addOppositeDirection: { action: 'addOppositeDirection' },
     removeStop: { action: 'removeStop' },
     removeBikeStation: { action: 'removeBikeStation' },
     clearAll: { action: 'clearAll' },
@@ -136,6 +137,25 @@ export const WithRoutes: Story = {
     const removeBtn = routeCategory.querySelector('button[matChipRemove]');
     if (!removeBtn) throw new Error('Remove button not found on chip');
     (removeBtn as HTMLElement).click();
+  },
+};
+
+export const OppositeDirections: Story = {
+  args: {
+    selectedRoutes: new Map<string, SelectedRoute>([
+      ['outbound', { ...route('outbound', '100', 'Terminal Centro - Terminal Bairro'), routeId: '100', destination: 'Terminal Municipal de São Paulo - Centro', directionId: 0 }],
+      ['inbound', { ...route('inbound', '100', 'Terminal Centro - Terminal Bairro'), routeId: '100', destination: 'Terminal Municipal de São Paulo - Bairro', directionId: 1 }],
+    ]),
+    selectedStops: new Map<string, SelectedStop>(),
+    selectedBikeStations: new Map<string, SelectedBikeStation>(),
+  },
+  play: async ({ canvasElement }) => {
+    const destinations = [...canvasElement.querySelectorAll('.route-direction-destination')]
+      .map((element) => element.textContent?.trim());
+    if (!destinations.includes('Terminal Municipal de São Paulo - Centro') ||
+        !destinations.includes('Terminal Municipal de São Paulo - Bairro')) {
+      throw new Error('Both directions must show their complete destination');
+    }
   },
 };
 

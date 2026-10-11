@@ -229,9 +229,24 @@ test('opens arrival details from a bus stop result', async ({ page }) => {
     stopDetail.getByRole('heading', { name: 'Av. Paulista, 1000' }),
   ).toBeVisible();
   await expect(stopDetail.getByText('ID: 340015325')).toBeVisible();
-  await expect(stopDetail.getByText('Previsão de chegada')).toBeVisible();
+  const routePanel = stopDetail.getByRole('button', {
+    name: /477A Sacomã – Pinheiros/,
+  });
+  const arrivals = stopDetail.getByRole('region', {
+    name: 'Previsões de chegada',
+    exact: true,
+  });
+  await routePanel.click();
+  await expect(routePanel).toHaveAttribute('aria-expanded', 'true');
+  await expect(
+    arrivals.getByRole('heading', { name: 'Próximos ônibus' }),
+  ).toBeVisible();
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await expect(stopDetail.getByText('Previsão de chegada')).toBeVisible();
+  await routePanel.click();
+  await expect(routePanel).toHaveAttribute('aria-expanded', 'true');
+  await expect(
+    arrivals.getByRole('heading', { name: 'Próximos ônibus' }),
+  ).toBeVisible();
   await expect(
     stopDetail.getByRole('link', { name: 'Ver no mapa' }),
   ).toHaveAttribute('href', /busStops=340015325/);

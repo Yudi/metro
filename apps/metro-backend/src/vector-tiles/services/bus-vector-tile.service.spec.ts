@@ -18,6 +18,7 @@ describe('BusVectorTileService', () => {
       routeId: 'directional-route',
       directionId,
       destination,
+      isCircular: false,
       favoriteCode,
       shapeIds,
       sourceId: 'directional-source-id',
@@ -48,6 +49,7 @@ describe('BusVectorTileService', () => {
       ['shape-out-a', 'shape-out-b'],
       'Terminal Norte',
     );
+    outbound.isCircular = true;
     const inbound = direction(
       inboundCode,
       1,
@@ -71,6 +73,7 @@ describe('BusVectorTileService', () => {
     expect(sql).toContain('shape.shape_id = trip.shape_id');
     expect(sql).toContain('direction.favorite_code AS feature_route_id');
     expect(sql).toContain('direction.destination');
+    expect(sql).toContain('direction.is_circular');
     expect(sql).toContain('direction.favorite_code,');
     expect(sql).toContain('direction.direction_id,');
 
@@ -83,6 +86,7 @@ describe('BusVectorTileService', () => {
         route_id: 'directional-route',
         direction_id: 0,
         destination: 'Terminal Norte',
+        is_circular: true,
         favorite_code: outboundCode,
         shape_ids: ['shape-out-a', 'shape-out-b'],
       },
@@ -137,6 +141,7 @@ describe('BusVectorTileService', () => {
         route_id: 'directional-route',
         direction_id: 0,
         destination: 'Terminal Norte',
+        is_circular: false,
         favorite_code: outboundCode,
         shape_ids: ['shape-out'],
       },
@@ -144,6 +149,7 @@ describe('BusVectorTileService', () => {
         route_id: 'directional-route',
         direction_id: 1,
         destination: 'Terminal Sul',
+        is_circular: false,
         favorite_code: inboundCode,
         shape_ids: ['shape-in'],
       },

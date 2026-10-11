@@ -47,7 +47,9 @@ export class RealtimeVehicleLayerService {
         const isAccessible = feature.get('accessible') as boolean;
         const vehicleId = feature.get('vehicleId') as string | number;
         const heading = feature.get('heading') as number | null;
-        const destination = feature.get('destination') as string | undefined;
+        const destination = feature.get('isCircular')
+          ? 'Circular'
+          : feature.get('destination') as string | undefined;
         const routeShortName = feature.get('routeShortName') as string;
         const routeColor = feature.get('routeColor') as string;
 
@@ -191,7 +193,9 @@ export class RealtimeVehicleLayerService {
             accessible: vehicle.a,
             timestamp: vehicle.ta,
             destination,
+            isCircular: this.isCircularRoute(realtimeRouteKey, line.c),
             routeColor,
+            routeTextColor: this.getRouteTextColor(realtimeRouteKey, line.c),
             origin: getOlhoVivoOrigin(line),
             direction: line.sl,
             latitude: vehicle.py,
@@ -263,23 +267,33 @@ export class RealtimeVehicleLayerService {
     );
   }
 
-  private getRouteColor(routeShortName: string, routeCode: string): string {
-    const matchingRoute = Array.from(
-      this.mapState.selectedRoutes().values(),
-    ).find(
-      (route) =>
-        route.id === routeShortName ||
-        (supportsSptransRealtime({
-          routeId: route.id,
-          sourceAgency: route.sourceAgency,
-          supportsRealtime: route.supportsRealtime,
-        }) &&
-          (route.shortName === routeShortName ||
-            route.shortName === routeCode ||
-            route.id === routeCode)),
-    );
+  private getRouteColor(routeKey: string, routeCode: string): string {
+    return this.normalizeHexColor(this.getSelectedRoute(routeKey, routeCode)?.color);
+  }
 
-    return this.normalizeHexColor(matchingRoute?.color);
+  private getRouteTextColor(routeKey: string, routeCode: string): string {
+    return this.getSelectedRoute(routeKey, routeCode)?.textColor ?? 'ffffff';
+  }
+
+  private getSelectedRoute(routeKey: string, routeCode: string) {
+    return Array.from(this.mapState.selectedRoutes().values()).find((route) =>
+      route.id === routeKey || route.routeId === routeKey ||
+      (supportsSptransRealtime({
+        routeId: route.routeId ?? route.id,
+        sourceAgency: route.sourceAgency,
+        supportsRealtime: route.supportsRealtime,
+      }) &&
+        (route.shortName === routeKey || route.shortName === routeCode || route.id === routeCode)),
+    );
+  }
+
+  private isCircularRoute(routeKey: string, routeCode: string): boolean {
+    return [...this.mapState.selectedRoutes().values()].some((route) =>
+      route.isCircular &&
+      (route.id === routeKey || route.routeId === routeKey ||
+        (supportsSptransRealtime({ ...route, routeId: route.routeId ?? route.id }) &&
+          (route.shortName === routeKey || route.shortName === routeCode))),
+    );
   }
 
   private addSanitizedVehicleMarker(
@@ -296,7 +310,9 @@ export class RealtimeVehicleLayerService {
       routeCode: routeShortName,
       timestamp: vehicle.recordedAt,
       destination: vehicle.destination,
+      isCircular: this.isCircularRoute(realtimeRouteKey, routeShortName),
       routeColor,
+      routeTextColor: this.getRouteTextColor(realtimeRouteKey, routeShortName),
       latitude: vehicle.latitude,
       longitude: vehicle.longitude,
       heading: null,

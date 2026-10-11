@@ -73,7 +73,11 @@
                                   </span>
                                   <span class="route-summary-copy">
                                     <span class="route-destination">
-                                      {{ route.destination || route.longName }}
+                                      {{
+                                        route.isCircular
+                                          ? 'Circular'
+                                          : route.destination || route.longName
+                                      }}
                                     </span>
                                     @if (agencyIdentity(route); as agency) {
                                       <span class="agency-identity">
@@ -169,7 +173,11 @@
                         {{ route.shortName }}
                       </span>
                       <div class="row-content">
-                        <h3>{{ route.destination || route.longName }}</h3>
+                        <h3>{{
+                          route.isCircular
+                            ? 'Circular'
+                            : route.destination || route.longName
+                        }}</h3>
                         @if (route.favoriteNotice) {
                           <p class="muted">{{ route.favoriteNotice }}</p>
                         }

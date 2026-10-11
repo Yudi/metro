@@ -44,7 +44,9 @@
                 >
                   {{ route.shortName }}
                 </span>
-                @if (route.destination?.trim(); as destination) {
+                @if (route.isCircular) {
+                  <span class="route-direction-destination">Circular</span>
+                } @else if (route.destination?.trim(); as destination) {
                   <span
                     class="route-direction"
                     [title]="'Sentido ' + destination"

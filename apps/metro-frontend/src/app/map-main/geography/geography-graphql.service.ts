@@ -460,6 +460,7 @@ export class GeographyGraphQLService {
               name
               lines
               distanceMeters
+              stopsUntil
             }
           }
         }

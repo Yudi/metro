@@ -12,7 +12,8 @@ const fixtures = `
     route_color, route_text_color, source_agency, source_id) AS (
     VALUES ('route', '001', 'A - B', 3, '000000', 'ffffff', 'sptrans', 'route'),
       ('artesp:route', '001', 'Regional', 3, '000000', 'ffffff', 'artesp', 'route'),
-      ('rail', 'L1', 'Rail', 1, '000000', 'ffffff', 'sptrans', 'rail')
+      ('rail', 'L1', 'Rail', 1, '000000', 'ffffff', 'sptrans', 'rail'),
+      ('circle', 'C1', 'Circular', 3, '000000', 'ffffff', 'sptrans', 'circle')
   ),
   fixture_trips(route_id, direction_id, trip_headsign, shape_id, trip_id) AS (
     VALUES ('route', 0, 'Terminal B', 'out', 'long'),
@@ -21,7 +22,9 @@ const fixtures = `
       ('route', 0, 'Terminal A', 'in', 'inbound'),
       ('route', 0, 'Branch', 'out', 'branch'),
       ('artesp:route', 0, 'Regional', 'artesp:shape', 'artesp:trip'),
-      ('rail', 0, 'Rail', 'rail', 'rail-trip')
+      ('rail', 0, 'Rail', 'rail', 'rail-trip'),
+      ('circle', 0, ' Loop ', 'circle-out', 'circle-out-trip'),
+      ('circle', 1, 'loop', 'circle-in', 'circle-in-trip')
   ),
   fixture_stop_times(trip_id, stop_id, stop_sequence) AS (
     VALUES ('long', 'a', 1), ('long', 'v1', 2), ('long', 'v2', 3), ('long', 'b', 4),
@@ -30,7 +33,9 @@ const fixtures = `
       ('inbound', 'b', 1), ('inbound', 'a', 2),
       ('branch', 'a', 1), ('branch', 'branch-end', 2),
       ('artesp:trip', 'artesp:a', 1), ('artesp:trip', 'artesp:b', 2),
-      ('rail-trip', 'a', 1), ('rail-trip', 'b', 2)
+      ('rail-trip', 'a', 1), ('rail-trip', 'b', 2),
+      ('circle-out-trip', 'circle-a', 1), ('circle-out-trip', 'circle-b', 2),
+      ('circle-in-trip', 'circle-b', 1), ('circle-in-trip', 'circle-a', 2)
   ),
   fixture_stops(stop_id, stop_lat, stop_lon, stop_name) AS (
     VALUES ('a', -23.55::float8, -46.63::float8, 'Terminal A'),
@@ -39,7 +44,9 @@ const fixtures = `
       ('short-only', -23.57, -46.66, 'Short only'),
       ('branch-end', -23.60, -46.70, 'Branch'),
       ('artesp:a', -23.65, -46.73, 'Regional A'),
-      ('artesp:b', -23.69, -46.78, 'Regional B')
+      ('artesp:b', -23.69, -46.78, 'Regional B'),
+      ('circle-a', -23.61, -46.71, 'Circle A'),
+      ('circle-b', -23.62, -46.72, 'Circle B')
   ),
   fixture_members(source_stop_id, physical_stop_id) AS (
     VALUES ('short-only', 'physical'), ('alias', 'physical')
@@ -109,7 +116,22 @@ describeDatabase('precomputed bus directions in PostgreSQL', () => {
   it('finds a physical-stop alias served only by a shorter trip', async () => {
     const directions = await service.forStop('alias');
     expect(directions).toHaveLength(1);
-    expect(directions[0]).toMatchObject({ routeId: 'route', destination: 'Terminal B' });
+    expect(directions[0]).toMatchObject({
+      routeId: 'route', destination: 'Terminal B', isCircular: false,
+    });
+  });
+
+  it('marks one normalized full-line destination circular without rewriting its destination', async () => {
+    const directions = await service.forRoutes(['circle']);
+    expect(directions).toHaveLength(2);
+    expect(directions.map((direction) => direction.destination).sort()).toEqual(['Loop', 'loop']);
+    expect(directions.every((direction) => direction.isCircular)).toBe(true);
+  });
+
+  it('does not infer circularity from only the destination served at a requested stop', async () => {
+    const directions = await service.forRoutes(['route'], 'alias');
+    expect(directions).toHaveLength(1);
+    expect(directions[0]).toMatchObject({ destination: 'Terminal B', isCircular: false });
   });
 
   it('keeps feeds separate and excludes rail patterns', async () => {

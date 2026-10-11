@@ -10,11 +10,17 @@ import type {
   LiteArrivalLine,
   LiteStopArrivalUpdate,
 } from '../../shared/realtime/lite-realtime.service';
+import type { LiteScheduledBusDeparture } from '../../shared/search/lite-search.service';
 import { Dashboard } from './dashboard';
 import type { BusRouteGraphQL, BusStopInsight } from './dashboard.types';
 
 interface DashboardHarness
-  extends Pick<Dashboard, 'getSelectedBusRoutes' | 'getBusArrivalLines'> {
+  extends Pick<
+    Dashboard,
+    | 'getSelectedBusRoutes'
+    | 'getBusArrivalLines'
+    | 'getScheduledDepartureDestination'
+  > {
   busRoutesByStopId: WritableSignal<Map<string, BusRouteGraphQL[]>>;
   busArrivalsByStopId: WritableSignal<Map<string, LiteStopArrivalUpdate>>;
   dashboardSelections: WritableSignal<DashboardFavoriteSelections | null>;
@@ -144,12 +150,48 @@ describe('Dashboard bus direction selection', () => {
     expect(dashboard.getBusArrivalLines('stop-1')).toEqual([arrivalLine(1)]);
   });
 
+  it('keeps matching circular favorites against their original destination', () => {
+    const circularRoutes = routes.map((route) => ({
+      ...route,
+      isCircular: true,
+    }));
+    const dashboard = createDashboardHarness([towardPinheiros]);
+    dashboard.busRoutesByStopId.set(new Map([['stop-1', circularRoutes]]));
+
+    expect(dashboard.getSelectedBusRoutes('stop-1')).toEqual([circularRoutes[0]]);
+    expect(dashboard.getBusArrivalLines('stop-1')).toEqual([arrivalLine(1)]);
+    expect(circularRoutes[0].destination).toBe('Pinheiros');
+  });
+
   it('filters schedules by destination even when two published patterns share a direction number', () => {
     const dashboard = createDashboardHarness([towardPinheiros]);
     const base = { routeId: '477A-10', routeShortName: '477A-10', tripId: 'trip-1', departureTime: '2026-10-10T12:00:00Z', directionId: 0 };
     const outward = { ...base, headsign: 'Pinheiros' };
     dashboard.busSchedulesByStopId = signal(new Map([['stop-1', [outward, { ...base, tripId: 'trip-2', headsign: 'Sacomã' }]]]));
     expect(dashboard.getBusScheduledDepartures('stop-1')).toEqual([outward]);
+  });
+
+  it('displays Circular for matching scheduled departures and preserves the destination for matching', () => {
+    const circularRoutes = routes.map((route) => ({
+      ...route,
+      isCircular: true,
+    }));
+    const dashboard = createDashboardHarness([towardPinheiros]);
+    dashboard.busRoutesByStopId.set(new Map([['stop-1', circularRoutes]]));
+    const departure: LiteScheduledBusDeparture = {
+      routeId: '477A-10',
+      routeShortName: '477A-10',
+      tripId: 'trip-1',
+      headsign: 'Pinheiros',
+      directionId: 0,
+      departureTime: '2026-10-10T12:00:00Z',
+    };
+
+    expect(dashboard.getScheduledDepartureDestination('stop-1', departure)).toBe(
+      'Circular',
+    );
+    expect(dashboard.getSelectedBusRoutes('stop-1')).toEqual([circularRoutes[0]]);
+    expect(circularRoutes[0].destination).toBe('Pinheiros');
   });
 
   it('uses the current destination when GTFS direction numbers differ from realtime', () => {

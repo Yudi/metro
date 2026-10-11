@@ -66,6 +66,15 @@ export const ArtespWithoutFare: Story = {
   },
 };
 
+export const Circular: Story = {
+  render: () => {
+    const result = toSearchResult(ROUTE_ARTESP_001);
+    if (!result.routeData) throw new Error('Circular fixture requires route data');
+    result.routeData = { ...result.routeData, destination: 'Terminal Regional', isCircular: true };
+    return { props: { result } };
+  },
+};
+
 export const UnknownAgency: Story = {
   args: {
     result: toSearchResult({

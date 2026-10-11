@@ -13,6 +13,7 @@ export type LiteSearchResultKind = 'busStop' | 'railStation' | 'bikeStation';
 export interface LiteBusRoute {
   favoriteCode?: string;
   destination?: string;
+  isCircular?: boolean;
   directionId?: number;
   id: string;
   routeId: string;
@@ -143,6 +144,7 @@ export interface SearchGraphQLResult {
 export interface LiteBusRouteGraphQL {
   favoriteCode?: string;
   destination?: string;
+  isCircular?: boolean;
   directionId?: number;
   id: string;
   route_id: string;

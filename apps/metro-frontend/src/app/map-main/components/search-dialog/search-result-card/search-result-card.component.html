@@ -31,7 +31,9 @@
             {{ result().name }}
           }
         </h4>
-        @if (result().type === "route" && result().routeData?.destination; as destination) {
+        @if (result().type === "route" && result().routeData?.isCircular) {
+          <p class="result-direction">Circular</p>
+        } @else if (result().type === "route" && result().routeData?.destination; as destination) {
           <p class="result-direction">Sentido {{ destination }}</p>
         }
         <p class="result-type">{{ formatResultType() }}</p>

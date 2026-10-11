@@ -322,6 +322,37 @@ describe('BusItineraryDialogComponent', () => {
     ).toBe('Sentido Pinheiros');
   });
 
+  it('displays Circular while matching the saved direction by its original destination', async () => {
+    dialogData.favoriteCode = directionFavoriteCode;
+    const circularDirections = directions.map((direction) => ({
+      ...direction,
+      isCircular: true,
+    }));
+    getBusRouteDirections.mockReturnValue(of(circularDirections));
+    const fixture = TestBed.createComponent(BusItineraryDialogComponent);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(
+      fixture.componentInstance.requestedDirection()?.direction.destination,
+    ).toBe('Pinheiros');
+    expect(fixture.componentInstance.directionDisplayName(circularDirections[0])).toBe(
+      'Circular',
+    );
+    expect(
+      fixture.componentInstance.directionFavoriteLabel(circularDirections[0]),
+    ).toContain('Circular');
+    expect(
+      fixture.nativeElement
+        .querySelector('.route-heading .route-direction')
+        ?.textContent?.trim(),
+    ).toBe('Circular');
+    expect(
+      fixture.nativeElement.querySelector('.destination-name')?.textContent?.trim(),
+    ).toBe('Circular');
+  });
+
   it('expands a saved whole-line favorite before removing one destination', async () => {
     const wholeLineCode = encodeBusLineFavorite(directionFavoriteCode);
     if (!wholeLineCode) throw new Error('Test whole-line key was invalid');

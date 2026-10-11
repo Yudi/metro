@@ -1,30 +1,306 @@
 <mat-card class="stop-arrivals-card" [class.compact-card]="compact()">
-  @if (!compact() && hasRealtimeSupport()) {
-    <mat-card-header>
-      <mat-card-title>
-        <mat-icon>schedule</mat-icon>
-        Previsão de chegada
-      </mat-card-title>
-      @if (arrivals(); as data) {
-        <mat-card-subtitle> Atualizado às {{ data.hr }} </mat-card-subtitle>
-      }
-    </mat-card-header>
-  }
-
   <mat-card-content>
-    @if (hasRealtimeSupport()) {
-      @if (isLoading()) {
-        <div class="loading-state">
-          <mat-spinner [diameter]="compact() ? 24 : 40"></mat-spinner>
-          <p>Consultando previsões de chegada…</p>
+    @if (compact() || routes().length === 0) {
+      @if (hasRealtimeSupport()) {
+        @if (isLoading()) {
+          <div class="loading-state">
+            <mat-spinner [diameter]="compact() ? 24 : 40"></mat-spinner>
+            <p>Consultando previsões de chegada…</p>
+          </div>
+        } @else if (hasArrivals()) {
+          <ng-container [ngTemplateOutlet]="arrivalList" [ngTemplateOutletContext]="{ $implicit: arrivalLines() }" />
+        } @else {
+          <div class="no-data-state">
+            <mat-icon>info</mat-icon>
+            <p>
+              {{
+                compact()
+                  ? "Sem previsão para esta linha no momento"
+                  : "Nenhuma previsão disponível no momento"
+              }}
+            </p>
+            @if (!compact()) {
+              <p class="hint">Os dados são atualizados a cada 30 segundos</p>
+            }
+          </div>
+        }
+      }
+
+      @if (hasArtespSchedules()) {
+        <section
+          class="scheduled-section"
+          aria-label="Horários programados"
+          [attr.aria-busy]="scheduledDeparturesLoading()"
+        >
+          <div class="route-rail-header scheduled-header">
+            <div>
+              <div class="scheduled-title">
+                <h4><mat-icon>schedule</mat-icon> Horários programados</h4>
+                <span class="agency-identity">
+                  <img [ngSrc]="artespLogo" width="24" height="24" alt="" />
+                  Artesp
+                </span>
+              </div>
+              <p>Estes horários não são previsões em tempo real.</p>
+            </div>
+          </div>
+
+          <ng-container [ngTemplateOutlet]="scheduleList" [ngTemplateOutletContext]="{ $implicit: scheduledGroups() }" />
+        </section>
+      }
+
+    }
+    @if (!compact() && routes().length > 0) {
+      <section
+        class="route-rail-section"
+        aria-label="Linhas que atendem o ponto"
+      >
+        <div class="route-rail-header">
+          <div>
+            <h4>Linhas do ponto</h4>
+            @if (arrivals(); as data) {
+              <p>Previsões atualizadas às {{ data.hr }}</p>
+            }
+          </div>
+
+          @if (railConnectionsLoading()) {
+            <mat-spinner diameter="22"></mat-spinner>
+          }
         </div>
-      } @else if (hasArrivals()) {
+
+        <mat-accordion class="route-chip-list" multi>
+          @for (row of routeRows(); track getRouteKey(row.route)) {
+            @let route = row.route;
+            <mat-expansion-panel
+              class="route-panel mat-elevation-z0"
+              [expanded]="isRouteExpanded(route)"
+              (opened)="setRouteExpanded(route, true)"
+              (closed)="setRouteExpanded(route, false)"
+            >
+              <mat-expansion-panel-header class="route-panel-header">
+                <mat-panel-title class="route-summary">
+                  <span
+                    class="route-badge"
+                    [style.background-color]="'#' + route.color"
+                    [style.color]="'#' + route.textColor"
+                    >{{ route.shortName }}</span
+                  >
+                  <span class="route-label">
+                    <span class="route-line-name">{{ route.longName }}</span>
+                    <span class="route-direction">{{ row.directionLabel }}</span>
+                  </span>
+                  <span class="route-meta">
+                    <span class="agency-identity">
+                      @if (route.agencyLogo; as logo) {
+                        <img [ngSrc]="logo" width="24" height="24" alt="" />
+                      }
+                      {{ route.agencyName }}
+                    </span>
+                    @if (route.fareLabel; as fareLabel) {
+                      <span
+                        class="route-fare"
+                        [class.fare-missing]="route.fareMissing"
+                        [attr.aria-label]="'Tarifa: ' + fareLabel"
+                      >
+                        <mat-icon>payments</mat-icon>
+                        <span>{{ fareLabel }}</span>
+                      </span>
+                    }
+                    @if (!railConnectionsLoading() && routeServesRail(route)) {
+                      <span
+                        class="rail-count"
+                        [attr.aria-label]="
+                          getRouteRailStationCount(route) +
+                          ' estações de metrô ou trem'
+                        "
+                      >
+                        <mat-icon>train</mat-icon>
+                        {{ getRouteRailStationCount(route) }}
+                      </span>
+                    }
+                    @if (!isRouteExpanded(route) && row.nextArrival) {
+                      <span
+                        class="route-next-arrival"
+                        [attr.aria-label]="'Próximo ônibus em ' + row.nextArrival"
+                      >
+                        <mat-icon>schedule</mat-icon>
+                        {{ row.nextArrival }}
+                      </span>
+                    }
+                  </span>
+                </mat-panel-title>
+              </mat-expansion-panel-header>
+
+              @if (isRouteExpanded(route)) {
+                <div class="route-rail-details">
+                  @if (row.hasRealtime) {
+                    <section class="route-arrivals" aria-label="Previsões de chegada">
+                      <h4 class="route-detail-title">Próximos ônibus</h4>
+                      @if (isLoading()) {
+                        <div class="route-detail-state" role="status">
+                          <mat-spinner diameter="24"></mat-spinner>
+                          <span>Consultando previsões de chegada…</span>
+                        </div>
+                      } @else if (row.arrivals.length > 0) {
+                        <ng-container [ngTemplateOutlet]="arrivalList" [ngTemplateOutletContext]="{ $implicit: row.arrivals }" />
+                      } @else {
+                        <p class="hint">Nenhuma previsão disponível no momento.</p>
+                      }
+                    </section>
+                  }
+                  @if (row.hasSchedules) {
+                    <section class="scheduled-section" aria-label="Horários programados" [attr.aria-busy]="scheduledDeparturesLoading()">
+                      <div class="route-rail-header scheduled-header">
+                        <div>
+                          <h4>Horários programados</h4>
+                          <p>Estes horários não são previsões em tempo real.</p>
+                        </div>
+                      </div>
+                      <ng-container [ngTemplateOutlet]="scheduleList" [ngTemplateOutletContext]="{ $implicit: row.schedules }" />
+                    </section>
+                  }
+                  <section
+                    class="route-rail-connections"
+                    [class.separated-section]="row.hasRealtime || row.hasSchedules"
+                    aria-label="Estações de metrô e trem atendidas"
+                  >
+                    <h4 class="route-detail-title">Estações de metrô e trem atendidas</h4>
+                  @if (railConnectionsLoading()) {
+                    <div class="route-detail-state">
+                      <mat-spinner diameter="24"></mat-spinner>
+                      <span
+                        >Verificando estações próximas aos próximos
+                        pontos...</span
+                      >
+                    </div>
+                  } @else if (railConnectionsError()) {
+                    <div class="route-detail-state">
+                      <mat-icon>error_outline</mat-icon>
+                      <span
+                        >Não foi possível carregar as conexões
+                        ferroviárias.</span
+                      >
+                    </div>
+                  } @else if (row.directions.length > 0) {
+                    <div class="direction-list">
+                      @for (
+                        direction of row.directions;
+                        track direction.directionId + direction.headsign
+                      ) {
+                        <div class="direction-block">
+                          <div class="direction-title">
+                            <mat-icon>arrow_forward</mat-icon>
+                            <span>{{ route.isCircular ? 'Circular' : 'Sentido ' + direction.headsign }}</span>
+                          </div>
+
+                          @for (
+                            station of direction.stations;
+                            track station.id;
+                            let stationIndex = $index
+                          ) {
+                            <div class="rail-station detail-station">
+                              @if (getStationSpacing(station, direction.stations[stationIndex - 1]); as spacing) {
+                                <span class="rail-station-spacing">
+                                  <mat-icon aria-hidden="true">pin_drop</mat-icon>
+                                  <span>{{ spacing }}</span>
+                                </span>
+                              }
+                              <span class="rail-station-heading">
+                                <span class="rail-station-name">{{
+                                  station.name
+                                }}</span>
+                                <span class="station-line-badges">
+                                  @for (
+                                    line of stationLineBadges().get(
+                                      station.id
+                                    ) ?? [];
+                                    track line.code
+                                  ) {
+                                    <span
+                                      class="station-line-badge"
+                                      [style.background-color]="line.bg"
+                                      [style.color]="line.text"
+                                      [attr.aria-label]="'Linha ' + line.code"
+                                      >{{ line.code }}</span
+                                    >
+                                  }
+                                </span>
+                              </span>
+                              @if (
+                                formatStationDistance(station);
+                                as distanceText
+                              ) {
+                                <span
+                                  class="rail-station-meta rail-station-distance"
+                                  >{{ distanceText }}</span
+                                >
+                              }
+                            </div>
+                          }
+                        </div>
+                      }
+                    </div>
+                  } @else {
+                    <div class="route-detail-state">
+                      <mat-icon>directions_bus</mat-icon>
+                      <span>
+                        Neste sentido, esta linha não serve estações de metrô ou
+                        de trem nos próximos pontos.
+                      </span>
+                    </div>
+                  }
+                  </section>
+                  @if (row.notices.length > 0) {
+                    <mat-expansion-panel class="route-diversions mat-elevation-z0">
+                      <mat-expansion-panel-header>
+                        <mat-panel-title>Desvios ({{ row.notices.length }})</mat-panel-title>
+                      </mat-expansion-panel-header>
+                      <ng-template matExpansionPanelContent>
+                        <app-bus-information
+                          [routeCode]="route.shortName"
+                          [notices]="row.notices"
+                          [stale]="busNotices()?.status === 'STALE'"
+                          [lastUpdated]="busNotices()?.lastUpdated ?? null"
+                        />
+                      </ng-template>
+                    </mat-expansion-panel>
+                  }
+                  @if (showMapActions()) {
+                    <div class="route-detail-actions">
+                      <button
+                        mat-button
+                        type="button"
+                        (click)="showRouteOnMap($event, route)"
+                        [disabled]="isRouteSelected(route)"
+                      >
+                        <mat-icon>map</mat-icon>
+                        {{
+                          isRouteSelected(route)
+                            ? "Exibida no mapa"
+                            : "Exibir no mapa"
+                        }}
+                      </button>
+                    </div>
+                  }
+                </div>
+              }
+            </mat-expansion-panel>
+          }
+        </mat-accordion>
+      </section>
+    }
+    @if (noticesUnavailable()) {
+      <p class="hint" role="status">Avisos de alterações indisponíveis no momento.</p>
+    }
+  </mat-card-content>
+</mat-card>
+
+<ng-template #arrivalList let-rows>
         <div class="arrivals-list">
           @for (
-            arrival of arrivalRows();
-            track getArrivalLineKey(arrival.line)
+            line of rows;
+            track getArrivalLineKey(line)
           ) {
-            @let line = arrival.line;
             <div class="arrival-line">
               <div class="line-header">
                 <div class="line-info">
@@ -39,12 +315,6 @@
                     {{ getLineDestination(line) }}
                   </span>
                 </div>
-                @if (!compact() && line.qv > 0) {
-                  <span class="vehicle-count"
-                    >{{ line.qv }}
-                    {{ line.qv === 1 ? "veículo" : "veículos" }}</span
-                  >
-                }
               </div>
 
               <div class="vehicles-list">
@@ -92,104 +362,24 @@
                 </button>
               }
 
-              <app-bus-information
-                [routeCode]="line.c"
-                [notices]="arrival.notices"
-                [stale]="busNotices()?.status === 'STALE'"
-                [lastUpdated]="busNotices()?.lastUpdated ?? null"
-              />
-
-              @if (!compact() && getLineRailStations(line).length > 0) {
-                <div class="rail-service">
-                  <div class="rail-service-header">
-                    <mat-icon>train</mat-icon>
-                    <span>Atende estação sobre trilhos neste sentido</span>
-                  </div>
-
-                  <div class="rail-stations">
-                    @for (
-                      station of getLineRailStations(line);
-                      track station.id
-                    ) {
-                      <div class="rail-station">
-                        <span class="rail-station-heading">
-                          <span class="rail-station-name">{{
-                            station.name
-                          }}</span>
-                          <span class="station-line-badges">
-                            @for (
-                              line of stationLineBadges().get(station.id) ?? [];
-                              track line.code
-                            ) {
-                              <span
-                                class="station-line-badge"
-                                [style.background-color]="line.bg"
-                                [style.color]="line.text"
-                                [attr.aria-label]="'Linha ' + line.code"
-                                >{{ line.code }}</span
-                              >
-                            }
-                          </span>
-                        </span>
-                        @if (formatStationDistance(station); as distanceText) {
-                          <span
-                            class="rail-station-meta rail-station-distance"
-                            >{{ distanceText }}</span
-                          >
-                        }
-                      </div>
-                    }
-                  </div>
-                </div>
+              @if (compact() || routes().length === 0) {
+                <app-bus-information
+                  [routeCode]="line.c"
+                  [notices]="noticesByRoute().get(line.c.trim().toUpperCase()) ?? []"
+                  [stale]="busNotices()?.status === 'STALE'"
+                  [lastUpdated]="busNotices()?.lastUpdated ?? null"
+                />
               }
+
             </div>
           }
         </div>
-      } @else {
-        <div class="no-data-state">
-          <mat-icon>info</mat-icon>
-          <p>
-            {{
-              compact()
-                ? "Sem previsão para esta linha no momento"
-                : "Nenhuma previsão disponível no momento"
-            }}
-          </p>
-          @if (!compact()) {
-            <p class="hint">Os dados são atualizados a cada 30 segundos</p>
-          }
-        </div>
-      }
-    }
+</ng-template>
 
-    @if (noticesUnavailable()) {
-      <p class="hint" role="status">
-        Avisos de alterações indisponíveis no momento.
-      </p>
-    }
-
-    @if (hasArtespSchedules()) {
-      <section
-        class="scheduled-section"
-        aria-label="Horários programados"
-        [attr.aria-busy]="scheduledDeparturesLoading()"
-      >
-        <div class="route-rail-header scheduled-header">
-          <div>
-            <div class="scheduled-title">
-              <h4><mat-icon>schedule</mat-icon> Horários programados</h4>
-              <span class="agency-identity">
-                <img [ngSrc]="artespLogo" width="24" height="24" alt="" />
-                Artesp
-              </span>
-            </div>
-            <p>Estes horários não são previsões em tempo real.</p>
-          </div>
-        </div>
-
-        @if (scheduledGroups().length > 0) {
+<ng-template #scheduleList let-groups>
+        @if (groups.length > 0) {
           <ul class="scheduled-list">
-            @for (group of scheduledGroups(); track group.routeId) {
+            @for (group of groups; track group.routeId) {
               <li class="scheduled-group">
                 <div class="scheduled-row">
                   <time
@@ -209,7 +399,7 @@
                       >{{ group.next.routeShortName }}</span
                     >
                     <span class="scheduled-destination">
-                      <span>{{ group.next.headsign }}</span>
+                      <span>{{ group.next.destinationLabel }}</span>
                       @if (group.next.platformCode) {
                         <small>Plataforma {{ group.next.platformCode }}</small>
                       }
@@ -231,7 +421,7 @@
                           ? 'Recolher horários da linha '
                           : 'Ver ' +
                             group.departures.length +
-                            ' horários da linha ') + group.next.routeShortName + ', sentido ' + group.next.headsign
+                            ' horários da linha ') + group.next.routeShortName + ', ' + group.next.directionDescription
                       "
                       (click)="toggleScheduleRoute(group.routeId)"
                     >
@@ -250,7 +440,7 @@
                   <ul
                     class="scheduled-following"
                     [attr.aria-label]="
-                      'Mais horários da linha ' + group.next.routeShortName + ', sentido ' + group.next.headsign
+                      'Mais horários da linha ' + group.next.routeShortName + ', ' + group.next.directionDescription
                     "
                   >
                     @for (departure of group.remaining; track departure.key) {
@@ -265,7 +455,7 @@
                           }
                         </time>
                         <span class="scheduled-destination">
-                          <span>{{ departure.headsign }}</span>
+                          <span>{{ departure.destinationLabel }}</span>
                           @if (departure.platformCode) {
                             <small
                               >Plataforma {{ departure.platformCode }}</small
@@ -295,183 +485,4 @@
             <span>Nenhum horário programado disponível.</span>
           </div>
         }
-      </section>
-    }
-
-    @if (!compact() && routes().length > 0) {
-      <section
-        class="route-rail-section"
-        aria-label="Linhas que atendem o ponto"
-      >
-        <div class="route-rail-header">
-          <div>
-            <h4>Linhas do ponto</h4>
-            <p>Integrações com metrô e trem nos próximos pontos.</p>
-          </div>
-
-          @if (railConnectionsLoading()) {
-            <mat-spinner diameter="22"></mat-spinner>
-          }
-        </div>
-
-        <mat-accordion class="route-chip-list" multi>
-          @for (route of displayRoutes(); track getRouteKey(route)) {
-            <mat-expansion-panel
-              class="route-panel mat-elevation-z0"
-              [expanded]="isRouteExpanded(route)"
-              (opened)="setRouteExpanded(route, true)"
-              (closed)="setRouteExpanded(route, false)"
-            >
-              <mat-expansion-panel-header class="route-panel-header">
-                <mat-panel-title class="route-summary">
-                  <span
-                    class="route-badge"
-                    [style.background-color]="'#' + route.color"
-                    [style.color]="'#' + route.textColor"
-                    >{{ route.shortName }}</span
-                  >
-                  <span class="route-label">
-                    <span class="route-line-name">{{ route.longName }}</span>
-                    @if (route.destination) {
-                      <span class="route-direction">Sentido {{ route.destination }}</span>
-                    }
-                  </span>
-                  <span class="route-meta">
-                    <span class="agency-identity">
-                      @if (route.agencyLogo; as logo) {
-                        <img [ngSrc]="logo" width="24" height="24" alt="" />
-                      }
-                      {{ route.agencyName }}
-                    </span>
-                    @if (route.fareLabel; as fareLabel) {
-                      <span
-                        class="route-fare"
-                        [class.fare-missing]="route.fareMissing"
-                        [attr.aria-label]="'Tarifa: ' + fareLabel"
-                      >
-                        <mat-icon>payments</mat-icon>
-                        <span>{{ fareLabel }}</span>
-                      </span>
-                    }
-                    @if (!railConnectionsLoading() && routeServesRail(route)) {
-                      <span
-                        class="rail-count"
-                        [attr.aria-label]="
-                          getRouteRailStationCount(route) +
-                          ' estações de metrô ou trem'
-                        "
-                      >
-                        <mat-icon>train</mat-icon>
-                        {{ getRouteRailStationCount(route) }}
-                      </span>
-                    }
-                  </span>
-                </mat-panel-title>
-              </mat-expansion-panel-header>
-
-              @if (isRouteExpanded(route)) {
-                <div class="route-rail-details">
-                  @if (railConnectionsLoading()) {
-                    <div class="route-detail-state">
-                      <mat-spinner diameter="24"></mat-spinner>
-                      <span
-                        >Verificando estações próximas aos próximos
-                        pontos...</span
-                      >
-                    </div>
-                  } @else if (railConnectionsError()) {
-                    <div class="route-detail-state">
-                      <mat-icon>error_outline</mat-icon>
-                      <span
-                        >Não foi possível carregar as conexões
-                        ferroviárias.</span
-                      >
-                    </div>
-                  } @else if (getRouteDirectionsWithRail(route).length > 0) {
-                    <div class="direction-list">
-                      @for (
-                        direction of getRouteDirectionsWithRail(route);
-                        track direction.directionId + direction.headsign
-                      ) {
-                        <div class="direction-block">
-                          <div class="direction-title">
-                            <mat-icon>arrow_forward</mat-icon>
-                            <span>Sentido {{ direction.headsign }}</span>
-                          </div>
-
-                          @for (
-                            station of direction.stations;
-                            track station.id
-                          ) {
-                            <div class="rail-station detail-station">
-                              <span class="rail-station-heading">
-                                <span class="rail-station-name">{{
-                                  station.name
-                                }}</span>
-                                <span class="station-line-badges">
-                                  @for (
-                                    line of stationLineBadges().get(
-                                      station.id
-                                    ) ?? [];
-                                    track line.code
-                                  ) {
-                                    <span
-                                      class="station-line-badge"
-                                      [style.background-color]="line.bg"
-                                      [style.color]="line.text"
-                                      [attr.aria-label]="'Linha ' + line.code"
-                                      >{{ line.code }}</span
-                                    >
-                                  }
-                                </span>
-                              </span>
-                              @if (
-                                formatStationDistance(station);
-                                as distanceText
-                              ) {
-                                <span
-                                  class="rail-station-meta rail-station-distance"
-                                  >{{ distanceText }}</span
-                                >
-                              }
-                            </div>
-                          }
-                        </div>
-                      }
-                    </div>
-                  } @else {
-                    <div class="route-detail-state">
-                      <mat-icon>directions_bus</mat-icon>
-                      <span>
-                        Neste sentido, esta linha não serve estações de metrô ou
-                        de trem nos próximos pontos.
-                      </span>
-                    </div>
-                  }
-
-                  @if (showMapActions()) {
-                    <div class="route-detail-actions">
-                      <button
-                        mat-button
-                        type="button"
-                        (click)="showRouteOnMap($event, route)"
-                        [disabled]="isRouteSelected(route)"
-                      >
-                        <mat-icon>map</mat-icon>
-                        {{
-                          isRouteSelected(route)
-                            ? "Exibida no mapa"
-                            : "Exibir no mapa"
-                        }}
-                      </button>
-                    </div>
-                  }
-                </div>
-              }
-            </mat-expansion-panel>
-          }
-        </mat-accordion>
-      </section>
-    }
-  </mat-card-content>
-</mat-card>
+</ng-template>

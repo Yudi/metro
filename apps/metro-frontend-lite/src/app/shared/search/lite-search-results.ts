@@ -21,6 +21,7 @@ export function processLiteSearchResults(
           id: route.favoriteCode ?? route.id,
           favoriteCode: route.favoriteCode,
           destination: route.destination,
+          isCircular: route.isCircular,
           directionId: route.directionId,
           routeId: route.route_id,
           shortName: route.route_short_name,

@@ -43,8 +43,14 @@
               >
               <span class="route-identification">
                 <span class="route-name">{{ route.longName }}</span>
-                @if (requestedDirection()?.direction.destination; as destination) {
-                  <span class="route-direction">Sentido {{ destination }}</span>
+                @if (isCircularRoute()) {
+                  <span class="route-direction">Circular</span>
+                } @else if (requestedDirection()?.direction; as direction) {
+                  @if (direction.destination; as destination) {
+                    <span class="route-direction">
+                      Sentido {{ destination }}
+                    </span>
+                  }
                 }
               </span>
             </h2>
@@ -113,7 +119,7 @@
                     {{ direction.shortName }}
                   </span>
                   <span class="destination-name">
-                    {{ direction.destination || direction.longName }}
+                    {{ directionDisplayName(direction) }}
                   </span>
                   <mat-icon aria-hidden="true">
                     {{ isDirectionFavorite(direction) ? "favorite" : "favorite_border" }}
@@ -156,7 +162,7 @@
                   track direction.id
                 ) {
                   <mat-option [value]="direction.id">{{
-                    direction.headsign
+                    isCircularRoute() ? 'Circular' : direction.headsign
                   }}</mat-option>
                 }
               </mat-select>

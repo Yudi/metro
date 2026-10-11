@@ -163,6 +163,7 @@ describe('GeographyServiceOptimized precomputed rail connections', () => {
           agencies: ['METRO'],
           lines: ['Azul'],
           distance_meters: 84.6,
+          stops_until: 3,
         },
       ]),
     };
@@ -196,6 +197,7 @@ describe('GeographyServiceOptimized precomputed rail connections', () => {
                 nearStopId: 'near-stop',
                 nearStopName: 'Parada da estação',
                 stopSequence: 12,
+                stopsUntil: 3,
               },
             ],
           },
@@ -206,6 +208,146 @@ describe('GeographyServiceOptimized precomputed rail connections', () => {
     expect(
       (prisma.$queryRaw.mock.calls[0][0] as TemplateStringsArray).join(' '),
     ).toContain('route_rail_connection_hits');
+    const query = (prisma.$queryRaw.mock.calls[0][0] as TemplateStringsArray)
+      .join(' ')
+      .replace(/\s+/g, ' ');
+    expect(query).toContain('COUNT(*)::INTEGER');
+    expect(query).toContain('COUNT(DISTINCT stops_until) = 1');
+    expect(query).toContain('origin.stop_id = hit.from_stop_id');
+    expect(query).toContain('near_stop.stop_sequence = hit.near_stop_sequence');
+    expect(query).toContain(
+      'between_stop.stop_sequence > origin.stop_sequence',
+    );
+    expect(query).toContain(
+      'between_stop.stop_sequence <= near_stop.stop_sequence',
+    );
+    expect(query).not.toContain(
+      'near_stop.stop_sequence - origin.stop_sequence',
+    );
+  });
+
+  it('deduplicates sibling-stop station hits when their stop counts agree', async () => {
+    const prisma = {
+      $queryRaw: jest.fn().mockResolvedValue([
+        {
+          route_id: '477A-10',
+          route_short_name: '477A-10',
+          route_long_name: 'Terminal - Estação',
+          direction_id: 0,
+          trip_headsign: 'Estação',
+          stop_id: 'sibling-near-stop',
+          stop_name: 'Parada próxima da plataforma irmã',
+          stop_sequence: 9,
+          station_id: 42,
+          station_name: 'Estação Central',
+          agencies: ['METRO'],
+          lines: ['Azul'],
+          distance_meters: 35,
+          stops_until: 4,
+        },
+        {
+          route_id: '477A-10',
+          route_short_name: '477A-10',
+          route_long_name: 'Terminal - Estação',
+          direction_id: 0,
+          trip_headsign: 'Estação',
+          stop_id: 'selected-near-stop',
+          stop_name: 'Parada próxima do ponto selecionado',
+          stop_sequence: 12,
+          station_id: 42,
+          station_name: 'Estação Central',
+          agencies: ['METRO'],
+          lines: ['Azul'],
+          distance_meters: 80,
+          stops_until: 4,
+        },
+      ]),
+    };
+    const service = new GeographyServiceOptimized(
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(
+      service.getRouteRailConnectionsForStop('stop-1', ['477A-10']),
+    ).resolves.toMatchObject([
+      {
+        directions: [
+          {
+            stations: [
+              {
+                id: '42',
+                nearStopId: 'sibling-near-stop',
+                stopsUntil: 4,
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('deduplicates sibling-stop hits and leaves their count unknown when they disagree', async () => {
+    const prisma = {
+      $queryRaw: jest.fn().mockResolvedValue([
+        {
+          route_id: '477A-10',
+          route_short_name: '477A-10',
+          route_long_name: 'Terminal - Estação',
+          direction_id: 0,
+          trip_headsign: 'Estação',
+          stop_id: 'sibling-near-stop',
+          stop_name: 'Parada próxima da plataforma irmã',
+          stop_sequence: 9,
+          station_id: 42,
+          station_name: 'Estação Central',
+          agencies: ['METRO'],
+          lines: ['Azul'],
+          distance_meters: 35,
+          stops_until: 2,
+        },
+        {
+          route_id: '477A-10',
+          route_short_name: '477A-10',
+          route_long_name: 'Terminal - Estação',
+          direction_id: 0,
+          trip_headsign: 'Estação',
+          stop_id: 'selected-near-stop',
+          stop_name: 'Parada próxima do ponto selecionado',
+          stop_sequence: 12,
+          station_id: 42,
+          station_name: 'Estação Central',
+          agencies: ['METRO'],
+          lines: ['Azul'],
+          distance_meters: 80,
+          stops_until: 4,
+        },
+      ]),
+    };
+    const service = new GeographyServiceOptimized(
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(
+      service.getRouteRailConnectionsForStop('stop-1', ['477A-10']),
+    ).resolves.toMatchObject([
+      {
+        directions: [
+          {
+            stations: [{ id: '42', stopsUntil: null }],
+          },
+        ],
+      },
+    ]);
   });
 
   it('omits routes without a positive precomputed rail connection', async () => {

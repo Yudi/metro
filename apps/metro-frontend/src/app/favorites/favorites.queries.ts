@@ -7,6 +7,7 @@ export const FAVORITE_REMOVAL_LOOKUP_QUERY = `
       favoriteCode
       requestedCode
       destination
+      isCircular
       directionId
       sourceAgency
       color

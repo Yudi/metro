@@ -313,6 +313,13 @@ export class RouteRailConnectionStation {
 
   @Field(() => Int)
   stopSequence!: number;
+
+  @Field(() => Int, {
+    nullable: true,
+    description:
+      'Number of scheduled bus stops after the selected physical stop through the nearest rail-serving bus stop; null when matching trips or merged source stops disagree',
+  })
+  stopsUntil!: number | null;
 }
 
 @ObjectType()

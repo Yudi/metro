@@ -106,7 +106,34 @@ describe('StopArrivalsComponent', () => {
     fixture.detectChanges();
   });
 
-  afterEach(() => fixture.destroy());
+  afterEach(() => {
+    fixture.destroy();
+    jest.useRealTimers();
+  });
+
+  function expandRoute(index = 0): HTMLElement {
+    const header = fixture.nativeElement.querySelectorAll(
+      '.route-panel-header',
+    )[index] as HTMLElement;
+    header.click();
+    fixture.detectChanges();
+    return header;
+  }
+
+  it('uses Circular for arrival and schedule labels without changing the schedule headsign', () => {
+    fixture.componentRef.setInput('routes', [{
+      ...route, isCircular: true, destination: 'Term. Pirituba', directionId: 0,
+    }]);
+    fixture.componentInstance.scheduledDepartures.set([{
+      routeId: route.routeId, routeShortName: route.shortName, tripId: 'circular-trip',
+      directionId: 0, headsign: 'Term. Pirituba', departureTime: '2026-10-10T12:00:00Z',
+    }]);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.getLineDestination(line)).toBe('Circular');
+    expect(fixture.componentInstance.scheduledRows()[0]).toEqual(expect.objectContaining({
+      headsign: 'Term. Pirituba', destinationLabel: 'Circular',
+    }));
+  });
 
   it('shows rail connections only for the displayed destination when direction IDs disagree', () => {
     const currentDirection = { ...route, destination: 'Term. Pirituba', directionId: 0 };
@@ -144,7 +171,101 @@ describe('StopArrivalsComponent', () => {
     ).toBe('Sentido Term. Pirituba');
   });
 
-  it('places a warning only under the matching arrival item and does not refetch on arrival updates', () => {
+  it('keeps full-mode arrival details inside the matching route panel', () => {
+    fixture.componentInstance.arrivals.set(
+      createArrivals({ ...line, vs: [createVehicle(847)] }),
+    );
+    fixture.detectChanges();
+    const routeHeader = fixture.nativeElement.querySelector(
+      '.route-panel-header',
+    ) as HTMLElement;
+
+    expect(fixture.nativeElement.querySelector('.arrival-line')).toBeNull();
+    expect(routeHeader.querySelector('.route-next-arrival')).toBeNull();
+
+    expandRoute();
+
+    expect(fixture.nativeElement.querySelectorAll('.arrival-line')).toHaveLength(1);
+    expect(
+      fixture.nativeElement.querySelector('.line-destination')?.textContent,
+    ).toContain('TERM. PIRITUBA');
+    expect(
+      fixture.nativeElement.querySelector('.vehicle-id')?.textContent,
+    ).toContain('Veículo 847');
+  });
+
+  it('keeps same-code directions separate and shows estimates only while closed', () => {
+    jest.useFakeTimers().setSystemTime(new Date(2026, 9, 10, 12, 0));
+    const inboundRoute: BusRouteGraphQL = {
+      ...route,
+      favoriteCode: 'saved-inbound',
+      destination: 'Term. Pirituba',
+      directionId: 0,
+    };
+    const outboundRoute: BusRouteGraphQL = {
+      ...route,
+      favoriteCode: 'saved-outbound',
+      destination: 'Vl. Olímpia',
+      directionId: 1,
+    };
+    const timedArrivals = createArrivals(line);
+    fixture.componentRef.setInput('routes', [inboundRoute, outboundRoute]);
+    fixture.componentInstance.arrivals.set({
+      ...timedArrivals,
+      p: {
+        ...timedArrivals.p,
+        l: [
+          { ...line, vs: [createVehicle(1, '12:03')] },
+          {
+            ...line,
+            sl: 1,
+            vs: [createVehicle(2, '12:08')],
+          },
+        ],
+      },
+    });
+    fixture.detectChanges();
+
+    const headerFor = (routeCode: string) =>
+      Array.from(
+        fixture.nativeElement.querySelectorAll('.route-panel-header'),
+      ).find(
+        (header) =>
+          header
+            .querySelector('.route-direction')
+            ?.textContent?.includes(routeCode),
+      ) as HTMLElement;
+    const firstHeader = headerFor('Term. Pirituba');
+    const secondHeader = headerFor('Vl. Olímpia');
+
+    expect(firstHeader.querySelector('.route-next-arrival')?.textContent).toContain(
+      '3 min',
+    );
+    expect(firstHeader.querySelector('.route-badge')?.textContent).toContain(
+      route.shortName,
+    );
+    expect(
+      firstHeader.querySelector('.route-next-arrival mat-icon')?.textContent,
+    ).toContain('schedule');
+    expect(secondHeader.querySelector('.route-next-arrival')?.textContent).toContain(
+      '8 min',
+    );
+    expect(secondHeader.querySelector('.route-badge')?.textContent).toContain(
+      route.shortName,
+    );
+    expect(firstHeader.querySelector('.vehicle-count')).toBeNull();
+    expect(secondHeader.querySelector('.vehicle-count')).toBeNull();
+
+    firstHeader.click();
+    fixture.detectChanges();
+
+    expect(firstHeader.querySelector('.route-next-arrival')).toBeNull();
+    expect(secondHeader.querySelector('.route-next-arrival')?.textContent).toContain(
+      '8 min',
+    );
+  });
+
+  it('counts route notices even without arrivals and keeps them after rail stations', () => {
     const api = TestBed.inject(BusInformationService);
     const query = api.notices as jest.Mock;
     const result = {
@@ -164,23 +285,36 @@ describe('StopArrivalsComponent', () => {
       ],
     };
     fixture.componentInstance.busNotices.set(result);
+    const noArrivalUpdate = createArrivals(line);
     fixture.componentInstance.arrivals.set({
-      hr: '12:00',
-      p: {
-        cp: 1,
-        np: 'Ponto',
-        py: 0,
-        px: 0,
-        l: [line, { ...line, c: '1234-10', cl: 999 }],
-      },
+      ...noArrivalUpdate,
+      p: { ...noArrivalUpdate.p, l: [] },
     });
     fixture.componentInstance.isLoading.set(false);
     fixture.detectChanges();
-    const items = fixture.nativeElement.querySelectorAll('.arrival-line');
+
+    expandRoute();
+    const directionList = fixture.nativeElement.querySelector(
+      '.direction-list',
+    ) as HTMLElement;
+    const diversions = fixture.nativeElement.querySelector(
+      '.route-diversions',
+    ) as HTMLElement;
+    expect(diversions?.textContent).toContain('Desvios (1)');
+    expect(directionList.compareDocumentPosition(diversions)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(fixture.nativeElement.querySelector('.arrival-line')).toBeNull();
+
+    const diversionsHeader = diversions.querySelector(
+      'mat-expansion-panel-header',
+    ) as HTMLElement;
+    diversionsHeader.click();
+    fixture.detectChanges();
     expect(
-      items[0].querySelector('app-bus-information button')?.textContent,
+      diversions.querySelector('app-bus-information button')?.textContent,
     ).toContain('Desvio');
-    expect(items[1].querySelector('app-bus-information button')).toBeNull();
+
     const count = query.mock.calls.length;
     fixture.componentInstance.arrivals.update((value) =>
       value ? { ...value, hr: '12:01' } : value,
@@ -219,6 +353,7 @@ describe('StopArrivalsComponent', () => {
       stopId: 'artesp:42',
       sourceAgency: 'ARTESP',
     });
+    fixture.componentRef.setInput('compact', true);
     fixture.detectChanges();
     fixture.detectChanges();
 
@@ -254,6 +389,7 @@ describe('StopArrivalsComponent', () => {
   });
 
   it('renders the destination selected by the OlhoVivo direction', () => {
+    expandRoute();
     const destination = fixture.nativeElement.querySelector(
       '.line-destination',
     ) as HTMLElement;
@@ -271,8 +407,53 @@ describe('StopArrivalsComponent', () => {
   });
 
   it('renders circular line numbers beside the station name and preserves distance', () => {
+    const displayedRoute = {
+      ...route,
+      destination: 'Term. Pirituba',
+      directionId: 0,
+    };
+    fixture.componentRef.setInput('routes', [displayedRoute]);
+    fixture.detectChanges();
+    fixture.componentInstance.railConnections.set(
+      new Map([
+        [
+          displayedRoute.routeId,
+          {
+            ...connection,
+            directions: [
+              {
+                directionId: 1,
+                headsign: 'Term. Pirituba',
+                stations: [
+                  { ...createStation('vila-madalena', 'Vila Madalena'), stopsUntil: 3 },
+                  { ...createStation('pinheiros', 'Pinheiros'), stopsUntil: 8 },
+                ],
+              },
+            ],
+          },
+        ],
+      ]),
+    );
+    fixture.detectChanges();
+    expandRoute();
+    const connectionsSection = fixture.nativeElement.querySelector(
+      '.route-rail-connections',
+    ) as HTMLElement;
+    const arrivalsSection = fixture.nativeElement.querySelector(
+      '.route-arrivals',
+    ) as HTMLElement;
+    expect(connectionsSection.getAttribute('aria-label')).toBe(
+      'Estações de metrô e trem atendidas',
+    );
+    expect(
+      connectionsSection.querySelector('.route-detail-title')?.textContent,
+    ).toContain('Estações de metrô e trem atendidas');
+    expect(connectionsSection.classList).toContain('separated-section');
+    expect(arrivalsSection.compareDocumentPosition(connectionsSection)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
     const station = fixture.nativeElement.querySelector(
-      '.rail-service .rail-station',
+      '.route-rail-connections .rail-station',
     ) as HTMLElement;
 
     expect(
@@ -287,6 +468,14 @@ describe('StopArrivalsComponent', () => {
     expect(
       station.querySelector('.rail-station-distance')?.textContent?.trim(),
     ).toBe('Parada da linha a 131 m da estação');
+    expect(
+      Array.from(
+        fixture.nativeElement.querySelectorAll('.rail-station-spacing > span'),
+      ).map((spacing: Element) => spacing.textContent?.trim()),
+    ).toEqual([
+      'Em 3 paradas',
+      'Mais 5 paradas',
+    ]);
   });
 
   it('does not format invalid station distances', () => {
@@ -344,7 +533,11 @@ describe('StopArrivalsComponent', () => {
   });
 });
 
-function createArrivals(line: LineWithVehicles): StopArrivalUpdate {
+type StopArrivalsWithPoint = Omit<StopArrivalUpdate, 'p'> & {
+  p: NonNullable<StopArrivalUpdate['p']>;
+};
+
+function createArrivals(line: LineWithVehicles): StopArrivalsWithPoint {
   return {
     stopCode: '630012905',
     hr: '15:31',
@@ -369,5 +562,16 @@ function createStation(id: string, name: string) {
     nearStopId: '6311025',
     nearStopName: 'R. Cristovão de Burgos, 54',
     stopSequence: 26,
+  };
+}
+
+function createVehicle(p: number, t?: string) {
+  return {
+    p,
+    a: false,
+    ta: '2026-10-10T12:00:00.000Z',
+    py: 0,
+    px: 0,
+    ...(t === undefined ? {} : { t }),
   };
 }

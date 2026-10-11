@@ -15,6 +15,7 @@ export const LITE_SEARCH_QUERY = `
           routes {
             favoriteCode
             destination
+            isCircular
             directionId
             id
             route_id
@@ -69,6 +70,7 @@ export const LITE_NEARBY_QUERY = `
           routes {
             favoriteCode
             destination
+            isCircular
             directionId
             id
             route_id

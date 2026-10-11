@@ -40,6 +40,7 @@ describe('DashboardApiService bus direction lookups', () => {
     expect(request.request.body.query).toContain('favoriteCode');
     expect(request.request.body.query).toContain('requestedCode');
     expect(request.request.body.query).toContain('destination');
+    expect(request.request.body.query).toContain('isCircular');
     expect(request.request.body.query).toContain('directionId');
 
     const response = {
@@ -52,6 +53,7 @@ describe('DashboardApiService bus direction lookups', () => {
             favoriteCode: 'bus:v1:sptrans:477A-10:one:two',
             requestedCode: '477A-10',
             destination: 'Pinheiros',
+            isCircular: true,
             directionId: 0,
           },
         ],
@@ -73,6 +75,7 @@ describe('DashboardApiService bus direction lookups', () => {
     );
     expect(request.request.body.query).toContain('favoriteCode');
     expect(request.request.body.query).toContain('destination');
+    expect(request.request.body.query).toContain('isCircular');
     expect(request.request.body.query).toContain('directionId');
 
     const response = {
@@ -84,6 +87,7 @@ describe('DashboardApiService bus direction lookups', () => {
             longName: 'Sacomã – Pinheiros',
             favoriteCode: 'bus:v1:sptrans:477A-10:one:two',
             destination: 'Pinheiros',
+            isCircular: true,
             directionId: 0,
           },
         ],

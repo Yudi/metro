@@ -23,6 +23,7 @@ export interface MapPanelOpenOptions<TData> {
   data: TData;
   title: string | Signal<string>;
   summary: string | Signal<string>;
+  showSummary?: boolean;
   titleLineGroups?: MapPanelAgencyLineGroup[];
   icon?: string;
   initialSnap?: MapPanelSnap;
@@ -35,6 +36,7 @@ export interface MapPanelDescriptor {
   data: unknown;
   title: string | Signal<string>;
   summary: string | Signal<string>;
+  showSummary?: boolean;
   titleLineGroups?: MapPanelAgencyLineGroup[];
   icon?: string;
   ref: MapPanelRef<unknown, unknown>;
@@ -85,6 +87,7 @@ export class MapPanelService {
       title: options.title,
       summary: options.summary,
       titleLineGroups: options.titleLineGroups,
+      showSummary: options.showSummary ?? true,
       icon: options.icon,
       showDismiss: options.showDismiss ?? true,
       ref: ref as unknown as MapPanelRef<unknown, unknown>,

@@ -132,6 +132,7 @@ export class SearchResolver {
           id: direction.favoriteCode,
           favoriteCode: direction.favoriteCode,
           destination: direction.destination,
+          isCircular: direction.isCircular,
           directionId: direction.directionId,
         })) : [base];
       });
@@ -157,7 +158,7 @@ export class SearchResolver {
     }
 
     const routes = await loaders.routesLoader.load(stop.stop_id);
-    if (info && !requestsAnyField(info, ['favoriteCode', 'destination', 'directionId'])) {
+    if (info && !requestsAnyField(info, ['favoriteCode', 'destination', 'isCircular', 'directionId'])) {
       return routes;
     }
     const directions = await this.getSearchDirections(routes.map((route) => route.route_id), stopId);
@@ -168,6 +169,7 @@ export class SearchResolver {
         id: direction.favoriteCode,
         favoriteCode: direction.favoriteCode,
         destination: direction.destination,
+        isCircular: direction.isCircular,
         directionId: direction.directionId,
       })) : [route];
     });

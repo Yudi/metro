@@ -20,6 +20,10 @@ import { MapSelectionService } from './map-selection.service';
 import { MapStateService } from './map-state.service';
 import { GeographyGraphQLService } from '../../geography/geography-graphql.service';
 import { MapPanelService } from './map-panel/map-panel.service';
+import {
+  BusVehicleDetailsComponent,
+  BusVehicleDetails,
+} from './bus-vehicle-details.component';
 
 @Service()
 export class MapFeatureInteractionService {
@@ -203,6 +207,7 @@ export class MapFeatureInteractionService {
       color: routeData.color,
       textColor: routeData.textColor,
       destination: routeData.destination,
+      isCircular: routeData.isCircular,
       favoriteCode: routeData.favoriteCode,
       directionId: routeData.directionId,
     };
@@ -219,6 +224,7 @@ export class MapFeatureInteractionService {
           sourceAgency: route?.sourceAgency,
           fares: route?.fares,
           destination: route?.destination ?? routeData.destination,
+          isCircular: route?.isCircular ?? routeData.isCircular,
           directionId: route?.directionId ?? routeData.directionId,
           favoriteCode: route?.favoriteCode ?? routeData.favoriteCode,
         });
@@ -280,10 +286,42 @@ export class MapFeatureInteractionService {
       ? `Linha ${routeShortName}`
       : 'Linha não informada';
 
-    this.panelService.openNotice({
+    const data: BusVehicleDetails = {
+      routeShortName,
+      destination: typeof destination === 'string' ? destination.trim() : undefined,
+      origin:
+        typeof properties['origin'] === 'string'
+          ? properties['origin'].trim()
+          : undefined,
+      isCircular: properties['isCircular'] === true,
+      routeColor:
+        typeof properties['routeColor'] === 'string'
+          ? properties['routeColor']
+          : undefined,
+      routeTextColor:
+        typeof properties['routeTextColor'] === 'string'
+          ? properties['routeTextColor']
+          : undefined,
+      accessible:
+        typeof properties['accessible'] === 'boolean'
+          ? properties['accessible']
+          : undefined,
+      recordedAt:
+        typeof properties['timestamp'] === 'string'
+          ? properties['timestamp']
+          : undefined,
+    };
+
+    this.panelService.openComponent({
+      component: BusVehicleDetailsComponent,
+      data,
+      showSummary: false,
+      initialSnap: 'half',
       title: `Ônibus ${vehicleId}`,
       summary:
-        typeof destination === 'string' && destination.trim()
+        properties['isCircular'] === true
+          ? `${routeSummary}, Circular`
+          : typeof destination === 'string' && destination.trim()
           ? `${routeSummary}, sentido ${destination}`
           : routeSummary,
       icon: 'directions_bus',
@@ -323,7 +361,9 @@ export class MapFeatureInteractionService {
         : `${properties['shortName']} - ${properties['longName']}`
       : properties['longName'] || routeId;
     const directionSuffix =
-      typeof destination === 'string' && destination.trim()
+      properties['isCircular'] === true
+        ? ', Circular'
+        : typeof destination === 'string' && destination.trim()
         ? `, sentido ${destination.trim()}`
         : '';
     const fareLabel = this.getFareLabel(properties['fares']);

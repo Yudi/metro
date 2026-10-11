@@ -479,6 +479,21 @@ export class Dashboard {
     return this.filterScheduledDestinations(stopId, this.busSchedulesByStopId().get(stopId) ?? []);
   }
 
+  getScheduledDepartureDestination(
+    stopId: string,
+    departure: LiteScheduledBusDeparture,
+  ): string {
+    const headsign = departure.headsign.trim().toLocaleUpperCase('pt-BR');
+    const route = this.getSelectedBusRoutes(stopId).find(
+      (candidate) =>
+        candidate.routeId === departure.routeId &&
+        (!candidate.destination ||
+          candidate.destination.trim().toLocaleUpperCase('pt-BR') === headsign),
+    );
+
+    return route?.isCircular ? 'Circular' : departure.headsign;
+  }
+
   private filterScheduledDestinations(stopId: string, departures: LiteScheduledBusDeparture[]): LiteScheduledBusDeparture[] {
     const routes = this.getSelectedBusRoutes(stopId);
     if (!this.busRoutesByStopId().has(stopId)) return departures;

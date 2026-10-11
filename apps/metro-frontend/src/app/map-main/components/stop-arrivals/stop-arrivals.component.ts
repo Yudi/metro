@@ -15,7 +15,7 @@ import {
   computed,
 } from '@angular/core';
 
-import { NgOptimizedImage } from '@angular/common';
+import { NgOptimizedImage, NgTemplateOutlet } from '@angular/common';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatCardModule } from '@angular/material/card';
@@ -63,6 +63,8 @@ import {
   getHiddenVehicleCount,
   getHiddenVehiclesLabel,
   getMinutesUntilArrival,
+  getNextArrivalEstimate,
+  getStationSpacing,
   getRailDirectionForLine,
   getRailDirections,
   getRouteAgencyLabel,
@@ -79,6 +81,7 @@ import {
   selector: 'app-stop-arrivals',
   imports: [
     NgOptimizedImage,
+    NgTemplateOutlet,
     BusInformationComponent,
     MatExpansionModule,
     MatTooltipModule,
@@ -139,13 +142,6 @@ export class StopArrivalsComponent {
         ]),
       ),
   );
-  readonly arrivalRows = computed(() =>
-    this.arrivalLines().map((line) => ({
-      line,
-      notices: this.noticesByRoute().get(line.c.trim().toUpperCase()) ?? [],
-    })),
-  );
-
   private realtimeService = inject(RealtimeWebsocketService);
   private geographyService = inject(GeographyGraphQLService);
 
@@ -179,6 +175,8 @@ export class StopArrivalsComponent {
       ).split(', ');
       return {
         ...departure,
+        destinationLabel: route?.isCircular ? 'Circular' : departure.headsign,
+        directionDescription: route?.isCircular ? 'Circular' : `sentido ${departure.headsign}`,
         key: this.getScheduledDepartureKey(departure),
         timeLabel,
         dayLabel,
@@ -253,6 +251,59 @@ export class StopArrivalsComponent {
     );
   });
 
+  readonly routeRows = computed(() => {
+    const arrivalsByRoute = new Map<string, LineWithVehicles[]>();
+    for (const line of this.arrivalLines()) {
+      const route = findRouteForArrivalLine(line, this.routes());
+      if (!route) continue;
+      const key = this.getRouteKey(route);
+      const lines = arrivalsByRoute.get(key) ?? [];
+      lines.push(line);
+      arrivalsByRoute.set(key, lines);
+    }
+
+    return this.displayRoutes().map((route) => {
+      const arrivals = arrivalsByRoute.get(this.getRouteKey(route)) ?? [];
+      return {
+        route,
+        arrivals,
+        nextArrival: getNextArrivalEstimate(arrivals),
+        directionLabel: this.getRouteDirectionLabel(route, arrivals),
+        schedules: this.scheduledGroups().filter((group) => {
+          const scheduledRoute = this.getScheduledDepartureRoute(group.next);
+          return scheduledRoute
+            ? this.getRouteKey(scheduledRoute) === this.getRouteKey(route)
+            : group.next.routeId === route.routeId && route.destination === undefined;
+        }),
+        notices: this.noticesByRoute().get(normalizeRouteCode(route.shortName)) ?? [],
+        directions: this.getRouteDirectionsWithRail(route),
+        hasRealtime: supportsSptransRealtime(route) && this.hasRealtimeSupport(),
+        hasSchedules: isArtespRoute(route) && this.hasArtespSchedules(),
+      };
+    });
+  });
+
+  private getRouteDirectionLabel(
+    route: BusRouteGraphQL,
+    arrivals: LineWithVehicles[],
+  ): string {
+    if (route.isCircular) return 'Circular';
+    if (route.destination) return `Sentido ${route.destination}`;
+
+    const directions = this.getRouteConnection(route)?.directions.filter(
+      (direction) => route.directionId === undefined || direction.directionId === route.directionId,
+    ) ?? [];
+    const destinations = [...new Set(
+      (directions.length > 0
+        ? directions.map((direction) => direction.headsign)
+        : arrivals.map((line) => getOlhoVivoDestination(line)))
+        .map((destination) => destination.trim())
+        .filter(Boolean),
+    )];
+    if (destinations.length === 0) return 'Sentido não informado';
+    return `${destinations.length === 1 ? 'Sentido' : 'Sentidos'} ${destinations.join(' / ')}`;
+  }
+
   constructor() {
     // Read the cached snapshot once for the route set, independently of 30s arrival updates.
     effect((onCleanup) => {
@@ -283,6 +334,8 @@ export class StopArrivalsComponent {
 
       this.arrivals.set(undefined);
       this.isLoading.set(realtimeStopCode !== null);
+      this.expandedRoutes.set(new Set());
+      this.expandedArrivalLines.set(new Set());
 
       if (realtimeStopCode) {
         // Subscribe to this stop
@@ -596,6 +649,9 @@ export class StopArrivalsComponent {
   }
 
   getLineDestination(line: LineWithVehicles): string {
+    if (findRouteForArrivalLine(line, this.routes())?.isCircular) {
+      return 'Circular';
+    }
     return getOlhoVivoDestination(line);
   }
 
@@ -611,5 +667,12 @@ export class StopArrivalsComponent {
 
   getArrivalLineKey(line: LineWithVehicles): string {
     return getArrivalLineKey(line);
+  }
+
+  getStationSpacing(
+    station: RouteRailConnectionStationGraphQL,
+    previous?: RouteRailConnectionStationGraphQL,
+  ): string | null {
+    return getStationSpacing(station, previous);
   }
 }

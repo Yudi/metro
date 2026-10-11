@@ -24,25 +24,35 @@ import type {
 
 export const VISIBLE_VEHICLE_COUNT = 2;
 
+export function getNextArrivalEstimate(lines: LineWithVehicles[]): string | null {
+  const now = new Date();
+  const minutes = lines.flatMap((line) =>
+    line.vs.flatMap((vehicle) => {
+      const estimate = vehicle.t ? getArrivalMinutes(vehicle.t, now) : null;
+      return estimate === null ? [] : [estimate];
+    }),
+  );
+  if (minutes.length === 0) return null;
+  return formatArrivalDuration(Math.min(...minutes));
+}
+
 export function getMinutesUntilArrival(arrivalTime: string): string {
-  try {
-    const [hours, minutes] = arrivalTime.split(':').map(Number);
-    const now = new Date();
-    const arrival = new Date();
-    arrival.setHours(hours, minutes, 0);
+  const minutes = getArrivalMinutes(arrivalTime, new Date());
+  if (minutes === null) return arrivalTime;
+  return minutes === 0 ? 'Chegando' : `Em ${formatArrivalDuration(minutes)}`;
+}
 
-    if (arrival < now) {
-      arrival.setDate(arrival.getDate() + 1);
-    }
+function formatArrivalDuration(minutes: number): string {
+  return minutes < 60
+    ? `${minutes} min`
+    : `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')}min`;
+}
 
-    const diffMins = Math.round((arrival.getTime() - now.getTime()) / 60000);
-    if (diffMins === 0) return 'Chegando';
-    if (diffMins < 0) return 'Atrasado';
-    if (diffMins === 1) return 'Em 1 min';
-    return `Em ${diffMins} min`;
-  } catch {
-    return arrivalTime;
-  }
+function getArrivalMinutes(arrivalTime: string, now: Date): number | null {
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(arrivalTime)) return null;
+  const [hours, minutes] = arrivalTime.split(':').map(Number);
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  return (hours * 60 + minutes - currentMinutes + 1440) % 1440;
 }
 
 export function getVisibleVehicles(
@@ -223,6 +233,24 @@ export function formatStationDistance(
     return null;
   }
   return `Parada da linha a ${distanceMeters} m da estação`;
+}
+
+export function getStationSpacing(
+  station: RouteRailConnectionStationGraphQL,
+  previous?: RouteRailConnectionStationGraphQL,
+): string | null {
+  const currentCount = station.stopsUntil;
+  const previousCount = previous ? previous.stopsUntil : 0;
+  if (
+    typeof currentCount !== 'number' || !Number.isInteger(currentCount) ||
+    typeof previousCount !== 'number' || !Number.isInteger(previousCount) ||
+    currentCount < 0 || previousCount < 0 || currentCount < previousCount
+  ) return null;
+
+  const stops = currentCount - previousCount;
+  if (stops === 0) return previous ? 'Na mesma parada' : 'Neste ponto';
+  const label = stops === 1 ? '1 parada' : `${stops} paradas`;
+  return previous ? `Mais ${label}` : `Em ${label}`;
 }
 
 function normalizeName(name: string): string {

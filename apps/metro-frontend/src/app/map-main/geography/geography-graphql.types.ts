@@ -24,6 +24,7 @@ export interface BusRouteGraphQL {
   favoriteCode?: string;
   requestedCode?: string;
   destination?: string;
+  isCircular?: boolean;
   directionId?: number;
   id: string;
   routeId: string;
@@ -73,6 +74,8 @@ export interface RouteRailConnectionStationGraphQL {
   name: string;
   lines: string[];
   distanceMeters: number;
+  /** Scheduled stops from the selected bus stop, excluding it and including the rail-serving stop. */
+  stopsUntil?: number | null;
 }
 
 export interface RouteRailConnectionDirectionGraphQL {

@@ -13,6 +13,7 @@ import {
   BoundingBox,
   RouteFullData,
   RouteRailConnection,
+  RouteRailConnectionStation,
 } from '../entities/geography.entity';
 import { BoundingBoxInput, StopSearchInput } from '../dto/geography.input';
 import { mapBusRoute } from './bus-catalog.utils';
@@ -275,6 +276,7 @@ export class GeographyServiceOptimized {
         agencies: string[];
         lines: string[];
         distance_meters: number;
+        stops_until: number | null;
       }>
     >`
       WITH resolved_stops AS (
@@ -294,6 +296,66 @@ export class GeographyServiceOptimized {
         FROM resolved_stops resolved
         LEFT JOIN "public"."physical_stop_members" member
           ON member.physical_stop_id = resolved.physical_stop_id
+      ),
+      matched_hits AS (
+        SELECT hit.*
+        FROM "public"."route_rail_connection_hits" hit
+        INNER JOIN expanded_stops expanded
+          ON expanded.source_stop_id = hit.from_stop_id
+        WHERE hit.route_id = ANY(${uniqueRouteIds}::TEXT[])
+      ),
+      candidate_stop_counts AS (
+        SELECT DISTINCT
+          hit.from_stop_id,
+          hit.route_id,
+          hit.direction_id,
+          hit.trip_headsign,
+          hit.station_id,
+          hit.near_stop_id,
+          hit.near_stop_sequence,
+          (
+            SELECT COUNT(*)::INTEGER
+            FROM "public"."Gtfs_StopTime" between_stop
+            WHERE between_stop.trip_id = trip.trip_id
+              AND between_stop.stop_sequence > origin.stop_sequence
+              AND between_stop.stop_sequence <= near_stop.stop_sequence
+          ) AS stops_until
+        FROM matched_hits hit
+        INNER JOIN "public"."Gtfs_Trip" trip
+          ON trip.route_id = hit.route_id
+          AND trip.direction_id = hit.direction_id
+          AND trip.trip_headsign = hit.trip_headsign
+        INNER JOIN "public"."Gtfs_StopTime" origin
+          ON origin.trip_id = trip.trip_id
+          AND origin.stop_id = hit.from_stop_id
+        INNER JOIN "public"."Gtfs_StopTime" near_stop
+          ON near_stop.trip_id = trip.trip_id
+          AND near_stop.stop_id = hit.near_stop_id
+          AND near_stop.stop_sequence = hit.near_stop_sequence
+        WHERE near_stop.stop_sequence > origin.stop_sequence
+      ),
+      matched_stop_counts AS (
+        SELECT
+          from_stop_id,
+          route_id,
+          direction_id,
+          trip_headsign,
+          station_id,
+          near_stop_id,
+          near_stop_sequence,
+          CASE
+            WHEN COUNT(DISTINCT stops_until) = 1 THEN MIN(stops_until)
+            ELSE NULL
+          END AS stops_until
+        FROM candidate_stop_counts
+        GROUP BY
+          from_stop_id,
+          route_id,
+          direction_id,
+          trip_headsign,
+          station_id,
+          near_stop_id,
+          near_stop_sequence
       )
       SELECT
         hit.route_id,
@@ -308,17 +370,25 @@ export class GeographyServiceOptimized {
         hit.station_name,
         hit.agencies,
         hit.lines,
-        hit.distance_meters
-      FROM "public"."route_rail_connection_hits" hit
-      INNER JOIN expanded_stops expanded
-        ON expanded.source_stop_id = hit.from_stop_id
-      WHERE hit.route_id = ANY(${uniqueRouteIds}::TEXT[])
+        hit.distance_meters,
+        matched_count.stops_until
+      FROM matched_hits hit
+      LEFT JOIN matched_stop_counts matched_count
+        ON matched_count.from_stop_id = hit.from_stop_id
+        AND matched_count.route_id = hit.route_id
+        AND matched_count.direction_id = hit.direction_id
+        AND matched_count.trip_headsign = hit.trip_headsign
+        AND matched_count.station_id = hit.station_id
+        AND matched_count.near_stop_id = hit.near_stop_id
+        AND matched_count.near_stop_sequence = hit.near_stop_sequence
       ORDER BY
         hit.route_short_name,
         CASE WHEN hit.route_id LIKE 'artesp:%' THEN 1 ELSE 0 END,
         hit.direction_id,
         hit.trip_headsign,
-        hit.near_stop_sequence
+        hit.near_stop_sequence,
+        hit.station_id,
+        hit.from_stop_id
     `;
 
     const connections = new Map<string, RouteRailConnection>();
@@ -350,7 +420,7 @@ export class GeographyServiceOptimized {
         connection.directions.push(direction);
       }
 
-      direction.stations.push({
+      const station: RouteRailConnectionStation = {
         id: row.station_id.toString(),
         name: row.station_name,
         agencies: row.agencies,
@@ -359,7 +429,21 @@ export class GeographyServiceOptimized {
         nearStopId: row.stop_id,
         nearStopName: row.stop_name,
         stopSequence: row.stop_sequence,
-      });
+        stopsUntil: row.stops_until,
+      };
+      const existingStation = direction.stations.find(
+        (item) => item.id === station.id,
+      );
+
+      if (!existingStation) {
+        direction.stations.push(station);
+        continue;
+      }
+
+      existingStation.stopsUntil =
+        existingStation.stopsUntil === row.stops_until
+          ? existingStation.stopsUntil
+          : null;
     }
 
     return Array.from(connections.values());

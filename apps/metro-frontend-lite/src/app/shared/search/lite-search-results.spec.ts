@@ -20,6 +20,8 @@ describe('processLiteSearchResults', () => {
             route_id: 'artesp:001',
             route_short_name: '001',
             route_long_name: 'Terminal Central',
+            destination: 'Terminal Central',
+            isCircular: true,
             supportsRealtime: false,
             fares: [{ price: 5, currency: 'BRL' }],
           },
@@ -55,6 +57,8 @@ describe('processLiteSearchResults', () => {
         {
           id: 'route-row',
           routeId: 'artesp:001',
+          destination: 'Terminal Central',
+          isCircular: true,
           supportsRealtime: false,
           fares: [{ price: 5, currency: 'BRL' }],
         },

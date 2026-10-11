@@ -13,6 +13,7 @@ function row(direction = 0) {
     route_id: 'new-feed-id', route_short_name: '001', route_long_name: 'A - B',
     source_agency: 'sptrans', source_id: 'new-feed-id', route_type: 3,
     direction_id: direction, destination: direction ? 'Terminal A' : 'Terminal B',
+    is_circular: false,
     shape_ids: [direction ? 'inbound-shape' : 'outbound-shape'],
     stops: direction ? [...outboundStops].reverse() : outboundStops,
     serves_stop: true, fares: [{ price: 5, currency: 'BRL' }],
@@ -58,6 +59,7 @@ describe('BusDirectionService favorites', () => {
     expect(directions).toHaveLength(2);
     expect(new Set(directions.map((direction) => direction.favoriteCode)).size).toBe(2);
     expect(directions.map((direction) => direction.destination)).toEqual(['Terminal B', 'Terminal A']);
+    expect(directions.every((direction) => !direction.isCircular)).toBe(true);
     expect(directions.every((direction) => direction.requestedCode === 'new-feed-id')).toBe(true);
     expect(directions[0].fares).toEqual([{ price: 5, currency: 'BRL' }]);
   });

@@ -1019,6 +1019,11 @@ type RouteRailConnectionStation {
   nearStopId: String!
   nearStopName: String!
   stopSequence: Int!
+
+  """
+  Number of scheduled bus stops after the selected physical stop through the nearest rail-serving bus stop; null when matching trips or merged source stops disagree
+  """
+  stopsUntil: Int
 }
 
 type ScheduledBusDeparture {

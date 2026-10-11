@@ -78,6 +78,9 @@ export class MapSelectionsPanelComponent {
   }
 
   getRouteDisplayName(route: SelectedRoute): string {
+    if (route.isCircular) {
+      return `${route.shortName}, Circular`;
+    }
     const destination = route.destination?.trim();
     if (destination) {
       return `${route.shortName}, sentido ${destination}`;

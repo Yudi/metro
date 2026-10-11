@@ -7,6 +7,7 @@ export const BUS_FAVORITES_LOOKUP_QUERY = `
       favoriteCode
       requestedCode
       destination
+      isCircular
       directionId
       color
       textColor

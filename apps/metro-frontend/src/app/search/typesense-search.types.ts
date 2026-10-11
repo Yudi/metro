@@ -3,6 +3,7 @@ import type { BusFare } from '@metro/shared/utils';
 export interface TypesenseRoute {
   favoriteCode?: string;
   destination?: string;
+  isCircular?: boolean;
   directionId?: number;
   id: string;
   route_id: string;

@@ -57,6 +57,7 @@ export class SearchBusRoute implements SearchResult {
   @Field() route_long_name!: string;
   @Field({ nullable: true }) favoriteCode?: string;
   @Field({ nullable: true }) destination?: string;
+  @Field(() => Boolean, { nullable: true }) isCircular?: boolean;
   @Field(() => Int, { nullable: true }) directionId?: number;
   @Field(() => Int) route_type!: number;
   @Field({ nullable: true }) route_color?: string;

@@ -202,6 +202,16 @@ type Story = StoryObj<LiteBusStopDetail>;
 
 export const WithArrivals: Story = {};
 
+export const CircularRoute: Story = {
+  args: {
+    stop: {
+      ...stop,
+      routes: [{ ...routes[2], isCircular: true }],
+    },
+    railConnections: [],
+  },
+};
+
 export const Loading: Story = {
   args: {
     arrivals: undefined,

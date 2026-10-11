@@ -24,9 +24,9 @@ export function mapTypesenseResult(
     const isRailLine = route.source === 'rail';
     return {
       id: route.id,
-      name: isRailLine ? route.route_long_name : `${route.route_short_name}${route.destination ? `, sentido ${route.destination}` : ''}`,
+      name: isRailLine ? route.route_long_name : `${route.route_short_name}${route.isCircular ? ', Circular' : route.destination ? `, sentido ${route.destination}` : ''}`,
       type: 'route' as SearchResultType,
-      description: isRailLine ? route.route_short_name : route.destination ?? route.route_long_name,
+      description: isRailLine ? route.route_short_name : route.isCircular ? 'Circular' : route.destination ?? route.route_long_name,
       routeData: route,
       latitude: undefined,
       longitude: undefined,

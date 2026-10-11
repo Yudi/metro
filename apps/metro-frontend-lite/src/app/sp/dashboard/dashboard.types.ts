@@ -18,6 +18,7 @@ export interface BusRouteInsight {
   favoriteCode?: string;
   requestedCode?: string;
   destination?: string;
+  isCircular?: boolean;
   directionId?: number;
   favoriteNotice?: string;
   color?: string;
@@ -53,6 +54,7 @@ export interface BusRouteGraphQL {
   favoriteCode?: string;
   requestedCode?: string;
   destination?: string;
+  isCircular?: boolean;
   directionId?: number;
   color?: string;
   textColor?: string;

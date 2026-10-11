@@ -15,6 +15,7 @@ import { AsyncTtlCache } from '../../common/cache/async-ttl-cache';
 interface DirectionRow extends BusRouteRow {
   direction_id: number | null;
   destination: string;
+  is_circular: boolean;
   shape_ids: string[];
   stops: Array<{ latitude: number; longitude: number; name: string }>;
   serves_stop: boolean;
@@ -153,6 +154,14 @@ export class BusDirectionService {
         FROM "public"."bus_direction_patterns" pattern
         INNER JOIN selected_routes route ON route.route_id = pattern.route_id
       ),
+      route_destination_counts AS MATERIALIZED (
+        SELECT route_id,
+          COUNT(DISTINCT NULLIF(LOWER(TRIM(COALESCE(
+            NULLIF(TRIM(trip_headsign), ''), stops->-1->>'name'
+          ))), '')) AS destination_count
+        FROM pattern_stops
+        GROUP BY route_id
+      ),
       anchored_patterns AS (
         SELECT pattern.*,
           concat_ws(':',
@@ -187,9 +196,11 @@ export class BusDirectionService {
       )
       SELECT route.*, COALESCE(fares.fares, '[]'::jsonb) AS fares, pattern.direction_id,
         COALESCE(NULLIF(TRIM(pattern.trip_headsign), ''), pattern.stops->-1->>'name') AS destination,
+        route_destinations.destination_count = 1 AS is_circular,
         pattern.shape_ids, pattern.stops, pattern.direction_serves_stop AS serves_stop
       FROM direction_patterns pattern
       INNER JOIN selected_routes route ON route.route_id = pattern.route_id
+      INNER JOIN route_destination_counts route_destinations ON route_destinations.route_id = route.route_id
       LEFT JOIN LATERAL (
         SELECT jsonb_agg(jsonb_build_object('price', fare.price, 'currency', fare.currency_type)) AS fares
         FROM (
@@ -233,6 +244,7 @@ export class BusDirectionService {
         favoriteCode,
         requestedCode: row.route_id,
         destination: row.destination,
+        isCircular: row.is_circular,
         directionId: row.direction_id ?? 0,
         shapeIds,
       });

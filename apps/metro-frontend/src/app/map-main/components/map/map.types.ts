@@ -25,6 +25,7 @@ export interface SelectedRoute {
   shortName: string;
   longName: string;
   destination?: string;
+  isCircular?: boolean;
   directionId?: number;
   color?: string;
   textColor?: string;
@@ -68,6 +69,7 @@ export interface SearchResult {
     route_id: string;
     favoriteCode?: string;
     destination?: string;
+    isCircular?: boolean;
     directionId?: number;
     route_short_name: string;
     route_long_name: string;

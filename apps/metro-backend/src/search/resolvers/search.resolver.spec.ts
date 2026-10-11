@@ -51,11 +51,14 @@ describe('SearchResolver', () => {
     },
   );
 
-  it.each(['terminal: destination', '...Direction', '... on SearchBusRoute { favoriteCode }'])(
+  it.each(['terminal: destination', 'isCircular', '...Direction', '... on SearchBusRoute { favoriteCode }'])(
     'retains requested stop direction enrichment through aliases and fragments: %s',
     async (selection) => {
       const forRoutes = jest.fn().mockResolvedValue([
-        { routeId: 'route-1', favoriteCode: 'outbound', destination: 'Terminal B', directionId: 0 },
+        {
+          routeId: 'route-1', favoriteCode: 'outbound', destination: 'Terminal B',
+          isCircular: true, directionId: 0,
+        },
       ]);
       const resolver = new SearchResolver({} as TypesenseService, {} as SearchService, { forRoutes } as never);
       const loaders = {
@@ -63,7 +66,9 @@ describe('SearchResolver', () => {
       } as unknown as GraphQLLoaders;
       await expect(resolver.routes(
         { stop_id: 'stop-1' } as SearchBusStop, loaders, routeInfo(selection),
-      )).resolves.toEqual([expect.objectContaining({ favoriteCode: 'outbound', destination: 'Terminal B' })]);
+      )).resolves.toEqual([expect.objectContaining({
+        favoriteCode: 'outbound', destination: 'Terminal B', isCircular: true,
+      })]);
     },
   );
 
@@ -156,14 +161,22 @@ describe('SearchResolver', () => {
       { search: jest.fn().mockResolvedValue([busRouteSearchResult({ route_id: 'route-1' })]) } as unknown as TypesenseService,
       {} as SearchService,
       { forRoutes: jest.fn().mockResolvedValue([
-        { routeId: 'route-1', favoriteCode: 'outbound', destination: 'Terminal B', directionId: 0 },
-        { routeId: 'route-1', favoriteCode: 'inbound', destination: 'Terminal A', directionId: 1 },
+        {
+          routeId: 'route-1', favoriteCode: 'outbound', destination: 'Terminal B',
+          isCircular: false, directionId: 0,
+        },
+        {
+          routeId: 'route-1', favoriteCode: 'inbound', destination: 'Terminal A',
+          isCircular: false, directionId: 1,
+        },
       ]) } as never,
     );
     const results = await resolver.search({ query: '001' });
     expect(results).toHaveLength(2);
     expect(results.map((result) => result.id)).toEqual(['outbound', 'inbound']);
-    expect(results[1]).toMatchObject({ route_id: 'route-1', destination: 'Terminal A' });
+    expect(results[1]).toMatchObject({
+      route_id: 'route-1', destination: 'Terminal A', isCircular: false,
+    });
   });
 
   it('applies the global limit after Typesense relevance ordering', async () => {

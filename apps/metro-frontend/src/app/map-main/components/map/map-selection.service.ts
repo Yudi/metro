@@ -142,6 +142,7 @@ export class MapSelectionService {
       shortName: route.shortName,
       longName: route.longName,
       destination: route.destination,
+      isCircular: route.isCircular,
       directionId: route.directionId,
       color: route.color ?? undefined,
       textColor: route.textColor ?? undefined,

@@ -73,6 +73,7 @@ export class FeatureFactoryService {
       properties['gtfsRouteId'] = shape.routeInfo.routeId;
       properties['favoriteCode'] = shape.routeInfo.favoriteCode;
       properties['destination'] = shape.routeInfo.destination;
+      properties['isCircular'] = shape.routeInfo.isCircular;
       properties['directionId'] = shape.routeInfo.directionId;
       properties['shortName'] = shape.routeInfo.shortName;
       properties['longName'] = shape.routeInfo.longName;

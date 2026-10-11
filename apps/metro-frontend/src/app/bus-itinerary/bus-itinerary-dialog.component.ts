@@ -265,6 +265,9 @@ export class BusItineraryDialogComponent {
   readonly data = computed(() => this.detailState().data);
   readonly route = computed(() => this.data()?.route);
   readonly patterns = computed(() => this.data()?.patterns ?? []);
+  readonly isCircularRoute = computed(() =>
+    this.directions().some((direction) => direction.isCircular === true),
+  );
   readonly pattern = computed<ItineraryPattern | undefined>(() => {
     const patterns = this.patterns();
     const manuallySelected = patterns.find(
@@ -304,12 +307,29 @@ export class BusItineraryDialogComponent {
 
     return patterns[0];
   });
-  readonly patternOptions = computed(() =>
-    this.patterns().map((pattern, index) => ({
-      value: pattern.id,
-      label: `${pattern.headsign || (pattern.directionId === 0 ? 'Ida' : pattern.directionId === 1 ? 'Volta' : 'Sentido não informado')}${this.patterns().some((other) => other.id !== pattern.id && other.headsign === pattern.headsign) ? ` (percurso ${index + 1})` : ''}`,
-    })),
-  );
+  readonly patternOptions = computed(() => {
+    const patterns = this.patterns();
+    const isCircular = this.isCircularRoute();
+
+    return patterns.map((pattern, index) => {
+      const hasDuplicateHeadsign = patterns.some(
+        (other) => other.id !== pattern.id && other.headsign === pattern.headsign,
+      );
+      const directionLabel = isCircular
+        ? 'Circular'
+        : pattern.headsign ||
+          (pattern.directionId === 0
+            ? 'Ida'
+            : pattern.directionId === 1
+              ? 'Volta'
+              : 'Sentido não informado');
+
+      return {
+        value: pattern.id,
+        label: `${directionLabel}${hasDuplicateHeadsign ? ` (percurso ${index + 1})` : ''}`,
+      };
+    });
+  });
   // Municipal Sunday gratuity applies to the calendar day, not GTFS hours >=24.
   // https://www.sptrans.com.br/tarifas
   readonly sundayFree = computed(
@@ -548,7 +568,9 @@ export class BusItineraryDialogComponent {
   }
 
   directionFavoriteLabel(direction: BusRouteGraphQL): string {
-    const destination = direction.destination || 'destino não informado';
+    const directionLabel = direction.isCircular
+      ? 'Circular'
+      : `destino ${direction.destination || 'não informado'}`;
     if (
       this.getSavedBusLineFavoriteCode(direction) &&
       this.directionFavoriteDisabled(direction)
@@ -556,8 +578,14 @@ export class BusItineraryDialogComponent {
       return `A linha ${direction.shortName} está salva por inteiro; os sentidos ainda não puderam ser separados`;
     }
     return this.isDirectionFavorite(direction)
-      ? `Remover favorito da linha ${direction.shortName}, destino ${destination}`
-      : `Adicionar aos favoritos a linha ${direction.shortName}, destino ${destination}`;
+      ? `Remover favorito da linha ${direction.shortName}, ${directionLabel}`
+      : `Adicionar aos favoritos a linha ${direction.shortName}, ${directionLabel}`;
+  }
+
+  directionDisplayName(direction: BusRouteGraphQL): string {
+    return direction.isCircular
+      ? 'Circular'
+      : direction.destination || direction.longName;
   }
 
   directionColor(direction: BusRouteGraphQL): string {

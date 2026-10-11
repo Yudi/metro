@@ -11,6 +11,7 @@ import { VectorTileLayerService } from './vector-tiles/vector-tile-layer.service
 import { MapDetailsDialogService } from './map-details-dialog.service';
 import { MapSelectionService } from './map-selection.service';
 import { MapPanelService } from './map-panel/map-panel.service';
+import { BusVehicleDetailsComponent } from './bus-vehicle-details.component';
 
 describe('MapFeatureInteractionService', () => {
   let service: MapFeatureInteractionService;
@@ -120,6 +121,9 @@ describe('MapFeatureInteractionService', () => {
       expect.objectContaining({
         title: 'Ônibus 1234',
         summary: 'Linha 8000-10',
+        component: BusVehicleDetailsComponent,
+        showSummary: false,
+        data: expect.objectContaining({ routeShortName: '8000-10', isCircular: false }),
       }),
     );
   });

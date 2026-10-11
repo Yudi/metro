@@ -103,6 +103,30 @@ describe('LiteBusStopDetail', () => {
     ).toBe('Sentido Vl. Olímpia');
   });
 
+  it('displays Circular while retaining the original destination for direction matching', () => {
+    const circularRoute = {
+      ...route,
+      destination: 'Vl. Olímpia',
+      directionId: 0,
+      isCircular: true,
+    };
+    fixture.componentRef.setInput('stop', {
+      ...stop,
+      routes: [circularRoute],
+    });
+    fixture.detectChanges();
+
+    expect(
+      fixture.nativeElement
+        .querySelector('.route-direction')
+        ?.textContent?.trim(),
+    ).toBe('Circular');
+    expect(circularRoute.destination).toBe('Vl. Olímpia');
+    expect(fixture.componentInstance.getRouteDirectionsWithRail(circularRoute)).toEqual([
+      railConnections[0].directions[0],
+    ]);
+  });
+
   it('uses the numeric direction when both rail directions are available', () => {
     const stationNames = fixture.componentInstance
       .getLineRailStations(line)

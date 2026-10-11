@@ -145,6 +145,7 @@ export class VectorTileFeatureExtractorService {
       routeId: String(routeId),
       favoriteCode: this.toOptionalString(properties['favorite_code']),
       destination: this.toOptionalString(properties['destination']),
+      isCircular: properties['is_circular'] === true,
       directionId: Number.isFinite(parsedDirectionId)
         ? parsedDirectionId
         : undefined,

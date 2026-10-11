@@ -62,6 +62,20 @@ describe('SearchResultCardComponent keyboard activation', () => {
       .toBe('result-direction');
   });
 
+  it('keeps the full line name and replaces a single destination with Circular', () => {
+    fixture.componentRef.setInput('result', {
+      id: 'circular', name: '100', type: 'route', source: 'gtfs',
+      routeData: {
+        id: 'circular', route_id: '100', route_short_name: '100',
+        route_long_name: 'Terminal Central - Bairro', destination: 'Terminal Central',
+        route_color: '1976d2', route_text_color: 'ffffff', source: 'gtfs', isCircular: true,
+      },
+    } satisfies SearchResult);
+    fixture.detectChanges();
+    expect(card.querySelector('.result-title')?.textContent?.trim()).toBe('Terminal Central - Bairro');
+    expect(card.querySelector('.result-direction')?.textContent?.trim()).toBe('Circular');
+  });
+
   it('emits one selection for Space and prevents page scrolling', () => {
     const event = new KeyboardEvent('keydown', {
       key: ' ',

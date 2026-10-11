@@ -188,7 +188,11 @@
                   {{ route.shortName }}
                 </span>
                 <div class="route-copy">
-                  <strong>{{ route.destination || route.longName }}</strong>
+                  <strong>{{
+                    route.isCircular
+                      ? 'Circular'
+                      : route.destination || route.longName
+                  }}</strong>
                   <span class="agency-lockup route-agency">
                     @if (getBusRouteAgencyKey(route); as agencyKey) {
                     <img
@@ -279,7 +283,9 @@
                       [style.color]="scheduleRoute ? routeTextColor(scheduleRoute) : null"
                       >{{ departure.routeShortName }}</strong
                     >
-                    <span>{{ departure.headsign }}</span>
+                    <span>{{
+                      getScheduledDepartureDestination(stop.stopId, departure)
+                    }}</span>
                   </div>
                   @if (departure.platformCode) {
                   <small class="scheduled-platform"
@@ -326,7 +332,11 @@
               {{ route.shortName }}
             </span>
             <div class="route-summary">
-              <strong>{{ route.destination || route.longName }}</strong>
+              <strong>{{
+                route.isCircular
+                  ? 'Circular'
+                  : route.destination || route.longName
+              }}</strong>
               @if (route.favoriteNotice) {
               <small>{{ route.favoriteNotice }}</small>
               }

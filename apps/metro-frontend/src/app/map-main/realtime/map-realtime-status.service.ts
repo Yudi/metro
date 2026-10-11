@@ -52,6 +52,9 @@ export class MapRealtimeStatusService {
           route.id === routeKey || route.routeId === routeKey || route.shortName === routeKey,
         );
         const code = positions.get(routeKey)?.routeLabel ?? selections[0]?.shortName ?? routeKey;
+        if (selections.length && selections.every((route) => route.isCircular)) {
+          return `${code}, Circular`;
+        }
         const destinations = [...new Set(selections.flatMap((route) => route.destination ? [route.destination] : []))];
         return destinations.length ? `${code}, sentido ${destinations.join(' / ')}` : code;
       });

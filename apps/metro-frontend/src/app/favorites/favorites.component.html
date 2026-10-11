@@ -107,7 +107,9 @@
                             </span>
                             <span class="choice-copy">
                               <span class="choice-title">{{
-                                route.destination || route.longName
+                                route.isCircular
+                                  ? 'Circular'
+                                  : route.destination || route.longName
                               }}</span>
                               <span class="choice-meta">
                                 @if (agencyIdentity(route); as agency) {
@@ -184,7 +186,11 @@
                         {{ route.shortName }}
                       </span>
                       <span class="route-favorite-copy">
-                        <strong>{{ route.destination || route.longName }}</strong>
+                        <strong>{{
+                          route.isCircular
+                            ? 'Circular'
+                            : route.destination || route.longName
+                        }}</strong>
                         @if (route.favoriteNotice) {
                           <span class="favorite-route-notice">{{ route.favoriteNotice }}</span>
                         }
@@ -222,7 +228,11 @@
                       matChipRemove
                       matTooltip="Remover dos favoritos"
                       [aria-label]="
-                        'Remover ' + (route.destination || route.longName) + ' dos favoritos'
+                        'Remover ' +
+                          (route.isCircular
+                            ? 'Circular'
+                            : route.destination || route.longName) +
+                          ' dos favoritos'
                       "
                     >
                       <mat-icon>favorite</mat-icon>

@@ -26,6 +26,7 @@ export interface FavoriteBusRoute {
   favoriteCode?: string;
   requestedCode?: string;
   destination?: string;
+  isCircular?: boolean;
   directionId?: number;
   favoriteNotice?: string;
   sourceAgency?: string;

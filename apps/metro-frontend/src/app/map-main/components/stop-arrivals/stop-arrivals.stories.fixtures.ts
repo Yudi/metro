@@ -1,12 +1,24 @@
 import { signal } from '@angular/core';
 import { NEVER, of, throwError } from 'rxjs';
-import { BusInformationService } from '../bus-information/bus-information.service';
+import {
+  BusInformationService,
+  type BusNoticesResult,
+} from '../bus-information/bus-information.service';
 import { GeographyGraphQLService } from '../../geography/geography-graphql.service';
-import type { BusStopGraphQL } from '../../geography/geography-graphql.service';
+import type {
+  BusRouteGraphQL,
+  BusStopGraphQL,
+  RouteRailConnectionGraphQL,
+} from '../../geography/geography-graphql.service';
 import { RealtimeWebsocketService } from '../../realtime/realtime-websocket.service';
 import type { StopArrivalUpdate } from '../../realtime/realtime-websocket.service';
 import {
   MOCK_ROUTE_RAIL_CONNECTIONS,
+  ROUTE_177H,
+  ROUTE_477A,
+  ROUTE_775A,
+  ROUTE_875A,
+  ROUTE_875I,
   SCHEDULED_ARTESP_DEPARTURES,
 } from '@metro/storybook-mocks';
 import { OLHOVIVO_POLL_INTERVAL_MS } from '@metro/shared/utils';
@@ -17,7 +29,76 @@ export interface StopArrivalsProviderOptions {
   isLoading?: boolean;
   scheduledDepartures?: typeof SCHEDULED_ARTESP_DEPARTURES;
   scheduledState?: 'loaded' | 'loading' | 'error';
+  notices?: BusNoticesResult;
+  railConnections?: RouteRailConnectionGraphQL[];
 }
+
+export const BUSY_STOP_MANY_ROUTES: BusRouteGraphQL[] = [
+  ROUTE_477A,
+  ROUTE_775A,
+  ROUTE_177H,
+  ROUTE_875A,
+  ROUTE_875I,
+  {
+    id: '1234-10',
+    routeId: '1234-10',
+    shortName: '1234-10',
+    longName: 'Terminal Regional – Jardim Norte',
+    color: '6D28D9',
+    textColor: 'FFFFFF',
+    sourceAgency: 'SPTRANS',
+    supportsRealtime: true,
+  },
+];
+
+export const SPACED_STATION_ROUTE: BusRouteGraphQL = {
+  id: '456T-10',
+  routeId: '456T-10',
+  shortName: '456T-10',
+  longName: 'Terminal Norte – Terminal Sul',
+  color: '006341',
+  textColor: 'FFFFFF',
+  sourceAgency: 'SPTRANS',
+  supportsRealtime: true,
+  destination: 'Terminal Sul',
+  directionId: 0,
+};
+
+export const SPACED_STATION_RAIL_CONNECTIONS: RouteRailConnectionGraphQL[] = [
+  {
+    routeId: SPACED_STATION_ROUTE.routeId,
+    routeShortName: SPACED_STATION_ROUTE.shortName,
+    directions: [
+      {
+        directionId: 0,
+        headsign: 'Terminal Sul',
+        stations: [
+          {
+            id: 'rail-norte',
+            name: 'Estação Norte',
+            lines: ['AZUL'],
+            distanceMeters: 120,
+            stopsUntil: 3,
+          },
+          {
+            id: 'rail-centro',
+            name: 'Estação Central',
+            lines: ['VERDE'],
+            distanceMeters: 88,
+            stopsUntil: 8,
+          },
+          {
+            id: 'rail-sul',
+            name: 'Estação Sul',
+            lines: ['RUBI'],
+            distanceMeters: 175,
+            stopsUntil: 13,
+          },
+        ],
+      },
+    ],
+  },
+];
 
 export function createStopArrivalsProviders(opts: StopArrivalsProviderOptions) {
   const { stop, arrivals, isLoading = false } = opts;
@@ -38,7 +119,7 @@ export function createStopArrivalsProviders(opts: StopArrivalsProviderOptions) {
       provide: BusInformationService,
       useValue: {
         notices: () =>
-          of({
+          of(opts.notices ?? {
             status: 'AVAILABLE',
             lastUpdated: '2026-09-07T07:30:00Z',
             notices: [
@@ -61,7 +142,8 @@ export function createStopArrivalsProviders(opts: StopArrivalsProviderOptions) {
     {
       provide: GeographyGraphQLService,
       useValue: {
-        getRouteRailConnectionsForStop: () => of(MOCK_ROUTE_RAIL_CONNECTIONS),
+        getRouteRailConnectionsForStop: () =>
+          of(opts.railConnections ?? MOCK_ROUTE_RAIL_CONNECTIONS),
         getScheduledBusDepartures: () => scheduledDepartures$,
       },
     },
@@ -82,6 +164,62 @@ export function createStopArrivalsProviders(opts: StopArrivalsProviderOptions) {
       },
     },
   ];
+}
+
+export function createBusyManyRouteArrivals(
+  stop: BusStopGraphQL,
+  routes: readonly BusRouteGraphQL[],
+): StopArrivalUpdate {
+  const destinations = [
+    'Pinheiros',
+    'Terminal Pirituba',
+    'Lapa',
+    'Term. Pq. Dom Pedro II',
+    'Pq. Dom Pedro II',
+    'Jardim Norte',
+  ];
+  const now = new Date();
+  const nowLabel = now.toTimeString().slice(0, 5);
+  const timeAfter = (minutes: number) =>
+    new Date(now.getTime() + minutes * 60_000).toTimeString().slice(0, 5);
+
+  return {
+    stopCode: stop.stopId,
+    hr: nowLabel,
+    p: {
+      cp: Number.parseInt(stop.stopId, 10),
+      np: stop.name,
+      py: stop.latitude,
+      px: stop.longitude,
+      l: routes.map((route, index) => ({
+        c: route.shortName,
+        cl: 40000 + index,
+        sl: 1,
+        lt0: destinations[index] ?? 'Terminal Regional',
+        lt1: 'Terminal Regional',
+        qv: 2,
+        vs: [
+          {
+            p: 41000 + index * 10,
+            a: index % 2 === 0,
+            ta: now.toISOString(),
+            py: stop.latitude,
+            px: stop.longitude,
+            t: timeAfter(3 + index * 2),
+          },
+          {
+            p: 41001 + index * 10,
+            a: false,
+            ta: now.toISOString(),
+            py: stop.latitude,
+            px: stop.longitude,
+            t: timeAfter(8 + index * 2),
+          },
+        ],
+      })),
+    },
+    cacheTimestamp: now.getTime(),
+  };
 }
 
 function createArrival(

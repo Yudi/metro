@@ -55,6 +55,7 @@ export class BusVectorTileService {
         route_id: direction.routeId,
         direction_id: direction.directionId,
         destination: direction.destination,
+        is_circular: direction.isCircular,
         favorite_code: direction.favoriteCode,
         shape_ids: direction.shapeIds,
       })),
@@ -76,11 +77,12 @@ export class BusVectorTileService {
         ),
         selected_directions AS MATERIALIZED (
           SELECT direction.route_id, direction.direction_id,
-            direction.destination, direction.favorite_code, direction.shape_ids
+            direction.destination, direction.is_circular, direction.favorite_code, direction.shape_ids
           FROM jsonb_to_recordset(${directionJson}::jsonb) AS direction(
             route_id text,
             direction_id integer,
             destination text,
+            is_circular boolean,
             favorite_code text,
             shape_ids text[]
           )
@@ -110,6 +112,7 @@ export class BusVectorTileService {
             NULL::text AS destination,
             NULL::text AS favorite_code,
             NULL::integer AS direction_id,
+            NULL::boolean AS is_circular,
             (LOWER(COALESCE(r.source_agency, 'sptrans')) = 'sptrans'
               AND NOT (r.route_type IN (1, 2) OR r.route_id LIKE 'METRÔ%' OR r.route_id LIKE 'CPTM%')) AS supports_realtime,
             sh.geom
@@ -131,6 +134,7 @@ export class BusVectorTileService {
             direction.destination,
             direction.favorite_code,
             direction.direction_id,
+            direction.is_circular,
             (LOWER(COALESCE(route.source_agency, 'sptrans')) = 'sptrans'
               AND NOT (route.route_type IN (1, 2) OR route.route_id LIKE 'METRÔ%' OR route.route_id LIKE 'CPTM%')) AS supports_realtime,
             gtfs_shape.geom
@@ -167,6 +171,7 @@ export class BusVectorTileService {
             destination,
             favorite_code,
             direction_id,
+            is_circular,
             supports_realtime,
             ST_AsMVTGeom(
               ST_Transform(rs.geom, 3857),

@@ -18,6 +18,7 @@ export const ROUTE_FIELDS = `
     favoriteCode
     requestedCode
     destination
+    isCircular
     directionId
     id
     routeId

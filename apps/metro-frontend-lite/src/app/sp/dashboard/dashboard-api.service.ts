@@ -35,6 +35,7 @@ export class DashboardApiService {
               favoriteCode
               requestedCode
               destination
+              isCircular
               directionId
               color
               textColor
@@ -148,6 +149,7 @@ export class DashboardApiService {
               favoriteCode
               requestedCode
               destination
+              isCircular
               directionId
               color
               textColor

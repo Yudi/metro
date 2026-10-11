@@ -12,6 +12,9 @@ export class BusRouteDirection extends BusRoute {
   @Field()
   destination!: string;
 
+  @Field({ description: 'Whether the route has exactly one distinct destination across its full feed' })
+  isCircular!: boolean;
+
   @Field(() => Int)
   directionId!: number;
 

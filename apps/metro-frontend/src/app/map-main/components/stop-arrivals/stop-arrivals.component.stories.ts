@@ -27,8 +27,12 @@ import {
   createStopArrivalsProviders,
   createSingleLineArrival,
   createBusyStopArrivals,
+  BUSY_STOP_MANY_ROUTES,
+  createBusyManyRouteArrivals,
   createVehicleArriving,
   createAllAccessibleArrivals,
+  SPACED_STATION_ROUTE,
+  SPACED_STATION_RAIL_CONNECTIONS,
 } from './stop-arrivals.stories.fixtures';
 
 // Meta
@@ -164,6 +168,72 @@ export const BusyStop: Story = {
       providers: createStopArrivalsProviders({
         stop: PINHEIROS_BUS_STOP,
         arrivals: createBusyStopArrivals(PINHEIROS_BUS_STOP),
+      }),
+    }),
+  ],
+};
+
+/** Several routes share one stop, each with a live next-arrival estimate. */
+export const BusyStopManyRoutes: Story = {
+  args: {
+    stop: PINHEIROS_BUS_STOP,
+    routes: BUSY_STOP_MANY_ROUTES,
+  },
+  decorators: [
+    applicationConfig({
+      providers: createStopArrivalsProviders({
+        stop: PINHEIROS_BUS_STOP,
+        arrivals: createBusyManyRouteArrivals(
+          PINHEIROS_BUS_STOP,
+          BUSY_STOP_MANY_ROUTES,
+        ),
+      }),
+    }),
+  ],
+};
+
+/** Route-level diversion remains visible even when no bus is approaching. */
+export const NoArrivalsWithDiversion: Story = {
+  args: {
+    stop: PINHEIROS_BUS_STOP,
+    routes: [ROUTE_477A],
+  },
+  decorators: [
+    applicationConfig({
+      providers: createStopArrivalsProviders({
+        stop: PINHEIROS_BUS_STOP,
+        arrivals: createEmptyArrivals(PINHEIROS_BUS_STOP.stopId),
+        notices: {
+          status: 'AVAILABLE',
+          lastUpdated: '2026-09-07T07:30:00Z',
+          notices: [
+            {
+              sourceId: 'storybook-477a-diversion',
+              sourceUrl: 'https://example.test/avisos/477a',
+              title: 'Desvio de itinerário',
+              description:
+                'Exemplo de aviso para a linha 477A-10. Ida: desvio pela via alternativa.',
+              periodText: 'Durante todo o dia.',
+              routes: ['477A-10'],
+            },
+          ],
+        },
+      }),
+    }),
+  ],
+};
+
+/** Stop spacing between rail stations is separate from each station's walking distance. */
+export const RailStationSpacing: Story = {
+  args: {
+    stop: PINHEIROS_BUS_STOP,
+    routes: [SPACED_STATION_ROUTE],
+  },
+  decorators: [
+    applicationConfig({
+      providers: createStopArrivalsProviders({
+        stop: PINHEIROS_BUS_STOP,
+        railConnections: SPACED_STATION_RAIL_CONNECTIONS,
       }),
     }),
   ],

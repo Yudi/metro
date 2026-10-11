@@ -50,6 +50,7 @@ export interface BusRouteTileData {
   routeId: string;
   favoriteCode?: string;
   destination?: string;
+  isCircular?: boolean;
   directionId?: number;
   shortName: string;
   longName: string;

@@ -3,6 +3,23 @@ import { MapSelectionsPanelComponent } from './map-selections-panel.component';
 import type { SelectedRoute } from '../map.types';
 
 describe('MapSelectionsPanelComponent route labels', () => {
+  it('labels a single-destination line as Circular while preserving its destination', async () => {
+    await TestBed.configureTestingModule({ imports: [MapSelectionsPanelComponent] }).compileComponents();
+    const fixture = TestBed.createComponent(MapSelectionsPanelComponent);
+    const route: SelectedRoute = {
+      id: 'circular', routeId: '100', shortName: '100', longName: 'Terminal Centro',
+      destination: 'Terminal Centro', isCircular: true, directionId: 0,
+    };
+    fixture.componentRef.setInput('selectedRoutes', new Map([[route.id, route]]));
+    fixture.componentRef.setInput('selectedStops', new Map());
+    fixture.detectChanges();
+    const element: HTMLElement = fixture.nativeElement;
+    expect(element.querySelector('.route-direction-destination')?.textContent?.trim()).toBe('Circular');
+    expect(element.querySelector('button[matChipRemove]')?.getAttribute('aria-label'))
+      .toBe('Remover rota 100, Circular');
+    expect(route.destination).toBe('Terminal Centro');
+  });
+
   it('adds the opposite on click or keyboard activation while removal stays separate', async () => {
     await TestBed.configureTestingModule({ imports: [MapSelectionsPanelComponent] }).compileComponents();
     const fixture = TestBed.createComponent(MapSelectionsPanelComponent);

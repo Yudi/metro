@@ -143,7 +143,7 @@
       "
     >
       @if (panelService.panel(); as panel) {
-        @if (panel.titleLineGroups?.length || summary()) {
+        @if (panel.titleLineGroups?.length || (panel.showSummary !== false && summary())) {
           <div class="map-panel__details">
             @if (panel.titleLineGroups?.length) {
               <div
@@ -177,7 +177,7 @@
                 }
               </div>
             }
-            @if (summary()) {
+            @if (panel.showSummary !== false && summary()) {
               <p>{{ summary() }}</p>
             }
           </div>

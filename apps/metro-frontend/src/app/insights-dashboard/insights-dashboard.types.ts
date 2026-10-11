@@ -9,6 +9,7 @@ export interface BusRouteInsight {
   favoriteCode?: string;
   requestedCode?: string;
   destination?: string;
+  isCircular?: boolean;
   directionId?: number;
   favoriteNotice?: string;
   color?: string;

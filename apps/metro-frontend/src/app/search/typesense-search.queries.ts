@@ -5,6 +5,7 @@ export const TYPESENSE_SEARCH_QUERY = `
         ... on SearchBusRoute {
           favoriteCode
           destination
+          isCircular
           directionId
           route_id
           route_short_name

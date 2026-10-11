@@ -38,6 +38,7 @@ export function convertToBusRoute(graphqlRoute: BusRouteGraphQL): MapFeature {
       favoriteCode: graphqlRoute.favoriteCode,
       requestedCode: graphqlRoute.requestedCode,
       destination: graphqlRoute.destination,
+      isCircular: graphqlRoute.isCircular,
       directionId: graphqlRoute.directionId,
       shortName: graphqlRoute.shortName,
       longName: graphqlRoute.longName,

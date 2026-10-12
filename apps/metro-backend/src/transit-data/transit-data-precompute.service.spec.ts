@@ -33,6 +33,8 @@ describe('TransitDataPrecomputeService', () => {
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ source_signature: 'rail-hash' }])
       .mockResolvedValueOnce([]);
 
@@ -50,25 +52,35 @@ describe('TransitDataPrecomputeService', () => {
       3,
       'ANALYZE "public"."stop_route_membership"',
     );
+    expect(prisma.$executeRawUnsafe).toHaveBeenNthCalledWith(4,
+      'REFRESH MATERIALIZED VIEW CONCURRENTLY "public"."bus_stop_membership"');
+    expect(prisma.$executeRawUnsafe).toHaveBeenNthCalledWith(5,
+      'ANALYZE "public"."bus_stop_membership"');
+    expect(prisma.$executeRawUnsafe).toHaveBeenNthCalledWith(6,
+      'REFRESH MATERIALIZED VIEW CONCURRENTLY "public"."bus_terminal_stops"');
+    expect(prisma.$executeRawUnsafe).toHaveBeenNthCalledWith(7,
+      'ANALYZE "public"."bus_terminal_stops"');
     expect(prisma.$executeRawUnsafe).toHaveBeenNthCalledWith(
-      4,
+      8,
       'REFRESH MATERIALIZED VIEW CONCURRENTLY "public"."bus_direction_patterns"',
     );
     expect(prisma.$executeRawUnsafe).toHaveBeenNthCalledWith(
-      5,
+      9,
       'ANALYZE "public"."bus_direction_patterns"',
     );
     expect(prisma.$executeRawUnsafe).toHaveBeenNthCalledWith(
-      6,
+      10,
       'REFRESH MATERIALIZED VIEW CONCURRENTLY "public"."route_rail_connection_hits"',
     );
-    expect(prisma.$executeRaw).toHaveBeenCalledTimes(4);
+    expect(prisma.$executeRaw).toHaveBeenCalledTimes(6);
   });
 
   it('skips refreshes when the imported GTFS and merged GeoSampa data are unchanged', async () => {
     prisma.$queryRaw
       .mockResolvedValueOnce([{ source_signature: 'gtfs-hash' }])
       .mockResolvedValueOnce([{ source_signature: 'v2:gtfs-hash' }])
+      .mockResolvedValueOnce([{ source_signature: 'v1:gtfs-hash' }])
+      .mockResolvedValueOnce([{ source_signature: 'v1:gtfs-hash' }])
       .mockResolvedValueOnce([{ source_signature: 'v1:gtfs-hash' }])
       .mockResolvedValueOnce([{ source_signature: 'v1:gtfs-hash' }])
       .mockResolvedValueOnce([{ source_signature: 'rail-hash' }])
@@ -90,6 +102,8 @@ describe('TransitDataPrecomputeService', () => {
       .mockResolvedValueOnce([{ source_signature: 'v2:gtfs-hash' }])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ source_signature: 'rail-hash' }])
       .mockResolvedValueOnce([
         { source_signature: 'v2:radius=200:gtfs=gtfs-hash:rail=rail-hash' },
@@ -100,16 +114,22 @@ describe('TransitDataPrecomputeService', () => {
     expect(prisma.$executeRawUnsafe.mock.calls).toEqual([
       ['REFRESH MATERIALIZED VIEW CONCURRENTLY "public"."stop_route_membership"'],
       ['ANALYZE "public"."stop_route_membership"'],
+      ['REFRESH MATERIALIZED VIEW CONCURRENTLY "public"."bus_stop_membership"'],
+      ['ANALYZE "public"."bus_stop_membership"'],
+      ['REFRESH MATERIALIZED VIEW CONCURRENTLY "public"."bus_terminal_stops"'],
+      ['ANALYZE "public"."bus_terminal_stops"'],
       ['REFRESH MATERIALIZED VIEW CONCURRENTLY "public"."bus_direction_patterns"'],
       ['ANALYZE "public"."bus_direction_patterns"'],
     ]);
-    expect(prisma.$executeRaw).toHaveBeenCalledTimes(2);
+    expect(prisma.$executeRaw).toHaveBeenCalledTimes(4);
   });
 
   it('leaves failed direction refreshes eligible for retry', async () => {
     prisma.$queryRaw
       .mockResolvedValueOnce([{ source_signature: 'gtfs-hash' }])
       .mockResolvedValueOnce([{ source_signature: 'v2:gtfs-hash' }])
+      .mockResolvedValueOnce([{ source_signature: 'v1:gtfs-hash' }])
+      .mockResolvedValueOnce([{ source_signature: 'v1:gtfs-hash' }])
       .mockResolvedValueOnce([{ source_signature: 'v1:gtfs-hash' }])
       .mockResolvedValueOnce([]);
     prisma.$executeRawUnsafe.mockRejectedValueOnce(new Error('direction refresh failed'));

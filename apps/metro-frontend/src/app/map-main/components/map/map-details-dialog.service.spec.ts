@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { LoggerService } from '@metro/shared/api';
+import { BUS_TERMINAL_DETAIL_FIXTURE, BUS_TERMINAL_SUMMARY_FIXTURE } from '@metro/shared/bus-terminal-contracts';
 import { Observable, Subject, of } from 'rxjs';
 import { BikeStation } from './map.types';
 import {
@@ -10,6 +11,9 @@ import {
   StopFullDataSnapshot,
 } from '../../geography/geography-graphql.service';
 import { BikeStationsService } from '../../geography/bike-stations.service';
+import { BusTerminalDialogComponent } from '../bus-terminal-dialog/bus-terminal-dialog.component';
+import type { BusTerminalDialogData } from '../bus-terminal-dialog/bus-terminal-dialog.types';
+import { BusStopDialogComponent } from '../bus-stop-dialog/bus-stop-dialog.component';
 import { MapDetailsDialogService } from './map-details-dialog.service';
 import { MapDisplayService } from './map-display.service';
 import { MapPanelService } from './map-panel/map-panel.service';
@@ -216,6 +220,50 @@ describe('MapDetailsDialogService map-panel lifecycle', () => {
       updatedStop.name,
     );
     expect(panelService.panel()?.id).toBe(firstPanel?.id);
+  });
+
+  it('opens a terminal panel and keeps its filter state for a child stop', () => {
+    service.showBusTerminalDetails(
+      BUS_TERMINAL_SUMMARY_FIXTURE.id,
+      BUS_TERMINAL_SUMMARY_FIXTURE,
+    );
+
+    const terminalPanel = panelService.panel();
+    expect(terminalPanel?.component).toBe(BusTerminalDialogComponent);
+    expect(terminalPanel?.title instanceof Function).toBe(true);
+    expect(
+      typeof terminalPanel?.title === 'function'
+        ? terminalPanel.title()
+        : terminalPanel?.title,
+    ).toBe(BUS_TERMINAL_SUMMARY_FIXTURE.name);
+    const terminalData = terminalPanel?.ref.data as BusTerminalDialogData;
+    expect(terminalData.terminalId).toBe(BUS_TERMINAL_SUMMARY_FIXTURE.id);
+
+    terminalData.onDetailsLoaded?.(BUS_TERMINAL_DETAIL_FIXTURE);
+    expect(
+      typeof terminalPanel?.summary === 'function'
+        ? terminalPanel.summary()
+        : terminalPanel?.summary,
+    ).toContain('2 direções de linha');
+
+    const boardingStop = BUS_TERMINAL_DETAIL_FIXTURE.stops.find(
+      (item) => item.boardingAllowed,
+    );
+    expect(boardingStop).toBeDefined();
+    if (!boardingStop) throw new Error('Terminal fixture requires a boarding stop');
+    terminalData.onSelectStop?.(boardingStop, {
+      query: 'jardim',
+      platformCode: '2',
+      scrollTop: 180,
+    });
+
+    const stopPanel = panelService.panel();
+    expect(stopPanel?.component).toBe(BusStopDialogComponent);
+    expect((stopPanel?.ref.data as { terminalReturn?: unknown }).terminalReturn).toEqual({
+      terminalId: BUS_TERMINAL_SUMMARY_FIXTURE.id,
+      summary: BUS_TERMINAL_SUMMARY_FIXTURE,
+      viewState: { query: 'jardim', platformCode: '2', scrollTop: 180 },
+    });
   });
 
   it('shows a route error when the stop arrives but the deferred patch fails', async () => {

@@ -37,8 +37,8 @@
               <div class="scheduled-title">
                 <h4><mat-icon>schedule</mat-icon> Horários programados</h4>
                 <span class="agency-identity">
-                  <img [ngSrc]="artespLogo" width="24" height="24" alt="" />
-                  Artesp
+                  <img [ngSrc]="artespLogo" width="24" height="24" [alt]="compact() ? 'ARTESP' : ''" />
+                  @if (!compact()) { Artesp }
                 </span>
               </div>
               <p>Estes horários não são previsões em tempo real.</p>

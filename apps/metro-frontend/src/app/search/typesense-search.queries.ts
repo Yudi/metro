@@ -2,6 +2,15 @@ export const TYPESENSE_SEARCH_QUERY = `
     query Search($input: SearchFiltersInput!) {
       search(input: $input) {
         __typename
+        ... on SearchBusTerminal {
+          id
+          name
+          aliases
+          terminalLatitude: latitude
+          terminalLongitude: longitude
+          stopIds
+          platformCodes
+        }
         ... on SearchBusRoute {
           favoriteCode
           destination

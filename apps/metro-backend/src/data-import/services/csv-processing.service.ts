@@ -31,8 +31,6 @@ import {
   importTrips as importTripsRows,
 } from './gtfs-csv-row-importers';
 
-const CSV_BATCH_SIZE = 1_000;
-
 type RowMapper<T extends SqlValue[]> = (record: CsvRecord) => T;
 
 @Injectable()
@@ -123,7 +121,7 @@ export class CsvProcessingService {
    * Read CSV file in bounded batches.
    */
   private async *readCsvBatches(filePath: string): AsyncGenerator<CsvRecord[]> {
-    yield* readCsvBatches(filePath, CSV_BATCH_SIZE);
+    yield* readCsvBatches(filePath, GTFSConfig.CSV_BATCH_SIZE);
   }
 
   /**
@@ -140,6 +138,7 @@ export class CsvProcessingService {
         await this.truncateTable(tx, tableName);
 
         let recordCount = 0;
+        let nextProgressCount = 100_000;
         for await (const records of this.readCsvBatches(filePath)) {
           recordCount += await this.importRecordsBatch(
             tx,
@@ -148,6 +147,10 @@ export class CsvProcessingService {
             records,
             feed,
           );
+          if (recordCount >= nextProgressCount) {
+            this.logger.log(`Imported ${recordCount} records into ${tableName}`);
+            nextProgressCount = recordCount + 100_000;
+          }
         }
 
         if (
@@ -169,7 +172,7 @@ export class CsvProcessingService {
       },
       {
         maxWait: 600000, // 10 minutes max wait
-        timeout: 900000, // 15 minutes timeout
+        timeout: GTFSConfig.getCsvImportTimeoutMs(feed),
       },
     );
   }

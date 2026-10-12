@@ -1,4 +1,5 @@
 import { BusFare } from '../../geography/entities/geography.entity';
+import type { BusTerminalSummary } from '@metro/shared/bus-terminal-contracts';
 import {
   createUnionType,
   ObjectType,
@@ -100,9 +101,21 @@ export class SearchBusStop implements SearchResult {
   routes?: SearchBusRoute[];
 }
 
-/**
- * Rail line
- */
+@ObjectType({ implements: () => SearchResult })
+export class SearchBusTerminal implements SearchResult, BusTerminalSummary {
+  @Field(() => ID) id!: string;
+  @Field(() => Float, { nullable: true }) score?: number;
+  @Field(() => [SearchHighlight], { nullable: true }) highlights?: SearchHighlight[] | null;
+  @Field() type!: 'busTerminal';
+  @Field() name!: string;
+  @Field(() => [String]) aliases!: string[];
+  @Field(() => Float) latitude!: number;
+  @Field(() => Float) longitude!: number;
+  @Field(() => [String]) stopIds!: string[];
+  @Field(() => [String]) platformCodes!: string[];
+}
+
+/** Rail line */
 @ObjectType({ implements: () => SearchResult })
 export class SearchRailLine implements SearchResult {
   // interface fields
@@ -175,20 +188,23 @@ export const SearchResultUnion = createUnionType({
     [
       SearchBusRoute,
       SearchBusStop,
+      SearchBusTerminal,
       SearchRailLine,
       SearchRailStation,
       SearchBikeStation,
     ] as const,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  resolveType(value: any) {
+  resolveType(value: unknown) {
     // expect your resolver objects to contain a `type` discriminator
     if (!value || typeof value !== 'object') return null;
 
+    if (!('type' in value)) return null;
     switch (value.type) {
       case 'busRoute':
         return SearchBusRoute;
       case 'busStop':
         return SearchBusStop;
+      case 'busTerminal':
+        return SearchBusTerminal;
       case 'railLine':
         return SearchRailLine;
       case 'railStation':

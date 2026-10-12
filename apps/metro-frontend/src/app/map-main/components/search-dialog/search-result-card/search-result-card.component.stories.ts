@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/angular';
+import { BUS_TERMINAL_SUMMARY_FIXTURE } from '@metro/shared/bus-terminal-contracts';
 import {
   ROUTE_ARTESP_001,
   ROUTE_ARTESP_WITHOUT_FARE,
@@ -53,6 +54,33 @@ const meta: Meta<SearchResultCardComponent> = {
 export default meta;
 
 type Story = StoryObj<SearchResultCardComponent>;
+
+export const BusTerminal: Story = {
+  args: {
+    result: {
+      id: BUS_TERMINAL_SUMMARY_FIXTURE.id,
+      name: BUS_TERMINAL_SUMMARY_FIXTURE.name,
+      type: 'bus_terminal',
+      source: 'gtfs',
+      description: `Plataformas ${BUS_TERMINAL_SUMMARY_FIXTURE.platformCodes.join(', ')}`,
+      terminalData: BUS_TERMINAL_SUMMARY_FIXTURE,
+    },
+  },
+};
+
+export const TerminalWithoutPlatforms: Story = {
+  args: {
+    result: {
+      ...BusTerminal.args?.result,
+      id: BUS_TERMINAL_SUMMARY_FIXTURE.id,
+      name: BUS_TERMINAL_SUMMARY_FIXTURE.name,
+      type: 'bus_terminal',
+      source: 'gtfs',
+      description: 'Linhas e pontos de embarque',
+      terminalData: { ...BUS_TERMINAL_SUMMARY_FIXTURE, platformCodes: [] },
+    },
+  },
+};
 
 export const ArtespWithFare: Story = {
   args: {

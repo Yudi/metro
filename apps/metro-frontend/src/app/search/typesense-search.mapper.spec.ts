@@ -1,6 +1,17 @@
 import { mapTypesenseSearchResponse } from './typesense-search.mapper';
+import { BUS_TERMINAL_SUMMARY_FIXTURE } from '@metro/shared/bus-terminal-contracts';
 
 describe('mapTypesenseSearchResponse', () => {
+  it('preserves the terminal summary and every member without turning its center into a stop', () => {
+    const terminal = BUS_TERMINAL_SUMMARY_FIXTURE;
+    const result = mapTypesenseSearchResponse(terminal.name, [{
+      ...terminal,
+      __typename: 'SearchBusTerminal',
+      terminalLatitude: terminal.latitude,
+      terminalLongitude: terminal.longitude,
+    }]);
+    expect(result.results[0]).toEqual({ type: 'terminal', document: terminal });
+  });
   it('preserves result order and transit identities without search metadata', () => {
     const route = {
       route_id: 'artesp:001',

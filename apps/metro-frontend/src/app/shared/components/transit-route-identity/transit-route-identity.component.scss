@@ -1,0 +1,16 @@
+@use '../../../../../../../libs/shared/styles/transit-identity' as identity;
+
+:host {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.route-badge {
+  @include identity.route-badge;
+}
+
+.agency-logo {
+  @include identity.agency-logo;
+}

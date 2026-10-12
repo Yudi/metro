@@ -4,6 +4,7 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { FavoritesService, LoggerService } from '@metro/shared/api';
+import { BUS_TERMINAL_SUMMARY_FIXTURE } from '@metro/shared/bus-terminal-contracts';
 import { GeographyGraphQLService } from '../../geography/geography-graphql.service';
 import type { BusRouteGraphQL } from '../../geography/geography-graphql.service';
 import { RealtimeWebsocketService } from '../../realtime/realtime-websocket.service';
@@ -11,6 +12,7 @@ import {
   BusStopDialogComponent,
   BusStopDialogData,
 } from './bus-stop-dialog.component';
+import type { BusTerminalReturnData } from '../bus-terminal-dialog/bus-terminal-dialog.types';
 
 describe('BusStopDialogComponent', () => {
   let component: BusStopDialogComponent;
@@ -20,6 +22,12 @@ describe('BusStopDialogComponent', () => {
     isFavorite: jest.Mock;
     addFavorite: jest.Mock;
     removeFavorite: jest.Mock;
+  };
+  let dialogClose: jest.Mock;
+  const terminalReturn: BusTerminalReturnData = {
+    terminalId: BUS_TERMINAL_SUMMARY_FIXTURE.id,
+    summary: BUS_TERMINAL_SUMMARY_FIXTURE,
+    viewState: { query: 'jardim', platformCode: '2', scrollTop: 140 },
   };
 
   const stop = {
@@ -52,14 +60,17 @@ describe('BusStopDialogComponent', () => {
       stop,
       routes: [],
       selectedRoutes: new Set(),
+      terminalReturn,
     };
+
+    dialogClose = jest.fn();
 
     await TestBed.configureTestingModule({
       imports: [BusStopDialogComponent],
       providers: [
         provideHttpClient(),
         { provide: MAT_DIALOG_DATA, useValue: data },
-        { provide: MatDialogRef, useValue: { close: jest.fn() } },
+        { provide: MatDialogRef, useValue: { close: dialogClose } },
         { provide: FavoritesService, useValue: favoritesService },
         {
           provide: LoggerService,
@@ -176,5 +187,18 @@ describe('BusStopDialogComponent', () => {
     expect(component.routes()).toEqual([route]);
     expect(component.routesLoading()).toBe(false);
     expect(component.routesError()).toBe(false);
+  });
+
+  it('returns to all terminal lines with the saved filters and scroll position', () => {
+    expect(fixture.nativeElement.textContent).toContain(
+      'Ver todas as linhas do terminal',
+    );
+
+    component.returnToTerminal();
+
+    expect(dialogClose).toHaveBeenCalledWith({
+      action: 'returnToTerminal',
+      terminalReturn,
+    });
   });
 });

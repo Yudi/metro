@@ -50,6 +50,35 @@ describe('StationImagesService', () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  it('keeps terminal IDs in their own manifest namespace', async () => {
+    const terminalImageRow = {
+      ...imageRow,
+      key: 'station-images/terminal/terminalcentral.avif',
+      stationIdentity: 'terminal:terminalcentral',
+      lineIds: [],
+    };
+    const { service } = createService({}, undefined, [
+      imageRow,
+      terminalImageRow,
+    ]);
+
+    const manifest = JSON.parse((await service.getManifest()).body.toString());
+
+    expect(manifest.stations).toHaveProperty('luz');
+    expect(manifest.stations).not.toHaveProperty('terminal:terminalcentral');
+    expect(manifest.terminals).toEqual({
+      'terminal:terminalcentral': [
+        {
+          key: terminalImageRow.key,
+          author: terminalImageRow.author,
+          title: terminalImageRow.title,
+          sourceUrl: terminalImageRow.sourceUrl,
+          license: terminalImageRow.license,
+        },
+      ],
+    });
+  });
+
   it('reports an empty metadata table as unavailable', async () => {
     const { service } = createService({}, undefined, []);
 
@@ -72,6 +101,16 @@ describe('StationImagesService', () => {
       }),
       { abortSignal: cancellation.signal },
     );
+    await service.getImage('terminal', 'terminalcentral.avif');
+    expect(send).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        input: {
+          Bucket: 'metro',
+          Key: 'station-images/terminal/terminalcentral.avif',
+        },
+      }),
+      { abortSignal: undefined },
+    );
     body.destroy();
   });
 
@@ -87,6 +126,11 @@ describe('StationImagesService', () => {
     await expect(
       Promise.resolve().then(() => service.getImage('metro', '../secret.avif')),
     ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      Promise.resolve().then(() =>
+        service.getImage('terminal', '../secret.avif'),
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('maps storage failures to 502 without exposing upstream details', async () => {
@@ -97,7 +141,9 @@ describe('StationImagesService', () => {
       }),
     );
 
-    await expect(service.getImage('metro', 'luz.avif')).rejects.toMatchObject({
+    await expect(
+      service.getImage('terminal', 'terminalcentral.avif'),
+    ).rejects.toMatchObject({
       status: 502,
       message: 'Station image storage is unavailable',
     });

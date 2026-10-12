@@ -1,4 +1,5 @@
 import { BusInformationService } from '../bus-information/bus-information.service';
+import { BusTerminalsService } from '../../geography/bus-terminals.service';
 import {
   Meta,
   StoryObj,
@@ -77,6 +78,7 @@ function createProviders(opts: ProviderOptions) {
   }
 
   return [
+    { provide: BusTerminalsService, useValue: { getTerminalForStop: () => of(null) } },
     {
       provide: BusInformationService,
       useValue: {

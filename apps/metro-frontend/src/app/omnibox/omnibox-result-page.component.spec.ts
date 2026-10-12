@@ -10,6 +10,8 @@ import { Observable, of, Subject } from 'rxjs';
 import { CityContextService } from '../cities/city-context.service';
 import { BikeStation } from '../map-main/components/map/map.types';
 import { BikeStationsService } from '../map-main/geography/bike-stations.service';
+import { BusTerminalsService } from '../map-main/geography/bus-terminals.service';
+import { BUS_TERMINAL_DETAIL_FIXTURE } from '@metro/shared/bus-terminal-contracts';
 import type {
   BusRouteGraphQL,
   StopFullDataSnapshot,
@@ -17,6 +19,7 @@ import type {
 import { GeographyGraphQLService } from '../map-main/geography/geography-graphql.service';
 import { TypesenseSearchService } from '../search/typesense-search.service';
 import { OmniboxResultPageComponent } from './omnibox-result-page.component';
+import { BusTerminalDialogComponent } from '../map-main/components/bus-terminal-dialog/bus-terminal-dialog.component';
 
 describe('OmniboxResultPageComponent', () => {
   const stop = {
@@ -37,6 +40,9 @@ describe('OmniboxResultPageComponent', () => {
     getStation: jest.fn(),
     upsertStationSummary: jest.fn(),
     ensureStationDetails: jest.fn(),
+  };
+  const terminals = {
+    getTerminalDetail: jest.fn(),
   };
 
   async function createPage(
@@ -62,6 +68,7 @@ describe('OmniboxResultPageComponent', () => {
         { provide: GeographyGraphQLService, useValue: geography },
         { provide: TypesenseSearchService, useValue: search },
         { provide: BikeStationsService, useValue: bikes },
+        { provide: BusTerminalsService, useValue: terminals },
         { provide: CityContextService, useValue: { path: () => '/sp/mapa' } },
       ],
     });
@@ -83,6 +90,7 @@ describe('OmniboxResultPageComponent', () => {
     );
     search.search.mockReturnValue(of({ success: false, results: [] }));
     bikes.getStation.mockReturnValue(null);
+    terminals.getTerminalDetail.mockReturnValue(of(null));
   });
 
   it('keeps the launcher available while loading and focuses before hiding it', async () => {
@@ -147,6 +155,31 @@ describe('OmniboxResultPageComponent', () => {
     expect(page.detailInjector()).toBe(dialogInjector);
     expect(page.embeddedInputs()).toMatchObject({
       detailsOverride: { stop, routes: [route] },
+    });
+  });
+
+  it('loads a terminal as a deep-linked detail and exposes its map and point actions', async () => {
+    terminals.getTerminalDetail.mockReturnValue(
+      of(BUS_TERMINAL_DETAIL_FIXTURE),
+    );
+    const page = await createPage('bus-terminal', BUS_TERMINAL_DETAIL_FIXTURE.id, {
+      q: 'terminal parque central',
+    });
+
+    expect(page.detail()).toMatchObject({
+      kind: 'bus-terminal',
+      title: BUS_TERMINAL_DETAIL_FIXTURE.name,
+      terminalDetail: BUS_TERMINAL_DETAIL_FIXTURE,
+      mapParams: {
+        busStops: BUS_TERMINAL_DETAIL_FIXTURE.stopIds.join(','),
+        lat: String(BUS_TERMINAL_DETAIL_FIXTURE.latitude),
+        lon: String(BUS_TERMINAL_DETAIL_FIXTURE.longitude),
+      },
+    });
+    expect(page.detailComponent()).toBe(BusTerminalDialogComponent);
+    expect(page.embeddedInputs()).toMatchObject({
+      embedded: true,
+      detailOverride: BUS_TERMINAL_DETAIL_FIXTURE,
     });
   });
 

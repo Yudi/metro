@@ -3,7 +3,11 @@ import { Injectable, inject, signal } from '@angular/core';
 import { API_BASE_URL } from '@metro/shared/api';
 import { getRailStationIdentityKey } from '@metro/shared/utils';
 import { take } from 'rxjs';
+import type { StationImage } from '@metro/shared/station-image-contracts';
 import {
+  isStationImageFileKey,
+  isStationImageManifest,
+  isTerminalImageIdentity,
   selectStationImage,
   StationHeaderImage,
   StationImageManifest,
@@ -21,14 +25,13 @@ export class StationImagesService {
     if (this.loading || this.manifest()) return;
     this.loading = true;
     this.http
-      .get<StationImageManifest>(`${this.apiUrl}/media/station-images`, {
+      .get<unknown>(`${this.apiUrl}/media/station-images`, {
         timeout: 15_000,
       })
       .pipe(take(1))
       .subscribe({
-        next: (manifest) => {
-          if (manifest.version === 1 && manifest.stations)
-            this.manifest.set(manifest);
+        next: (response) => {
+          if (isStationImageManifest(response)) this.manifest.set(response);
           this.loading = false;
         },
         error: () => {
@@ -47,15 +50,30 @@ export class StationImagesService {
       return undefined;
     const images = stations[identity];
     const image = selectStationImage(images, lineId);
-    // A failed image must not replace a line-specific view with an unrelated photo.
-    if (!image || this.unavailable().has(image.key)) return undefined;
-    return {
-      ...image,
-      src: `${this.apiUrl}/media/station-images/files/${image.key.replace(/^station-images\//, '')}`,
-    };
+    return this.headerImage(image, 'station');
+  }
+
+  terminalImage(terminalId: string): StationHeaderImage | undefined {
+    if (!isTerminalImageIdentity(terminalId)) return undefined;
+    const images = this.manifest()?.terminals?.[terminalId];
+    if (!images) return undefined;
+    return this.headerImage(selectStationImage(images), 'terminal');
   }
 
   markUnavailable(key: string): void {
     this.unavailable.update((keys) => new Set([...keys, key]));
+  }
+
+  private headerImage(
+    image: StationImage | undefined,
+    category: 'station' | 'terminal',
+  ): StationHeaderImage | undefined {
+    // A failed image must not replace a line-specific view with an unrelated photo.
+    if (!image || this.unavailable().has(image.key)) return undefined;
+    if (!isStationImageFileKey(image.key, category)) return undefined;
+    return {
+      ...image,
+      src: `${this.apiUrl}/media/station-images/files/${image.key.slice('station-images/'.length)}`,
+    };
   }
 }

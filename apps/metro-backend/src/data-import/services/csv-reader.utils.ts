@@ -14,15 +14,21 @@ export async function* readCsvBatches(
   const stream = parser as AsyncIterable<CsvRecord>;
   let batch: CsvRecord[] = [];
 
-  for await (const record of stream) {
-    batch.push(record);
-    if (batch.length >= batchSize) {
-      yield batch;
-      batch = [];
+  try {
+    for await (const record of stream) {
+      batch.push(record);
+      if (batch.length >= batchSize) {
+        yield batch;
+        batch = [];
+      }
     }
-  }
 
-  if (batch.length > 0) {
-    yield batch;
+    if (batch.length > 0) {
+      yield batch;
+    }
+  } finally {
+    // Release the file even when a database batch fails or times out.
+    parser.destroy();
+    input.destroy();
   }
 }

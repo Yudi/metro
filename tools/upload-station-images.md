@@ -11,7 +11,9 @@ node tools/upload-station-images.mjs \
 
 `--manifest` and `--assets-dir` are required. Each image `key` in the manifest must exist beneath the asset root. `--env-file` is optional; it reads `KEY=VALUE` entries.
 
-The manifest must use version 1 and contain one or more images per station identity (up to 12). Each image requires `key`, `author`, `title`, `sourceUrl`, and `license`; `label`, `lineIds`, `service`, and `licenseUrl` are optional. Keys use `station-images/{metro|monorail|rail}/<name>.avif`.
+The manifest must use version 1 and contain one or more images per station identity (up to 12). Each image requires `key`, `author`, `title`, `sourceUrl`, and `license`; `label`, `lineIds`, `service`, and `licenseUrl` are optional. Station keys use `station-images/{metro|monorail|rail}/<name>.avif`.
+
+Terminal photos use the optional `terminals` object, keyed by the full current bus-terminal catalog ID. Those IDs are dynamic and derived from normalized terminal names (for example, `terminal:terminalcentral`); if a catalog rename changes an ID, update the manifest assignment to the new ID. Terminal images use `station-images/terminal/<name>.avif`. Keep `terminals` absent or set it to `{}` until real, licensed photos are available; do not add placeholder or invented image metadata.
 
 ```json
 {
@@ -29,7 +31,8 @@ The manifest must use version 1 and contain one or more images per station ident
         "licenseUrl": "https://creativecommons.org/licenses/by/4.0"
       }
     ]
-  }
+  },
+  "terminals": {}
 }
 ```
 

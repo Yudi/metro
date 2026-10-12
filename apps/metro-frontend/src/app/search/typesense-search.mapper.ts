@@ -11,6 +11,21 @@ export function mapTypesenseSearchResponse(
 ): TypesenseSearchResponse {
   const mappedResults = results
     .map((result): TypesenseSearchResult | null => {
+      if (result.__typename === 'SearchBusTerminal') {
+        const terminal = {
+          id: result.id,
+          name: result.name,
+          aliases: result.aliases,
+          latitude: result.terminalLatitude,
+          longitude: result.terminalLongitude,
+          stopIds: result.stopIds,
+          platformCodes: result.platformCodes,
+        };
+        return {
+          type: 'terminal',
+          document: terminal,
+        };
+      }
       if (result.__typename === 'SearchBusRoute') {
         return {
           type: 'route',

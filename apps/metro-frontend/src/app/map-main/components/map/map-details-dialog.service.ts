@@ -4,6 +4,7 @@ import { shareReplay, takeWhile } from 'rxjs/operators';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { LoggerService } from '@metro/shared/api';
 import { BikeStationsService } from '../../geography/bike-stations.service';
+import type { BusTerminalSummary, BusTerminalStop } from '@metro/shared/bus-terminal-contracts';
 import { GeographyGraphQLService } from '../../geography/geography-graphql.service';
 import type {
   BusRouteGraphQL,
@@ -20,6 +21,12 @@ import {
   BusStopDialogData,
   BusStopDialogResult,
 } from '../bus-stop-dialog/bus-stop-dialog.component';
+import { BusTerminalDialogComponent } from '../bus-terminal-dialog/bus-terminal-dialog.component';
+import type {
+  BusTerminalDialogData,
+  BusTerminalReturnData,
+  BusTerminalViewState,
+} from '../bus-terminal-dialog/bus-terminal-dialog.types';
 import {
   SubwayStationDialogComponent,
   SubwayStationDialogData,
@@ -169,6 +176,7 @@ export class MapDetailsDialogService {
   showRoutesForStop(
     stopId: string,
     initialStop?: BusStopGraphQL,
+    terminalReturn?: BusTerminalReturnData,
   ): Promise<void> {
     this.logger.debug('Showing routes for stop', { stopId });
     const knownStop =
@@ -223,6 +231,7 @@ export class MapDetailsDialogService {
           routesLoading,
           routesError,
           selectedRoutes: this.mapState.selectedRouteIds(),
+          terminalReturn,
         };
         panelTitle.set(stop.name);
         openingResultPanel = true;
@@ -251,6 +260,13 @@ export class MapDetailsDialogService {
             );
           } else if (result?.action === 'selectRoute') {
             this.selectionService.addRouteToSelection(result.routeId, true);
+          } else if (result?.action === 'returnToTerminal') {
+            this.showBusTerminalDetails(
+              result.terminalReturn.terminalId,
+              result.terminalReturn.summary,
+              result.terminalReturn.viewState,
+              false,
+            );
           } else if (openedPanel.closeReason === 'dismissed') {
             this.displayService.updateMapDisplay();
           }
@@ -381,6 +397,77 @@ export class MapDetailsDialogService {
         }),
       );
     });
+  }
+
+  showBusTerminalDetails(
+    terminalId: string,
+    summary?: BusTerminalSummary,
+    viewState?: BusTerminalViewState,
+    fitOnLoad = true,
+  ): void {
+    const title = signal(summary?.name ?? 'Terminal de ônibus');
+    const panelSummary = signal('');
+    const data: BusTerminalDialogData = {
+      terminalId,
+      summary,
+      query: viewState?.query ?? '',
+      platformCode: viewState?.platformCode ?? 'all',
+      scrollTop: viewState?.scrollTop ?? 0,
+      expandedPlatformKeys: viewState?.expandedPlatformKeys ?? [],
+      fitOnLoad,
+      onDetailsLoaded: (detail) => {
+        title.set(detail.name);
+        const boardingPoints = detail.stops.filter(
+          (stop) => stop.boardingAllowed,
+        ).length;
+        panelSummary.set(
+          `${detail.routes.length} ${detail.routes.length === 1 ? 'direção de linha' : 'direções de linha'}, ${boardingPoints} ${boardingPoints === 1 ? 'ponto de embarque' : 'pontos de embarque'}`,
+        );
+      },
+      onSelectStop: (stop, currentState) => {
+        void this.showRoutesForStop(
+          stop.stopId,
+          this.toBusStopGraphQL(stop),
+          {
+            terminalId,
+            summary,
+            viewState: currentState,
+          },
+        );
+      },
+    };
+    const panelRef = this.panelService.openComponent<BusTerminalDialogData, void>({
+      component: BusTerminalDialogComponent,
+      data,
+      title,
+      summary: panelSummary,
+      icon: 'directions_bus',
+    });
+    panelRef.setDataUpdater<BusTerminalDialogComponent>((component, nextData) =>
+      component.updateTerminal(nextData),
+    );
+    panelRef.afterClosed().subscribe(() => {
+      if (panelRef.closeReason === 'dismissed') {
+        this.displayService.updateMapDisplay();
+      }
+    });
+  }
+
+  private toBusStopGraphQL(stop: BusTerminalStop): BusStopGraphQL {
+    return {
+      id: stop.stopId,
+      stopId: stop.stopId,
+      name: stop.name,
+      description: stop.description,
+      latitude: stop.latitude,
+      longitude: stop.longitude,
+      isSubwayStation: false,
+      agencies: [stop.sourceAgency],
+      sourceAgency: stop.sourceAgency,
+      sourceId: stop.sourceId,
+      platformCode: stop.platformCode,
+      mergedStopIds: stop.mergedStopIds,
+    };
   }
 
   private openSubwayStationPanel(data: SubwayStationDialogData): void {

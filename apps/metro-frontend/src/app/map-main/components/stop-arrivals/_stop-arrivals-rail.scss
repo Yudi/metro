@@ -1,3 +1,5 @@
+@use '../../../../../../../libs/shared/styles/transit-identity' as identity;
+
 .rail-service {
   margin-top: 10px;
   padding: 10px;
@@ -121,18 +123,7 @@
 }
 
 .route-badge {
-  background: var(--mat-sys-secondary-container);
-  color: var(--mat-sys-on-secondary-container);
-  display: inline-grid;
-  place-items: center;
-  min-width: 64px;
-  min-height: 28px;
-  padding: 0 8px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1;
-  white-space: nowrap;
+  @include identity.route-badge;
 }
 
 .route-label {

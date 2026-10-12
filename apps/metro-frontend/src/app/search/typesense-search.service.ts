@@ -111,6 +111,7 @@ export class TypesenseSearchService {
             query,
             includeBusRoutes: types.includes('busRoute'),
             includeBusStops: types.includes('busStop'),
+            includeBusTerminals: types.includes('busStop'),
             includeRailLines: types.includes('railLine'),
             includeRailStations: types.includes('railStation'),
             includeBikeStations: types.includes('bikeStation'),

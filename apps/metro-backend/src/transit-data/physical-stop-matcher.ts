@@ -31,9 +31,9 @@ export function extractBusPlatform(
 ): string | undefined {
   if (platformCode?.trim()) return platformCode.trim();
   const text = normalize(`${name} ${description ?? ''}`);
-  return /\b(?:plataforma|plat)\.?\s*([a-z]|\d{1,3})\b/
-    .exec(text)?.[1]
-    ?.toUpperCase();
+  const match = /\b(?:plataforma|plat|pl)(?:[.\s]+([a-z0-9]{1,3})|(\d{1,3}))\b/.exec(text);
+  const platform = (match?.[1] ?? match?.[2])?.toUpperCase();
+  return platform === 'NAO' || platform === 'SEM' ? undefined : platform;
 }
 
 function stopEvidence(

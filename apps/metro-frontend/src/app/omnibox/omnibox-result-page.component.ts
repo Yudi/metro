@@ -39,6 +39,9 @@ import { LineStatusGridComponent } from '../home/components/line-status-grid/lin
 import { BikeStationDialogComponent } from '../map-main/components/bike-station-dialog/bike-station-dialog.component';
 import { BikeStation } from '../map-main/components/map/map.types';
 import { BusStopDialogComponent } from '../map-main/components/bus-stop-dialog/bus-stop-dialog.component';
+import type { BusStopDialogData } from '../map-main/components/bus-stop-dialog/bus-stop-dialog.component';
+import { BusTerminalDialogComponent } from '../map-main/components/bus-terminal-dialog/bus-terminal-dialog.component';
+import type { BusTerminalDialogData, BusTerminalViewState } from '../map-main/components/bus-terminal-dialog/bus-terminal-dialog.types';
 import { SubwayStationDialogComponent } from '../map-main/components/subway-station-dialog/subway-station-dialog.component';
 import { SearchResult } from '../map-main/components/search-dialog/search-result-card/search-result-card.component';
 import {
@@ -46,6 +49,8 @@ import {
   mergeSubwayStationResults,
 } from '../map-main/components/search-dialog/search-dialog.utils';
 import { BikeStationsService } from '../map-main/geography/bike-stations.service';
+import { BusTerminalsService } from '../map-main/geography/bus-terminals.service';
+import type { BusTerminalDetail } from '@metro/shared/bus-terminal-contracts';
 import type {
   BusRouteGraphQL,
   BusStopGraphQL,
@@ -66,16 +71,14 @@ type Detail = DetailBase &
     | { kind: 'rail-line'; data: RailLineInfo }
     | {
         kind: 'bus-stop';
-        data: {
-          stop: BusStopGraphQL;
-          routes: BusRouteGraphQL[];
-          selectedRoutes: Set<string>;
-          showMapActions: false;
-          routesLoading: boolean;
-          routesError: boolean;
-        };
+        data: BusStopDialogData;
       }
     | { kind: 'rail-station'; data: { stop: BusStopGraphQL } }
+  | {
+      kind: 'bus-terminal';
+      data: BusTerminalDialogData;
+      terminalDetail: BusTerminalDetail;
+    }
     | { kind: 'bike-station'; data: { station: BikeStation } }
   );
 
@@ -109,6 +112,7 @@ export class OmniboxResultPageComponent {
   private readonly geography = inject(GeographyGraphQLService);
   private readonly search = inject(TypesenseSearchService);
   private readonly bikes = inject(BikeStationsService);
+  private readonly terminals = inject(BusTerminalsService);
   readonly cityContext = inject(CityContextService);
   private readonly urlQuery = toSignal(
     this.route.queryParamMap.pipe(map((params) => params.get('q') ?? '')),
@@ -152,6 +156,8 @@ export class OmniboxResultPageComponent {
         return BusItineraryDialogComponent;
       case 'bus-stop':
         return BusStopDialogComponent;
+      case 'bus-terminal':
+        return BusTerminalDialogComponent;
       case 'rail-station':
         return SubwayStationDialogComponent;
       case 'bike-station':
@@ -183,6 +189,9 @@ export class OmniboxResultPageComponent {
     return {
       embedded: true,
       ...(detail?.kind === 'bus-stop' ? { detailsOverride: detail.data } : {}),
+      ...(detail?.kind === 'bus-terminal'
+        ? { detailOverride: detail.terminalDetail }
+        : {}),
       ...(detail?.kind === 'bike-station'
         ? { stationOverride: this.bikeStation() }
         : {}),
@@ -191,6 +200,17 @@ export class OmniboxResultPageComponent {
         : {}),
     };
   });
+
+  private terminalViewState(): BusTerminalViewState {
+    const params = this.route.snapshot?.queryParamMap;
+    const scrollTop = Number(params?.get('terminalScroll'));
+    return {
+      query: params?.get('terminalQuery') ?? '',
+      platformCode: params?.get('terminalPlatform') ?? 'all',
+      scrollTop: Number.isFinite(scrollTop) ? Math.max(0, scrollTop) : 0,
+      expandedPlatformKeys: params?.getAll('terminalExpanded') ?? [],
+    };
+  }
 
   private loadDetail(
     kind: string | null,
@@ -256,6 +276,19 @@ export class OmniboxResultPageComponent {
         routes,
         selectedRoutes: new Set<string>(),
         showMapActions: false,
+        terminalViewState: this.terminalViewState(),
+        onOpenTerminal: (terminal) => {
+          void this.router.navigate(
+            [this.cityContext.path('/busca'), 'bus-terminal', terminal.terminalId],
+            { queryParams: {
+              q: this.query(),
+              terminalQuery: terminal.viewState.query,
+              terminalPlatform: terminal.viewState.platformCode,
+              terminalScroll: terminal.viewState.scrollTop,
+              terminalExpanded: terminal.viewState.expandedPlatformKeys,
+            } },
+          );
+        },
         routesLoading: snapshot.hasNext && !routesError,
         routesError,
       },
@@ -304,6 +337,59 @@ export class OmniboxResultPageComponent {
               },
             };
           }
+          break;
+        }
+        case 'bus-terminal': {
+          const terminal = await firstValueFrom(
+            this.terminals.getTerminalDetail(id),
+          );
+          if (!terminal) break;
+          const mapParams = {
+            busStops: terminal.stopIds.join(','),
+            lat: String(terminal.latitude),
+            lon: String(terminal.longitude),
+            z: '14',
+          };
+          const data: BusTerminalDialogData = {
+            terminalId: terminal.id,
+            summary: terminal,
+            ...this.terminalViewState(),
+            fitOnLoad: false,
+            onShowTerminalOnMap: () => {
+              void this.router.navigate([this.cityContext.path('/mapa')], {
+                queryParams: mapParams,
+              });
+            },
+            onShowStopOnMap: (stop) => {
+              void this.router.navigate([this.cityContext.path('/mapa')], {
+                queryParams: {
+                  busStops: stop.stopId,
+                  lat: String(stop.latitude),
+                  lon: String(stop.longitude),
+                  z: '17',
+                },
+              });
+            },
+            onSelectStop: (stop, viewState) => {
+              void this.router.navigate(
+                [this.cityContext.path('/busca'), 'bus-stop', stop.stopId],
+                { queryParams: {
+                  q: this.query(),
+                  terminalQuery: viewState.query,
+                  terminalPlatform: viewState.platformCode,
+                  terminalScroll: viewState.scrollTop,
+                  terminalExpanded: viewState.expandedPlatformKeys,
+                } },
+              );
+            },
+          };
+          detail = {
+            kind,
+            title: terminal.name,
+            data,
+            terminalDetail: terminal,
+            mapParams,
+          };
           break;
         }
         case 'rail-station':

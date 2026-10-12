@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { BUS_TERMINAL_SUMMARY_FIXTURE } from '@metro/shared/bus-terminal-contracts';
 import {
   SearchResultCardComponent,
   SearchResult,
@@ -40,6 +41,18 @@ describe('SearchResultCardComponent keyboard activation', () => {
 
     expect(selection).toHaveBeenCalledTimes(1);
     expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('identifies a terminal and emits its complete overview when selected by keyboard', () => {
+    const terminal = BUS_TERMINAL_SUMMARY_FIXTURE;
+    fixture.componentRef.setInput('result', {
+      id: terminal.id, name: terminal.name, type: 'bus_terminal',
+      source: 'gtfs', terminalData: terminal,
+    } satisfies SearchResult);
+    fixture.detectChanges();
+    expect(card.querySelector('.result-type')?.textContent?.trim()).toBe('Terminal de ônibus');
+    card.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    expect(selection).toHaveBeenCalledWith(expect.objectContaining({ terminalData: terminal }));
   });
 
   it('keeps the full line name above the destination', () => {

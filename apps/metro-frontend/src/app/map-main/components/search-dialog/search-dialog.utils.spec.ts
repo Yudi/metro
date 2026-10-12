@@ -3,6 +3,7 @@ import {
   mergeSubwayStationResults,
 } from './search-dialog.utils';
 import type { SearchResult } from './search-result-card/search-result-card.component';
+import { BUS_TERMINAL_SUMMARY_FIXTURE } from '@metro/shared/bus-terminal-contracts';
 
 describe('mergeSubwayStationResults', () => {
   it('retains ranked positions and all interchange line information', () => {
@@ -37,6 +38,15 @@ describe('mergeSubwayStationResults', () => {
 });
 
 describe('mapTypesenseResult', () => {
+  it('opens terminal details rather than selecting an artificial boarding point', () => {
+    const terminal = BUS_TERMINAL_SUMMARY_FIXTURE;
+    expect(mapTypesenseResult({
+      type: 'terminal',
+      document: terminal,
+    })).toMatchObject({
+      type: 'bus_terminal', id: terminal.id, terminalData: terminal,
+    });
+  });
   it('keeps the Artesp route ID used by map selection', () => {
     const result = mapTypesenseResult({
       type: 'route',

@@ -299,7 +299,7 @@ async function main() {
         )
       : 0;
     console.log(
-      `${options.verifyOnly ? "Verified" : "Uploaded and verified"} ${images.length} images with S3 and database metadata for ${Object.keys(manifest.stations).length} station identities.${deleted ? ` Removed ${deleted} unlisted images.` : ""}`,
+      `${options.verifyOnly ? "Verified" : "Uploaded and verified"} ${images.length} images with S3 and database metadata for ${Object.keys(manifest.stations).length + Object.keys(manifest.terminals ?? {}).length} station and terminal identities.${deleted ? ` Removed ${deleted} unlisted images.` : ""}`,
     );
   } finally {
     client.destroy();

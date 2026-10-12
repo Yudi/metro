@@ -1,6 +1,7 @@
 export const IMAGE_KEY_PATTERN =
-  /^station-images\/(?:metro|monorail|rail)\/[a-z0-9]+(?:-[a-z0-9]+)*\.avif$/;
+  /^station-images\/(?:metro|monorail|rail|terminal)\/[a-z0-9]+(?:-[a-z0-9]+)*\.avif$/;
 const STATION_IDENTITY_PATTERN = /^[a-z0-9][a-z0-9_-]{0,159}$/;
+const TERMINAL_IDENTITY_PATTERN = /^terminal:[a-z0-9][a-z0-9_-]{0,159}$/;
 const MAX_OBJECT_METADATA_BYTES = 2 * 1024;
 
 function isRequiredText(value, maxLength) {
@@ -32,16 +33,44 @@ export function validateStationImageManifest(manifest) {
 
   const images = [];
   const keys = new Set();
-  for (const [stationIdentity, stationImages] of Object.entries(
+  validateImageGroups(
     manifest.stations,
-  )) {
+    STATION_IDENTITY_PATTERN,
+    false,
+    images,
+    keys,
+  );
+
+  if (manifest.terminals !== undefined) {
     if (
-      !STATION_IDENTITY_PATTERN.test(stationIdentity) ||
+      !manifest.terminals ||
+      typeof manifest.terminals !== "object" ||
+      Array.isArray(manifest.terminals)
+    ) {
+      throw new Error("Manifest terminals must be an object when present");
+    }
+    validateImageGroups(
+      manifest.terminals,
+      TERMINAL_IDENTITY_PATTERN,
+      true,
+      images,
+      keys,
+    );
+  }
+
+  if (images.length === 0) throw new Error("Manifest contains no images");
+  return images;
+}
+
+function validateImageGroups(groups, identityPattern, isTerminal, images, keys) {
+  for (const [stationIdentity, stationImages] of Object.entries(groups)) {
+    if (
+      !identityPattern.test(stationIdentity) ||
       !Array.isArray(stationImages) ||
       stationImages.length === 0 ||
       stationImages.length > 12
     ) {
-      throw new Error(`Invalid station entry: ${stationIdentity}`);
+      throw new Error(`Invalid ${isTerminal ? "terminal" : "station"} entry: ${stationIdentity}`);
     }
 
     for (const [position, image] of stationImages.entries()) {
@@ -53,6 +82,11 @@ export function validateStationImageManifest(manifest) {
         !IMAGE_KEY_PATTERN.test(image.key)
       ) {
         throw new Error(`Invalid image key for station ${stationIdentity}`);
+      }
+      if (
+        isTerminal !== image.key.startsWith("station-images/terminal/")
+      ) {
+        throw new Error(`Image category does not match ${stationIdentity}`);
       }
       if (keys.has(image.key))
         throw new Error(`Duplicate image key: ${image.key}`);
@@ -88,9 +122,6 @@ export function validateStationImageManifest(manifest) {
       images.push({ ...image, stationIdentity, position });
     }
   }
-
-  if (images.length === 0) throw new Error("Manifest contains no images");
-  return images;
 }
 
 export function buildStationImageObjectMetadata(image) {

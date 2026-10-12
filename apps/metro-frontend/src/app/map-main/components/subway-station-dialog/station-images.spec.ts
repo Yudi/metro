@@ -1,4 +1,8 @@
-import { selectStationImage, StationImage } from './station-images';
+import {
+  isStationImageManifest,
+  selectStationImage,
+  StationImage,
+} from './station-images';
 
 const primary: StationImage = {
   key: 'station-images/metro/luz.avif',
@@ -44,5 +48,66 @@ describe('station image selection', () => {
     expect(selectStationImage(images)).toBe(primary);
     expect(selectStationImage([], 'L2')).toBeUndefined();
     expect(selectStationImage([train], 'L4')).toBe(train);
+  });
+});
+
+describe('station image manifest', () => {
+  it('accepts old manifests without terminal metadata and an empty terminal section', () => {
+    const stationOnly = { version: 1, stations: { luz: images } };
+
+    expect(isStationImageManifest(stationOnly)).toBe(true);
+    expect(isStationImageManifest({ ...stationOnly, terminals: {} })).toBe(true);
+  });
+
+  it('accepts a current dynamic terminal ID with terminal-category images', () => {
+    expect(
+      isStationImageManifest({
+        version: 1,
+        stations: {},
+        terminals: {
+          'terminal:terminal-parque-central': [
+            {
+              ...primary,
+              key: 'station-images/terminal/terminal-parque-central.avif',
+            },
+          ],
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it.each([
+    {
+      terminals: {
+        'terminal:terminal-parque-central': [
+          { ...primary, key: 'station-images/rail/parque-central.avif' },
+        ],
+      },
+    },
+    {
+      terminals: {
+        'terminal:../parque-central': [
+          {
+            ...primary,
+            key: 'station-images/terminal/parque-central.avif',
+          },
+        ],
+      },
+    },
+    {
+      terminals: {
+        'terminal:parque-central': [
+          {
+            ...primary,
+            key: 'station-images/terminal/parque-central.avif',
+            licenseUrl: 'javascript:alert(1)',
+          },
+        ],
+      },
+    },
+  ])('rejects invalid terminal metadata and unsafe proxy inputs', (fields) => {
+    expect(
+      isStationImageManifest({ version: 1, stations: {}, ...fields }),
+    ).toBe(false);
   });
 });

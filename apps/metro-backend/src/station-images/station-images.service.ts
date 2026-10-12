@@ -54,8 +54,11 @@ export class StationImagesService implements OnModuleDestroy {
     }
 
     const stations = new Map<string, StationImage[]>();
+    const terminals = new Map<string, StationImage[]>();
     for (const row of rows) {
-      const images = stations.get(row.stationIdentity) ?? [];
+      const isTerminal = row.stationIdentity.startsWith('terminal:');
+      const imageGroups = isTerminal ? terminals : stations;
+      const images = imageGroups.get(row.stationIdentity) ?? [];
       images.push({
         key: row.key,
         label: row.label ?? undefined,
@@ -67,12 +70,13 @@ export class StationImagesService implements OnModuleDestroy {
         license: row.license,
         licenseUrl: row.licenseUrl ?? undefined,
       });
-      stations.set(row.stationIdentity, images);
+      imageGroups.set(row.stationIdentity, images);
     }
 
     const manifest: StationImageManifest = {
       version: 1,
       stations: Object.fromEntries(stations),
+      ...(terminals.size > 0 ? { terminals: Object.fromEntries(terminals) } : {}),
     };
     const body = Buffer.from(JSON.stringify(manifest));
     if (body.byteLength > MAX_MANIFEST_BYTES) {

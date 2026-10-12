@@ -11,15 +11,18 @@ import { MapDisplayService } from './map-display.service';
 import { MapPanelService } from './map-panel/map-panel.service';
 import { MapSelectionService } from './map-selection.service';
 import { MapStateService } from './map-state.service';
+import { BUS_TERMINAL_SUMMARY_FIXTURE } from '@metro/shared/bus-terminal-contracts';
 
 describe('MapSearchInteractionService', () => {
   let service: MapSearchInteractionService;
   let openDialog: jest.Mock;
   let addRouteToSelection: jest.Mock;
+  let showBusTerminalDetails: jest.Mock;
 
   beforeEach(() => {
     openDialog = jest.fn(() => ({ afterClosed: () => of(null) }));
     addRouteToSelection = jest.fn();
+    showBusTerminalDetails = jest.fn();
 
     TestBed.configureTestingModule({
       providers: [
@@ -28,7 +31,10 @@ describe('MapSearchInteractionService', () => {
         { provide: MatSnackBar, useValue: { open: jest.fn() } },
         { provide: LoggerService, useValue: { debug: jest.fn() } },
         { provide: BikeStationsService, useValue: {} },
-        { provide: MapDetailsDialogService, useValue: {} },
+        {
+          provide: MapDetailsDialogService,
+          useValue: { showBusTerminalDetails },
+        },
         { provide: MapDisplayService, useValue: {} },
         { provide: MapPanelService, useValue: { compactOnMobile: jest.fn() } },
         {
@@ -76,5 +82,23 @@ describe('MapSearchInteractionService', () => {
     service.openSearchModal();
 
     expect(addRouteToSelection).toHaveBeenCalledWith(favoriteCode, true);
+  });
+
+  it('opens one terminal panel for a terminal search result', () => {
+    const result = {
+      id: BUS_TERMINAL_SUMMARY_FIXTURE.id,
+      name: BUS_TERMINAL_SUMMARY_FIXTURE.name,
+      type: 'bus_terminal' as const,
+      terminalData: BUS_TERMINAL_SUMMARY_FIXTURE,
+    };
+    openDialog.mockImplementationOnce(() => ({ afterClosed: () => of(result) }));
+
+    service.openSearchModal();
+
+    expect(showBusTerminalDetails).toHaveBeenCalledWith(
+      BUS_TERMINAL_SUMMARY_FIXTURE.id,
+      BUS_TERMINAL_SUMMARY_FIXTURE,
+    );
+    expect(addRouteToSelection).not.toHaveBeenCalled();
   });
 });

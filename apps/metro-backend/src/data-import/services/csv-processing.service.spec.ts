@@ -1,4 +1,7 @@
 import { CsvProcessingService } from './csv-processing.service';
+import { mkdtemp, writeFile, rm } from 'fs/promises';
+import { tmpdir } from 'os';
+import { join } from 'path';
 
 describe('CsvProcessingService', () => {
   const executeRaw = jest.fn().mockResolvedValue(1);
@@ -220,5 +223,40 @@ describe('CsvProcessingService', () => {
 
     expect(failure).toBeInstanceOf(Error);
     expect((failure as Error & { cause?: unknown }).cause).toBeDefined();
+  });
+
+  it.each([
+    ['artesp', 90 * 60_000, 'ARTESP_StopTime'],
+    ['sptrans', 15 * 60_000, 'SPTrans_StopTime'],
+  ] as const)('streams %s stop times in larger bounded inserts', async (feed, timeout, table) => {
+    const directory = await mkdtemp(join(tmpdir(), 'gtfs-batches-'));
+    const filePath = join(directory, 'stop_times.txt');
+    try {
+      await writeFile(
+        filePath,
+        'trip_id,arrival_time,departure_time,stop_id,stop_sequence\n' +
+          Array.from({ length: 5_001 }, (_, index) =>
+            `trip,25:00:00,25:01:00,stop,${index}\n`,
+          ).join(''),
+      );
+
+      await expect(
+        service.processCsvFile(filePath, 'stop_times.txt', feed),
+      ).resolves.toBe(5_001);
+      expect(prisma.$transaction).toHaveBeenCalledWith(
+        expect.any(Function),
+        { maxWait: 600_000, timeout },
+      );
+      const inserts = executeRaw.mock.calls.filter(([query]) =>
+        (query as string).startsWith('INSERT'),
+      );
+      expect(inserts).toHaveLength(2);
+      expect(inserts[0][0]).toContain(table);
+      expect(inserts[0]).toHaveLength(30_001);
+      expect(inserts[1]).toHaveLength(7);
+      expect(inserts[0]).toContain('25:00:00');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });

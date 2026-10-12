@@ -11,6 +11,7 @@ import type {
   BikeVehicleAvailability,
 } from '@metro/shared/bike-contracts';
 import type { BusFare } from '@metro/shared/utils';
+import type { BusTerminalSummary } from '@metro/shared/bus-terminal-contracts';
 
 export type { BikePricingPlan, BikeVehicleAvailability };
 
@@ -57,6 +58,7 @@ export interface SearchResult {
     | 'route'
     | 'place'
     | 'bus_stop'
+    | 'bus_terminal'
     | 'subway_station'
     | 'bike_station';
   description?: string;
@@ -93,6 +95,7 @@ export interface SearchResult {
   platformCode?: string;
   mergedStopIds?: string[];
   specialService?: SpecialRailService;
+  terminalData?: BusTerminalSummary;
 }
 
 export interface MapSelectionCounts {

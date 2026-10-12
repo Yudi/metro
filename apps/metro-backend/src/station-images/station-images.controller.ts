@@ -41,8 +41,8 @@ export class StationImagesController {
   @ApiProduces('image/avif')
   @ApiParam({
     name: 'category',
-    enum: ['metro', 'monorail', 'rail'],
-    description: 'Tipo de serviço da estação.',
+    enum: ['metro', 'monorail', 'rail', 'terminal'],
+    description: 'Tipo de serviço da estação ou terminal.',
   })
   @ApiParam({
     name: 'filename',

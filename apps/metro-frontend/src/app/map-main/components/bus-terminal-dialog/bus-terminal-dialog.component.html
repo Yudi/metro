@@ -1,0 +1,224 @@
+<section
+  #terminalContent
+  class="terminal-content"
+  [attr.aria-label]="terminalName()"
+>
+  @if (embedded() && headerImage(); as image) {
+    <div class="terminal-photo">
+      <img
+        [ngSrc]="image.src"
+        width="1200"
+        height="320"
+        sizes="(max-width: 600px) 100vw, 720px"
+        alt=""
+        (error)="onHeaderImageError()"
+      />
+    </div>
+    <p class="terminal-photo-credit">
+      <a [href]="image.sourceUrl" target="_blank" rel="noopener noreferrer">{{ image.title }}</a>,
+      {{ image.author }}.
+      @if (image.licenseUrl) {
+        <a [href]="image.licenseUrl" target="_blank" rel="noopener noreferrer">{{ image.license }}</a>
+      } @else { {{ image.license }} }
+    </p>
+  }
+
+  <div class="terminal-filters" aria-label="Filtros do terminal">
+    <mat-form-field appearance="outline" class="line-filter">
+      <mat-label>Linha ou destino</mat-label>
+      <mat-icon matPrefix aria-hidden="true">search</mat-icon>
+      <input
+        #lineQuery
+        matInput
+        type="search"
+        [value]="query()"
+        (input)="setQuery(lineQuery.value)"
+      />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="platform-filter">
+      <mat-label>Plataforma</mat-label>
+      <mat-icon matPrefix aria-hidden="true">location_on</mat-icon>
+      <mat-select
+        [value]="platformFilter()"
+        (selectionChange)="setPlatform($event.value)"
+      >
+        <mat-option value="all">Todas as plataformas</mat-option>
+        @for (platform of platformOptions().codes; track platform) {
+          <mat-option [value]="platform">Plataforma {{ platform }}</mat-option>
+        }
+        @if (platformOptions().hasUnknown) {
+          <mat-option value="__unknown__">Plataforma não informada</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    @if (detail() && !embedded()) {
+      <button mat-icon-button type="button" class="terminal-map-action"
+        aria-label="Ver pontos no mapa" matTooltip="Ver pontos no mapa"
+        (click)="showAllStopsOnMap()">
+        <mat-icon>map</mat-icon>
+      </button>
+    }
+  </div>
+
+  @if (loading()) {
+    <div class="terminal-state" role="status" aria-live="polite">
+      <mat-spinner diameter="32" />
+      <span>Carregando linhas e plataformas…</span>
+    </div>
+  } @else if (unavailable()) {
+    <div class="terminal-state" role="status">
+      <mat-icon aria-hidden="true">location_off</mat-icon>
+      <p>Terminal indisponível no catálogo atual.</p>
+      <span>Faça uma nova busca para consultar os pontos disponíveis.</span>
+    </div>
+  } @else if (error()) {
+    <div class="terminal-state terminal-state--error" role="alert">
+      <mat-icon aria-hidden="true">error_outline</mat-icon>
+      <p>Não foi possível carregar as linhas deste terminal.</p>
+      <button mat-stroked-button type="button" (click)="retry()">
+        <mat-icon>refresh</mat-icon>
+        Tentar novamente
+      </button>
+    </div>
+  } @else if (detail()) {
+    @if (!hasRoutes()) {
+      <div class="terminal-state terminal-state--inline" role="status">
+        <mat-icon aria-hidden="true">directions_bus</mat-icon>
+        <p>Sem informações de linhas para este terminal.</p>
+        <span>Os pontos disponíveis estão listados abaixo.</span>
+      </div>
+    } @else if (rows().length === 0) {
+      <div class="terminal-state terminal-state--inline" role="status">
+        <mat-icon aria-hidden="true">search_off</mat-icon>
+        <p>Nenhuma linha encontrada para estes filtros.</p>
+      </div>
+    }
+
+    @if (platformGroups().length > 0) {
+      <mat-accordion
+        class="platform-accordion"
+        multi
+        aria-label="Plataformas e linhas do terminal"
+      >
+        @for (platform of platformGroups(); track platform.key) {
+          <mat-expansion-panel class="platform-panel mat-elevation-z0"
+            [expanded]="expandedPlatforms().has(platform.key)"
+            (opened)="setPlatformExpanded(platform.key, true)"
+            (closed)="setPlatformExpanded(platform.key, false)">
+            <mat-expansion-panel-header class="platform-header">
+              <mat-panel-title class="platform-title">
+                <span class="platform-heading">
+                  <mat-icon aria-hidden="true">location_on</mat-icon>
+                  <span>{{ platform.label }}</span>
+                  <span class="platform-point-count">{{ platform.points.length }}
+                    {{ platform.points.length === 1 ? "ponto" : "pontos" }}</span>
+                </span>
+                <span class="platform-line-summary">
+                @if (platform.lineBadges.length > 0) {
+                  @for (badge of platform.lineBadges; track badge.key) {
+                    <app-transit-route-identity [code]="badge.shortName"
+                      [sourceAgency]="badge.sourceAgency" [description]="badge.ariaLabel"
+                      [color]="badge.color" [textColor]="badge.textColor" />
+                  }
+                } @else {
+                  <span class="no-line-summary">Linhas não informadas</span>
+                }
+                </span>
+              </mat-panel-title>
+            </mat-expansion-panel-header>
+
+            <ng-template matExpansionPanelContent>
+              @if (expandedPlatforms().has(platform.key)) {
+              <div class="platform-points">
+                @for (point of platform.points; track point.key) {
+                  <section class="boarding-point">
+                    <div class="boarding-point__heading">
+                      <div class="boarding-point__identity">
+                        <app-transit-agency-logo [sourceAgency]="point.stop.sourceAgency" />
+                        <div>
+                          <strong>{{ pointIdentity(point.stop) }}</strong>
+                          <span>{{ point.stop.name }}</span>
+                        </div>
+                      </div>
+                      <div class="boarding-point__actions">
+                        <button
+                          mat-icon-button
+                          type="button"
+                          (click)="showStopOnMap(point.stop)"
+                          [attr.aria-label]="
+                            'Ver ' + point.stop.name + ' no mapa'
+                          "
+                        >
+                          <mat-icon>map</mat-icon>
+                        </button>
+                        <button
+                          mat-icon-button
+                          type="button"
+                          [attr.aria-label]="'Detalhes de ' + pointIdentity(point.stop)"
+                          matTooltip="Detalhes da parada"
+                          (click)="showStop(point.stop)"
+                        >
+                          <mat-icon>info</mat-icon>
+                        </button>
+                      </div>
+                    </div>
+
+                    @if (point.routes.length > 0) {
+                      @defer (on viewport) {
+                        <app-stop-arrivals
+                          [stop]="point.graphqlStop"
+                          [routes]="point.routes"
+                          [selectedRoutes]="selectedRouteIds()"
+                          [selectedRouteKeys]="point.routeKeys"
+                          [showMapActions]="false"
+                          [compact]="true"
+                        />
+                      } @placeholder (minimum 120ms) {
+                        <div class="arrivals-placeholder" role="status">
+                          <mat-spinner diameter="22" />
+                          <span>Carregando previsões e horários…</span>
+                        </div>
+                      }
+                    } @else {
+                      <p class="point-without-lines">
+                        Sem informações de linhas para este ponto.
+                      </p>
+                    }
+                  </section>
+                }
+              </div>
+              }
+            </ng-template>
+          </mat-expansion-panel>
+        }
+      </mat-accordion>
+    }
+
+    @if (alightingOnlyStops().length > 0) {
+      <section class="alighting-points" aria-labelledby="alighting-heading">
+        <h3 id="alighting-heading"><mat-icon aria-hidden="true">directions_walk</mat-icon>
+          Somente desembarque</h3>
+        <div class="alighting-point-list">
+          @for (stop of alightingOnlyStops(); track stop.stopId) {
+            <div class="alighting-point">
+              <app-transit-agency-logo [sourceAgency]="stop.sourceAgency" />
+              <div>
+                <strong>{{ pointIdentity(stop) }}</strong>
+                <span>{{ stop.name }}</span>
+              </div>
+              <button
+                mat-icon-button
+                type="button"
+                (click)="showStopOnMap(stop)"
+                [attr.aria-label]="'Ver ' + stop.name + ' no mapa'"
+              >
+                <mat-icon>map</mat-icon>
+              </button>
+            </div>
+          }
+        </div>
+      </section>
+    }
+  }
+</section>

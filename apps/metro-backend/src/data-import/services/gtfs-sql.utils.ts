@@ -47,7 +47,10 @@ export async function insertRows(
 
   const insertColumns = columns.includes('id') ? columns : ['id', ...columns];
   const quotedColumns = insertColumns.map(quoteIdent);
-  const chunkSize = Math.max(1, Math.floor(5000 / insertColumns.length));
+  const chunkSize = Math.max(
+    1,
+    Math.floor(GTFSConfig.MAX_INSERT_PARAMETERS / insertColumns.length),
+  );
 
   for (let offset = 0; offset < rows.length; offset += chunkSize) {
     const chunk = rows.slice(offset, offset + chunkSize);

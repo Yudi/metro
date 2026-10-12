@@ -34,6 +34,22 @@ export function mapTypesenseResult(
     };
   }
 
+  if (result.type === 'terminal') {
+    const terminal = result.document;
+    return {
+      id: terminal.id,
+      name: terminal.name,
+      type: 'bus_terminal',
+      latitude: terminal.latitude,
+      longitude: terminal.longitude,
+      source: 'gtfs',
+      description: terminal.platformCodes.length
+        ? `Plataformas ${terminal.platformCodes.join(', ')}`
+        : 'Linhas e pontos de embarque',
+      terminalData: terminal,
+    };
+  }
+
   const stopResult = mapTypesenseStopToTransitSearchResult(
     document as TypesenseStop,
   );

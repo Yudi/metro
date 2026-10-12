@@ -99,7 +99,9 @@ describe('TypesenseService', () => {
     (service as never as { initialized: boolean }).initialized = true;
     (service as never as { client: unknown }).client = {
       collections,
-      aliases: jest.fn(() => ({ upsert: upsertAlias })),
+      aliases: jest.fn((name?: string) => name
+        ? { retrieve: jest.fn().mockRejectedValue({ httpStatus: 404 }) }
+        : { upsert: upsertAlias, retrieve: jest.fn().mockResolvedValue({ aliases: [] }) }),
       multiSearch: { perform },
     };
 
@@ -128,7 +130,7 @@ describe('TypesenseService', () => {
     ]);
     expect(perform).toHaveBeenCalledTimes(2);
     expect(perform.mock.calls[1][0].searches[0].collection).toBe(
-      createdSchemas[0]['name'],
+      `${GTFS_ROUTES_COLLECTION_NAME}__live`,
     );
     service.onModuleDestroy();
   });
@@ -149,6 +151,9 @@ describe('TypesenseService', () => {
           ? { delete: deleteCollection }
           : { create: createCollection },
       ),
+      aliases: jest.fn((name?: string) => name
+        ? { retrieve: jest.fn().mockRejectedValue({ httpStatus: 404 }) }
+        : { retrieve: jest.fn().mockResolvedValue({ aliases: [] }) }),
     };
 
     await service.beginFullRebuild();
@@ -232,7 +237,7 @@ describe('TypesenseService', () => {
           per_page: 2,
         }),
         expect.objectContaining({
-          query_by: 'stop_name,stop_desc',
+          query_by: 'stop_name,stop_desc,stop_id',
           sort_by: '_text_match:desc,stop_id:asc',
           per_page: 2,
         }),

@@ -1,4 +1,5 @@
 import { ServiceUnavailableException } from '@nestjs/common';
+import { BUS_TERMINAL_SUMMARY_FIXTURE } from '@metro/shared/bus-terminal-contracts';
 import { SearchResolver } from './search.resolver';
 import type { TypesenseService } from '../services/typesense.service';
 import type { SearchService } from '../services/search.service';
@@ -14,6 +15,43 @@ import {
 } from '../testing/search.fixtures';
 
 describe('SearchResolver', () => {
+  it('collapses members before limiting and keeps the catalog complete', async () => {
+    const terminal = BUS_TERMINAL_SUMMARY_FIXTURE;
+    const search = jest.fn().mockResolvedValue(terminal.stopIds.map((stop_id) =>
+      busStopSearchResult({ stop_id, stop_name: terminal.name }),
+    ));
+    const resolver = new SearchResolver(
+      { search } as unknown as TypesenseService, {} as SearchService,
+      { forRoutes: jest.fn() } as never,
+      { getCatalog: jest.fn().mockResolvedValue([terminal]) } as never,
+    );
+    expect(await resolver.search({ query: terminal.name, limit: 1, includeBusTerminals: true }))
+      .toEqual([expect.objectContaining({ type: 'busTerminal', stopIds: terminal.stopIds })]);
+    expect(search).toHaveBeenCalledWith(terminal.name, expect.any(Array), 100);
+  });
+
+  it('keeps individual stops when the current terminal catalog fails', async () => {
+    const terminal = BUS_TERMINAL_SUMMARY_FIXTURE;
+    const resolver = new SearchResolver(
+      { search: jest.fn().mockResolvedValue([busStopSearchResult({ stop_id: terminal.stopIds[0] })]) } as unknown as TypesenseService,
+      {} as SearchService, { forRoutes: jest.fn() } as never,
+      { getCatalog: jest.fn().mockRejectedValue(new Error('unavailable')) } as never,
+    );
+    expect(await resolver.search({ query: terminal.name, includeBusTerminals: true }))
+      .toEqual([expect.objectContaining({ type: 'busStop', stop_id: terminal.stopIds[0] })]);
+  });
+
+  it('preserves individual results for clients that have not opted into terminal support', async () => {
+    const getCatalog = jest.fn();
+    const resolver = new SearchResolver(
+      { search: jest.fn().mockResolvedValue([busStopSearchResult()]) } as unknown as TypesenseService,
+      {} as SearchService, { forRoutes: jest.fn() } as never,
+      { getCatalog } as never,
+    );
+    expect(await resolver.search({ query: 'Terminal' }))
+      .toEqual([expect.objectContaining({ type: 'busStop' })]);
+    expect(getCatalog).not.toHaveBeenCalled();
+  });
   function routeInfo(selection: string, variables: Record<string, unknown> = {}): GraphQLResolveInfo {
     const document = parse(`query { routes { ${selection} } } fragment Direction on SearchBusRoute { destination }`);
     const operation = document.definitions.find((definition) =>

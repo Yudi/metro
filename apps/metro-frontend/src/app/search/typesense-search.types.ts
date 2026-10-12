@@ -1,4 +1,5 @@
 import type { BusFare } from '@metro/shared/utils';
+import type { BusTerminalSummary } from '@metro/shared/bus-terminal-contracts';
 
 export interface TypesenseRoute {
   favoriteCode?: string;
@@ -34,10 +35,10 @@ export interface TypesenseStop {
   routes?: TypesenseRoute[];
 }
 
-export interface TypesenseSearchResult {
-  type: 'route' | 'stop';
-  document: TypesenseRoute | TypesenseStop;
-}
+export type TypesenseSearchResult =
+  | { type: 'route'; document: TypesenseRoute }
+  | { type: 'stop'; document: TypesenseStop }
+  | { type: 'terminal'; document: BusTerminalSummary };
 
 export interface TypesenseSearchResponse {
   success: boolean;
@@ -51,6 +52,7 @@ export interface SearchGraphQLResultBase {
   __typename:
     | 'SearchBusRoute'
     | 'SearchBusStop'
+    | 'SearchBusTerminal'
     | 'SearchRailLine'
     | 'SearchRailStation'
     | 'SearchBikeStation';
@@ -74,6 +76,13 @@ export interface SearchGraphQLBusStop extends SearchGraphQLResultBase {
   sourceId?: string | null;
   platformCode?: string | null;
   mergedStopIds?: string[] | null;
+}
+
+export interface SearchGraphQLBusTerminal
+  extends SearchGraphQLResultBase, Omit<BusTerminalSummary, 'latitude' | 'longitude'> {
+  __typename: 'SearchBusTerminal';
+  terminalLatitude: number;
+  terminalLongitude: number;
 }
 
 export interface SearchGraphQLRailLine extends SearchGraphQLResultBase {
@@ -102,6 +111,7 @@ export interface SearchGraphQLBikeStation extends SearchGraphQLResultBase {
 export type SearchGraphQLResult =
   | SearchGraphQLBusRoute
   | SearchGraphQLBusStop
+  | SearchGraphQLBusTerminal
   | SearchGraphQLRailLine
   | SearchGraphQLRailStation
   | SearchGraphQLBikeStation;

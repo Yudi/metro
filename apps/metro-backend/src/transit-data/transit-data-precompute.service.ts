@@ -9,6 +9,10 @@ const GTFS_STOP_SUMMARY_STATE_KEY = 'gtfs-stop-service-summary';
 const GTFS_STOP_SUMMARY_VERSION = 2;
 const STOP_ROUTE_MEMBERSHIP_STATE_KEY = 'stop-route-membership';
 const STOP_ROUTE_MEMBERSHIP_VERSION = 1;
+const BUS_STOP_MEMBERSHIP_STATE_KEY = 'bus-stop-membership';
+const BUS_STOP_MEMBERSHIP_VERSION = 1;
+const BUS_TERMINAL_STOPS_STATE_KEY = 'bus-terminal-stops';
+const BUS_TERMINAL_STOPS_VERSION = 1;
 const BUS_DIRECTION_PATTERNS_STATE_KEY = 'bus-direction-patterns';
 const BUS_DIRECTION_PATTERNS_VERSION = 1;
 const ROUTE_RAIL_CONNECTION_STATE_KEY = 'route-rail-connections';
@@ -26,6 +30,8 @@ const ROUTE_RAIL_GTFS_FILES = [
 type PrecomputedView =
   | 'gtfs_stop_service_summary'
   | 'stop_route_membership'
+  | 'bus_stop_membership'
+  | 'bus_terminal_stops'
   | 'bus_direction_patterns'
   | 'route_rail_connection_hits';
 
@@ -82,7 +88,17 @@ export class TransitDataPrecomputeService {
         : null,
       'stop_route_membership',
     );
+    await this.refreshMaterializedViewIfNeeded(
+      BUS_STOP_MEMBERSHIP_STATE_KEY,
+      gtfsSignature ? `v${BUS_STOP_MEMBERSHIP_VERSION}:${gtfsSignature}` : null,
+      'bus_stop_membership',
+    );
     await this.physicalStops.refresh(gtfsSignature);
+    await this.refreshMaterializedViewIfNeeded(
+      BUS_TERMINAL_STOPS_STATE_KEY,
+      gtfsSignature ? `v${BUS_TERMINAL_STOPS_VERSION}:${gtfsSignature}` : null,
+      'bus_terminal_stops',
+    );
     await this.refreshMaterializedViewIfNeeded(
       BUS_DIRECTION_PATTERNS_STATE_KEY,
       gtfsSignature ? `v${BUS_DIRECTION_PATTERNS_VERSION}:${gtfsSignature}` : null,
@@ -136,6 +152,20 @@ export class TransitDataPrecomputeService {
   }
 
   private async refreshMaterializedView(view: PrecomputedView): Promise<void> {
+    if (view === 'bus_terminal_stops') {
+      await this.prisma.$executeRawUnsafe(
+        'REFRESH MATERIALIZED VIEW CONCURRENTLY "public"."bus_terminal_stops"',
+      );
+      await this.prisma.$executeRawUnsafe('ANALYZE "public"."bus_terminal_stops"');
+      return;
+    }
+    if (view === 'bus_stop_membership') {
+      await this.prisma.$executeRawUnsafe(
+        'REFRESH MATERIALIZED VIEW CONCURRENTLY "public"."bus_stop_membership"',
+      );
+      await this.prisma.$executeRawUnsafe('ANALYZE "public"."bus_stop_membership"');
+      return;
+    }
     if (view === 'stop_route_membership') {
       await this.prisma.$executeRawUnsafe(
         'REFRESH MATERIALIZED VIEW CONCURRENTLY "public"."stop_route_membership"',

@@ -37,6 +37,12 @@
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">
+  @if (terminalReturn()) {
+    <button mat-button type="button" (click)="returnToTerminal()">
+      <mat-icon>arrow_back</mat-icon>
+      Ver todas as linhas do terminal
+    </button>
+  }
   <button
     mat-icon-button
     class="favorite-button"

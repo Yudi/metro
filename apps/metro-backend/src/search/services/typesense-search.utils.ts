@@ -114,7 +114,7 @@ export async function searchTypesense(
       request: {
         collection: context.getReadCollectionName(GTFS_STOPS_COLLECTION_NAME),
         q: query,
-        query_by: 'stop_name,stop_desc',
+        query_by: 'stop_name,stop_desc,stop_id',
         sort_by: '_text_match:desc,stop_id:asc',
         per_page: safeLimit,
         typo_tokens_threshold: 2,

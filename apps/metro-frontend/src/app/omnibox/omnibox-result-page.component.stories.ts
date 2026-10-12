@@ -23,7 +23,11 @@ import {
 import { concat, map, of, timer } from 'rxjs';
 import { userEvent, within } from 'storybook/test';
 import { BikeStationsService } from '../map-main/geography/bike-stations.service';
+import { BusTerminalsService } from '../map-main/geography/bus-terminals.service';
+import { BUS_TERMINAL_DETAIL_FIXTURE } from '@metro/shared/bus-terminal-contracts';
 import { GeographyGraphQLService } from '../map-main/geography/geography-graphql.service';
+import { MapDisplayService } from '../map-main/components/map/map-display.service';
+import { StationImagesService } from '../map-main/components/subway-station-dialog/station-images.service';
 import { TypesenseSearchService } from '../search/typesense-search.service';
 import { createOmniboxSearchResponse } from './omnibox.fixtures';
 import { BusItineraryService } from '../bus-itinerary/bus-itinerary.service';
@@ -62,6 +66,23 @@ const meta: Meta<OmniboxResultPageComponent> = {
           }),
         },
         { provide: BikeStationsService, useValue: {} },
+        { provide: BusTerminalsService, useValue: { getTerminalDetail: () => of(null) } },
+        {
+          provide: MapDisplayService,
+          useValue: {
+            fitToCoordinates: () => undefined,
+            centerOn: () => undefined,
+            showExploreLocation: () => undefined,
+          },
+        },
+        {
+          provide: StationImagesService,
+          useValue: {
+            load: () => undefined,
+            terminalImage: () => undefined,
+            markUnavailable: () => undefined,
+          },
+        },
         { provide: GeographyGraphQLService, useValue: {} },
         {
           provide: TypesenseSearchService,
@@ -107,6 +128,29 @@ export const Unavailable: Story = {
         {
           provide: ActivatedRoute,
           useValue: detailRoute('rail-line', 'unknown', 'linha 9'),
+        },
+      ],
+    }),
+  ],
+};
+
+export const BusTerminal: Story = {
+  decorators: [
+    applicationConfig({
+      providers: [
+        {
+          provide: ActivatedRoute,
+          useValue: detailRoute(
+            'bus-terminal',
+            BUS_TERMINAL_DETAIL_FIXTURE.id,
+            'terminal parque central',
+          ),
+        },
+        {
+          provide: BusTerminalsService,
+          useValue: {
+            getTerminalDetail: () => of(BUS_TERMINAL_DETAIL_FIXTURE),
+          },
         },
       ],
     }),

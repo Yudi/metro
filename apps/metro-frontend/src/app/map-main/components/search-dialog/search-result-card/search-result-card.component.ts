@@ -6,6 +6,7 @@ import {
   output,
 } from '@angular/core';
 import { NgOptimizedImage } from '@angular/common';
+import type { BusTerminalSummary } from '@metro/shared/bus-terminal-contracts';
 
 import { MatCardModule } from '@angular/material/card';
 import { MatChipsModule } from '@angular/material/chips';
@@ -35,6 +36,7 @@ interface AgencyIdentity {
 /** Search result type */
 export type SearchResultType =
   | 'bus_stop'
+  | 'bus_terminal'
   | 'subway_station'
   | 'bike_station'
   | 'route';
@@ -62,6 +64,7 @@ export interface SearchResult {
   platformCode?: string;
   mergedStopIds?: string[];
   specialService?: SpecialRailService;
+  terminalData?: BusTerminalSummary;
 }
 
 @Component({
@@ -137,6 +140,8 @@ export class SearchResultCardComponent {
         return 'train';
       case 'bus_stop':
         return 'directions_bus';
+      case 'bus_terminal':
+        return 'departure_board';
       case 'bike_station':
         return 'pedal_bike';
       case 'route':
@@ -156,6 +161,8 @@ export class SearchResultCardComponent {
         return 'Estação de metrô/trem';
       case 'bus_stop':
         return 'Ponto de ônibus';
+      case 'bus_terminal':
+        return 'Terminal de ônibus';
       case 'bike_station':
         return 'Estação de bicicleta';
       case 'route':

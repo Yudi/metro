@@ -4,6 +4,7 @@ export type OmniboxResultKind =
   | 'bus-route'
   | 'rail-line'
   | 'bus-stop'
+  | 'bus-terminal'
   | 'rail-station'
   | 'bike-station';
 
@@ -17,12 +18,16 @@ export function resultKind(result: SearchResult): OmniboxResultKind {
       return 'bike-station';
     case 'bus_stop':
       return 'bus-stop';
+    case 'bus_terminal':
+      return 'bus-terminal';
   }
 }
 
 export function resultQueryParams(result: SearchResult, query: string) {
   const hasCoordinates =
-    result.type === 'subway_station' || result.type === 'bike_station';
+    result.type === 'subway_station' ||
+    result.type === 'bike_station' ||
+    result.type === 'bus_terminal';
   return {
     q: query.trim() || undefined,
     name: hasCoordinates ? result.name : undefined,

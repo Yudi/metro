@@ -450,6 +450,12 @@ export class MapDisplayService {
     this.mapService.centerOn(coordinates, zoom);
   }
 
+  fitToCoordinates(
+    coordinates: readonly (readonly [number, number])[],
+  ): void {
+    this.mapService.fitToCoordinates(coordinates);
+  }
+
   clearSelection(): void {
     this.mapService.clearSelection();
   }

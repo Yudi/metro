@@ -69,8 +69,13 @@ describe('physical bus stop matching', () => {
     expect(extractBusPlatform('Terminal Barra Funda Lado Norte Plat. A')).toBe(
       'A',
     );
+    expect(extractBusPlatform('Terminal Pinheiros - Pl. 12')).toBe('12');
+    expect(extractBusPlatform('Terminal Penha Pl B2')).toBe('B2');
     expect(extractBusPlatform('Terminal', 'Plataforma 12')).toBe('12');
     expect(extractBusPlatform('Terminal', null, 'B2')).toBe('B2');
     expect(extractBusPlatform('Rua das Flores, 12')).toBeUndefined();
+    expect(extractBusPlatform('Terminal Platina')).toBeUndefined();
+    expect(extractBusPlatform('Terminal Central - Plat01')).toBe('01');
+    expect(extractBusPlatform('Terminal Central', 'Plataforma não informada')).toBeUndefined();
   });
 });

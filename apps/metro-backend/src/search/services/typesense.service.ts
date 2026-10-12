@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Client } from 'typesense';
+import { randomBytes } from 'node:crypto';
 import {
   SearchTypes,
   SearchTypesEnum,
@@ -52,6 +53,10 @@ import { TypesenseIndexingFacade } from './typesense-indexing.facade';
 import { TypesenseCollectionFacade } from './typesense-collection.facade';
 import { getConfiguredNumber } from './typesense-config.utils';
 import { AsyncTtlCache } from '../../common/cache/async-ttl-cache';
+import {
+  discardUnaliasedRebuilds,
+  retireManagedRebuilds,
+} from './typesense-rebuild-lifecycle';
 
 const TEXT_SEARCH_CACHE_TTL_MS = 5_000;
 const TEXT_SEARCH_CACHE_MAX_ENTRIES = 128;
@@ -82,9 +87,13 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TypesenseService.name);
   private client: Client;
   private readonly liveCollectionTargets = new Map<string, string>();
+  private readonly aliasedBaseCollectionNames = new Set<string>();
   private readonly rebuildCollectionTargets = new Map<string, string>();
   private readonly rebuildExpectedCounts = new Map<string, number>();
-  private previousLiveCollectionTargets = new Map<string, string>();
+  private readonly previousLiveCollectionTargets = new Map<string, string>();
+  private rebuildInProgress = false;
+  private retirementInFlight = false;
+  private retirementTimer: NodeJS.Timeout | undefined;
   private initialized = false;
   private recoveryTimer: NodeJS.Timeout | undefined;
   private recoveryInFlight = false;
@@ -156,6 +165,7 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
   onModuleDestroy(): void {
     this.shuttingDown = true;
     this.clearRecoveryProbe();
+    clearInterval(this.retirementTimer);
   }
 
   private async initializeCollections(): Promise<void> {
@@ -192,12 +202,14 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
             .aliases(`${collectionName}__live`)
             .retrieve();
           this.liveCollectionTargets.set(collectionName, alias.collection_name);
+          this.aliasedBaseCollectionNames.add(collectionName);
         } catch (error) {
           if (!isTypesenseNotFoundError(error)) {
             throw error;
           }
 
           this.liveCollectionTargets.set(collectionName, collectionName);
+          this.aliasedBaseCollectionNames.delete(collectionName);
         }
       }
 
@@ -211,6 +223,13 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
       this.logger.debug('Typesense collections initialized successfully');
       this.initialized = true;
       this.clearRecoveryProbe();
+      await this.retireSupersededCollections();
+      if (!this.retirementTimer && !this.shuttingDown) {
+        this.retirementTimer = setInterval(() => {
+          void this.retireSupersededCollections();
+        }, 15 * 60 * 1_000);
+        this.retirementTimer.unref?.();
+      }
     } catch (error) {
       this.initialized = false;
       this.logger.error(
@@ -304,40 +323,55 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
       throw new Error('Typesense rebuild contains an invalid collection name');
     }
 
-    if (this.rebuildCollectionTargets.size > 0) {
+    if (this.rebuildInProgress) {
       throw new Error('Typesense full rebuild already in progress');
     }
+    // Reserve before the first await so simultaneous starts cannot leak stages.
+    this.rebuildInProgress = true;
 
-    const rebuildId = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    const rebuildId = `${Date.now()}_${randomBytes(8).toString('hex')}`;
     const schemas = TYPESENSE_COLLECTION_SCHEMAS.filter(([baseName]) =>
       requestedNames.has(baseName),
     );
 
     const created: string[] = [];
     try {
+      this.previousLiveCollectionTargets.clear();
+      for (const baseName of requestedNames) {
+        try {
+          const alias = await this.client
+            .aliases(`${baseName}__live`)
+            .retrieve();
+          this.previousLiveCollectionTargets.set(baseName, alias.collection_name);
+        } catch (error) {
+          if (!isTypesenseNotFoundError(error)) {
+            throw error;
+          }
+          this.previousLiveCollectionTargets.set(baseName, baseName);
+        }
+      }
       for (const [baseName, schema] of schemas) {
         const stagingName = `${baseName}__rebuild_${rebuildId}`;
         await this.client.collections().create({
           ...(schema as Record<string, unknown>),
           name: stagingName,
+          metadata: {
+            metro_rebuild: {
+              version: 1,
+              base_name: baseName,
+              previous_target: this.previousLiveCollectionTargets.get(baseName),
+            },
+          },
         } as never);
         created.push(stagingName);
         this.rebuildCollectionTargets.set(baseName, stagingName);
         this.rebuildExpectedCounts.set(baseName, 0);
       }
-
-      this.previousLiveCollectionTargets = new Map(this.liveCollectionTargets);
     } catch (error) {
-      await Promise.all(
-        created.map((collectionName) =>
-          this.client
-            .collections(collectionName)
-            .delete()
-            .catch(() => undefined),
-        ),
-      );
+      await this.discardCollections(created);
       this.rebuildCollectionTargets.clear();
       this.rebuildExpectedCounts.clear();
+      this.rebuildInProgress = false;
       throw error;
     }
   }
@@ -347,7 +381,7 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
       throw new Error('Typesense full rebuild has not started');
     }
 
-    const aliasesSwapped: string[] = [];
+    const aliasesAttempted: string[] = [];
     try {
       for (const [baseName, stagingName] of this.rebuildCollectionTargets) {
         const expected = this.rebuildExpectedCounts.get(baseName) ?? 0;
@@ -362,53 +396,133 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
       }
 
       for (const [baseName, stagingName] of this.rebuildCollectionTargets) {
+        const aliasName = `${baseName}__live`;
+        let currentTarget = baseName;
+        try {
+          currentTarget = (await this.client.aliases(aliasName).retrieve())
+            .collection_name;
+        } catch (error) {
+          if (!isTypesenseNotFoundError(error)) {
+            throw error;
+          }
+        }
+        if (currentTarget !== this.previousLiveCollectionTargets.get(baseName)) {
+          throw new Error(
+            `Typesense alias changed during rebuild: ${aliasName}`,
+          );
+        }
+        // A timeout can still mean the server applied this write.
+        aliasesAttempted.push(baseName);
         await this.client.aliases().upsert(`${baseName}__live`, {
           collection_name: stagingName,
         });
-        aliasesSwapped.push(baseName);
       }
 
       for (const [baseName, stagingName] of this.rebuildCollectionTargets) {
         this.liveCollectionTargets.set(baseName, stagingName);
+        this.aliasedBaseCollectionNames.add(baseName);
       }
       this.rebuildCollectionTargets.clear();
       this.rebuildExpectedCounts.clear();
+      this.rebuildInProgress = false;
       this.textSearchCache.clear();
     } catch (error) {
       // Restore aliases already swapped in this attempt.  The previous
       // physical collections remain untouched and therefore continue serving
       // search traffic if the rebuild fails.
       await Promise.all(
-        aliasesSwapped.map((baseName) => {
+        aliasesAttempted.map(async (baseName) => {
           const previous = this.previousLiveCollectionTargets.get(baseName);
-          return previous
-            ? this.client
-                .aliases()
-                .upsert(`${baseName}__live`, { collection_name: previous })
-                .catch(() => undefined)
-            : this.client
-                .aliases(`${baseName}__live`)
-                .delete()
-                .catch(() => undefined);
+          try {
+            const alias = await this.client
+              .aliases(`${baseName}__live`)
+              .retrieve();
+            if (
+              alias.collection_name === this.rebuildCollectionTargets.get(baseName) &&
+              previous
+            ) {
+              await this.client.aliases().upsert(`${baseName}__live`, {
+                collection_name: previous,
+              });
+            }
+          } catch (rollbackError) {
+            this.logger.warn(
+              `Could not restore Typesense alias: ${formatTypesenseError(rollbackError)}`,
+            );
+          }
         }),
       );
+      for (const baseName of aliasesAttempted) {
+        try {
+          const alias = await this.client
+            .aliases(`${baseName}__live`)
+            .retrieve();
+          this.liveCollectionTargets.set(baseName, alias.collection_name);
+          this.aliasedBaseCollectionNames.add(baseName);
+        } catch (inspectionError) {
+          if (isTypesenseNotFoundError(inspectionError)) {
+            this.liveCollectionTargets.set(baseName, baseName);
+            this.aliasedBaseCollectionNames.delete(baseName);
+          } else {
+            this.markUnavailable(inspectionError);
+          }
+        }
+      }
+      this.textSearchCache.clear();
       await this.discardFullRebuild();
       throw error;
     }
+    // Retirement failure must never roll back a successfully promoted rebuild.
+    await this.retireSupersededCollections();
   }
 
   async discardFullRebuild(): Promise<void> {
     const stagingCollections = [...this.rebuildCollectionTargets.values()];
     this.rebuildCollectionTargets.clear();
     this.rebuildExpectedCounts.clear();
-    await Promise.all(
-      stagingCollections.map((collectionName) =>
-        this.client
-          .collections(collectionName)
-          .delete()
-          .catch(() => undefined),
-      ),
-    );
+    await this.discardCollections(stagingCollections);
+    this.rebuildInProgress = false;
+  }
+
+  private async discardCollections(names: readonly string[]): Promise<void> {
+    try {
+      await discardUnaliasedRebuilds(this.client, names);
+    } catch (error) {
+      this.logger.warn(
+        `Typesense staging cleanup deferred: ${formatTypesenseError(error)}`,
+      );
+    }
+  }
+
+  private async retireSupersededCollections(): Promise<void> {
+    if (this.retirementInFlight || this.shuttingDown) {
+      return;
+    }
+    this.retirementInFlight = true;
+    try {
+      const pinned = new Set(
+        this.configService
+          .get<string>('TYPESENSE_REBUILD_PINNED_COLLECTIONS', '')
+          .split(',')
+          .map((name) => name.trim())
+          .filter(Boolean),
+      );
+      for (const name of this.rebuildCollectionTargets.values()) {
+        pinned.add(name);
+      }
+      const retired = await retireManagedRebuilds(this.client, pinned);
+      if (retired.length > 0) {
+        this.logger.log(
+          `Retired ${retired.length} superseded Typesense rebuild collections`,
+        );
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Typesense retirement deferred: ${formatTypesenseError(error)}`,
+      );
+    } finally {
+      this.retirementInFlight = false;
+    }
   }
 
   private getBaseCollectionNames(): string[] {
@@ -416,14 +530,15 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
   }
 
   private getReadCollectionName(baseName: string): string {
-    return this.liveCollectionTargets.get(baseName) ?? baseName;
+    return this.aliasedBaseCollectionNames.has(baseName)
+      ? `${baseName}__live`
+      : baseName;
   }
 
   private getWriteCollectionName(baseName: string): string {
     return (
       this.rebuildCollectionTargets.get(baseName) ??
-      this.liveCollectionTargets.get(baseName) ??
-      baseName
+      this.getReadCollectionName(baseName)
     );
   }
 
@@ -642,7 +757,8 @@ export class TypesenseService implements OnModuleInit, OnModuleDestroy {
   ): Promise<T> {
     const affectsLiveSearch = writes.some(
       ({ baseName, collectionName }) =>
-        collectionName === this.getReadCollectionName(baseName),
+        collectionName === this.getReadCollectionName(baseName) ||
+        collectionName === this.liveCollectionTargets.get(baseName),
     );
     if (affectsLiveSearch) {
       this.textSearchCache.clear();

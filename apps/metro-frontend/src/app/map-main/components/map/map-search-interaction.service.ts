@@ -113,6 +113,15 @@ export class MapSearchInteractionService {
       } else {
         this.logger.warn('Route search result missing routeData', result);
       }
+    } else if (result.type === 'bus_terminal') {
+      if (result.terminalData) {
+        this.detailsService.showBusTerminalDetails(
+          result.id,
+          result.terminalData,
+        );
+      } else {
+        this.logger.warn('Terminal search result missing terminalData', result);
+      }
     }
   }
 

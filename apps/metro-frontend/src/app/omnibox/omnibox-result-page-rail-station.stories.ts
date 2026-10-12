@@ -37,6 +37,7 @@ import {
   createSubwayStationDialogProviders,
 } from '../map-main/components/subway-station-dialog/subway-station-dialog.stories.fixtures';
 import { BikeStationsService } from '../map-main/geography/bike-stations.service';
+import { BusTerminalsService } from '../map-main/geography/bus-terminals.service';
 import { GeographyGraphQLService } from '../map-main/geography/geography-graphql.service';
 import { TypesenseSearchService } from '../search/typesense-search.service';
 import type { TypesenseSearchResponse } from '../search/typesense-search.types';
@@ -211,6 +212,7 @@ function createStoryProviders() {
     { provide: ActivatedRoute, useValue: routeState.route },
     { provide: STORY_ROUTE_STATE, useValue: routeState },
     { provide: BikeStationsService, useValue: {} },
+    { provide: BusTerminalsService, useValue: { getTerminalDetail: () => of(null) } },
     { provide: GeographyGraphQLService, useValue: {} },
     {
       provide: TypesenseSearchService,

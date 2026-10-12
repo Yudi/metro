@@ -38,6 +38,9 @@ import {
   closeMapPanelOrDialog,
   MAP_PANEL_REF,
 } from '../map/map-panel/map-panel-ref';
+import type { BusTerminalReturnData } from '../bus-terminal-dialog/bus-terminal-dialog.types';
+import type { BusTerminalViewState } from '../bus-terminal-dialog/bus-terminal-dialog.types';
+import { BusTerminalsService } from '../../geography/bus-terminals.service';
 
 export interface BusStopDialogData {
   stop: BusStopGraphQL;
@@ -45,13 +48,17 @@ export interface BusStopDialogData {
   selectedRoutes: Set<string>;
   routesLoading?: boolean;
   routesError?: boolean;
+  terminalReturn?: BusTerminalReturnData;
+  terminalViewState?: BusTerminalViewState;
+  onOpenTerminal?: (terminal: BusTerminalReturnData) => void;
   /** Whether to show map-specific actions (add to selection, show route on map). Default: true */
   showMapActions?: boolean;
 }
 
 export type BusStopDialogResult =
   | { action: 'add'; stopId: string }
-  | { action: 'selectRoute'; routeId: string };
+  | { action: 'selectRoute'; routeId: string }
+  | { action: 'returnToTerminal'; terminalReturn: BusTerminalReturnData };
 
 @Component({
   selector: 'app-bus-stop-dialog',
@@ -81,6 +88,9 @@ export class BusStopDialogComponent {
   readonly routes = signal(this.data.routes);
   readonly routesLoading = signal(this.data.routesLoading ?? false);
   readonly routesError = signal(this.data.routesError ?? false);
+  private readonly terminals = inject(BusTerminalsService);
+  private readonly explicitTerminalReturn = signal(this.data.terminalReturn);
+  readonly terminalReturn = signal(this.data.terminalReturn);
   readonly stopDescription = computed(() =>
     this.stop().description?.trim() === `Plataforma ${this.stop().platformCode}`
       ? null
@@ -178,6 +188,23 @@ export class BusStopDialogComponent {
   });
 
   constructor() {
+    effect((onCleanup) => {
+      const explicit = this.explicitTerminalReturn();
+      const stopId = this.stop().stopId;
+      this.terminalReturn.set(explicit);
+      if (explicit || !stopId) return;
+      const subscription = this.terminals.getTerminalForStop(stopId).subscribe({
+        next: (summary) => {
+          if (summary) this.terminalReturn.set({
+            terminalId: summary.id,
+            summary,
+            viewState: this.data.terminalViewState ?? { query: '', platformCode: 'all', scrollTop: 0 },
+          });
+        },
+        error: () => this.terminalReturn.set(undefined),
+      });
+      onCleanup(() => subscription.unsubscribe());
+    });
     effect(() => {
       const details = this.detailsOverride();
       if (details) {
@@ -193,6 +220,7 @@ export class BusStopDialogComponent {
   }
 
   updateDetails(data: BusStopDialogData): void {
+    this.explicitTerminalReturn.set(data.terminalReturn);
     this.stop.set(data.stop);
     this.routes.set(data.routes);
     this.routesLoading.set(data.routesLoading ?? false);
@@ -228,6 +256,19 @@ export class BusStopDialogComponent {
     closeMapPanelOrDialog(this.panelRef, this.dialogRef, {
       action: 'add',
       stopId: this.stop().stopId,
+    });
+  }
+
+  returnToTerminal(): void {
+    const terminalReturn = this.terminalReturn();
+    if (!terminalReturn) return;
+    if (this.data.onOpenTerminal) {
+      this.data.onOpenTerminal(terminalReturn);
+      return;
+    }
+    closeMapPanelOrDialog(this.panelRef, this.dialogRef, {
+      action: 'returnToTerminal',
+      terminalReturn,
     });
   }
 

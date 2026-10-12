@@ -1,0 +1,9 @@
+{
+  "name": "shared-bus-terminal-contracts",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/shared/bus-terminal-contracts/src",
+  "projectType": "library",
+  "tags": [],
+  "// targets": "to see all targets run: nx show project shared-bus-terminal-contracts --web",
+  "targets": {}
+}

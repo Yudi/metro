@@ -7,13 +7,14 @@ export const STATION_IMAGES_KEY_PREFIX = 'station-images/';
 
 const stationIdentityPattern = /^[a-z0-9][a-z0-9_-]{0,159}$/;
 const stationImageKeyPattern =
-  /^station-images\/(?:metro|monorail|rail)\/[a-z0-9]+(?:-[a-z0-9]+)*\.avif$/;
+  /^station-images\/(?:metro|monorail|rail|terminal)\/[a-z0-9]+(?:-[a-z0-9]+)*\.avif$/;
+const terminalIdentityPattern = /^terminal:[a-z0-9][a-z0-9_-]{0,159}$/;
 
 export function buildStationImageObjectKey(
   category: string,
   filename: string,
 ): string {
-  if (!['metro', 'monorail', 'rail'].includes(category)) {
+  if (!['metro', 'monorail', 'rail', 'terminal'].includes(category)) {
     throw new Error('Invalid station image category');
   }
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*\.avif$/.test(filename)) {
@@ -39,28 +40,54 @@ export function parseStationImageManifest(value: string): StationImageManifest {
     throw new Error('Station image metadata must contain a stations object');
   }
 
-  for (const [identity, images] of Object.entries(stations)) {
-    if (!stationIdentityPattern.test(identity) || !Array.isArray(images)) {
-      throw new Error('Station image metadata contains an invalid station');
+  validateImageGroups(stations, stationIdentityPattern, 'station');
+
+  const terminals = parsed['terminals'];
+  if (terminals !== undefined) {
+    if (!isRecord(terminals)) {
+      throw new Error('Station image metadata must contain a terminals object');
     }
-    if (images.length > 12 || !images.every(isStationImageMetadataEntry)) {
-      throw new Error('Station image metadata contains an invalid image entry');
-    }
+    validateImageGroups(terminals, terminalIdentityPattern, 'terminal');
   }
 
   return parsed as unknown as StationImageManifest;
 }
 
+function validateImageGroups(
+  groups: Record<string, unknown>,
+  identityPattern: RegExp,
+  groupName: 'station' | 'terminal',
+): void {
+  for (const [identity, images] of Object.entries(groups)) {
+    if (!identityPattern.test(identity) || !Array.isArray(images)) {
+      throw new Error(`Station image metadata contains an invalid ${groupName}`);
+    }
+    if (
+      images.length > 12 ||
+      !images.every((image) =>
+        isStationImageMetadataEntry(image, groupName === 'terminal'),
+      )
+    ) {
+      throw new Error('Station image metadata contains an invalid image entry');
+    }
+  }
+}
+
 function isStationImageMetadataEntry(
   value: unknown,
+  terminal: boolean,
 ): value is StationImageMetadataEntry {
   if (!isRecord(value)) {
     return false;
   }
 
+  const isTerminalImage =
+    typeof value['key'] === 'string' &&
+    value['key'].startsWith('station-images/terminal/');
   return (
     typeof value['key'] === 'string' &&
     stationImageKeyPattern.test(value['key']) &&
+    terminal === isTerminalImage &&
     isOptionalText(value['label'], 160) &&
     isLineIds(value['lineIds']) &&
     (value['service'] === undefined || value['service'] === 'train') &&

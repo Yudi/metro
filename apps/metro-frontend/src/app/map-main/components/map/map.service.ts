@@ -21,6 +21,7 @@ import type {
 } from './map-service.types';
 import { featureToMapFeature } from './map-feature.utils';
 import { MapBaseTileService } from './layers/map-base-tile.service';
+import { getProjectedCoordinateExtent } from './map-coordinate-extent.utils';
 
 export type {
   MapFeature,
@@ -323,6 +324,21 @@ export class MapService {
         view.setZoom(zoom);
       }
     }
+  }
+
+  /** Fit a set of geographic points, such as the physical stops in a terminal. */
+  fitToCoordinates(
+    coordinates: readonly (readonly [number, number])[],
+  ): void {
+    const map = this.map();
+    const extent = getProjectedCoordinateExtent(coordinates);
+    if (!map || !extent) return;
+
+    map.getView().fit(extent, {
+      padding: [64, 64, 64, 64],
+      maxZoom: 16,
+      duration: 250,
+    });
   }
 
   /** Fit a route loaded from vector tiles after the selection filter has rendered. */

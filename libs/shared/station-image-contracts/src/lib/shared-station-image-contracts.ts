@@ -13,4 +13,6 @@ export interface StationImage {
 export interface StationImageManifest {
   readonly version: 1;
   readonly stations: Readonly<Record<string, readonly StationImage[]>>;
+  /** Optional images keyed by the full dynamic catalog ID, such as terminal:central. */
+  readonly terminals?: Readonly<Record<string, readonly StationImage[]>>;
 }

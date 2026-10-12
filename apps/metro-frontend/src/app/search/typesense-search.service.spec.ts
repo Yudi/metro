@@ -49,6 +49,7 @@ describe('TypesenseSearchService', () => {
       query: '477A',
       includeBusRoutes: true,
       includeBusStops: false,
+      includeBusTerminals: false,
       includeRailLines: false,
       includeRailStations: true,
       includeBikeStations: false,

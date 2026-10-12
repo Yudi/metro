@@ -62,6 +62,17 @@ export class GTFSConfig {
    */
   static readonly PROCESSING_TIMEOUT_MS = 1800000; // 30 minutes
 
+  /** ARTESP publishes millions of explicit stop times instead of frequencies. */
+  static getCsvImportTimeoutMs(feed: GTFSFeed): number {
+    return (feed === 'artesp' ? 90 : 15) * 60_000;
+  }
+
+  /** Keep CSV memory bounded while amortizing database round trips. */
+  static readonly CSV_BATCH_SIZE = 5_000;
+
+  /** Stay below Prisma's 32,767 bind-parameter limit, including generated IDs. */
+  static readonly MAX_INSERT_PARAMETERS = 30_000;
+
   /**
    * Maximum time a process may hold the cross-process import lock.
    */

@@ -27,6 +27,11 @@ import {
   BikeStationDocument,
 } from '../services/typesense.service';
 import { SearchService } from '../services/search.service';
+import { BusTerminalService } from '../../bus-terminals/bus-terminal.service';
+import {
+  aggregateTerminalSearchHits,
+  TerminalAwareSearchHit,
+} from '../services/terminal-search.utils';
 import {
   SearchResult as SearchResultItem,
   SearchBusRoute as SearchBusRoute,
@@ -64,6 +69,7 @@ export class SearchResolver {
     private readonly typesenseService: TypesenseService,
     private readonly searchService: SearchService,
     private readonly directions: BusDirectionService,
+    private readonly terminals?: BusTerminalService,
   ) {}
 
   @Query(() => [SearchResultUnion])
@@ -105,10 +111,23 @@ export class SearchResolver {
 
       // Typesense provides the base results; directions are optional enrichment.
       const typesenseResults = await (types.length > 0
-        ? this.typesenseService.search(input.query, types, input.limit ?? 10)
+        ? this.typesenseService.search(
+          input.query, types, includeBusStops && input.includeBusTerminals ? 100 : input.limit ?? 10,
+        )
         : Promise.resolve([]));
 
-      const sortedByRelevance = [...typesenseResults].sort((a, b) =>
+      let terminalAwareResults: TerminalAwareSearchHit[] = typesenseResults;
+      if (includeBusStops && input.includeBusTerminals && this.terminals) {
+        try {
+          terminalAwareResults = aggregateTerminalSearchHits(
+            typesenseResults, await this.terminals.getCatalog(), input.query,
+          );
+        } catch {
+          // Without current verified membership, retain the original stops.
+          this.logger.warn('Terminal catalog unavailable; returning individual stops');
+        }
+      }
+      const sortedByRelevance = [...terminalAwareResults].sort((a, b) =>
         this.compareSearchResults(a, b, input.query),
       );
 
@@ -116,7 +135,10 @@ export class SearchResolver {
       const directions = await this.getSearchDirections(
         hits.flatMap((hit) => hit.type === 'busRoute' ? [(hit.document as RouteDocument).route_id] : []),
       );
-      return hits.flatMap((hit) => {
+      return hits.flatMap<SearchResultItem>((hit) => {
+        if (hit.type === 'busTerminal') {
+          return [{ ...hit.document, type: 'busTerminal', score: hit.score, highlights: [] }];
+        }
         const base = {
           ...this.formatSearchDocument(hit.document, hit.type),
           score: hit.score,
@@ -327,8 +349,8 @@ export class SearchResolver {
   }
 
   private compareSearchResults(
-    hit: Awaited<ReturnType<TypesenseService['search']>>[number],
-    other: Awaited<ReturnType<TypesenseService['search']>>[number],
+    hit: TerminalAwareSearchHit,
+    other: TerminalAwareSearchHit,
     query: string,
   ): number {
     const normalizedQuery = hardNormalizeString(query);
@@ -338,6 +360,10 @@ export class SearchResolver {
     if (exactMatchOrder !== 0) {
       return exactMatchOrder;
     }
+
+    // A terminal overview is the primary result for a broad terminal name search.
+    const terminalOrder = Number(other.type === 'busTerminal') - Number(hit.type === 'busTerminal');
+    if (terminalOrder !== 0) return terminalOrder;
 
     const scoreOrder = (other.score ?? 0) - (hit.score ?? 0);
     if (scoreOrder !== 0) {
@@ -352,7 +378,7 @@ export class SearchResolver {
   }
 
   private isExactIdentity(
-    hit: Awaited<ReturnType<TypesenseService['search']>>[number],
+    hit: TerminalAwareSearchHit,
     normalizedQuery: string,
   ): boolean {
     if (!normalizedQuery) {
@@ -361,6 +387,9 @@ export class SearchResolver {
 
     let candidates: string[] = [];
     switch (hit.type) {
+      case 'busTerminal':
+        candidates = [hit.document.name, ...hit.document.aliases];
+        break;
       case 'busRoute': {
         const route = hit.document as RouteDocument;
         candidates = [
@@ -373,7 +402,7 @@ export class SearchResolver {
       }
       case 'busStop': {
         const stop = hit.document as StopDocument;
-        candidates = [stop.stop_name];
+        candidates = [stop.stop_id, stop.sourceId ?? '', stop.stop_name];
         break;
       }
       case 'railLine': {
@@ -411,7 +440,7 @@ export class SearchResolver {
   }
 
   private getSearchResultIdentity(
-    hit: Awaited<ReturnType<TypesenseService['search']>>[number],
+    hit: TerminalAwareSearchHit,
   ): string {
     let id = hit.document.id;
     switch (hit.type) {

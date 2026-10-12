@@ -62,6 +62,12 @@ export class SearchFiltersInput {
   @IsBoolean()
   includeBusStops?: boolean;
 
+  /** Opt in so existing clients that only understand individual stops keep working. */
+  @Field(() => Boolean, { nullable: true, defaultValue: false })
+  @IsOptional()
+  @IsBoolean()
+  includeBusTerminals?: boolean;
+
   @Field(() => Boolean, { nullable: true, defaultValue: true })
   @IsOptional()
   @IsBoolean()

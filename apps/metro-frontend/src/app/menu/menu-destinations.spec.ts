@@ -8,6 +8,7 @@ import {
 
 describe('omnibox destination catalog', () => {
   const destinations = searchDestinations(SAO_PAULO_CITY);
+  const adminDestinations = searchDestinations(SAO_PAULO_CITY, true);
 
   it('covers every concrete application page and uses existing routes', () => {
     // The search-result detail route is parameterized and is only navigated to
@@ -16,12 +17,17 @@ describe('omnibox destination catalog', () => {
       .filter((route) => !route.path?.includes(':'))
       .map((route) => `/${route.path}`)
       .map((path) => (path === '/' ? '' : path));
-    const searchablePaths = destinations.flatMap((item) =>
+    const searchablePaths = adminDestinations.flatMap((item) =>
       item.route === undefined ? [] : [item.route],
     );
     expect(new Set(searchablePaths)).toEqual(new Set(paths));
     expect(paths).not.toContain('/itinerarios');
     expect(paths).not.toContain('/proxima-chegada');
+  });
+
+  it('only includes the administration page for administrators', () => {
+    expect(destinations.some((item) => item.route === '/admin')).toBe(false);
+    expect(adminDestinations.some((item) => item.route === '/admin')).toBe(true);
   });
 
   it('shares map presets and external links with the menu', () => {

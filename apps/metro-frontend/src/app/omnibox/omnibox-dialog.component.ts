@@ -29,6 +29,7 @@ import {
   timer,
 } from 'rxjs';
 import { GeolocationService } from '@metro/shared/geolocation';
+import { firebaseIsAdmin } from '@metro/shared/firebase';
 import { SearchTypes } from '@metro/shared/utils';
 import { CityContextService } from '../cities/city-context.service';
 import {
@@ -118,7 +119,7 @@ export class OmniboxDialogComponent {
     { value: 'pages', label: 'Páginas' },
   ];
   readonly destinations = computed(() =>
-    searchDestinations(this.cityContext.city()),
+    searchDestinations(this.cityContext.city(), firebaseIsAdmin()),
   );
   readonly pages = computed(() =>
     !this.nearby() && (this.filter() === 'all' || this.filter() === 'pages')

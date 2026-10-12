@@ -143,11 +143,22 @@ const PAGE_DESTINATIONS: MenuDestination[] = [
   },
 ];
 
+const ADMIN_PAGE_DESTINATIONS: MenuDestination[] = [
+  {
+    label: 'Administração',
+    icon: 'admin_panel_settings',
+    route: '/admin',
+    keywords: 'administradores imagens direitos autorais',
+  },
+];
+
 export function searchDestinations(
   city: ReturnType<CityContextService['city']>,
+  isAdmin = false,
 ): MenuDestination[] {
   return [
     ...PAGE_DESTINATIONS,
+    ...(isAdmin ? ADMIN_PAGE_DESTINATIONS : []),
     ...Object.values(menuDestinations(city)).flat(),
   ];
 }

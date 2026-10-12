@@ -22,6 +22,20 @@ const row = (
 });
 
 describe('bus terminal catalog builder', () => {
+  it('handles long whitespace runs without rejecting long legitimate names', () => {
+    const maliciousName = `Terminal Central${' '.repeat(32_000)}!`;
+    expect(parseBusTerminalStop(maliciousName)?.name).toBe('Terminal Central !');
+    const longName = `Terminal ${'Nome '.repeat(8_000)}Norte`;
+    expect(parseBusTerminalStop(longName)?.name).toBe(longName);
+    expect(parseBusTerminalStop(`${longName} - Plat. 1`)?.name).toBe(longName);
+    expect(parseBusTerminalStop(`Terminal Central${'-'.repeat(32_000)}!`)?.name)
+      .toBe(`Terminal Central${'-'.repeat(32_000)}!`);
+    expect(buildBusTerminalCatalog([
+      row('malicious', maliciousName),
+      row('long-name', longName),
+    ])).toHaveLength(2);
+  });
+
   it('leaves the Silva Bueno street stop outside Sacomã while retaining unlabelled terminal stops', () => {
     const stops = [
       row('330016296', 'Terminal Sacoma', {
@@ -93,6 +107,14 @@ describe('bus terminal catalog builder', () => {
       .toBe(catalog.find((terminal) => terminal.name.endsWith('Norte'))?.id);
   });
   it('does not mistake a terminal name for an explicitly labeled platform', () => {
+    expect(parseBusTerminalStop('Terminal Central - Plat. PL'))
+      .toMatchObject({ name: 'Terminal Central', platformCode: 'PL' });
+    expect(parseBusTerminalStop('Terminal Central PMV PMV'))
+      .toMatchObject({ name: 'Terminal Central' });
+    expect(parseBusTerminalStop('Terminal Central PMV PMV-PMV'))
+      .toMatchObject({ name: 'Terminal Central' });
+    expect(parseBusTerminalStop(`Terminal Central PMV ${'PMV-'.repeat(8_000)}PMV`))
+      .toMatchObject({ name: 'Terminal Central' });
     expect(parseBusTerminalStop('Terminal Nova Platina'))
       .toMatchObject({ name: 'Terminal Nova Platina' });
     expect(parseBusTerminalStop('Terminal Nova Platina')?.platformCode).toBeUndefined();

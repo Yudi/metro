@@ -8,7 +8,7 @@ import {
   valueFromASTUntyped,
 } from 'graphql';
 
-const MAX_BATCH_IDS = 500;
+export const MAX_BATCH_IDS = 500;
 const MAX_IDENTIFIER_LENGTH = 128;
 
 export interface RouteFullDataSelection {

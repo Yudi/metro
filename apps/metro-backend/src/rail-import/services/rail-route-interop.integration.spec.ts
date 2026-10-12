@@ -1,5 +1,8 @@
 import { Client } from 'pg';
-import { railRoutesSql } from './rail-route-interop.sql';
+import {
+  railRoutesMaterializedViewQuery,
+  railRoutesSql,
+} from './rail-route-interop.sql';
 import { RAIL_DATASETS } from '../config/rail-datasets.config';
 
 // Exercise the real parameterized SQL in PostGIS; unit tests mock Prisma SQL.
@@ -12,6 +15,22 @@ jest.mock('../../../generated/prisma/client', () => {
 
 const databaseUrl = process.env.VECTOR_TILES_TEST_DATABASE_URL;
 const describeDatabase = databaseUrl ? describe : describe.skip;
+
+describe('materialized selected rail route query', () => {
+  it('inlines only escaped developer configuration values for the stored view', () => {
+    const query = railRoutesMaterializedViewQuery([
+      {
+        lineCode: 17,
+        source: 'sptrans',
+        gtfsRouteIds: ["METRÔ17A' OR TRUE --", 'METRÔ17W'],
+      },
+    ]);
+
+    expect(query).toContain("ARRAY['METRÔ17A'' OR TRUE --', 'METRÔ17W']::text[]");
+    expect(query).toContain('FROM selected_rail_routes');
+    expect(query).not.toMatch(/\$\d+/);
+  });
+});
 
 const fixtures = `
   fixture_routes(route_id) AS (
@@ -98,6 +117,29 @@ describeDatabase('rail route dataset interoperability in PostGIS', () => {
     return result.rows;
   }
 
+  async function materializedRoutes(
+    configuration = RAIL_DATASETS,
+  ): Promise<Array<{ line_number: number; source: string }>> {
+    let sql = railRoutesMaterializedViewQuery(configuration).replace(
+      'WITH line_config',
+      `WITH ${fixtures}, line_config`,
+    );
+    for (const [table, fixture] of Object.entries({
+      SPTrans_Route: 'fixture_routes',
+      SPTrans_Trip: 'fixture_trips',
+      SPTrans_Shape: 'fixture_shapes',
+      mvt_rail_routes: 'fixture_geosampa',
+    })) {
+      sql = sql.split(`"public"."${table}"`).join(fixture);
+    }
+
+    const result = await client.query<{
+      line_number: number;
+      source: string;
+    }>(`${sql} ORDER BY line_number`);
+    return result.rows;
+  }
+
   it('uses SPTrans for L6 and both L17 branches, and GeoSampa for L10 and L15', async () => {
     const selected = await routes();
     expect(selected).toMatchObject([
@@ -108,6 +150,15 @@ describeDatabase('rail route dataset interoperability in PostGIS', () => {
     ]);
     expect(selected.find((line) => line.line_number === 17)?.includes_branch_endpoint).toBe(true);
     expect(selected.find((line) => line.line_number === 6)?.includes_full_l6_shape).toBe(true);
+  });
+
+  it('stores the same configured source selection in the materialized-view query', async () => {
+    expect(await materializedRoutes()).toEqual([
+      { line_number: 6, source: 'sptrans' },
+      { line_number: 10, source: 'geosampa' },
+      { line_number: 15, source: 'geosampa' },
+      { line_number: 17, source: 'sptrans' },
+    ]);
   });
 
   it('switches one line without changing the others', async () => {

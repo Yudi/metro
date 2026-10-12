@@ -54,3 +54,88 @@ describe('VectorTilesService bus direction cache keys', () => {
     expect(generateBusRoutesTile).toHaveBeenCalledTimes(3);
   });
 });
+
+describe('VectorTilesService rail tile cache and request coalescing', () => {
+  it('caches empty rail tiles and coalesces concurrent misses', async () => {
+    let resolveGeneration: ((tile: Buffer | null) => void) | undefined;
+    const generation = new Promise<Buffer | null>((resolve) => {
+      resolveGeneration = resolve;
+    });
+    const generateRailRoutesTile = jest.fn(() => generation);
+    const cache = new VectorTileCacheService();
+    const service = new VectorTilesService(
+      cache,
+      { onPollComplete: jest.fn(), offPollComplete: jest.fn() } as never,
+      { generateRailRoutesTile } as never,
+      {
+        normalizeIds: jest.fn().mockReturnValue([]),
+        normalizeNearby: jest.fn().mockReturnValue(undefined),
+      } as never,
+      {} as never,
+    );
+
+    const first = service.getTile(VectorTileLayer.RAIL_ROUTES, 12, 1000, 1000);
+    const duplicate = service.getTile(
+      VectorTileLayer.RAIL_ROUTES,
+      12,
+      1000,
+      1000,
+    );
+    expect(generateRailRoutesTile).toHaveBeenCalledTimes(1);
+
+    resolveGeneration?.(null);
+    await expect(Promise.all([first, duplicate])).resolves.toEqual([null, null]);
+    await expect(
+      service.getTile(VectorTileLayer.RAIL_ROUTES, 12, 1000, 1000),
+    ).resolves.toBeNull();
+    expect(generateRailRoutesTile).toHaveBeenCalledTimes(1);
+    expect(cache.getStats().size).toBe(1);
+  });
+
+  it('does not cache a tile result after the cache is cleared in flight', async () => {
+    const resolutions: Array<(tile: Buffer | null) => void> = [];
+    const generateRailRoutesTile = jest.fn(
+      () =>
+        new Promise<Buffer | null>((resolve) => {
+          resolutions.push(resolve);
+        }),
+    );
+    const cache = new VectorTileCacheService();
+    const service = new VectorTilesService(
+      cache,
+      { onPollComplete: jest.fn(), offPollComplete: jest.fn() } as never,
+      { generateRailRoutesTile } as never,
+      {
+        normalizeIds: jest.fn().mockReturnValue([]),
+        normalizeNearby: jest.fn().mockReturnValue(undefined),
+      } as never,
+      {} as never,
+    );
+
+    const staleTile = Buffer.from([1]);
+    const currentTile = Buffer.from([2]);
+    const staleRequest = service.getTile(
+      VectorTileLayer.RAIL_ROUTES,
+      12,
+      1000,
+      1000,
+    );
+    service.clearCache();
+    const currentRequest = service.getTile(
+      VectorTileLayer.RAIL_ROUTES,
+      12,
+      1000,
+      1000,
+    );
+
+    expect(generateRailRoutesTile).toHaveBeenCalledTimes(2);
+    resolutions[0](staleTile);
+    resolutions[1](currentTile);
+    await Promise.all([staleRequest, currentRequest]);
+
+    await expect(
+      service.getTile(VectorTileLayer.RAIL_ROUTES, 12, 1000, 1000),
+    ).resolves.toBe(currentTile);
+    expect(cache.getStats().size).toBe(1);
+  });
+});

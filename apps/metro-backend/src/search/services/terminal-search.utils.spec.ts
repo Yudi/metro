@@ -20,6 +20,18 @@ describe('terminal search aggregation', () => {
       .toEqual([{ type: 'busTerminal', document: terminal, score: 0 }]);
   });
 
+  it('handles long aliases in an existing cached catalog during repeated searches', () => {
+    const cached = {
+      ...terminal,
+      aliases: [`Terminal Central${' '.repeat(32_000)}!`],
+    };
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      expect(aggregateTerminalSearchHits([], [cached], 'unmatched')).toEqual([]);
+    }
+    expect(aggregateTerminalSearchHits([], [cached], terminal.name))
+      .toEqual([{ type: 'busTerminal', document: cached, score: 0 }]);
+  });
+
   it('does not turn an unlabeled platform number into a terminal-name match', () => {
     expect(aggregateTerminalSearchHits([], [terminal], '3')).toEqual([]);
   });

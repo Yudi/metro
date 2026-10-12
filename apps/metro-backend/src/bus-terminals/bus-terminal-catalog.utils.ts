@@ -22,10 +22,10 @@ export interface ParsedBusTerminalStop {
   excluded: boolean;
 }
 
-const PLATFORM_SUFFIX = /[\s,;–—-]*\b(?:plataforma|plat|pl)(?:[.\s]+[a-z0-9]{1,3}|\d{1,3})(?:\s*,\s*\d{1,4})?\s*[)\]]*$/i;
-const BOARDING_SUFFIX = /[\s,;–—-]*(?:(?:somente|apenas)\s+)?(desembarque|desemb|embarque)\.?(?:\s+(?:de\s+passageiros|somente))?\s*[)\]]*$/i;
-const BOTH_TRANSFER_SUFFIX = /[\s,;–—-]+(?:embarque\s*(?:e|\/)\s*(?:desembarque|desemb)|(?:desembarque|desemb)\s*(?:e|\/)\s*embarque)\.?\s*$/i;
-const PMV_SUFFIX = /[\s,;–—-]*(?:ref\.?\s*[:.]?\s*)?pmv\s*[a-z0-9-]+\s*$/i;
+const PLATFORM_SUFFIX = /^(?:plataforma|plat|pl)(?:[.\s]+[a-z0-9]{1,3}|\d{1,3})(?:\s*,\s*\d{1,4})?\s*[)\]]*$/i;
+const BOARDING_SUFFIX = /^(?:(?:somente|apenas)\s+)?(desembarque|desemb|embarque)\.?(?:\s+(?:de\s+passageiros|somente))?\s*[)\]]*$/i;
+const BOTH_TRANSFER_SUFFIX = /^(?:embarque\s*(?:e|\/)\s*(?:desembarque|desemb)|(?:desembarque|desemb)\s*(?:e|\/)\s*embarque)\.?\s*$/i;
+const PMV_SUFFIX = /^(?:ref\.?\s*[:.]?\s*)?pmv\s*[a-z0-9-]+\s*$/i;
 const SAFE_IDENTITY_EXPANSIONS: Readonly<Record<string, string>> = {
   pq: 'parque',
   vl: 'vila',
@@ -74,8 +74,33 @@ export function normalizeTerminalSearchText(value: string): string {
 }
 
 function explicitTerminalCore(name: string): string | undefined {
-  const match = /^\s*(?:terminal|term)\.?\s+(.+?)\s*$/i.exec(name);
+  const match = /^(?:terminal|term)\.?\s+(.+)$/i.exec(name.trim().replace(/\s+/g, ' '));
   return match?.[1]?.trim() || undefined;
+}
+
+/** Scan once for the last suffix markers, then match only anchored candidates. */
+function terminalSuffix(
+  value: string,
+  marker: RegExp,
+  suffix: RegExp,
+  candidateCount = 1,
+): { core: string; match: RegExpExecArray } | undefined {
+  const starts: number[] = [];
+  for (const match of value.matchAll(marker)) {
+    starts.push(match.index);
+    if (starts.length > candidateCount) starts.shift();
+  }
+  for (const start of starts) {
+    const match = suffix.exec(value.slice(start));
+    if (!match) continue;
+    let end = start;
+    // Strip separators backwards; an unanchored separator regex can backtrack
+    // over every position of a long run when no recognized suffix follows it.
+    while (end > 0 && /[\s,;–—-]/.test(value[end - 1])) end -= 1;
+    const core = value.slice(0, end).trim();
+    if (core) return { core, match };
+  }
+  return undefined;
 }
 
 function stripTerminalSuffixes(value: string): {
@@ -86,32 +111,45 @@ function stripTerminalSuffixes(value: string): {
   let alightingOnly = false;
 
   for (let count = 0; count < 3; count += 1) {
-    const unlabeledPlatform = /\s*[-–—]\s*(?:plataforma|plat|pl)\.?\s*$/i.exec(core);
-    if (unlabeledPlatform && core.slice(0, unlabeledPlatform.index).trim()) {
-      core = core.slice(0, unlabeledPlatform.index).trim();
+    const unlabeledPlatform = terminalSuffix(
+      core, /[-–—]/g, /^[-–—]\s*(?:plataforma|plat|pl)\.?\s*$/i,
+    );
+    if (unlabeledPlatform) {
+      core = unlabeledPlatform.core;
       continue;
     }
-    const bothTransfer = BOTH_TRANSFER_SUFFIX.exec(core);
-    if (bothTransfer && core.slice(0, bothTransfer.index).trim()) {
-      core = core.slice(0, bothTransfer.index).trim();
+    const bothTransfer = terminalSuffix(
+      core, /\b(?:embarque|desembarque|desemb)\b/gi, BOTH_TRANSFER_SUFFIX, 2,
+    );
+    if (bothTransfer) {
+      core = bothTransfer.core;
       continue;
     }
-    const pointMarker = PMV_SUFFIX.exec(core);
-    if (pointMarker && core.slice(0, pointMarker.index).trim()) {
-      core = core.slice(0, pointMarker.index).trim();
+    const pointMarker = terminalSuffix(
+      // Consume attached codes so an embedded PMV does not become a marker.
+      core, /\b(?:ref\.?\s*[:.]?\s*)?pmv[a-z0-9-]*/gi, PMV_SUFFIX, 2,
+    );
+    if (pointMarker) {
+      core = pointMarker.core;
       continue;
     }
 
-    const boarding = BOARDING_SUFFIX.exec(core);
-    if (boarding?.[1] && core.slice(0, boarding.index).trim()) {
-      alightingOnly ||= fold(boarding[1]).startsWith('desemb');
-      core = core.slice(0, boarding.index).trim();
+    const boarding = terminalSuffix(
+      core,
+      /\b(?:(?:somente|apenas)\s+)?(?:desembarque|desemb|embarque)\b/gi,
+      BOARDING_SUFFIX,
+    );
+    if (boarding) {
+      alightingOnly ||= fold(boarding.match[1]).startsWith('desemb');
+      core = boarding.core;
       continue;
     }
 
-    const platform = PLATFORM_SUFFIX.exec(core);
-    if (platform && core.slice(0, platform.index).trim()) {
-      core = core.slice(0, platform.index).trim();
+    const platform = terminalSuffix(
+      core, /\b(?:plataforma|plat|pl)(?=[.\s0-9]|$)/gi, PLATFORM_SUFFIX, 2,
+    );
+    if (platform) {
+      core = platform.core;
       continue;
     }
     break;
@@ -157,6 +195,7 @@ function hasConfirmedCommaMetadata(
 ): boolean {
   const explicitCore = explicitTerminalCore(stopName);
   if (!explicitCore || !description) return false;
+  description = description.replace(/\s+/g, ' ');
   const nameCore = stripTerminalSuffixes(explicitCore).core;
   const commaSuffix = /^(.*?),\s*(\d{1,4})$/.exec(nameCore);
   if (!commaSuffix?.[1] || !commaSuffix[2]) return false;
@@ -298,7 +337,7 @@ interface Candidate {
 const STREET_STOP_PLATFORM_TOLERANCE_METERS = 50;
 
 function hasStreetAddressDescription(candidate: Candidate): boolean {
-  const description = fold(candidate.row.stop_desc ?? '').trim();
+  const description = fold(candidate.row.stop_desc ?? '').trim().replace(/\s+/g, ' ');
   // A street reference after a terminal label is normal platform metadata.
   // Only a description starting with a numbered street address contradicts it.
   return /^(?:r\.?|rua|av\.?|avenida|al\.?|alameda|praca|pca\.?)\s+.+?,\s*\d+\b/.test(description);

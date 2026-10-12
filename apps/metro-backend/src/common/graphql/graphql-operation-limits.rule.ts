@@ -1,6 +1,7 @@
 import {
   ASTVisitor,
   DocumentNode,
+  FieldNode,
   FragmentDefinitionNode,
   GraphQLError,
   Kind,
@@ -8,15 +9,22 @@ import {
   SelectionSetNode,
   ValidationRule,
 } from 'graphql';
+import { MAX_BATCH_IDS } from '../../geography/resolvers/geography-resolver.utils';
 
 const MAX_OPERATION_DEPTH = 12;
 const MAX_OPERATION_FIELDS = 300;
 const MAX_OPERATION_ALIASES = 50;
 const MAX_EXPENSIVE_BUS_QUERIES = 1;
+const MAX_BUS_DIRECTION_GEOMETRY_WORK = 1_000;
 const EXPENSIVE_BUS_QUERY_FIELDS = new Set([
   'busServiceIntervals',
   'busRouteItinerary',
   'busPublishedRouteInformation',
+]);
+const BUS_DIRECTION_GEOMETRY_QUERY_ARGUMENTS = new Map<string, string | undefined>([
+  ['favoriteBusDirections', 'codes'],
+  ['busRouteDirections', 'ids'],
+  ['busStopDirections', undefined],
 ]);
 
 interface OperationMetrics {
@@ -24,6 +32,7 @@ interface OperationMetrics {
   fields: number;
   aliases: number;
   expensiveBusQueries: number;
+  busDirectionGeometryWork: number;
 }
 
 export const graphqlOperationLimitsRule: ValidationRule = (context) =>
@@ -61,6 +70,7 @@ function validateOperation(
     fields: 0,
     aliases: 0,
     expensiveBusQueries: 0,
+    busDirectionGeometryWork: 0,
   };
   inspectSelectionSet(operation.selectionSet, 0, fragments, new Set(), metrics);
   const operationName = operation.name?.value ?? 'anonymous';
@@ -106,6 +116,17 @@ function validateOperation(
       ),
     );
   }
+  if (metrics.busDirectionGeometryWork > MAX_BUS_DIRECTION_GEOMETRY_WORK) {
+    reportError(
+      new GraphQLError(
+        `GraphQL operation ${operationName} exceeds maximum bus-direction geometry work ${MAX_BUS_DIRECTION_GEOMETRY_WORK}`,
+        {
+          nodes: operation,
+          extensions: { code: 'BUS_DIRECTION_GEOMETRY_COST_LIMIT_EXCEEDED' },
+        },
+      ),
+    );
+  }
 }
 
 function inspectSelectionSet(
@@ -122,6 +143,16 @@ function inspectSelectionSet(
       metrics.fields += 1;
       if (depth === 0 && EXPENSIVE_BUS_QUERY_FIELDS.has(selection.name.value)) {
         metrics.expensiveBusQueries += 1;
+      }
+      if (
+        depth === 0 &&
+        BUS_DIRECTION_GEOMETRY_QUERY_ARGUMENTS.has(selection.name.value) &&
+        selection.selectionSet
+      ) {
+        metrics.busDirectionGeometryWork += getListArgumentCardinality(
+          selection,
+          BUS_DIRECTION_GEOMETRY_QUERY_ARGUMENTS.get(selection.name.value),
+        ) * countGeometrySelections(selection.selectionSet, fragments);
       }
       if (selection.alias) {
         metrics.aliases += 1;
@@ -166,4 +197,58 @@ function inspectSelectionSet(
       metrics,
     );
   }
+}
+
+function getListArgumentCardinality(
+  field: FieldNode,
+  argumentName?: string,
+): number {
+  if (!argumentName) return MAX_BATCH_IDS;
+  const argument = field.arguments?.find((value) => value.name.value === argumentName);
+  if (!argument || argument.value.kind !== Kind.LIST) {
+    return MAX_BATCH_IDS;
+  }
+  return Math.min(argument.value.values.length, MAX_BATCH_IDS);
+}
+
+function countGeometrySelections(
+  selectionSet: SelectionSetNode,
+  fragments: Map<string, FragmentDefinitionNode>,
+  activeFragments = new Set<string>(),
+): number {
+  return selectionSet.selections.reduce((count, selection) => {
+    if (selection.kind === Kind.FIELD) {
+      if (selection.name.value === 'geometry') {
+        return count + 1;
+      }
+      return count + (selection.selectionSet
+        ? countGeometrySelections(
+          selection.selectionSet,
+          fragments,
+          activeFragments,
+        )
+        : 0);
+    }
+
+    if (selection.kind === Kind.INLINE_FRAGMENT) {
+      return count + countGeometrySelections(
+        selection.selectionSet,
+        fragments,
+        activeFragments,
+      );
+    }
+
+    const fragmentName = selection.name.value;
+    if (activeFragments.has(fragmentName)) {
+      return count;
+    }
+    const fragment = fragments.get(fragmentName);
+    return fragment
+      ? count + countGeometrySelections(
+        fragment.selectionSet,
+        fragments,
+        new Set(activeFragments).add(fragmentName),
+      )
+      : count;
+  }, 0);
 }

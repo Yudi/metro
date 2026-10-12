@@ -24,6 +24,8 @@ export type { VectorTileOptions } from './vector-tile.types';
 export class VectorTilesService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(VectorTilesService.name);
   private readonly bikePollListener = this.handleBikePollComplete.bind(this);
+  private readonly inFlightTiles = new Map<string, Promise<Buffer | null>>();
+  private cacheGeneration = 0;
 
   constructor(
     private readonly cache: VectorTileCacheService,
@@ -54,23 +56,40 @@ export class VectorTilesService implements OnModuleInit, OnModuleDestroy {
     const cacheKey = `${layer}/${z}/${x}/${y}/${this.getOptionsCacheKey(options)}`;
 
     const cached = this.cache.get(cacheKey);
-    if (cached) {
+    if (cached !== undefined) {
       return cached;
     }
 
-    const tile = await this.generateTile(layer, z, x, y, options);
-
-    if (tile && tile.length > 0) {
-      this.cache.set(cacheKey, tile);
+    const inFlight = this.inFlightTiles.get(cacheKey);
+    if (inFlight) {
+      return inFlight;
     }
 
-    return tile;
+    const generation = this.cacheGeneration;
+    const request = this.generateTile(layer, z, x, y, options)
+      .then((tile) => {
+        const result = tile && tile.length > 0 ? tile : null;
+        if (generation === this.cacheGeneration) {
+          this.cache.set(cacheKey, result);
+        }
+        return result;
+      })
+      .finally(() => {
+        if (this.inFlightTiles.get(cacheKey) === request) {
+          this.inFlightTiles.delete(cacheKey);
+        }
+      });
+    this.inFlightTiles.set(cacheKey, request);
+
+    return request;
   }
 
   /**
    * Clear the tile cache. Useful after data updates.
    */
   clearCache(): void {
+    this.cacheGeneration++;
+    this.inFlightTiles.clear();
     this.cache.clear();
   }
 
@@ -78,6 +97,13 @@ export class VectorTilesService implements OnModuleInit, OnModuleDestroy {
    * Clear cache for a specific layer.
    */
   clearLayerCache(layer: VectorTileLayer): void {
+    this.cacheGeneration++;
+    const prefix = `${layer}/`;
+    for (const key of this.inFlightTiles.keys()) {
+      if (key.startsWith(prefix)) {
+        this.inFlightTiles.delete(key);
+      }
+    }
     this.cache.clearLayer(layer);
   }
 

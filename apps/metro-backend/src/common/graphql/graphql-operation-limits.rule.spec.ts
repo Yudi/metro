@@ -4,11 +4,16 @@ import { graphqlOperationLimitsRule } from './graphql-operation-limits.rule';
 const schema = buildSchema(`
   type Query {
     node: Node!
+    favoriteBusDirections(codes: [String!]!): [BusRouteDirection!]!
+    busRouteDirections(ids: [String!]!): [BusRouteDirection!]!
+    busStopDirections(stopId: String!): [BusRouteDirection!]!
     busServiceIntervals(routeCodes: [String!]!): IntervalsResult!
     busRouteItinerary(routeId: String!, serviceDate: String!): IntervalsResult!
     busPublishedRouteInformation(routeId: String!): IntervalsResult!
   }
   type Node { value: String, child: Node! }
+  type BusRouteDirection { geometry: Geometry }
+  type Geometry { type: String! }
   type IntervalsResult { status: String! }
 `);
 
@@ -119,5 +124,96 @@ describe('graphqlOperationLimitsRule', () => {
     );
 
     expect(errors).toEqual([]);
+  });
+
+  it('rejects list-amplified geometry aliases that fit the syntax limits', () => {
+    const codes = Array.from({ length: 500 }, (_, index) =>
+      JSON.stringify(`direction-${index}`),
+    ).join(', ');
+    const geometryAliases = Array.from(
+      { length: 50 },
+      (_, index) => `geometry${index}: geometry { type }`,
+    ).join('\n');
+    const errors = validate(
+      schema,
+      parse(`query Amplification {
+        favoriteBusDirections(codes: [${codes}]) { ${geometryAliases} }
+      }`),
+      [graphqlOperationLimitsRule],
+    );
+
+    expect(errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          extensions: {
+            code: 'BUS_DIRECTION_GEOMETRY_COST_LIMIT_EXCEEDED',
+          },
+        }),
+      ]),
+    );
+  });
+
+  it('uses literal list cardinality when estimating geometry work', () => {
+    const geometryAliases = Array.from(
+      { length: 50 },
+      (_, index) => `geometry${index}: geometry { type }`,
+    ).join('\n');
+    const errors = validate(
+      schema,
+      parse(`query SmallBatch {
+        favoriteBusDirections(codes: ["first", "second"]) { ${geometryAliases} }
+      }`),
+      [graphqlOperationLimitsRule],
+    );
+
+    expect(errors).toEqual([]);
+  });
+
+  it('assumes variable lists can reach the resolver batch limit', () => {
+    const errors = validate(
+      schema,
+      parse(`query VariableBatch($codes: [String!]!) {
+        favoriteBusDirections(codes: $codes) {
+          first: geometry { type }
+          second: geometry { type }
+          third: geometry { type }
+        }
+      }`),
+      [graphqlOperationLimitsRule],
+    );
+
+    expect(errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          extensions: {
+            code: 'BUS_DIRECTION_GEOMETRY_COST_LIMIT_EXCEEDED',
+          },
+        }),
+      ]),
+    );
+  });
+
+  it('applies geometry cost to route and stop direction queries', () => {
+    const errors = validate(
+      schema,
+      parse(`query StopDirections {
+        busStopDirections(stopId: "stop-1") {
+          first: geometry { type }
+          second: geometry { type }
+          third: geometry { type }
+        }
+      }`),
+      [graphqlOperationLimitsRule],
+    );
+
+    expect(errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          extensions: {
+            code: 'BUS_DIRECTION_GEOMETRY_COST_LIMIT_EXCEEDED',
+          },
+        }),
+      ]),
+    );
   });
 });

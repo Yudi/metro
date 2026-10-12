@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import {
   encodeBusDirectionFavorite,
   matchBusDirectionFavorite,
@@ -21,24 +21,96 @@ interface DirectionRow extends BusRouteRow {
   serves_stop: boolean;
 }
 
+const MAX_CONCURRENT_GEOMETRY_TRANSACTIONS = 4;
+const MAX_QUEUED_GEOMETRY_TRANSACTIONS = 32;
+
 /** Resolve a saved geographic direction against the current feed, never its IDs. */
 @Injectable()
 export class BusDirectionService {
   private readonly catalog = new AsyncTtlCache<BusRouteDirection[]>(30_000, 128);
+  private activeGeometryTransactions = 0;
+  private readonly geometryTransactionQueue: Array<() => void> = [];
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async geometry(direction: BusRouteDirection): Promise<GeometryData | null> {
-    const rows = await this.prisma.$transaction(async (tx) => {
+  async geometries(shapeIdsByRequest: readonly string[][]): Promise<Array<GeometryData | null>> {
+    const geometries: Array<GeometryData | null> = Array.from(
+      { length: shapeIdsByRequest.length },
+      () => null,
+    );
+    const requests = shapeIdsByRequest.flatMap((shapeIds, requestIndex) => {
+      const normalizedShapeIds = [...new Set(shapeIds)].sort();
+      return normalizedShapeIds.length
+        ? [{ requestIndex, shapeIds: normalizedShapeIds }]
+        : [];
+    });
+    if (requests.length === 0) return geometries;
+
+    const requestJson = JSON.stringify(requests.map(({ requestIndex, shapeIds }) => ({
+      request_index: requestIndex,
+      shape_ids: shapeIds,
+    })));
+    const rows = await this.withGeometryTransaction(() => this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SET LOCAL statement_timeout = '5s'`;
-      return tx.$queryRaw<Array<{ coordinates: number[][] }>>`
-      SELECT ST_AsGeoJSON(geom)::json->'coordinates' AS coordinates
-      FROM "public"."Gtfs_Shape"
-      WHERE shape_id = ANY(${direction.shapeIds}::text[]) AND geom IS NOT NULL
-      ORDER BY ST_Length(geom::geography) DESC, shape_id LIMIT 1
+      return tx.$queryRaw<Array<{ requestIndex: number; coordinates: number[][] | null }>>`
+      WITH requests AS (
+        SELECT request.request_index, request.shape_ids
+        FROM jsonb_to_recordset(${requestJson}::jsonb) AS request(request_index int, shape_ids text[])
+      )
+      SELECT requests.request_index AS "requestIndex", geometry.coordinates
+      FROM requests
+      LEFT JOIN LATERAL (
+        SELECT ST_AsGeoJSON(shape.geom)::json->'coordinates' AS coordinates
+        FROM "public"."Gtfs_Shape" shape
+        WHERE shape.shape_id = ANY(requests.shape_ids) AND shape.geom IS NOT NULL
+        ORDER BY ST_Length(shape.geom::geography) DESC, shape.shape_id
+        LIMIT 1
+      ) geometry ON TRUE
+      ORDER BY requests.request_index
     `;
-    }, { maxWait: 2_000, timeout: 10_000 });
-    return rows[0] ? { type: 'LineString', coordinates: rows[0].coordinates } : null;
+    }, { maxWait: 2_000, timeout: 10_000 }));
+    for (const row of rows) {
+      if (row.coordinates) {
+        geometries[row.requestIndex] = {
+          type: 'LineString',
+          coordinates: row.coordinates,
+        };
+      }
+    }
+    return geometries;
+  }
+
+  private async withGeometryTransaction<T>(operation: () => Promise<T>): Promise<T> {
+    await this.acquireGeometryTransactionSlot();
+    try {
+      return await operation();
+    } finally {
+      this.releaseGeometryTransactionSlot();
+    }
+  }
+
+  private acquireGeometryTransactionSlot(): Promise<void> {
+    if (this.activeGeometryTransactions < MAX_CONCURRENT_GEOMETRY_TRANSACTIONS) {
+      this.activeGeometryTransactions += 1;
+      return Promise.resolve();
+    }
+    if (this.geometryTransactionQueue.length >= MAX_QUEUED_GEOMETRY_TRANSACTIONS) {
+      return Promise.reject(new ServiceUnavailableException(
+        'Bus direction geometry lookup capacity is full',
+      ));
+    }
+
+    return new Promise((resolve) => {
+      this.geometryTransactionQueue.push(() => {
+        this.activeGeometryTransactions += 1;
+        resolve();
+      });
+    });
+  }
+
+  private releaseGeometryTransactionSlot(): void {
+    this.activeGeometryTransactions -= 1;
+    this.geometryTransactionQueue.shift()?.();
   }
 
   async forRoutes(ids: string[], stopId?: string): Promise<BusRouteDirection[]> {

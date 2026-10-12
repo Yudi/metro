@@ -1,4 +1,5 @@
 import { encodeBusDirectionFavorite, encodeBusLineFavorite } from '@metro/shared/utils';
+import { ServiceUnavailableException } from '@nestjs/common';
 import { BusDirectionService } from './bus-direction.service';
 
 const outboundStops = [
@@ -27,6 +28,82 @@ function setup(rows = [row(), row(1)]) {
 }
 
 describe('BusDirectionService favorites', () => {
+  it('loads distinct geometry identities together and preserves missing results', async () => {
+    const { service, tx, prisma } = setup();
+    const coordinates = [[-46.63, -23.55], [-46.64, -23.56]];
+    tx.$queryRaw.mockResolvedValue([
+      { requestIndex: 1, coordinates },
+      { requestIndex: 0, coordinates: null },
+    ]);
+
+    await expect(service.geometries([['missing-shape'], ['shape-a']])).resolves.toEqual([
+      null,
+      { type: 'LineString', coordinates },
+    ]);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it('limits geometry transactions to four active and 32 queued batches', async () => {
+    let releaseTransactions!: () => void;
+    const transactionGate = new Promise<void>((resolve) => {
+      releaseTransactions = resolve;
+    });
+    let signalFourTransactionsStarted!: () => void;
+    const fourTransactionsStarted = new Promise<void>((resolve) => {
+      signalFourTransactionsStarted = resolve;
+    });
+    let activeTransactions = 0;
+    let maximumActiveTransactions = 0;
+    let startedTransactions = 0;
+    const tx = {
+      $executeRaw: jest.fn(),
+      $queryRaw: jest.fn().mockResolvedValue([
+        { requestIndex: 0, coordinates: [[-46.63, -23.55]] },
+      ]),
+    };
+    const prisma = {
+      $transaction: jest.fn(async (read: (transaction: typeof tx) => Promise<unknown>) => {
+        activeTransactions += 1;
+        startedTransactions += 1;
+        maximumActiveTransactions = Math.max(
+          maximumActiveTransactions,
+          activeTransactions,
+        );
+        if (startedTransactions === 4) signalFourTransactionsStarted();
+        try {
+          const result = await read(tx);
+          await transactionGate;
+          return result;
+        } finally {
+          activeTransactions -= 1;
+        }
+      }),
+    };
+    const service = new BusDirectionService(prisma as never);
+    const queuedRequests = Array.from({ length: 36 }, (_, index) =>
+      service.geometries([[`shape-${index}`]]),
+    );
+
+    try {
+      await fourTransactionsStarted;
+      expect(startedTransactions).toBe(4);
+      await expect(service.geometries([['overflow-shape']]))
+        .rejects.toBeInstanceOf(ServiceUnavailableException);
+      expect(startedTransactions).toBe(4);
+
+      releaseTransactions();
+      const results = await Promise.all(queuedRequests);
+      expect(results).toHaveLength(36);
+      expect(startedTransactions).toBe(36);
+      expect(maximumActiveTransactions).toBe(4);
+      expect(prisma.$transaction).toHaveBeenCalledTimes(36);
+    } finally {
+      releaseTransactions();
+      await Promise.allSettled(queuedRequests);
+    }
+  });
+
   it('coalesces identical route catalogs but partitions physical-stop directions', async () => {
     const { service, prisma } = setup();
     await Promise.all([

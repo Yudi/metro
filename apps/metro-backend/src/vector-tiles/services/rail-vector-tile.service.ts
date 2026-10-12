@@ -5,6 +5,10 @@ import {
   ImportLockService,
   TRANSIT_CATALOG_IMPORT_LOCK,
 } from '../../common/import-lock.service';
+import {
+  railRoutesMaterializedViewQuery,
+  SELECTED_RAIL_ROUTES_MATERIALIZED_VIEW,
+} from '../../rail-import/services/rail-route-interop.sql';
 
 /**
  * Refreshes the selected station catalog and caches raw GeoSampa route shapes.
@@ -68,6 +72,29 @@ export class RailVectorTileService implements OnModuleInit {
     );
     await this.prisma.$executeRawUnsafe(
       'REFRESH MATERIALIZED VIEW "public"."mvt_rail_routes"',
+    );
+
+    // This view contains the configured source selection and merged route
+    // geometry. Rebuild it only during catalog refresh, never per tile request.
+    // The transaction keeps readers from observing a missing view while the
+    // definition and its spatial indexes are replaced.
+    const routesQuery = railRoutesMaterializedViewQuery();
+    await this.prisma.$transaction(
+      async (transaction) => {
+        await transaction.$executeRawUnsafe(
+          `DROP MATERIALIZED VIEW IF EXISTS "public"."${SELECTED_RAIL_ROUTES_MATERIALIZED_VIEW}"`,
+        );
+        await transaction.$executeRawUnsafe(
+          `CREATE MATERIALIZED VIEW "public"."${SELECTED_RAIL_ROUTES_MATERIALIZED_VIEW}" AS ${routesQuery}`,
+        );
+        await transaction.$executeRawUnsafe(
+          `CREATE UNIQUE INDEX "idx_${SELECTED_RAIL_ROUTES_MATERIALIZED_VIEW}_id" ON "public"."${SELECTED_RAIL_ROUTES_MATERIALIZED_VIEW}" (id)`,
+        );
+        await transaction.$executeRawUnsafe(
+          `CREATE INDEX "idx_${SELECTED_RAIL_ROUTES_MATERIALIZED_VIEW}_geom" ON "public"."${SELECTED_RAIL_ROUTES_MATERIALIZED_VIEW}" USING GIST (geom_3857)`,
+        );
+      },
+      { maxWait: 30_000, timeout: 120_000 },
     );
 
     this.logger.debug('Rail MVT views refreshed successfully');

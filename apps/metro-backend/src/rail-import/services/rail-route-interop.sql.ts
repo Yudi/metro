@@ -5,6 +5,9 @@ import {
   type RailLineDatasetConfig,
 } from '../config/rail-datasets.config';
 
+export const SELECTED_RAIL_ROUTES_MATERIALIZED_VIEW =
+  'mvt_selected_rail_routes';
+
 /** Resolve route geometry for map tiles and train context. SPTrans shapes are
  * joined through trips, using the longest shape per route.
  */
@@ -72,4 +75,48 @@ export function railRoutesSql(
       WHERE sp.geom_3857 IS NOT NULL OR geo.geom_3857 IS NOT NULL
     )
   `;
+}
+
+/**
+ * Build the selected-route query used to persist the configured route catalog.
+ * PostgreSQL stores materialized-view definitions, so their developer-owned
+ * configuration values must be SQL literals instead of bind parameters.
+ */
+export function railRoutesMaterializedViewQuery(
+  configuration: readonly RailLineDatasetConfig[] = RAIL_DATASETS,
+): string {
+  const query = Prisma.sql`
+    ${railRoutesSql(configuration)}
+    SELECT id, name, line_number, agency, color_hex, source, geom_3857
+    FROM selected_rail_routes
+  `;
+
+  return inlineSqlParameters(query);
+}
+
+function inlineSqlParameters(query: Prisma.Sql): string {
+  return query.text.replace(/\$(\d+)/g, (placeholder, indexText: string) => {
+    const value = query.values[Number(indexText) - 1];
+    if (value === undefined) {
+      throw new Error(`Missing rail route SQL value for ${placeholder}`);
+    }
+
+    return toSqlLiteral(value);
+  });
+}
+
+function toSqlLiteral(value: unknown): string {
+  if (typeof value === 'string') {
+    return `'${value.replace(/'/g, "''")}'`;
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  if (Array.isArray(value) && value.every((item) => typeof item === 'string')) {
+    return `ARRAY[${value.map((item) => toSqlLiteral(item)).join(', ')}]`;
+  }
+
+  throw new Error('Unsupported rail route SQL configuration value');
 }

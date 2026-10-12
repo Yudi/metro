@@ -30,6 +30,27 @@ describe('station image metadata contract', () => {
     expect(manifest.terminals).toBeUndefined();
   });
 
+  it('preserves punctuation in canonical rail station identities', () => {
+    const manifest = parseStationImageManifest(
+      JSON.stringify({
+        version: 1,
+        stations: {
+          'engº.goulart': [
+            {
+              key: 'station-images/rail/engenheiro-goulart.avif',
+              author: 'Photographer',
+              title: 'Engenheiro Goulart',
+              sourceUrl: 'https://example.com/source',
+              license: 'CC BY 4.0',
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(manifest.stations['engº.goulart']).toHaveLength(1);
+  });
+
   it('accepts absent or empty terminal metadata for existing manifests', () => {
     const stationImages = {
       key: 'station-images/metro/luz.avif',
@@ -82,6 +103,34 @@ describe('station image metadata contract', () => {
     );
     expect(buildStationImageObjectKey('terminal', 'central.avif')).toBe(
       'station-images/terminal/central.avif',
+    );
+  });
+
+  it('accepts full namespaced stop identities and stop image keys', () => {
+    const manifest = parseStationImageManifest(
+      JSON.stringify({
+        version: 1,
+        stations: {},
+        stops: {
+          'stop:sptrans:10001': [
+            {
+              key: 'station-images/stop/stop-fixture.avif',
+              author: 'Photographer',
+              title: 'Parada de teste',
+              sourceUrl: 'https://example.com/source',
+              license: 'CC BY 4.0',
+              isDefault: true,
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(manifest.stops?.['stop:sptrans:10001']?.[0]?.key).toBe(
+      'station-images/stop/stop-fixture.avif',
+    );
+    expect(buildStationImageObjectKey('stop', 'stop-fixture.avif')).toBe(
+      'station-images/stop/stop-fixture.avif',
     );
   });
 

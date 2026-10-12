@@ -20,7 +20,7 @@ import { MatIcon } from '@angular/material/icon';
 import { MatListModule } from '@angular/material/list';
 import { RouterLink } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
-import { AuthService, authReady, firebaseUser } from '@metro/shared/firebase';
+import { AuthService, authReady, firebaseIsAdmin, firebaseUser } from '@metro/shared/firebase';
 import { CityContextService } from '../cities/city-context.service';
 import { menuDestinations } from './menu-destinations';
 
@@ -53,6 +53,7 @@ export class MenuComponent {
   readonly cityContext = inject(CityContextService);
   readonly authReady = authReady;
   readonly firebaseUser = firebaseUser;
+  readonly firebaseIsAdmin = firebaseIsAdmin;
   readonly searchControl = new FormControl('', { nonNullable: true });
   readonly searchOpen = signal(false);
   readonly searchError = signal('');

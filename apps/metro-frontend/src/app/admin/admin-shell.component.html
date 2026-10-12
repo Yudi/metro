@@ -1,0 +1,43 @@
+<section class="admin-shell" aria-label="Área administrativa">
+  <header class="shell-heading">
+    <h1>Administração</h1>
+  </header>
+
+  <div class="shell-layout">
+    <nav class="admin-navigation" aria-label="Administração">
+      <mat-nav-list>
+        <a
+          mat-list-item
+          routerLink="/sp/admin/administradores"
+          routerLinkActive="navigation-active"
+          ariaCurrentWhenActive="page"
+        >
+          <mat-icon matListItemIcon aria-hidden="true">group</mat-icon>
+          <span matListItemTitle>Administradores</span>
+        </a>
+        <a
+          mat-list-item
+          routerLink="/sp/admin/imagens"
+          routerLinkActive="navigation-active"
+          ariaCurrentWhenActive="page"
+        >
+          <mat-icon matListItemIcon aria-hidden="true">image</mat-icon>
+          <span matListItemTitle>Imagens</span>
+        </a>
+        <a
+          mat-list-item
+          routerLink="/sp/admin/direitos-autorais"
+          routerLinkActive="navigation-active"
+          ariaCurrentWhenActive="page"
+        >
+          <mat-icon matListItemIcon aria-hidden="true">copyright</mat-icon>
+          <span matListItemTitle>Licenças</span>
+        </a>
+      </mat-nav-list>
+    </nav>
+
+    <section class="admin-content" aria-live="polite">
+      <router-outlet />
+    </section>
+  </div>
+</section>

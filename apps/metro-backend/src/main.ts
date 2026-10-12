@@ -81,7 +81,7 @@ export async function bootstrap() {
     origin: allowedOrigins,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Request-ID'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Request-ID', 'X-GraphQL-Upload'],
     exposedHeaders: ['X-Request-ID'],
   });
 

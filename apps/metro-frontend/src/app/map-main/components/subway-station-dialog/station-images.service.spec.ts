@@ -7,6 +7,7 @@ import { TestBed } from '@angular/core/testing';
 import { API_BASE_URL } from '@metro/shared/api';
 import { StationImagesService } from './station-images.service';
 import { StationImageManifest } from './station-images';
+import { IMAGE_ENTRY_FIXTURE, MEDIA_STOP_FIXTURE, MEDIA_TERMINAL_FIXTURE } from '@metro/shared/admin-contracts';
 
 const manifest: StationImageManifest = {
   version: 1,
@@ -39,6 +40,35 @@ describe('StationImagesService', () => {
   });
   afterEach(() => http.verify());
 
+  it('invalidates stale pending metadata and bypasses the previous HTTP cache after admin edits', () => {
+    service.load();
+    const stale = http.expectOne('/api/media/station-images');
+    service.invalidate();
+    service.load();
+    const fresh = http.expectOne((request) => request.url === '/api/media/station-images' && request.params.has('version'));
+    stale.flush(manifest);
+    expect(service.image('Luz')).toBeUndefined();
+    fresh.flush({ ...manifest, stations: { luz: [{ ...manifest.stations['luz'][0], title: 'Título atualizado' }] } });
+    expect(service.image('Luz')?.title).toBe('Título atualizado');
+  });
+
+  it('uses stop-specific terminal metadata and preserves generic fallback for other stops', () => {
+    const generic = { ...IMAGE_ENTRY_FIXTURE, key: 'station-images/terminal/default.avif' };
+    const scoped = { ...generic, key: 'station-images/terminal/platform.avif', isDefault: false, stopIds: [MEDIA_TERMINAL_FIXTURE.scopes[0].id] };
+    const stopImage = { ...IMAGE_ENTRY_FIXTURE, key: 'station-images/stop/direct.avif' };
+    service.load();
+    http.expectOne('/api/media/station-images').flush({ version: 1, stations: {},
+      terminals: { [MEDIA_TERMINAL_FIXTURE.identity]: [generic, scoped] },
+      stops: { [MEDIA_STOP_FIXTURE.identity]: [stopImage] },
+    });
+    expect(service.terminalImage(MEDIA_TERMINAL_FIXTURE.identity, MEDIA_TERMINAL_FIXTURE.scopes[0].id)?.key).toBe(scoped.key);
+    expect(service.stopImage('sptrans:10002', MEDIA_TERMINAL_FIXTURE.identity)?.key).toBe(generic.key);
+    expect(service.stopImage('sptrans:10001', MEDIA_TERMINAL_FIXTURE.identity)?.key).toBe(stopImage.key);
+    expect(service.stopImage('10001', MEDIA_TERMINAL_FIXTURE.identity, 'SPTRANS', '10001')?.key).toBe(stopImage.key);
+    expect(service.terminalImage(MEDIA_TERMINAL_FIXTURE.identity, '10001')?.key).toBe(scoped.key);
+    expect(service.stopImage('missing')).toBeUndefined();
+  });
+
   it('loads metadata once and constructs only backend proxy image URLs', () => {
     service.load();
     service.load();
@@ -51,6 +81,14 @@ describe('StationImagesService', () => {
     expect(service.terminalImage('terminal:terminal-parque-central')).toBeUndefined();
     expect(service.image('Varginha')).toBeUndefined();
     expect(service.image('constructor')).toBeUndefined();
+  });
+
+  it('preserves punctuation in the canonical identity of Engº. Goulart', () => {
+    service.load();
+    http.expectOne('/api/media/station-images').flush({ version: 1,
+      stations: { 'engº.goulart': [IMAGE_ENTRY_FIXTURE] },
+    });
+    expect(service.image('Engº. Goulart')?.key).toBe(IMAGE_ENTRY_FIXTURE.key);
   });
 
   it('looks up terminals by exact catalog ID without using rail station keys', () => {

@@ -20,6 +20,8 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { SaoPauloTransitModule } from '../cities/sp/sp-transit.module';
 import { createGraphQLYogaConfig } from '../common/graphql/graphql-yoga.config';
 import { StationImagesModule } from '../station-images/station-images.module';
+import { AdminAuthModule } from '../admin-auth';
+import { AdminMediaModule } from '../admin-media/admin-media.module';
 
 @Module({
   imports: [
@@ -56,6 +58,8 @@ import { StationImagesModule } from '../station-images/station-images.module';
     NotificationsModule,
     ObservabilityModule,
     StationImagesModule,
+    AdminAuthModule,
+    AdminMediaModule,
     LoadersModule,
   ],
   controllers: [AppController],

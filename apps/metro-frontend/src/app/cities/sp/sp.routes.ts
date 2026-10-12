@@ -1,5 +1,6 @@
 import type { Route, Routes } from '@angular/router';
 import { SAO_PAULO_CITY } from '@metro/shared/cities';
+import { adminAccessGuard } from '../../auth/admin-access.guard';
 
 const title = (label: string) => `${label} | ${SAO_PAULO_CITY.siteTitle}`;
 const page = (label: string, data: Record<string, unknown> = {}) => ({
@@ -17,6 +18,13 @@ export const homeRoute: Route = {
 
 export const spFeatureRoutes: Routes = [
   homeRoute,
+  {
+    path: 'admin',
+    ...page('Administração'),
+    canMatch: [adminAccessGuard],
+    loadChildren: () =>
+      import('../../admin/admin.routes').then((m) => m.adminRoutes),
+  },
   {
     path: 'proximo-trem',
     ...page('Próxima chegada'),

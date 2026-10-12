@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { createFetch } from '@whatwg-node/fetch';
 import { NoSchemaIntrospectionCustomRule } from 'graphql';
 import { useDeferStream } from '@graphql-yoga/plugin-defer-stream';
 import { useExecutionCancellation } from 'graphql-yoga';
@@ -29,6 +30,21 @@ function createGraphQLValidationPlugin(isProduction: boolean): Plugin {
   };
 }
 
+/** Bound native multipart parsing before resolver authorization/conversion. */
+export function createGraphQLFetchAPI() {
+  return createFetch({
+    useNodeFetch: true,
+    formDataLimits: {
+      fileSize: 10 * 1024 * 1024,
+      files: 1,
+      fields: 2,
+      parts: 3,
+      fieldSize: 128 * 1024,
+      headerSize: 16 * 1024,
+    },
+  });
+}
+
 export function createGraphQLYogaConfig(
   loadersService: LoadersService,
   isProduction = process.env.NODE_ENV === 'production',
@@ -39,6 +55,7 @@ export function createGraphQLYogaConfig(
     sortSchema: true,
     graphiql: !isProduction,
     cors: false,
+    fetchAPI: createGraphQLFetchAPI(),
     maskedErrors: {
       errorMessage: 'Unexpected error.',
       isDev: false,

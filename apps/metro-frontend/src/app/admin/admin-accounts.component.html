@@ -1,0 +1,130 @@
+<section class="admin-page" aria-labelledby="accounts-title">
+  <header class="page-heading">
+    <div>
+      <h2 id="accounts-title">Administradores</h2>
+      <p>Adicione ou remova acesso administrativo.</p>
+    </div>
+    @if (loadState() === 'ready') {
+      <button
+        mat-icon-button
+        type="button"
+        aria-label="Atualizar administradores"
+        [disabled]="adding() || deletingUid() !== null"
+        (click)="loadAccounts()"
+      >
+        <mat-icon>refresh</mat-icon>
+      </button>
+    }
+  </header>
+
+  <form class="add-form" (submit)="$event.preventDefault(); addAccount()">
+    <mat-form-field appearance="outline">
+      <mat-label>E-mail</mat-label>
+      <input
+        matInput
+        type="email"
+        autocomplete="email"
+        [formControl]="email"
+        (input)="actionError.set(null)"
+      />
+      @if (email.invalid && email.touched) {
+        <mat-error>{{ emailError() }}</mat-error>
+      }
+    </mat-form-field>
+    <button mat-flat-button color="primary" type="submit" [disabled]="adding()">
+      <mat-icon [class.busy-icon]="adding()">
+        {{ adding() ? 'sync' : 'person_add' }}
+      </mat-icon>
+      {{ adding() ? 'Adicionando…' : 'Adicionar' }}
+    </button>
+  </form>
+
+  @if (actionError(); as message) {
+    <p class="inline-message error-message" role="alert">{{ message }}</p>
+  }
+
+  @switch (loadState()) {
+    @case ('loading') {
+      <div class="account-list skeleton-list" aria-label="Carregando administradores" aria-busy="true">
+        <span></span><span></span><span></span>
+      </div>
+    }
+    @case ('error') {
+      <section class="state-message" role="alert">
+        <mat-icon aria-hidden="true">cloud_off</mat-icon>
+        <p>{{ loadError() }}</p>
+        <button mat-stroked-button type="button" (click)="loadAccounts()">
+          <mat-icon>refresh</mat-icon>
+          Tentar novamente
+        </button>
+      </section>
+    }
+    @case ('ready') {
+      @if (accounts().length === 0) {
+        <section class="state-message">
+          <mat-icon aria-hidden="true">group_off</mat-icon>
+          <h3>Nenhum administrador cadastrado</h3>
+          <p>Adicione um e-mail para liberar acesso.</p>
+        </section>
+      } @else {
+        <ul class="account-list" aria-label="Contas administradoras">
+          @for (account of accounts(); track account.uid) {
+            <li class="account-row">
+              <div class="account-details">
+                <mat-icon aria-hidden="true">account_circle</mat-icon>
+                <div>
+                  <strong>{{ account.displayName || account.email || 'Conta sem e-mail' }}</strong>
+                  @if (account.displayName && account.email) {
+                    <span>{{ account.email }}</span>
+                  }
+                </div>
+                <div class="account-badges">
+                  @if (account.bootstrap) {
+                    <span class="account-badge">Protegida</span>
+                  }
+                  @if (isCurrentAccount(account)) {
+                    <span class="account-badge">Sua conta</span>
+                  }
+                </div>
+              </div>
+
+              <div class="account-actions">
+                @if (pendingDeleteUid() === account.uid) {
+                  <span>Remover acesso?</span>
+                  <button
+                    mat-button
+                    type="button"
+                    [disabled]="deletingUid() === account.uid"
+                    (click)="cancelDelete()"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    mat-flat-button
+                    color="warn"
+                    type="button"
+                    [disabled]="deletingUid() === account.uid"
+                    (click)="deleteAccount(account)"
+                  >
+                    {{ deletingUid() === account.uid ? 'Removendo…' : 'Remover acesso' }}
+                  </button>
+                } @else {
+                  <button
+                    mat-button
+                    type="button"
+                    [disabled]="account.bootstrap || isCurrentAccount(account) || deletingUid() !== null"
+                    [attr.aria-label]="'Remover acesso de ' + (account.email || account.uid)"
+                    (click)="askToDelete(account)"
+                  >
+                    <mat-icon>delete</mat-icon>
+                    Remover acesso
+                  </button>
+                }
+              </div>
+            </li>
+          }
+        </ul>
+      }
+    }
+  }
+</section>

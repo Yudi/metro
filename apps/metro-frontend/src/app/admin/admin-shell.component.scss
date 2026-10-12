@@ -1,0 +1,80 @@
+:host {
+  display: block;
+}
+
+.admin-shell {
+  box-sizing: border-box;
+  width: min(100%, 1440px);
+  margin-inline: auto;
+  padding: 32px clamp(16px, 3vw, 40px) 48px;
+}
+
+.shell-heading {
+  margin-bottom: 28px;
+}
+
+.shell-heading h1 {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.shell-heading p {
+  margin: 8px 0 0;
+  color: var(--mat-sys-on-surface-variant);
+  max-width: 68ch;
+}
+
+.shell-layout {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+
+.admin-navigation {
+  position: sticky;
+  top: 24px;
+  border-radius: 12px;
+  background: var(--mat-sys-surface-container-low);
+  padding: 8px;
+}
+
+.admin-navigation mat-nav-list {
+  padding: 0;
+}
+
+.admin-navigation a {
+  border-radius: 8px;
+  transition: background-color 180ms ease-out;
+}
+
+.admin-navigation a:hover {
+  background: var(--mat-sys-surface-container-high);
+}
+
+.admin-navigation .navigation-active {
+  background: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+}
+
+.admin-content {
+  min-width: 0;
+}
+
+@media (max-width: 760px) {
+  .admin-shell {
+    padding-top: 20px;
+  }
+
+  .shell-layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .admin-navigation {
+    position: static;
+    padding: 4px;
+  }
+}

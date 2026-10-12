@@ -47,6 +47,9 @@ import {
   createMockLoggerService,
 } from '@metro/storybook-mocks';
 import { of } from 'rxjs';
+import { StationImagesService } from '../subway-station-dialog/station-images.service';
+import type { StationHeaderImage } from '../subway-station-dialog/station-images';
+import { IMAGE_ENTRY_FIXTURE } from '@metro/shared/admin-contracts';
 
 // Helper Functions
 
@@ -63,6 +66,7 @@ function createDialogData(
 interface ProviderOptions {
   dialogData: BusStopDialogData;
   realtimeKind?: 'arrivals' | 'no-arrivals' | 'loading';
+  image?: StationHeaderImage;
 }
 
 function createProviders(opts: ProviderOptions) {
@@ -78,6 +82,14 @@ function createProviders(opts: ProviderOptions) {
   }
 
   return [
+    {
+      provide: StationImagesService,
+      useValue: {
+        load: () => undefined,
+        stopImage: () => opts.image,
+        markUnavailable: () => undefined,
+      },
+    },
     { provide: BusTerminalsService, useValue: { getTerminalForStop: () => of(null) } },
     {
       provide: BusInformationService,
@@ -191,6 +203,21 @@ export const Default: Story = {
           ROUTE_875A,
         ]),
         realtimeKind: 'arrivals',
+      }),
+    }),
+  ],
+};
+
+export const WithAttributedImage: Story = {
+  decorators: [
+    applicationConfig({
+      providers: createProviders({
+        dialogData: createDialogData(PINHEIROS_BUS_STOP, [ROUTE_477A]),
+        image: {
+          ...IMAGE_ENTRY_FIXTURE,
+          title: 'Prévia ilustrativa da parada',
+          src: '/app/icons/logo-og.png',
+        },
       }),
     }),
   ],

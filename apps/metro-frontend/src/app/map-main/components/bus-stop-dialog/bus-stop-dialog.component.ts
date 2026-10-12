@@ -41,6 +41,8 @@ import {
 import type { BusTerminalReturnData } from '../bus-terminal-dialog/bus-terminal-dialog.types';
 import type { BusTerminalViewState } from '../bus-terminal-dialog/bus-terminal-dialog.types';
 import { BusTerminalsService } from '../../geography/bus-terminals.service';
+import { NgOptimizedImage } from '@angular/common';
+import { StationImagesService } from '../subway-station-dialog/station-images.service';
 
 export interface BusStopDialogData {
   stop: BusStopGraphQL;
@@ -69,6 +71,7 @@ export type BusStopDialogResult =
     MatDividerModule,
     StopArrivalsComponent,
     DialogHeaderComponent,
+    NgOptimizedImage,
   ],
   templateUrl: './bus-stop-dialog.component.html',
   styleUrls: ['./bus-stop-dialog.component.scss'],
@@ -89,8 +92,15 @@ export class BusStopDialogComponent {
   readonly routesLoading = signal(this.data.routesLoading ?? false);
   readonly routesError = signal(this.data.routesError ?? false);
   private readonly terminals = inject(BusTerminalsService);
+  private readonly images = inject(StationImagesService);
   private readonly explicitTerminalReturn = signal(this.data.terminalReturn);
   readonly terminalReturn = signal(this.data.terminalReturn);
+  readonly headerImage = computed(() => this.images.stopImage(
+    this.stop().stopId,
+    this.terminalReturn()?.terminalId,
+    this.stop().sourceAgency,
+    this.stop().sourceId,
+  ));
   readonly stopDescription = computed(() =>
     this.stop().description?.trim() === `Plataforma ${this.stop().platformCode}`
       ? null
@@ -188,6 +198,7 @@ export class BusStopDialogComponent {
   });
 
   constructor() {
+    this.images.load();
     effect((onCleanup) => {
       const explicit = this.explicitTerminalReturn();
       const stopId = this.stop().stopId;
@@ -225,6 +236,11 @@ export class BusStopDialogComponent {
     this.routes.set(data.routes);
     this.routesLoading.set(data.routesLoading ?? false);
     this.routesError.set(data.routesError ?? false);
+  }
+
+  onHeaderImageError(): void {
+    const image = this.headerImage();
+    if (image) this.images.markUnavailable(image.key);
   }
 
   /** Whether to show map-specific actions */

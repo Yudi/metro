@@ -13,6 +13,8 @@ import {
   BusStopDialogData,
 } from './bus-stop-dialog.component';
 import type { BusTerminalReturnData } from '../bus-terminal-dialog/bus-terminal-dialog.types';
+import { StationImagesService } from '../subway-station-dialog/station-images.service';
+import { IMAGE_ENTRY_FIXTURE } from '@metro/shared/admin-contracts';
 
 describe('BusStopDialogComponent', () => {
   let component: BusStopDialogComponent;
@@ -24,6 +26,7 @@ describe('BusStopDialogComponent', () => {
     removeFavorite: jest.Mock;
   };
   let dialogClose: jest.Mock;
+  const images = { load: jest.fn(), stopImage: jest.fn(), markUnavailable: jest.fn() };
   const terminalReturn: BusTerminalReturnData = {
     terminalId: BUS_TERMINAL_SUMMARY_FIXTURE.id,
     summary: BUS_TERMINAL_SUMMARY_FIXTURE,
@@ -43,6 +46,7 @@ describe('BusStopDialogComponent', () => {
   };
 
   beforeEach(async () => {
+    images.stopImage.mockReturnValue(undefined);
     const favorites = signal({
       busStop: ['artesp:42'],
       busRoute: [],
@@ -69,6 +73,7 @@ describe('BusStopDialogComponent', () => {
       imports: [BusStopDialogComponent],
       providers: [
         provideHttpClient(),
+        { provide: StationImagesService, useValue: images },
         { provide: MAT_DIALOG_DATA, useValue: data },
         { provide: MatDialogRef, useValue: { close: dialogClose } },
         { provide: FavoritesService, useValue: favoritesService },
@@ -104,6 +109,21 @@ describe('BusStopDialogComponent', () => {
   });
 
   afterEach(() => fixture.destroy());
+
+  it('shows an attributed stop photo and hides it when the proxy cannot load it', () => {
+    const image = { ...IMAGE_ENTRY_FIXTURE, src: '/api/media/station-images/files/stop/fixture.avif' };
+    images.stopImage.mockReturnValue(image);
+    component.stop.set({ ...stop });
+    fixture.detectChanges();
+    expect(images.stopImage).toHaveBeenLastCalledWith(stop.stopId, terminalReturn.terminalId, stop.sourceAgency, stop.sourceId);
+    expect(fixture.nativeElement.querySelector('.stop-photo-credit').textContent).toContain(image.author);
+    component.onHeaderImageError();
+    expect(images.markUnavailable).toHaveBeenCalledWith(image.key);
+    images.stopImage.mockReturnValue(undefined);
+    component.stop.set({ ...stop });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.stop-photo')).toBeNull();
+  });
 
   it('recognizes and removes a saved Artesp alias after the stop is merged', () => {
     expect(component.isFavorite()).toBe(true);

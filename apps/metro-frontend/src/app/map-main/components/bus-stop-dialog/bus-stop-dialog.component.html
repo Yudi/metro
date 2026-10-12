@@ -9,6 +9,21 @@
 />
 
 <mat-dialog-content class="stop-content">
+  @if (headerImage(); as image) {
+    <div class="stop-photo">
+      <img [ngSrc]="image.src" width="1200" height="320"
+        [disableOptimizedSrcset]="true"
+        sizes="100vw" alt=""
+        (error)="onHeaderImageError()" />
+    </div>
+    <p class="stop-photo-credit">
+      <a [href]="image.sourceUrl" target="_blank" rel="noopener noreferrer">{{ image.title }}</a>,
+      {{ image.author }}.
+      @if (image.licenseUrl) {
+        <a [href]="image.licenseUrl" target="_blank" rel="noopener noreferrer">{{ image.license }}</a>
+      } @else { {{ image.license }} }
+    </p>
+  }
   @if (stopDescription()) {
     <p class="stop-description">{{ stopDescription() }}</p>
     <mat-divider></mat-divider>

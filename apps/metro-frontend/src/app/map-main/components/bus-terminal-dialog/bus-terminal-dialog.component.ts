@@ -165,7 +165,10 @@ export class BusTerminalDialogComponent {
   );
   readonly headerImage = computed<StationHeaderImage | undefined>(() => {
     const terminalId = this.detail()?.id ?? this.panelData().terminalId;
-    return this.images.terminalImage(terminalId);
+    const platform = this.platformFilter();
+    const stops = platform === ALL_TERMINAL_PLATFORMS ? [] :
+      (this.detail()?.stops.filter((stop) => this.matchesPlatform(stop, platform)) ?? []);
+    return this.images.terminalImage(terminalId, stops.length === 1 ? stops[0].stopId : undefined);
   });
   readonly platformOptions = computed(() => {
     const stops =

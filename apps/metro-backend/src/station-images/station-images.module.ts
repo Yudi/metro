@@ -18,5 +18,6 @@ import { StationImagesController } from './station-images.controller';
     },
     StationImagesService,
   ],
+  exports: [STATION_IMAGES_S3_CLIENT, StationImagesService],
 })
 export class StationImagesModule {}

@@ -17,6 +17,7 @@
     "../../libs/shared/utils/src/**/*.ts",
     "../../libs/shared/bus-terminal-contracts/src/**/*.ts",
     "../../libs/shared/station-image-contracts/src/**/*.ts",
+    "../../libs/shared/admin-contracts/src/**/*.ts",
     "../../libs/shared/environment/src/**/*.ts",
     "../../libs/shared/bike-contracts/src/**/*.ts",
     "../../libs/shared/notification-contracts/src/**/*.ts",

@@ -71,6 +71,12 @@ body {
   white-space: pre-line;
 }
 
+@media (max-width: 767px) {
+  .mat-mdc-snack-bar-container.admin-feedback {
+    margin-bottom: calc(5rem + 16px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 .station-tabs .mat-mdc-tab-labels {
   display: flex;
   width: 100%;

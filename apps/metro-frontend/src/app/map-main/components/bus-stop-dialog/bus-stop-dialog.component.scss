@@ -2,6 +2,23 @@
   margin-bottom: 16px;
 }
 
+.stop-photo img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 15 / 4;
+  object-fit: cover;
+}
+
+.stop-photo-credit {
+  margin: 8px 0 16px;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+
+  a { color: inherit; }
+}
+
 :host.embedded mat-dialog-content {
   max-height: none;
   overflow: visible;

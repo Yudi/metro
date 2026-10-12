@@ -7,9 +7,10 @@
     <div class="terminal-photo">
       <img
         [ngSrc]="image.src"
+        [disableOptimizedSrcset]="true"
         width="1200"
         height="320"
-        sizes="(max-width: 600px) 100vw, 720px"
+        sizes="100vw"
         alt=""
         (error)="onHeaderImageError()"
       />

@@ -1,6 +1,12 @@
 import { NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { S3Client } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  HeadObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { Readable } from 'node:stream';
 import { PrismaService } from '../prisma/prisma.service';
 import { StationImagesService } from './station-images.service';
@@ -11,12 +17,29 @@ const imageRow = {
   position: 0,
   label: null,
   lineIds: ['1', '4'],
+  stopIds: [],
   service: null,
   author: 'Photographer',
   title: 'Luz station platform',
   sourceUrl: 'https://example.com/source',
   license: 'CC BY 4.0',
   licenseUrl: null,
+  copyrightId: null,
+  isDefault: false,
+  copyright: null,
+};
+
+type StationImageTestRow = Omit<
+  typeof imageRow,
+  'licenseUrl' | 'copyrightId' | 'copyright'
+> & {
+  licenseUrl: string | null;
+  copyrightId: string | null;
+  copyright: {
+    id: string;
+    license: string;
+    licenseUrl: string | null;
+  } | null;
 };
 
 describe('StationImagesService', () => {
@@ -29,6 +52,7 @@ describe('StationImagesService', () => {
 
     expect(findMany).toHaveBeenCalledWith({
       orderBy: [{ stationIdentity: 'asc' }, { position: 'asc' }],
+      include: { copyright: true },
     });
     expect(JSON.parse(result.body.toString())).toEqual({
       version: 1,
@@ -41,6 +65,7 @@ describe('StationImagesService', () => {
             title: imageRow.title,
             sourceUrl: imageRow.sourceUrl,
             license: imageRow.license,
+            isDefault: false,
           },
         ],
       },
@@ -74,9 +99,39 @@ describe('StationImagesService', () => {
           title: terminalImageRow.title,
           sourceUrl: terminalImageRow.sourceUrl,
           license: terminalImageRow.license,
+          isDefault: false,
         },
       ],
     });
+  });
+
+  it('keeps namespaced stop identities and uses the referenced license', async () => {
+    const stopImageRow = {
+      ...imageRow,
+      key: 'station-images/stop/stop-fixture.avif',
+      stationIdentity: 'stop:sptrans:10001',
+      lineIds: [],
+      stopIds: [],
+      copyrightId: 'license-id',
+      license: 'Legacy CC BY',
+      licenseUrl: 'https://example.com/legacy-license',
+      copyright: {
+        id: 'license-id',
+        license: 'CC BY 4.0',
+        licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
+      },
+    };
+    const { service } = createService({}, undefined, [stopImageRow]);
+
+    const manifest = JSON.parse((await service.getManifest()).body.toString());
+
+    expect(manifest.stops['stop:sptrans:10001'][0]).toMatchObject({
+      key: stopImageRow.key,
+      license: 'CC BY 4.0',
+      licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
+      isDefault: false,
+    });
+    expect(manifest.stations).toEqual({});
   });
 
   it('reports an empty metadata table as unavailable', async () => {
@@ -148,12 +203,87 @@ describe('StationImagesService', () => {
       message: 'Station image storage is unavailable',
     });
   });
+
+  it('restores an image when storage deletes it but loses the delete response', async () => {
+    const bytes = Buffer.from('image bytes');
+    let storedImage: Buffer | null = bytes;
+    const { service, send } = createService({});
+    send.mockImplementation(async (command: unknown) => {
+      if (command instanceof HeadObjectCommand) {
+        return { ContentLength: bytes.byteLength };
+      }
+      if (command instanceof GetObjectCommand) {
+        return {
+          Body: Readable.from([bytes]),
+          ContentType: 'image/avif',
+          CacheControl: 'public, max-age=86400',
+          Metadata: { attribution: 'fixture' },
+        };
+      }
+      if (command instanceof DeleteObjectCommand) {
+        storedImage = null;
+        throw new Error('Delete response connection reset');
+      }
+      if (command instanceof PutObjectCommand && Buffer.isBuffer(command.input.Body)) {
+        storedImage = command.input.Body;
+        return {};
+      }
+      throw new Error('Unexpected storage command');
+    });
+
+    await expect(service.removeImageWithRestore('metro', 'luz.avif')).rejects.toMatchObject({
+      status: 502,
+      message: 'Station image storage is unavailable',
+    });
+    expect(storedImage).toEqual(bytes);
+    expect(send).toHaveBeenLastCalledWith(expect.objectContaining({
+      input: {
+        Bucket: 'metro',
+        Key: imageRow.key,
+        Body: bytes,
+        ContentLength: bytes.byteLength,
+        ContentType: 'image/avif',
+        CacheControl: 'public, max-age=86400',
+        Metadata: { attribution: 'fixture' },
+      },
+    }));
+  });
+
+  it('reports failed recovery separately when the delete outcome is unknown', async () => {
+    const { service, send } = createService({});
+    send
+      .mockResolvedValueOnce({ ContentLength: 5 })
+      .mockResolvedValueOnce({ Body: Readable.from(['image']) })
+      .mockRejectedValueOnce(new Error('Delete response connection reset'))
+      .mockRejectedValueOnce(new Error('Recovery unavailable'));
+
+    await expect(service.removeImageWithRestore('metro', 'luz.avif')).rejects.toMatchObject({
+      status: 503,
+      message: 'Station image recovery could not be confirmed',
+    });
+    expect(send).toHaveBeenLastCalledWith(expect.any(PutObjectCommand));
+  });
+
+  it('returns a recovery callback after a confirmed storage deletion', async () => {
+    const { service, send } = createService({});
+    send
+      .mockResolvedValueOnce({ ContentLength: 5 })
+      .mockResolvedValueOnce({ Body: Readable.from(['image']) })
+      .mockResolvedValueOnce({});
+
+    const restore = await service.removeImageWithRestore('metro', 'luz.avif');
+
+    expect(send).toHaveBeenCalledTimes(3);
+    expect(send).toHaveBeenLastCalledWith(expect.any(DeleteObjectCommand));
+    await restore();
+    expect(send).toHaveBeenLastCalledWith(expect.any(PutObjectCommand));
+  });
 });
 
 function createService(
   result: Record<string, unknown>,
   error?: Error,
-  rows: readonly (typeof imageRow)[] = [imageRow],
+  rows: readonly StationImageTestRow[] = [imageRow],
 ): { service: StationImagesService; send: jest.Mock; findMany: jest.Mock } {
   const send = jest
     .fn()

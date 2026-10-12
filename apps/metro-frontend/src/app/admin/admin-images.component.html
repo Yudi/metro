@@ -1,0 +1,506 @@
+<section class="admin-page" aria-labelledby="images-title">
+  <header class="page-heading">
+    <div>
+      <h2 id="images-title">Imagens</h2>
+    </div>
+  </header>
+
+  <mat-form-field class="resource-search" appearance="outline">
+    <mat-label>Buscar local</mat-label>
+    <input
+      matInput
+      type="search"
+      autocomplete="off"
+      [formControl]="search"
+      aria-describedby="resource-search-hint"
+    />
+    <mat-icon matSuffix aria-hidden="true">search</mat-icon>
+    <mat-hint id="resource-search-hint"
+      >Estações, paradas e terminais.</mat-hint
+    >
+  </mat-form-field>
+
+  @if (resourceError(); as message) {
+    <div class="inline-message error-message" role="alert">
+      <span>{{ message }}</span>
+      <button mat-button type="button" (click)="retryResourceSearch()">
+        Tentar novamente
+      </button>
+    </div>
+  }
+
+  <div class="workspace" [class.has-selection]="selectedResource() !== null">
+    <section class="resource-panel" aria-label="Resultados">
+      @switch (resourceState()) {
+        @case ("loading") {
+          <div
+            class="resource-results skeleton-results"
+            aria-label="Buscando locais"
+            aria-busy="true"
+          >
+            <span></span><span></span><span></span>
+          </div>
+        }
+        @case ("ready") {
+          @if (resources().length === 0) {
+            <p class="empty-search">Nenhum local encontrado.</p>
+          } @else {
+            <ul class="resource-results" aria-label="Locais encontrados">
+              @for (resource of resources(); track resource.identity) {
+                <li>
+                  <button
+                    type="button"
+                    class="resource-option"
+                    [class.resource-selected]="
+                      selectedResource()?.identity === resource.identity
+                    "
+                    [attr.aria-pressed]="
+                      selectedResource()?.identity === resource.identity
+                    "
+                    [disabled]="saving() || deletingKey() !== null"
+                    (click)="chooseResource(resource)"
+                  >
+                    <mat-icon aria-hidden="true">
+                      {{
+                        resource.kind === "station"
+                          ? "train"
+                          : resource.kind === "terminal"
+                            ? "directions_bus"
+                            : "place"
+                      }}
+                    </mat-icon>
+                    <span class="resource-copy">
+                      <strong>{{ resource.name }}</strong>
+                      <span
+                        >{{ resourceKindLabel(resource)
+                        }}{{
+                          resourceScopeSummary(resource)
+                            ? " · " + resourceScopeSummary(resource)
+                            : ""
+                        }}</span
+                      >
+                    </span>
+                    <mat-icon class="chevron" aria-hidden="true"
+                      >chevron_right</mat-icon
+                    >
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+        }
+      }
+    </section>
+
+    @if (selectedResource(); as resource) {
+      <section class="detail-panel" aria-labelledby="selected-resource-title">
+        <header class="detail-heading">
+          <div>
+            <h3 id="selected-resource-title">{{ resource.name }}</h3>
+            <p>{{ resourceKindLabel(resource) }}</p>
+          </div>
+          @if (entryState() === "ready" && mode() === null) {
+            <button
+              mat-flat-button
+              color="primary"
+              type="button"
+              [disabled]="saving() || deletingKey() !== null"
+              (click)="startUpload()"
+            >
+              <mat-icon>upload</mat-icon>
+              Nova imagem
+            </button>
+          }
+        </header>
+
+        @if (copyrightsError(); as message) {
+          <div class="inline-message error-message" role="alert">
+            <span>{{ message }}</span>
+            <button mat-button type="button" (click)="loadCopyrights()">
+              Tentar novamente
+            </button>
+          </div>
+        } @else if (copyrights().length === 0) {
+          <p class="license-notice">
+            Cadastre uma licença antes de enviar.
+            <a routerLink="/sp/admin/direitos-autorais">Gerenciar licenças</a>
+          </p>
+        }
+
+        @if (mode() === null && actionError(); as message) {
+          <p class="inline-message error-message" role="alert">{{ message }}</p>
+        }
+
+        @switch (entryState()) {
+          @case ("loading") {
+            <div
+              class="entry-skeleton"
+              aria-label="Carregando imagens"
+              aria-busy="true"
+            >
+              <span></span><span></span>
+            </div>
+          }
+          @case ("error") {
+            <section class="state-message" role="alert">
+              <mat-icon aria-hidden="true">cloud_off</mat-icon>
+              <p>{{ entryError() }}</p>
+              <button mat-stroked-button type="button" (click)="retryEntries()">
+                <mat-icon>refresh</mat-icon>
+                Tentar novamente
+              </button>
+            </section>
+          }
+          @case ("ready") {
+            @if (entries().length === 0) {
+              <section class="state-message">
+                <mat-icon aria-hidden="true">image</mat-icon>
+                <h4>Sem imagens</h4>
+                <p>Envie uma imagem para este local.</p>
+                @if (copyrights().length > 0 && mode() === null) {
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    (click)="startUpload()"
+                  >
+                    <mat-icon>upload</mat-icon>
+                    Enviar imagem
+                  </button>
+                }
+              </section>
+            } @else {
+              <ul class="entry-list" aria-label="Imagens deste local">
+                @for (entry of entries(); track entry.key) {
+                  <li class="entry-row">
+                    @if (imageUrl(entry.key); as previewUrl) {
+                      <img
+                        class="entry-preview"
+                        [src]="previewUrl"
+                        [alt]="entry.title"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    } @else {
+                      <div
+                        class="entry-preview preview-placeholder"
+                        aria-hidden="true"
+                      >
+                        <mat-icon>image_not_supported</mat-icon>
+                      </div>
+                    }
+                    <div class="entry-details">
+                      <strong>{{ entry.title }}</strong>
+                      <span
+                        >{{ entry.label || "Sem rótulo" }} ·
+                        {{ entry.author }}</span
+                      >
+                      <span
+                        >{{ entry.license
+                        }}{{
+                          entryScopeSummary(entry)
+                            ? " · " + entryScopeSummary(entry)
+                            : ""
+                        }}</span
+                      >
+                      @if (entry.isDefault) {
+                        <span class="default-badge">Padrão</span>
+                      }
+                    </div>
+                    <div class="entry-actions">
+                      @if (pendingDeleteKey() === entry.key) {
+                        <span>Remover imagem?</span>
+                        <button
+                          mat-button
+                          type="button"
+                          [disabled]="deletingKey() === entry.key"
+                          (click)="pendingDeleteKey.set(null)"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          mat-flat-button
+                          color="warn"
+                          type="button"
+                          [disabled]="deletingKey() === entry.key"
+                          (click)="deleteEntry(entry)"
+                        >
+                          {{
+                            deletingKey() === entry.key
+                              ? "Removendo…"
+                              : "Confirmar"
+                          }}
+                        </button>
+                      } @else {
+                        <button
+                          mat-button
+                          type="button"
+                          [disabled]="mode() !== null || deletingKey() !== null"
+                          (click)="startEdit(entry)"
+                        >
+                          <mat-icon>edit</mat-icon>
+                          Editar
+                        </button>
+                        <button
+                          mat-button
+                          type="button"
+                          [disabled]="mode() !== null || deletingKey() !== null"
+                          (click)="askToDelete(entry)"
+                        >
+                          <mat-icon>delete</mat-icon>
+                          Remover
+                        </button>
+                      }
+                    </div>
+                  </li>
+                }
+              </ul>
+            }
+          }
+        }
+
+        @if (mode(); as editorMode) {
+          <form class="image-editor" (submit)="$event.preventDefault(); save()">
+            <div class="editor-heading">
+              <div>
+                <h4>
+                  {{
+                    editorMode === "upload" ? "Enviar imagem" : "Editar dados"
+                  }}
+                </h4>
+              </div>
+              <button
+                mat-icon-button
+                type="button"
+                aria-label="Fechar editor"
+                [disabled]="saving()"
+                (click)="cancelEdit()"
+              >
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+
+            @if (editorMode === "upload") {
+              <div class="file-picker">
+                <label for="admin-image-file"
+                  >Arquivo da imagem (até 10 MiB)</label
+                >
+                <input
+                  id="admin-image-file"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/avif,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.avif,.heic,.heif"
+                  [disabled]="saving()"
+                  (change)="onFileSelected($event)"
+                />
+                <p class="file-format-hint">
+                  Formatos aceitos: JPEG, PNG, WebP, AVIF, HEIC e HEIF. O
+                  servidor otimiza todas as imagens e as armazena em AVIF quando
+                  o formato for compatível.
+                </p>
+                @if (selectedFile(); as file) {
+                  <div class="selected-file">
+                    @if (filePreviewUrl(); as preview) {
+                      @if (filePreviewError()) {
+                        <div class="file-preview-unavailable" role="status">
+                          <mat-icon aria-hidden="true">image</mat-icon>
+                          <span
+                            >A prévia ficará disponível após a conversão.</span
+                          >
+                        </div>
+                      } @else {
+                        <img
+                          [src]="preview"
+                          [alt]="'Prévia de ' + file.name"
+                          (error)="onFilePreviewError()"
+                        />
+                      }
+                    }
+                    <span
+                      >{{ file.name }} ·
+                      {{ (file.size / 1024 / 1024).toFixed(1) }} MiB</span
+                    >
+                  </div>
+                }
+                @if (fileError(); as message) {
+                  <p class="inline-message error-message" role="alert">
+                    {{ message }}
+                  </p>
+                }
+              </div>
+            }
+
+            <div class="editor-fields">
+              <mat-form-field appearance="outline">
+                <mat-label>Titular</mat-label>
+                <input
+                  matInput
+                  [formControl]="form.controls.author"
+                  maxlength="256"
+                />
+                @if (
+                  form.controls.author.hasError("required") &&
+                  form.controls.author.touched
+                ) {
+                  <mat-error>Informe o titular.</mat-error>
+                }
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Título</mat-label>
+                <input
+                  matInput
+                  [formControl]="form.controls.title"
+                  maxlength="1024"
+                />
+                @if (
+                  form.controls.title.hasError("required") &&
+                  form.controls.title.touched
+                ) {
+                  <mat-error>Informe o título da imagem.</mat-error>
+                }
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Rótulo (opcional)</mat-label>
+                <input
+                  matInput
+                  [formControl]="form.controls.label"
+                  maxlength="160"
+                />
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Fonte (URL)</mat-label>
+                <input
+                  matInput
+                  type="url"
+                  [formControl]="form.controls.sourceUrl"
+                  maxlength="2048"
+                />
+                @if (
+                  form.controls.sourceUrl.hasError("required") &&
+                  form.controls.sourceUrl.touched
+                ) {
+                  <mat-error>Informe a URL da fonte.</mat-error>
+                } @else if (
+                  form.controls.sourceUrl.hasError("pattern") &&
+                  form.controls.sourceUrl.touched
+                ) {
+                  <mat-error>Use http:// ou https://.</mat-error>
+                }
+              </mat-form-field>
+              <mat-form-field appearance="outline">
+                <mat-label>Licença</mat-label>
+                <mat-select [formControl]="form.controls.copyrightId">
+                  @for (license of copyrights(); track license.id) {
+                    <mat-option [value]="license.id">{{
+                      license.license
+                    }}</mat-option>
+                  }
+                </mat-select>
+                @if (
+                  form.controls.copyrightId.hasError("required") &&
+                  form.controls.copyrightId.touched
+                ) {
+                  <mat-error>Escolha uma licença cadastrada.</mat-error>
+                }
+              </mat-form-field>
+
+              @if (resource.kind === "station" && resource.scopes.length > 0) {
+                <mat-form-field appearance="outline">
+                  <mat-label>Linhas</mat-label>
+                  <mat-select
+                    multiple
+                    [formControl]="form.controls.lineIds"
+                    (selectionChange)="onScopeSelectionChanged('station')"
+                  >
+                    @for (scope of resourceScopeOptions(); track scope.id) {
+                      <mat-option
+                        [value]="scope.id"
+                        [disabled]="scopeOptionDisabled('station', scope.id)"
+                        >{{ scope.label }}</mat-option
+                      >
+                    }
+                  </mat-select>
+                  <mat-hint>Até 8 linhas</mat-hint>
+                </mat-form-field>
+              }
+
+              @if (resource.kind === "terminal" && resource.scopes.length > 0) {
+                <mat-form-field appearance="outline">
+                  <mat-label>Paradas</mat-label>
+                  <mat-select
+                    multiple
+                    [formControl]="form.controls.stopIds"
+                    (selectionChange)="onScopeSelectionChanged('terminal')"
+                  >
+                    @for (scope of resourceScopeOptions(); track scope.id) {
+                      <mat-option
+                        [value]="scope.id"
+                        [disabled]="scopeOptionDisabled('terminal', scope.id)"
+                        >{{ scope.label }}</mat-option
+                      >
+                    }
+                  </mat-select>
+                  <mat-hint>Até 64 paradas</mat-hint>
+                </mat-form-field>
+              }
+            </div>
+
+            @if (resource.kind === "station") {
+              <div class="service-fallback">
+                <mat-checkbox [formControl]="form.controls.serviceTrain">
+                  Imagem de trens urbanos (não-metrô)
+                </mat-checkbox>
+                <p>Usada em linhas de trem sem imagem própria.</p>
+              </div>
+            }
+
+            <div class="default-selection">
+              <mat-checkbox
+                [formControl]="form.controls.isDefault"
+                (change)="onDefaultToggle($event.checked)"
+              >
+                Imagem padrão
+              </mat-checkbox>
+              <p>Usada quando não houver imagem específica.</p>
+            </div>
+
+            @if (actionError(); as message) {
+              <p class="inline-message error-message" role="alert">
+                {{ message }}
+              </p>
+            }
+
+            <div class="editor-actions">
+              <button
+                mat-button
+                type="button"
+                [disabled]="saving()"
+                (click)="cancelEdit()"
+              >
+                Cancelar
+              </button>
+              <button
+                mat-flat-button
+                color="primary"
+                type="submit"
+                [disabled]="saving() || copyrights().length === 0"
+              >
+                {{
+                  saving()
+                    ? "Salvando…"
+                    : editorMode === "upload"
+                      ? "Enviar imagem"
+                      : "Salvar"
+                }}
+              </button>
+            </div>
+          </form>
+        }
+      </section>
+    } @else {
+      <section class="detail-placeholder">
+        <mat-icon aria-hidden="true">image_search</mat-icon>
+        <h3>Escolha um local</h3>
+        <p>Selecione um resultado para ver as imagens.</p>
+      </section>
+    }
+  </div>
+</section>

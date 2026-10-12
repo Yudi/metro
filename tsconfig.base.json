@@ -15,6 +15,9 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "paths": {
+      "@metro/shared/admin-contracts": [
+        "./libs/shared/admin-contracts/src/index.ts"
+      ],
       "@metro/shared/bus-terminal-contracts": [
         "./libs/shared/bus-terminal-contracts/src/index.ts"
       ],

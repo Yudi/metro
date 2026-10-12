@@ -5,16 +5,17 @@ import type {
 
 export const STATION_IMAGES_KEY_PREFIX = 'station-images/';
 
-const stationIdentityPattern = /^[a-z0-9][a-z0-9_-]{0,159}$/;
+const stationIdentityPattern = /^.{1,160}$/u;
 const stationImageKeyPattern =
-  /^station-images\/(?:metro|monorail|rail|terminal)\/[a-z0-9]+(?:-[a-z0-9]+)*\.avif$/;
+  /^station-images\/(?:metro|monorail|rail|terminal|stop)\/[a-z0-9]+(?:-[a-z0-9]+)*\.avif$/;
 const terminalIdentityPattern = /^terminal:[a-z0-9][a-z0-9_-]{0,159}$/;
+const stopIdentityPattern = /^stop:.{1,256}$/u;
 
 export function buildStationImageObjectKey(
   category: string,
   filename: string,
 ): string {
-  if (!['metro', 'monorail', 'rail', 'terminal'].includes(category)) {
+  if (!['metro', 'monorail', 'rail', 'terminal', 'stop'].includes(category)) {
     throw new Error('Invalid station image category');
   }
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*\.avif$/.test(filename)) {
@@ -42,6 +43,14 @@ export function parseStationImageManifest(value: string): StationImageManifest {
 
   validateImageGroups(stations, stationIdentityPattern, 'station');
 
+  const stops = parsed['stops'];
+  if (stops !== undefined) {
+    if (!isRecord(stops)) {
+      throw new Error('Station image metadata must contain a stops object');
+    }
+    validateImageGroups(stops, stopIdentityPattern, 'stop');
+  }
+
   const terminals = parsed['terminals'];
   if (terminals !== undefined) {
     if (!isRecord(terminals)) {
@@ -56,16 +65,21 @@ export function parseStationImageManifest(value: string): StationImageManifest {
 function validateImageGroups(
   groups: Record<string, unknown>,
   identityPattern: RegExp,
-  groupName: 'station' | 'terminal',
+  groupName: 'station' | 'stop' | 'terminal',
 ): void {
   for (const [identity, images] of Object.entries(groups)) {
-    if (!identityPattern.test(identity) || !Array.isArray(images)) {
+    const validIdentity = groupName === 'stop'
+      ? stopIdentityPattern.test(identity) && !hasControlCharacters(identity)
+      : groupName === 'station'
+        ? stationIdentityPattern.test(identity) && !hasControlCharacters(identity)
+        : identityPattern.test(identity);
+    if (!validIdentity || !Array.isArray(images)) {
       throw new Error(`Station image metadata contains an invalid ${groupName}`);
     }
     if (
       images.length > 12 ||
       !images.every((image) =>
-        isStationImageMetadataEntry(image, groupName === 'terminal'),
+        isStationImageMetadataEntry(image, groupName),
       )
     ) {
       throw new Error('Station image metadata contains an invalid image entry');
@@ -75,21 +89,25 @@ function validateImageGroups(
 
 function isStationImageMetadataEntry(
   value: unknown,
-  terminal: boolean,
+  groupName: 'station' | 'stop' | 'terminal',
 ): value is StationImageMetadataEntry {
   if (!isRecord(value)) {
     return false;
   }
 
-  const isTerminalImage =
-    typeof value['key'] === 'string' &&
+  const isTerminalImage = typeof value['key'] === 'string' &&
     value['key'].startsWith('station-images/terminal/');
+  const isStopImage = typeof value['key'] === 'string' &&
+    value['key'].startsWith('station-images/stop/');
   return (
     typeof value['key'] === 'string' &&
     stationImageKeyPattern.test(value['key']) &&
-    terminal === isTerminalImage &&
+    (groupName === 'terminal') === isTerminalImage &&
+    (groupName === 'stop') === isStopImage &&
     isOptionalText(value['label'], 160) &&
     isLineIds(value['lineIds']) &&
+    isStopIds(value['stopIds']) &&
+    (value['isDefault'] === undefined || typeof value['isDefault'] === 'boolean') &&
     (value['service'] === undefined || value['service'] === 'train') &&
     isRequiredText(value['author'], 256) &&
     isRequiredText(value['title'], 1024) &&
@@ -124,6 +142,31 @@ function isLineIds(value: unknown): boolean {
         (entry) => typeof entry === 'string' && /^\d{1,3}$/.test(entry),
       ))
   );
+}
+
+function isStopIds(value: unknown): boolean {
+  return (
+    value === undefined ||
+    (Array.isArray(value) &&
+      value.length <= 64 &&
+      value.every(
+        (entry) =>
+          typeof entry === 'string' &&
+          entry.length > 0 &&
+          entry.length <= 256 &&
+          !hasControlCharacters(entry),
+      ))
+  );
+}
+
+function hasControlCharacters(value: string): boolean {
+  for (const character of value) {
+    const codePoint = character.codePointAt(0) ?? 0;
+    if (codePoint < 0x20 || (codePoint >= 0x7f && codePoint <= 0x9f)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function isWebUrl(value: unknown): value is string {

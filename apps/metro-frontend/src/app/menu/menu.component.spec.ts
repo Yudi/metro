@@ -1,11 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { AuthService } from '@metro/shared/firebase';
+import { AuthService, firebaseUser, firebaseIdToken } from '@metro/shared/firebase';
+import { ADMIN_ACCOUNT_FIXTURE } from '@metro/shared/admin-contracts';
+import type { User } from 'firebase/auth';
 import { MenuComponent } from './menu.component';
 
 describe('MenuComponent', () => {
   let component: MenuComponent;
   let fixture: ComponentFixture<MenuComponent>;
+
+  afterEach(() => {
+    firebaseUser.set(null);
+    firebaseIdToken.set(null);
+  });
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -29,6 +36,19 @@ describe('MenuComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('shows the admin destination only for a boolean Firebase admin claim', () => {
+    const links = () => [...fixture.nativeElement.querySelectorAll('a')]
+      .map((link) => (link as HTMLAnchorElement).textContent);
+    expect(links().some((text) => text?.includes('Administração'))).toBe(false);
+    firebaseUser.set({ uid: ADMIN_ACCOUNT_FIXTURE.uid } as User);
+    firebaseIdToken.set(`header.${btoa(JSON.stringify({ admin: true }))}.signature`);
+    fixture.detectChanges();
+    expect(links().some((text) => text?.includes('Administração'))).toBe(true);
+    firebaseIdToken.set(`header.${btoa(JSON.stringify({ admin: false }))}.signature`);
+    fixture.detectChanges();
+    expect(links().some((text) => text?.includes('Administração'))).toBe(false);
   });
 
   it('lists useful phones immediately before the about page', () => {

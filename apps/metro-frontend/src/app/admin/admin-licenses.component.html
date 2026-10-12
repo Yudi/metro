@@ -1,0 +1,139 @@
+<section class="admin-page" aria-labelledby="licenses-title">
+  <header class="page-heading">
+    <div>
+      <h2 id="licenses-title">Licenças</h2>
+      <p>
+        Reutilize licenças; informe o titular em cada imagem.
+      </p>
+    </div>
+    @if (loadState() === 'ready' && mode() === null) {
+      <button mat-flat-button color="primary" type="button" (click)="startCreate()">
+        <mat-icon>add</mat-icon>
+        Nova licença
+      </button>
+    }
+  </header>
+
+  @if (mode(); as editorMode) {
+    <form class="license-editor" (submit)="$event.preventDefault(); save()">
+      <h3>{{ editorMode === 'create' ? 'Nova licença' : 'Editar licença' }}</h3>
+      <div class="editor-fields">
+        <mat-form-field appearance="outline">
+          <mat-label>Nome</mat-label>
+          <input matInput [formControl]="form.controls.license" maxlength="128" />
+          @if (form.controls.license.hasError('required') && form.controls.license.touched) {
+            <mat-error>Informe um nome.</mat-error>
+          }
+          @if (form.controls.license.hasError('maxlength')) {
+            <mat-error>Use até 128 caracteres.</mat-error>
+          }
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>URL (opcional)</mat-label>
+          <input
+            matInput
+            type="url"
+            autocomplete="url"
+            [formControl]="form.controls.licenseUrl"
+            maxlength="2048"
+          />
+          @if (form.controls.licenseUrl.hasError('pattern') && form.controls.licenseUrl.touched) {
+            <mat-error>Use http:// ou https://.</mat-error>
+          }
+        </mat-form-field>
+      </div>
+
+      @if (actionError(); as message) {
+        <p class="inline-message error-message" role="alert">{{ message }}</p>
+      }
+
+      <div class="editor-actions">
+        <button mat-button type="button" [disabled]="saving()" (click)="cancelEdit()">
+          Cancelar
+        </button>
+        <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
+          {{ saving() ? 'Salvando…' : 'Salvar' }}
+        </button>
+      </div>
+    </form>
+  }
+
+  @if (mode() === null && actionError(); as message) {
+    <p class="inline-message error-message" role="alert">{{ message }}</p>
+  }
+
+  @switch (loadState()) {
+    @case ('loading') {
+      <div class="license-list skeleton-list" aria-label="Carregando licenças" aria-busy="true">
+        <span></span><span></span><span></span>
+      </div>
+    }
+    @case ('error') {
+      <section class="state-message" role="alert">
+        <mat-icon aria-hidden="true">cloud_off</mat-icon>
+        <p>{{ loadError() }}</p>
+        <button mat-stroked-button type="button" (click)="loadLicenses()">
+          <mat-icon>refresh</mat-icon>
+          Tentar novamente
+        </button>
+      </section>
+    }
+    @case ('ready') {
+      @if (licenses().length === 0) {
+        <section class="state-message">
+          <mat-icon aria-hidden="true">copyright</mat-icon>
+          <h3>Nenhuma licença</h3>
+          <p>Cadastre licenças para usá-las nas imagens.</p>
+          @if (mode() === null) {
+            <button mat-stroked-button type="button" (click)="startCreate()">
+              <mat-icon>add</mat-icon>
+              Cadastrar licença
+            </button>
+          }
+        </section>
+      } @else {
+        <ul class="license-list" aria-label="Licenças cadastradas">
+          @for (license of licenses(); track license.id) {
+            <li class="license-row">
+              <div class="license-details">
+                <mat-icon aria-hidden="true">copyright</mat-icon>
+                <div>
+                  <strong>{{ license.license }}</strong>
+                  @if (license.licenseUrl && isSafeUrl(license.licenseUrl)) {
+                    <a [href]="license.licenseUrl" target="_blank" rel="noreferrer">
+                      Abrir licença
+                      <mat-icon aria-hidden="true">open_in_new</mat-icon>
+                    </a>
+                  } @else {
+                    <span>Sem URL</span>
+                  }
+                </div>
+              </div>
+
+              <div class="license-actions">
+                @if (pendingDeleteId() === license.id) {
+                  <span>Remover licença?</span>
+                  <button mat-button type="button" [disabled]="deletingId() === license.id" (click)="pendingDeleteId.set(null)">
+                    Cancelar
+                  </button>
+                  <button mat-flat-button color="warn" type="button" [disabled]="deletingId() === license.id" (click)="deleteLicense(license)">
+                    {{ deletingId() === license.id ? 'Removendo…' : 'Remover' }}
+                  </button>
+                } @else {
+                  <button mat-button type="button" [disabled]="mode() !== null || deletingId() !== null" (click)="startEdit(license)">
+                    <mat-icon>edit</mat-icon>
+                    Editar
+                  </button>
+                  <button mat-button type="button" [disabled]="mode() !== null || deletingId() !== null" (click)="askToDelete(license)">
+                    <mat-icon>delete</mat-icon>
+                    Remover
+                  </button>
+                }
+              </div>
+            </li>
+          }
+        </ul>
+      }
+    }
+  }
+</section>

@@ -266,23 +266,6 @@ export const L2_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
         direction: { destinationCodes: ['VPT'] },
         disembarkingSide: 'right',
         platformType: 'side',
-        features: [],
-      },
-      {
-        id: 'l2-aip-towards-vmd',
-        direction: { destinationCodes: ['VMD'] },
-        disembarkingSide: 'right',
-        platformType: 'side',
-        features: [],
-      },
-    ],
-
-    AIP: [
-      {
-        id: 'l2-aip-towards-vpt',
-        direction: { destinationCodes: ['VPT'] },
-        disembarkingSide: 'right',
-        platformType: 'side',
         features: [
           {
             id: 'l2-aip-vpt-stairs-penultimate-door',

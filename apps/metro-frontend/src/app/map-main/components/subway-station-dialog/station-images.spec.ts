@@ -1,8 +1,10 @@
 import {
   isStationImageManifest,
   selectStationImage,
+  selectStopImage,
   StationImage,
 } from './station-images';
+import { IMAGE_ENTRY_FIXTURE, MEDIA_TERMINAL_FIXTURE } from '@metro/shared/admin-contracts';
 
 const primary: StationImage = {
   key: 'station-images/metro/luz.avif',
@@ -26,6 +28,11 @@ const train: StationImage = {
 const images = [primary, yellow, train];
 
 describe('station image selection', () => {
+  it('uses the selected default after line/service assignments and before legacy order', () => {
+    expect(selectStationImage([...images, IMAGE_ENTRY_FIXTURE], '2')).toBe(IMAGE_ENTRY_FIXTURE);
+    expect(selectStationImage([...images, IMAGE_ENTRY_FIXTURE], '4')).toBe(yellow);
+    expect(selectStationImage([...images, IMAGE_ENTRY_FIXTURE], '11')).toBe(train);
+  });
   it('selects explicitly assigned lines, including prefixed line codes', () => {
     expect(selectStationImage(images, 'L4')).toBe(yellow);
     expect(selectStationImage(images, 1)).toBe(primary);
@@ -51,7 +58,31 @@ describe('station image selection', () => {
   });
 });
 
+describe('stop image selection', () => {
+  const scoped = { ...IMAGE_ENTRY_FIXTURE, isDefault: false, stopIds: [MEDIA_TERMINAL_FIXTURE.scopes[0].id] };
+
+  it('prioritizes the current stop, then the explicit default', () => {
+    expect(selectStopImage([IMAGE_ENTRY_FIXTURE, scoped], MEDIA_TERMINAL_FIXTURE.scopes[0].id)).toBe(scoped);
+    expect(selectStopImage([scoped, IMAGE_ENTRY_FIXTURE], 'other')).toBe(IMAGE_ENTRY_FIXTURE);
+    expect(selectStopImage([scoped], 'other')).toBeUndefined();
+    expect(selectStopImage([scoped])).toBeUndefined();
+  });
+
+  it('preserves legacy generic terminal fallback', () => {
+    const legacy = { ...primary, lineIds: undefined };
+    expect(selectStopImage([scoped, legacy], 'other')).toBe(legacy);
+  });
+});
+
 describe('station image manifest', () => {
+  it('accepts stop images and rejects malformed selectors and duplicate keys', () => {
+    const stop = { ...IMAGE_ENTRY_FIXTURE, key: 'station-images/stop/test.avif' };
+    const metadata = { version: 1, stations: {}, stops: { 'stop:sptrans:10001': [stop] } };
+    expect(isStationImageManifest(metadata)).toBe(true);
+    expect(isStationImageManifest({ ...metadata, stops: { 'stop:sptrans:10001': [{ ...stop, isDefault: 'true' }] } })).toBe(false);
+    expect(isStationImageManifest({ ...metadata, stops: { 'stop:sptrans:10001': [{ ...stop, stopIds: ['\n'] }] } })).toBe(false);
+    expect(isStationImageManifest({ ...metadata, stops: { 'stop:sptrans:10001': [stop, stop] } })).toBe(false);
+  });
   it('accepts old manifests without terminal metadata and an empty terminal section', () => {
     const stationOnly = { version: 1, stations: { luz: images } };
 

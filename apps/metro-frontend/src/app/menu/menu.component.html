@@ -70,6 +70,12 @@
   </div>
   <mat-nav-list aria-label="Páginas do Metro">
     <section>
+      @if (firebaseIsAdmin()) {
+        <a mat-list-item [routerLink]="cityPath('/admin')">
+          <mat-icon matListItemIcon>admin_panel_settings</mat-icon>
+          <span matListItemTitle>Administração</span>
+        </a>
+      }
       @for (section of sections; track section) {
         <div>
           @if (section === "null") {

@@ -1,3 +1,4 @@
+import { RailHolidayService } from '../rail/rail-holiday.service';
 import { ConfigService } from '@nestjs/config';
 import {
   CallOptions,
@@ -15,13 +16,42 @@ import {
 import { RailIntegrationClientService } from './rail-integration-client.service';
 
 describe('RailIntegrationClientService', () => {
+  it('passes stored holiday service dates to scheduled arrival calculations', async () => {
+    const fetchScheduledService = jest.fn(unarySuccess({ services: [] }));
+    const service = createServiceWithClient({ fetchScheduledService });
+    await service.fetchScheduledService('L1', 'TUC');
+    expect(fetchScheduledService.mock.calls[0][0]).toMatchObject({
+      lineCode: 'L1', stationCode: 'TUC', holidayDates: ['2026-10-12'],
+    });
+    service.onModuleDestroy();
+  });
+
   afterEach(() => {
     jest.useRealTimers();
     jest.restoreAllMocks();
   });
 
+  it('loads both holiday years when the schedule lookahead crosses New Year', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-12-31T23:00:00-03:00'));
+    const holidays = holidayService();
+    const service = new RailIntegrationClientService(configService({}), holidays);
+    clientOf(service).close();
+    Object.defineProperty(service, 'client', {
+      value: {
+        waitForReady: jest.fn((_deadline, callback) => callback()),
+        check: jest.fn(unarySuccess({ ready: true })),
+        fetchScheduledService: jest.fn(unarySuccess({ services: [] })),
+        close: jest.fn(),
+      },
+    });
+    await service.fetchScheduledService('L1', 'TUC');
+    expect(holidays.getHolidaysForYear).toHaveBeenCalledWith(2026);
+    expect(holidays.getHolidaysForYear).toHaveBeenCalledWith(2027);
+    service.onModuleDestroy();
+  });
+
   it('uses port 50051 when no target is configured', () => {
-    const service = new RailIntegrationClientService(configService({}));
+    const service = new RailIntegrationClientService(configService({}), holidayService());
 
     expect(service).toHaveProperty('target', 'localhost:50051');
 
@@ -32,7 +62,7 @@ describe('RailIntegrationClientService', () => {
     const service = new RailIntegrationClientService(
       configService({
         RAIL_INTEGRATION_GRPC_URL: '127.0.0.1:55051',
-      }),
+      }), holidayService(),
     );
 
     expect(service).toHaveProperty('target', '127.0.0.1:55051');
@@ -180,7 +210,7 @@ describe('RailIntegrationClientService', () => {
     ]);
 
     expect(fetchScheduledService).toHaveBeenCalledWith(
-      { lineCode: 'L1', stationCode: 'LUZ' },
+      { lineCode: 'L1', stationCode: 'LUZ', holidayDates: ['2026-10-12'] },
       { deadline: expect.any(Date) },
       expect.any(Function),
     );
@@ -328,7 +358,7 @@ describe('RailIntegrationClientService', () => {
           RAIL_INTEGRATION_GRPC_READINESS_DEADLINE_MS: 100,
           RAIL_INTEGRATION_GRPC_MAX_ATTEMPTS: 2,
           RAIL_INTEGRATION_GRPC_RETRY_DELAY_MS: 1,
-        }));
+        }), holidayService());
         const client = clientOf(service);
         await new Promise<void>((resolve, reject) => {
           client.waitForReady(
@@ -486,7 +516,7 @@ function createServiceWithClient(
   requestContext?: { getRequestId(): string | undefined },
 ): RailIntegrationClientService {
   const service = new RailIntegrationClientService(
-    configService(values),
+    configService(values), holidayService(),
     requestContext as never,
   );
   clientOf(service).close();
@@ -545,4 +575,13 @@ function configService(
   return {
     get: jest.fn((key: string) => values[key]),
   } as unknown as ConfigService<Record<string, unknown>, false>;
+}
+
+function holidayService(): RailHolidayService {
+  return {
+    getTodayInSaoPaulo: jest.fn((date: Date) => new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Sao_Paulo',
+    }).format(date)),
+    getHolidaysForYear: jest.fn().mockResolvedValue([{ date: '2026-10-12' }]),
+  } as unknown as RailHolidayService;
 }

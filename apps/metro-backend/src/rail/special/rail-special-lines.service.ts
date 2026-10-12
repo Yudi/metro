@@ -49,6 +49,7 @@ export class RailSpecialLinesService {
       this.buildExpressoAeroportoStatus(
         regularLines,
         saoPauloNow,
+        options.isHoliday ?? false,
         expressoAeroportoStatus,
       ),
       this.buildExpressoLinha10Status(
@@ -63,6 +64,7 @@ export class RailSpecialLinesService {
   private buildExpressoAeroportoStatus(
     regularLines: RailLine[],
     now: Date,
+    isHoliday: boolean,
     externalStatus?: RailSpecialStatusSourceLine,
   ): SpecialRailLine {
     if (externalStatus && externalStatus.statusCode !== 'OperacaoNormal') {
@@ -112,7 +114,7 @@ export class RailSpecialLinesService {
       });
     }
 
-    const nextDeparture = this.getNextExpressoAeroportoDeparture(now);
+    const nextDeparture = this.getNextExpressoAeroportoDeparture(now, isHoliday);
 
     return this.buildSpecialLine({
       code: SPECIAL_RAIL_LINE_CODES.EXPRESSO_AEROPORTO,
@@ -297,14 +299,14 @@ export class RailSpecialLinesService {
     return !isAfter(date, maxDate);
   }
 
-  private getNextExpressoAeroportoDeparture(now: Date): string {
+  private getNextExpressoAeroportoDeparture(now: Date, isHoliday: boolean): string {
     const normalizedNow = this.toMinutePrecision(now);
 
     if (this.isExactlyMidnight(normalizedNow)) {
       return '00:00';
     }
 
-    const intervalMinutes = isSunday(normalizedNow)
+    const intervalMinutes = isHoliday || isSunday(normalizedNow)
       ? EXPRESSO_AEROPORTO_SCHEDULE.sundayIntervalMinutes
       : EXPRESSO_AEROPORTO_SCHEDULE.weekdayIntervalMinutes;
 

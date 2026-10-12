@@ -1,3 +1,4 @@
+import { RailHolidayService } from '../rail/rail-holiday.service';
 import {
   Injectable,
   Logger,
@@ -128,6 +129,7 @@ export class RailIntegrationClientService
 
   constructor(
     configService: ConfigService,
+    private readonly railHolidayService: RailHolidayService,
     @Optional() private readonly requestContext?: RequestContextService,
   ) {
     super();
@@ -213,11 +215,25 @@ export class RailIntegrationClientService
     lineCode: string,
     stationCode: string,
   ): Promise<RailScheduledService[]> {
+    const now = new Date();
+    // Include adjacent service dates for overnight departures and the week ahead.
+    const years = new Set(
+      [-1, 0, 7].map((days) => {
+        const date = new Date(now.getTime() + days * 86_400_000);
+        const localDate = this.railHolidayService.getTodayInSaoPaulo(date);
+        return Number(localDate.slice(0, 4));
+      }),
+    );
+    const holidays = await Promise.all(
+      Array.from(years, (year) => this.railHolidayService.getHolidaysForYear(year)),
+    );
+    const holidayDates = holidays.flat().map((holiday) => holiday.date);
     const response = await this.call<ScheduledServicesTransportResponse>(
       'fetchScheduledService',
       {
         lineCode,
         stationCode,
+        holidayDates,
       },
     );
 

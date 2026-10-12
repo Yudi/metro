@@ -1,3 +1,4 @@
+import { RailHolidayService } from '../rail/rail-holiday.service';
 import { Module } from '@nestjs/common';
 import {
   RailRealtimeSourcePort,
@@ -7,6 +8,7 @@ import { RailIntegrationClientService } from './rail-integration-client.service'
 
 @Module({
   providers: [
+    RailHolidayService,
     RailIntegrationClientService,
     {
       provide: RailRealtimeSourcePort,

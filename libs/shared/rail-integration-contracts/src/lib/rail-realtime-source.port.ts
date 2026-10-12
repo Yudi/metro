@@ -94,6 +94,7 @@ export abstract class RailRealtimeSourcePort {
   abstract fetchScheduledService(
     lineCode: string,
     stationCode: string,
+    holidayDates?: readonly string[],
   ): Promise<RailScheduledService[]>;
 
   abstract fetchNextTrains(

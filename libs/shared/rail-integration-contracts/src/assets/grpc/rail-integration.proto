@@ -5,7 +5,7 @@ package metro.rail.integration.v1;
 service RailIntegrationService {
   rpc Check(ReadinessRequest) returns (ReadinessResponse);
   rpc FetchNextTrains(LineStationRequest) returns (NextTrainsResponse);
-  rpc FetchScheduledService(LineStationRequest) returns (ScheduledServicesResponse);
+  rpc FetchScheduledService(ScheduledServiceRequest) returns (ScheduledServicesResponse);
   rpc GetStationName(LineStationRequest) returns (StationNameResponse);
   rpc GetStationCodes(LineRequest) returns (StationCodesResponse);
   rpc GetStationByName(StationByNameRequest) returns (StationLookupResponse);
@@ -29,6 +29,13 @@ message LineRequest {
 message LineStationRequest {
   string line_code = 1;
   string station_code = 2;
+}
+
+// Holiday dates refer to service days in the transit timezone.
+message ScheduledServiceRequest {
+  string line_code = 1;
+  string station_code = 2;
+  repeated string holiday_dates = 3;
 }
 
 message StationByNameRequest {

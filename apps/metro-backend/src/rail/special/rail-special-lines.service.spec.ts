@@ -4,6 +4,16 @@ import { RailSpecialStatusSourceLine } from '@metro/rail-integration-contracts';
 describe('RailSpecialLinesService', () => {
   const service = new RailSpecialLinesService();
 
+  it('uses the Sunday airport express interval on holidays', () => {
+    const now = new Date('2026-10-12T07:05:00-03:00');
+    const holiday = service.getSpecialLinesStatus([], now, { isHoliday: true });
+    const weekday = service.getSpecialLinesStatus([], now, { isHoliday: false });
+    expect(holiday.find((line) => line.code === 'EA')?.nextDepartures)
+      .toEqual([{ label: 'Próxima partida', time: '07:30' }]);
+    expect(weekday.find((line) => line.code === 'EA')?.nextDepartures)
+      .toEqual([{ label: 'Próxima partida', time: '08:00' }]);
+  });
+
   it('does not expose Expresso Linha 10 departures on São Paulo holidays', () => {
     const statuses = service.getSpecialLinesStatus(
       [],

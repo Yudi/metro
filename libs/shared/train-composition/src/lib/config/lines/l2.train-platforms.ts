@@ -277,6 +277,49 @@ export const L2_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
       },
     ],
 
+    AIP: [
+      {
+        id: 'l2-aip-towards-vpt',
+        direction: { destinationCodes: ['VPT'] },
+        disembarkingSide: 'right',
+        platformType: 'side',
+        features: [
+          {
+            id: 'l2-aip-vpt-stairs-penultimate-door',
+            type: 'stairs',
+            label: 'Escada na penúltima porta',
+            anchor: { type: 'door', carPosition: 6, doorPosition: 3 },
+          },
+          {
+            id: 'l2-aip-vpt-stairs-rear-door-6',
+            type: 'stairs',
+            label: 'Escada na 6ª porta, contando de trás para frente',
+            anchor: { type: 'door', carPosition: 5, doorPosition: 3 },
+          },
+        ],
+      },
+      {
+        id: 'l2-aip-towards-vmd',
+        direction: { destinationCodes: ['VMD'] },
+        disembarkingSide: 'right',
+        platformType: 'side',
+        features: [
+          {
+            id: 'l2-aip-vmd-stairs-door-2',
+            type: 'stairs',
+            label: 'Escada na 2ª porta',
+            anchor: { type: 'door', carPosition: 1, doorPosition: 2 },
+          },
+          {
+            id: 'l2-aip-vmd-stairs-rear-door-6',
+            type: 'stairs',
+            label: 'Escada na 6ª porta, contando de trás para frente',
+            anchor: { type: 'door', carPosition: 5, doorPosition: 3 },
+          },
+        ],
+      },
+    ],
+
     SAC: [
       {
         id: 'l2-sac-towards-vpt',

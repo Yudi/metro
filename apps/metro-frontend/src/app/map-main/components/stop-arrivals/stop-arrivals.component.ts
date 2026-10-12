@@ -110,6 +110,7 @@ export class StopArrivalsComponent {
   selectedRoutes = input<Set<string>>(new Set());
   showMapActions = input(false);
   compact = input(false);
+  readonly embedded = input(false);
   selectedRouteKey = input<string | null>(null);
   selectedRouteKeys = input<string[]>([]);
   selectRoute = output<string>();

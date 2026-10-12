@@ -1,0 +1,37 @@
+.container.compact {
+  max-width: none;
+}
+
+.compact .regular-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 12px;
+  padding-top: 0;
+}
+
+.compact .regular-grid .line-card {
+  flex-direction: row;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+}
+
+.compact .regular-grid .badge {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.compact .regular-grid .content {
+  flex: 1;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.compact .regular-grid .line-name {
+  margin: 0;
+}

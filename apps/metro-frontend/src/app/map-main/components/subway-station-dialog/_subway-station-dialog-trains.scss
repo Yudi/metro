@@ -42,35 +42,3 @@
 .train-line-chip__badge {
   @include lineBadge.circle(32px, 0.75rem);
 }
-
-.train-line-content {
-  min-width: 0;
-}
-
-.static-composition-line__directions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 12px;
-  min-width: 0;
-}
-
-.static-composition-line__direction {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-}
-
-.static-composition-line__direction-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--mat-sys-on-surface-variant, #666);
-  font-size: 0.82rem;
-  font-weight: 650;
-
-  mat-icon {
-    width: 1rem;
-    height: 1rem;
-    font-size: 1rem;
-  }
-}

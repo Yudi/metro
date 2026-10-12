@@ -1,8 +1,6 @@
 <section class="insights-page">
   <header class="page-header">
-    <div>
-      <h1 class="global-header">Painel</h1>
-    </div>
+    <h1 class="global-header">Painel</h1>
     <a mat-stroked-button [routerLink]="cityPath('/favoritos')">
       <mat-icon>settings</mat-icon>
       Configurar
@@ -11,300 +9,215 @@
 
   @if (!hasRelevantFavorites()) {
     <div class="empty-state">
-      <mat-icon>favorite_border</mat-icon>
+      <mat-icon aria-hidden="true">favorite_border</mat-icon>
       <h2>Nenhum favorito</h2>
       <p>
-        Salve pontos, linhas ou estações na busca ou no mapa para montar seu
-        painel.
+        Salve pontos, linhas ou estações na busca ou no mapa para montar seu painel.
       </p>
+      <a mat-flat-button [routerLink]="cityPath('/menu')">Buscar favoritos</a>
     </div>
   } @else {
     @if (lookupError()) {
-      <div class="error-message">{{ lookupError() }}</div>
+      <div class="error-message" role="status">
+        <mat-icon aria-hidden="true">error_outline</mat-icon>
+        <span>
+          {{ lookupError() }} Confira sua conexão e tente novamente mais tarde.
+        </span>
+      </div>
     }
 
-    <div class="dashboard-grid">
-      @if (busStops().length + busRoutes().length > 0) {
-        <mat-card appearance="outlined">
-          <mat-card-header>
-            <mat-icon mat-card-avatar>directions_bus</mat-icon>
-            <mat-card-title>Ônibus</mat-card-title>
-            <mat-card-subtitle>
-              {{ busStops().length + busRoutes().length }} favoritos
-            </mat-card-subtitle>
-          </mat-card-header>
-          <mat-card-content>
-            <section class="category-section">
-              <h2>Pontos favoritos</h2>
-              @if (loadingBusDetails()) {
-                <div class="loading-row">Carregando pontos...</div>
-              } @else if (busStops().length === 0) {
-                <div class="empty-category">Nenhum ponto salvo.</div>
-              } @else {
-                <div class="item-list">
-                  @for (stop of busStops(); track stop.stopId) {
-                    <article class="insight-row">
-                      <mat-icon class="row-icon">departure_board</mat-icon>
-                      <div class="row-content">
-                        <h3>{{ stop.name }}</h3>
-                        <span class="muted">ID: {{ stopDisplayId(stop) }}</span>
-                        @if (stop.platformCode) {
-                          <span class="muted"
-                            >Plataforma {{ stop.platformCode }}</span
-                          >
-                        }
-                        @let routes = getRoutesForStop(stop.stopId);
-                        @if (routes.length > 0) {
-                          @let selectedRoutes =
-                            getSelectedBusRoutes(stop.stopId);
-                          @if (selectedRoutes.length > 0) {
-                            <div class="chip-row">
-                              @for (
-                                route of selectedRoutes;
-                                track route.favoriteCode || route.routeId
-                              ) {
-                                <span class="route-summary">
-                                  <span
-                                    class="route-badge compact-badge"
-                                    [style.backgroundColor]="routeColor(route)"
-                                    [style.color]="routeTextColor(route)"
-                                  >
-                                    {{ route.shortName }}
-                                  </span>
-                                  <span class="route-summary-copy">
-                                    <span class="route-destination">
-                                      {{
-                                        route.isCircular
-                                          ? 'Circular'
-                                          : route.destination || route.longName
-                                      }}
-                                    </span>
-                                    @if (agencyIdentity(route); as agency) {
-                                      <span class="agency-identity">
-                                        @if (agency.iconPath; as iconPath) {
-                                          <img
-                                            [ngSrc]="iconPath"
-                                            width="18"
-                                            height="18"
-                                            alt=""
-                                          />
-                                        } @else {
-                                          <mat-icon aria-hidden="true"
-                                            >business</mat-icon
-                                          >
-                                        }
-                                        <span>{{ agency.name }}</span>
-                                      </span>
-                                    }
-                                    @if (routeFareLabel(route); as fareLabel) {
-                                      <span
-                                        class="route-fare"
-                                        [class.missing-fare]="
-                                          fareLabel === 'Tarifa não informada'
-                                        "
-                                      >
-                                        <mat-icon>payments</mat-icon>
-                                        {{ fareLabel }}
-                                      </span>
-                                    }
-                                  </span>
-                                </span>
-                              }
-                            </div>
-
-                            <app-stop-arrivals
-                              [stop]="stop"
-                              [routes]="selectedRoutes"
-                              [selectedRouteKeys]="
-                                getSelectedBusRouteKeys(stop.stopId)
-                              "
-                              [compact]="true"
-                            />
-                          } @else {
-                            <div class="muted-state">
-                              <mat-icon>visibility_off</mat-icon>
-                              <span>Nenhuma linha selecionada no painel.</span>
-                            </div>
-                          }
-                        } @else {
-                          <div class="chip-row">
-                            @if (stop.routeShortNames.length === 0) {
-                              <span class="muted">Carregando linhas...</span>
-                            } @else {
-                              @for (
-                                route of visibleRoutes(stop.routeShortNames);
-                                track route
-                              ) {
-                                <span class="soft-chip">{{ route }}</span>
-                              }
-                              @if (hiddenRouteCount(stop.routeShortNames) > 0) {
-                                <span class="muted">
-                                  +{{ hiddenRouteCount(stop.routeShortNames) }}
-                                </span>
-                              }
-                            }
-                          </div>
-                        }
-                      </div>
-                    </article>
-                  }
-                </div>
-              }
-            </section>
-
-            <section class="category-section">
-              <h2>Linhas favoritas</h2>
-              @if (loadingBusDetails()) {
-                <div class="loading-row">Carregando linhas...</div>
-              } @else if (busRoutes().length === 0) {
-                <div class="empty-category">Nenhuma linha salva.</div>
-              } @else {
-                <div class="item-list">
-                  @for (
-                    route of busRoutes();
-                    track route.favoriteCode || route.favoriteId || route.routeId
-                  ) {
-                    <article class="insight-row">
-                      <span
-                        class="route-badge"
-                        [style.backgroundColor]="routeColor(route)"
-                        [style.color]="routeTextColor(route)"
-                      >
-                        {{ route.shortName }}
-                      </span>
-                      <div class="row-content">
-                        <h3>{{
-                          route.isCircular
-                            ? 'Circular'
-                            : route.destination || route.longName
-                        }}</h3>
-                        @if (route.favoriteNotice) {
-                          <p class="muted">{{ route.favoriteNotice }}</p>
-                        }
-                        <div class="route-meta">
-                          <span class="muted">{{ routeDisplayId(route) }}</span>
-                          @if (agencyIdentity(route); as agency) {
-                            <span class="agency-identity">
-                              @if (agency.iconPath; as iconPath) {
-                                <img
-                                  [ngSrc]="iconPath"
-                                  width="18"
-                                  height="18"
-                                  alt=""
-                                />
-                              } @else {
-                                <mat-icon aria-hidden="true">business</mat-icon>
-                              }
-                              <span>{{ agency.name }}</span>
-                            </span>
-                          }
-                          @if (routeFareLabel(route); as fareLabel) {
-                            <span
-                              class="route-fare"
-                              [class.missing-fare]="
-                                fareLabel === 'Tarifa não informada'
-                              "
-                            >
-                              <mat-icon>payments</mat-icon>
-                              {{ fareLabel }}
-                            </span>
-                          }
-                        </div>
-                      </div>
-                    </article>
-                  }
-                </div>
-              }
-            </section>
-          </mat-card-content>
-        </mat-card>
-      }
-
-      <mat-card appearance="outlined">
-        <mat-card-header>
-          <mat-icon mat-card-avatar>train</mat-icon>
-          <mat-card-title>Estações</mat-card-title>
-          <mat-card-subtitle>
-            {{ railStations().length }} favoritas
-          </mat-card-subtitle>
-        </mat-card-header>
-        <mat-card-content>
-          @if (railStations().length === 0) {
-            <div class="empty-category">Nenhuma estação salva.</div>
-          } @else {
-            <div class="item-list">
-              @for (station of railStations(); track station.key) {
-                <article class="insight-row">
-                  <mat-icon class="row-icon">train</mat-icon>
-                  <div class="row-content">
-                    <h3>{{ station.name }}</h3>
-                    @if (station.lines.length > 0) {
-                      @let selectedLines = getSelectedRailLines(station);
-                      @if (selectedLines.length > 0) {
-                        <div class="chip-row">
-                          @for (line of selectedLines; track line.id) {
-                            <span
-                              class="line-chip compact-badge"
-                              [style.backgroundColor]="line.colorHex"
-                              [style.color]="lineTextColor(line.lineCode)"
-                            >
-                              {{ line.lineCode }}
-                            </span>
-                          }
-                        </div>
-
-                        @for (line of selectedLines; track line.id) {
-                          @if (hasNextTrain(line)) {
-                            <app-next-train-card
-                              [lineCode]="line.nextTrainLineCode"
-                              [stationCode]="line.stationCode"
-                              [showLineName]="true"
-                            />
-                          }
-                        }
-                      } @else {
-                        <div class="muted-state">
-                          <mat-icon>visibility_off</mat-icon>
-                          <span>Nenhuma linha selecionada no painel.</span>
-                        </div>
-                      }
-                    } @else {
-                      <div class="chip-row">
-                        @for (code of station.lineCodes; track code) {
-                          <span
-                            class="line-chip"
-                            [style.backgroundColor]="lineColor(code)"
-                            [style.color]="lineTextColor(code)"
-                          >
-                            {{ lineName(code) }}
-                          </span>
-                        }
-                        @if (station.lineCodes.length === 0) {
-                          <span class="muted">Linhas indisponíveis.</span>
-                        }
-                      </div>
-                    }
-                  </div>
-                </article>
-              }
-            </div>
-          }
-        </mat-card-content>
-      </mat-card>
-    </div>
-
-    @if (
-      railStatusCodes().length > 0 || specialRailLineFavoriteCodes().length > 0
-    ) {
-      <section class="status-section">
+    @if (railStatusCodes().length > 0 || specialRailLineFavoriteCodes().length > 0) {
+      <section class="category-section status-section" aria-labelledby="rail-status-title">
+        <h2 id="rail-status-title">Status das linhas favoritas</h2>
         <app-line-status-grid
-          headerText="Status das linhas favoritas"
+          [showHeader]="false"
+          [compact]="true"
           [lineCodes]="railStatusCodes()"
           [issueLineCodes]="railIssueStatusCodes()"
           [specialLineCodes]="specialRailLineFavoriteCodes()"
           [showSpecialServices]="specialRailLineFavoriteCodes().length > 0"
           emptyText="Nenhum status encontrado para seus favoritos."
         />
+      </section>
+    }
+
+    <div
+      class="dashboard-grid"
+      [class.single-column]="!hasBusStopFavorites() || stationViews().length === 0"
+    >
+      @if (hasBusStopFavorites()) {
+        <section class="category-section" aria-labelledby="bus-stops-title">
+          <h2 id="bus-stops-title">
+            <mat-icon aria-hidden="true">departure_board</mat-icon>
+            Pontos favoritos
+          </h2>
+          @if (loadingBusDetails()) {
+            <div class="loading-row" role="status">Carregando pontos...</div>
+          } @else {
+            @for (stop of busStops(); track stop.stopId) {
+              <article class="favorite-detail">
+                <header class="favorite-header">
+                  <h3>{{ stop.name }}</h3>
+                  <p class="muted">
+                    Ponto {{ stopDisplayId(stop) }}
+                    @if (stop.platformCode) {
+                      · Plataforma {{ stop.platformCode }}
+                    }
+                  </p>
+                </header>
+                @let routes = getRoutesForStop(stop.stopId);
+                @if (routes.length > 0) {
+                  @let selectedRoutes = getSelectedBusRoutes(stop.stopId);
+                  @if (selectedRoutes.length > 0) {
+                    <app-stop-arrivals
+                      [stop]="stop"
+                      [routes]="selectedRoutes"
+                      [selectedRouteKeys]="getSelectedBusRouteKeys(stop.stopId)"
+                      [embedded]="true"
+                    />
+                  } @else {
+                    <p class="muted-state">
+                  <mat-icon aria-hidden="true">visibility_off</mat-icon>
+                  Nenhuma linha selecionada no painel.
+                </p>
+                  }
+                } @else {
+                  <div class="chip-row">
+                    @for (route of visibleRoutes(stop.routeShortNames); track route) {
+                      <span class="soft-chip">{{ route }}</span>
+                    }
+                    @if (hiddenRouteCount(stop.routeShortNames) > 0) {
+                      <span class="muted">+{{ hiddenRouteCount(stop.routeShortNames) }}</span>
+                    }
+                  </div>
+                  <p class="muted" role="status">
+                    @if (lookupError()) {
+                      Linhas indisponíveis no momento.
+                    } @else if (busRoutesByStopId().has(stop.stopId)) {
+                      Nenhuma linha disponível para este ponto.
+                    } @else {
+                      Carregando linhas...
+                    }
+                  </p>
+                }
+              </article>
+            }
+          }
+        </section>
+      }
+
+      @if (stationViews().length > 0) {
+        <section class="category-section" aria-labelledby="rail-stations-title">
+          <h2 id="rail-stations-title">
+            <mat-icon aria-hidden="true">train</mat-icon>
+            Estações favoritas
+          </h2>
+          @for (station of stationViews(); track station.key) {
+            <article class="favorite-detail">
+              <header class="favorite-header">
+                <h3>{{ station.name }}</h3>
+              </header>
+              @if (station.selectedLines.length > 0) {
+                <mat-tab-group
+                  [attr.aria-label]="'Informações de ' + station.name"
+                  animationDuration="0ms"
+                >
+                  <mat-tab label="Próximos trens">
+                    <ng-template matTabContent>
+                      @for (line of station.selectedLines; track line.id) {
+                        <section class="train-line" [attr.aria-label]="line.lineName">
+                          <h4>
+                            <span
+                              class="line-chip"
+                              [style.backgroundColor]="line.colorHex"
+                              [style.color]="lineTextColor(line.lineCode)"
+                            >{{ line.lineCode }}</span>
+                            {{ line.lineName }}
+                          </h4>
+                          <app-train-line-details
+                            [lineCode]="line.nextTrainLineCode"
+                            [stationCode]="line.stationCode"
+                            [stationName]="station.name"
+                            mode="schedule"
+                          />
+                        </section>
+                      }
+                    </ng-template>
+                  </mat-tab>
+                  <mat-tab label="Composição">
+                    <ng-template matTabContent>
+                      @for (line of station.selectedLines; track line.id) {
+                        <section class="train-line" [attr.aria-label]="'Composição de ' + line.lineName">
+                          <h4>
+                            <span
+                              class="line-chip"
+                              [style.backgroundColor]="line.colorHex"
+                              [style.color]="lineTextColor(line.lineCode)"
+                            >{{ line.lineCode }}</span>
+                            {{ line.lineName }}
+                          </h4>
+                          <app-train-line-details
+                            [lineCode]="line.nextTrainLineCode"
+                            [stationCode]="line.stationCode"
+                            [stationName]="station.name"
+                            [compositions]="line.compositions"
+                            mode="composition"
+                          />
+                        </section>
+                      }
+                    </ng-template>
+                  </mat-tab>
+                </mat-tab-group>
+              } @else if (station.lines.length > 0) {
+                <p class="muted-state">
+                  <mat-icon aria-hidden="true">visibility_off</mat-icon>
+                  Nenhuma linha selecionada no painel.
+                </p>
+              } @else {
+                <p class="muted" role="status">Linhas indisponíveis.</p>
+              }
+            </article>
+          }
+        </section>
+      }
+    </div>
+
+    @if (hasBusRouteFavorites()) {
+      <section class="category-section routes-section" aria-labelledby="bus-routes-title">
+        <h2 id="bus-routes-title">
+          <mat-icon aria-hidden="true">directions_bus</mat-icon>
+          Linhas favoritas
+        </h2>
+        @if (loadingBusDetails()) {
+          <div class="loading-row" role="status">Carregando linhas...</div>
+        } @else {
+          <div class="route-list">
+            @for (route of busRoutes(); track route.favoriteCode || route.favoriteId || route.routeId) {
+              <article class="route-row">
+                <app-transit-route-identity
+                  [code]="route.shortName"
+                  [sourceAgency]="routeAgency(route)"
+                  [color]="route.color"
+                  [textColor]="route.textColor"
+                />
+                <div class="route-copy">
+                  <h3>{{
+                    route.isCircular ? 'Circular' : route.destination || route.longName
+                  }}</h3>
+                  @if (route.favoriteNotice) {
+                    <p class="muted">{{ route.favoriteNotice }}</p>
+                  }
+                </div>
+                @if (routeFareLabel(route); as fareLabel) {
+                  <span class="route-fare">
+                    <mat-icon aria-hidden="true">payments</mat-icon>
+                    {{ fareLabel }}
+                  </span>
+                }
+              </article>
+            }
+          </div>
+        }
       </section>
     }
   }

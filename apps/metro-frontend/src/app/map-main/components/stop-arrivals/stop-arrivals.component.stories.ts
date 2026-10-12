@@ -428,3 +428,10 @@ export const AllAccessible: Story = {
     }),
   ],
 };
+
+/** Dashboard embeds keep arrival summaries visible without another card shell. */
+export const DashboardEmbedded: Story = {
+  ...ArtespScheduledSharedStop,
+  name: 'Painel — previsões e horários programados',
+  args: { ...ArtespScheduledSharedStop.args, embedded: true },
+};

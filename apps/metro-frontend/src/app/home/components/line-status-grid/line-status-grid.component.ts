@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, Signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, Signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -98,7 +98,11 @@ const SPECIAL_LINE_DIALOG_INFO: Record<
   selector: 'app-line-status-grid',
   imports: [MatDialogModule, MatIconModule, DatePipe],
   templateUrl: './line-status-grid.component.html',
-  styleUrl: './line-status-grid.component.scss',
+  styleUrls: [
+    './line-status-grid.component.scss',
+    './_line-status-grid-compact.scss',
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class LineStatusGridComponent {
   private readonly apiService = inject(ApiService);
@@ -110,6 +114,7 @@ export class LineStatusGridComponent {
   readonly issueLineCodes = input<readonly number[]>([]);
   readonly headerText = input('Estado das linhas');
   readonly showHeader = input(true);
+  readonly compact = input(false);
   readonly showSpecialServices = input(true);
   readonly emptyText = input('Nenhuma linha para exibir.');
 

@@ -188,19 +188,13 @@
                   'Trens da linha ' + line.badge + ' ' + line.name
                 "
               >
-                @if (line.station; as station) {
-                  <app-next-train-card
-                    [lineCode]="station.lineCode"
-                    [stationCode]="station.stationCode"
-                    [stationName]="displayName"
-                    [displayMode]="'schedule'"
-                  />
-                } @else {
-                  <div class="station-tab-empty" role="status">
-                    <mat-icon aria-hidden="true">schedule</mat-icon>
-                    <span>Horários não disponíveis para esta linha</span>
-                  </div>
-                }
+                <app-train-line-details
+                  [lineCode]="line.station?.lineCode ?? null"
+                  [stationCode]="line.station?.stationCode ?? null"
+                  [stationName]="displayName"
+                  [mode]="'schedule'"
+                  [compositions]="line.compositions"
+                />
               </div>
             }
           } @else {
@@ -232,32 +226,13 @@
                   'Composição da linha ' + line.badge + ' ' + line.name
                 "
               >
-                @if (line.station; as station) {
-                  <app-next-train-card
-                    [lineCode]="station.lineCode"
-                    [stationCode]="station.stationCode"
-                    [stationName]="displayName"
-                    [displayMode]="'composition'"
-                  />
-                } @else if (line.compositions; as compositions) {
-                  <div class="static-composition-line__directions">
-                    @for (
-                      composition of compositions;
-                      track composition.directionName
-                    ) {
-                      <div class="static-composition-line__direction">
-                        <div class="static-composition-line__direction-header">
-                          <mat-icon>arrow_forward</mat-icon>
-                          <span>{{ composition.directionName }}</span>
-                        </div>
-                        <lib-train-composition
-                          [composition]="composition"
-                          [compactContext]="true"
-                        />
-                      </div>
-                    }
-                  </div>
-                }
+                <app-train-line-details
+                  [lineCode]="line.station?.lineCode ?? null"
+                  [stationCode]="line.station?.stationCode ?? null"
+                  [stationName]="displayName"
+                  [mode]="'composition'"
+                  [compositions]="line.compositions"
+                />
               </div>
             }
           } @else {

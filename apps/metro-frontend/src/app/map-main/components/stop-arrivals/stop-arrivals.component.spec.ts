@@ -323,6 +323,49 @@ describe('StopArrivalsComponent', () => {
     expect(query).toHaveBeenCalledTimes(count);
   });
 
+  it('shows a programmed departure in the embedded summary before expanding', () => {
+    const scheduledRoute: BusRouteGraphQL = {
+      ...route,
+      routeId: 'artesp:001',
+      shortName: '001',
+      sourceAgency: 'ARTESP',
+      supportsRealtime: false,
+      destination: 'Centro',
+      directionId: 0,
+    };
+    const departure: ScheduledBusDepartureGraphQL = {
+      routeId: scheduledRoute.routeId,
+      routeShortName: scheduledRoute.shortName,
+      tripId: 'scheduled-trip',
+      headsign: 'Centro',
+      directionId: 0,
+      departureTime: '2026-10-12T14:05:00-03:00',
+      sourceAgency: 'ARTESP',
+    };
+    jest.spyOn(TestBed.inject(GeographyGraphQLService), 'getScheduledBusDepartures')
+      .mockReturnValue(of([departure]));
+    fixture.componentRef.setInput('stop', {
+      ...stop,
+      stopId: 'artesp:42',
+      sourceAgency: 'ARTESP',
+    });
+    fixture.componentRef.setInput('routes', [scheduledRoute]);
+    fixture.componentRef.setInput('embedded', true);
+    fixture.detectChanges();
+    fixture.detectChanges();
+
+    const header = fixture.nativeElement.querySelector('.route-panel-header') as HTMLElement;
+    expect(fixture.nativeElement.querySelector('mat-card')).toBeNull();
+    expect(header.querySelector('.route-next-arrival')?.textContent).toContain('14:05');
+    expect(header.querySelector('.route-next-arrival')?.textContent).toContain('Programado');
+    expect(fixture.nativeElement.querySelector('.scheduled-list')).toBeNull();
+
+    expandRoute();
+
+    expect(fixture.nativeElement.querySelector('.scheduled-time')?.textContent).toContain('14:05');
+    expect(header.querySelector('.route-next-arrival')).toBeNull();
+  });
+
   it('shows one departure per route and expands only that route to five', () => {
     const departures: ScheduledBusDepartureGraphQL[] = Array.from(
       { length: 7 },

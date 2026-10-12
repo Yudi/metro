@@ -319,3 +319,16 @@ export const WithTransferInfoCard: Story = {
     }),
   ],
 };
+
+/** Compact overview retains the shared status labels and issue interactions. */
+export const DashboardCompact: Story = {
+  args: {
+    compact: true,
+    headerText: 'Status das linhas favoritas',
+    lineCodes: [1, 2, 3, 4, 9],
+    showSpecialServices: false,
+  },
+  decorators: [
+    applicationConfig({ providers: createProviders({ fetchKind: 'normal', fetchDelayMs: 0 }) }),
+  ],
+};

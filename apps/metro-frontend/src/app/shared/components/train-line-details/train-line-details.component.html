@@ -1,0 +1,54 @@
+@if (lineCode(); as lineCode) {
+  @if (stationCode(); as stationCode) {
+    <app-next-train-card
+      [lineCode]="lineCode"
+      [stationCode]="stationCode"
+      [stationName]="stationName()"
+      [displayMode]="mode()"
+    />
+  } @else {
+    <ng-container [ngTemplateOutlet]="fallback"></ng-container>
+  }
+} @else {
+  <ng-container [ngTemplateOutlet]="fallback"></ng-container>
+}
+
+<ng-template #fallback>
+  @if (mode() === 'composition' && compositions(); as staticCompositions) {
+    @if (staticCompositions.length > 0) {
+      <div class="static-compositions">
+        @for (composition of staticCompositions; track composition.directionName) {
+          <section class="static-composition">
+            <h3 class="static-composition__heading">
+              <mat-icon aria-hidden="true">arrow_forward</mat-icon>
+              <span>{{ composition.directionName }}</span>
+            </h3>
+            <lib-train-composition
+              [composition]="composition"
+              [compactContext]="true"
+            />
+          </section>
+        }
+      </div>
+    } @else {
+      <ng-container [ngTemplateOutlet]="unavailable"></ng-container>
+    }
+  } @else {
+    <ng-container [ngTemplateOutlet]="unavailable"></ng-container>
+  }
+</ng-template>
+
+<ng-template #unavailable>
+  <div class="unavailable-state" role="status">
+    <mat-icon aria-hidden="true">
+      {{ mode() === 'schedule' ? 'schedule' : 'train' }}
+    </mat-icon>
+    <span>
+      {{
+        mode() === 'schedule'
+          ? 'Horários não disponíveis para esta linha'
+          : 'Composição não disponível para esta estação'
+      }}
+    </span>
+  </div>
+</ng-template>

@@ -1,0 +1,45 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.static-compositions {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.static-composition {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.static-composition__heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.static-composition__heading mat-icon {
+  width: 1rem;
+  height: 1rem;
+  font-size: 1rem;
+}
+
+.unavailable-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.875rem;
+}
+
+.unavailable-state mat-icon {
+  flex: 0 0 auto;
+  color: var(--mat-sys-outline);
+}

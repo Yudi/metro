@@ -48,13 +48,12 @@ import {
   SPECIAL_RAIL_LINE_CODES,
 } from '@metro/shared/utils';
 import { DialogHeaderComponent } from '../../../shared/components/dialog-header/dialog-header.component';
-import { NextTrainCardComponent } from '../../../next-train/components/next-train-card/next-train-card.component';
+import { TrainLineDetailsComponent } from '../../../shared/components/train-line-details/train-line-details.component';
 import { NextTrainWebsocketService } from '../../../next-train/next-train-websocket.service';
 import { DatePipe, NgOptimizedImage, NgTemplateOutlet } from '@angular/common';
 import {
   resolveStationTrainCompositionViews,
   TRAIN_PLATFORM_CONFIGS,
-  TrainCompositionComponent,
   TrainCompositionView,
 } from '@metro/shared/train-composition';
 import {
@@ -88,8 +87,7 @@ interface TrainLineOption {
     MatTabsModule,
     RouterLink,
     DialogHeaderComponent,
-    NextTrainCardComponent,
-    TrainCompositionComponent,
+    TrainLineDetailsComponent,
     DatePipe,
     NgOptimizedImage,
     NgTemplateOutlet,

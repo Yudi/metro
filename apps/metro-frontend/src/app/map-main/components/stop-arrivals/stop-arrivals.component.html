@@ -1,5 +1,16 @@
-<mat-card class="stop-arrivals-card" [class.compact-card]="compact()">
-  <mat-card-content>
+@if (embedded()) {
+  <section class="embedded-arrivals">
+    <ng-container [ngTemplateOutlet]="arrivalContent" />
+  </section>
+} @else {
+  <mat-card class="stop-arrivals-card" [class.compact-card]="compact()">
+    <mat-card-content>
+      <ng-container [ngTemplateOutlet]="arrivalContent" />
+    </mat-card-content>
+  </mat-card>
+}
+
+<ng-template #arrivalContent>
     @if (compact() || routes().length === 0) {
       @if (hasRealtimeSupport()) {
         @if (isLoading()) {
@@ -57,7 +68,7 @@
       >
         <div class="route-rail-header">
           <div>
-            <h4>Linhas do ponto</h4>
+            <h4>{{ embedded() ? 'Linhas selecionadas' : 'Linhas do ponto' }}</h4>
             @if (arrivals(); as data) {
               <p>Previsões atualizadas às {{ data.hr }}</p>
             }
@@ -117,6 +128,19 @@
                         <mat-icon>train</mat-icon>
                         {{ getRouteRailStationCount(route) }}
                       </span>
+                    }
+                    @if (!isRouteExpanded(route) && row.hasSchedules) {
+                      @if (row.schedules[0]?.next; as departure) {
+                        <span class="route-next-arrival" [attr.aria-label]="'Horário programado: ' + departure.timeLabel">
+                          <mat-icon aria-hidden="true">event</mat-icon>
+                          {{ departure.timeLabel }} {{ departure.dayLabel }} · Programado
+                        </span>
+                      } @else {
+                        <span class="hint">{{ scheduledDeparturesLoading() ? 'Carregando horários…' : scheduledDeparturesError() ? 'Horários indisponíveis' : 'Sem horário programado' }}</span>
+                      }
+                    }
+                    @if (!isRouteExpanded(route) && row.hasRealtime && !row.nextArrival) {
+                      <span class="hint">{{ isLoading() ? 'Consultando previsões…' : 'Sem previsão no momento' }}</span>
                     }
                     @if (!isRouteExpanded(route) && row.nextArrival) {
                       <span
@@ -292,8 +316,7 @@
     @if (noticesUnavailable()) {
       <p class="hint" role="status">Avisos de alterações indisponíveis no momento.</p>
     }
-  </mat-card-content>
-</mat-card>
+</ng-template>
 
 <ng-template #arrivalList let-rows>
         <div class="arrivals-list">

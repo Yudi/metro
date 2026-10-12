@@ -1,4 +1,4 @@
-import { isPlatformBrowser, NgOptimizedImage } from '@angular/common';
+import { isPlatformBrowser } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
@@ -12,30 +12,24 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
+import { MatTabsModule } from '@angular/material/tabs';
 import { MatIconModule } from '@angular/material/icon';
 import { RouterLink } from '@angular/router';
 import { FavoritesService } from '@metro/shared/api';
 import {
-  AGENCIES_DATA,
   FavoriteRailLineOption,
   createFavoriteRailLineOptions,
   getContrastColor,
-  getAgencyIconPath,
   getRouteAgency,
   getRailLineFavorites,
   getRailLineByCode,
   getRailStationIdentityKey,
   getRailStationIdentityFromFavoriteKey,
-  hasFetchableNextTrain,
-  normalizeHexColor,
   sortRailLineCodes,
   toTitleCase,
-  ExtendedNextTrainLineCode,
   uniqueIds,
   formatBusFare,
   getBusStopDisplayId,
-  getBusRouteDisplayId,
   getBusStopIdentityAliases,
   isArtespRoute,
   encodeBusLineFavorite,
@@ -54,10 +48,14 @@ import {
   GeographyGraphQLService,
 } from '../map-main/geography/geography-graphql.service';
 import { StopArrivalsComponent } from '../map-main/components/stop-arrivals/stop-arrivals.component';
-import { NextTrainCardComponent } from '../next-train/components/next-train-card/next-train-card.component';
+import {
+  TRAIN_PLATFORM_CONFIGS,
+  resolveStationTrainCompositionViews,
+} from '@metro/shared/train-composition';
+import { TrainLineDetailsComponent } from '../shared/components/train-line-details/train-line-details.component';
+import { TransitRouteIdentityComponent } from '../shared/components/transit-route-identity/transit-route-identity.component';
 import { CityContextService } from '../cities/city-context.service';
 import type {
-  AgencyIdentity,
   BusFavoritesLookupResponse,
   BusRouteInsight,
   BusStopInsight,
@@ -74,13 +72,13 @@ import { addRailStationGroup } from './insights-dashboard.utils';
   selector: 'app-insights-dashboard',
   imports: [
     MatButtonModule,
-    MatCardModule,
+    MatTabsModule,
     MatIconModule,
     RouterLink,
     LineStatusGridComponent,
-    NextTrainCardComponent,
+    TrainLineDetailsComponent,
+    TransitRouteIdentityComponent,
     StopArrivalsComponent,
-    NgOptimizedImage,
   ],
   templateUrl: './insights-dashboard.component.html',
   styleUrl: './insights-dashboard.component.scss',
@@ -111,6 +109,8 @@ export class InsightsDashboardComponent {
     sortBusRoutesByAgency([...this.busRoutesById().values()]),
   );
   readonly busStops = computed(() => [...this.busStopsById().values()]);
+  readonly hasBusStopFavorites = computed(() => this.favorites().busStop.length > 0);
+  readonly hasBusRouteFavorites = computed(() => this.favorites().busRoute.length > 0);
 
   readonly railStations = computed(() => {
     const groups = new Map<string, RailStationInsight>();
@@ -241,51 +241,14 @@ export class InsightsDashboardComponent {
     return getBusStopDisplayId(stop);
   }
 
-  routeDisplayId(route: BusRouteInsight): string {
-    return getBusRouteDisplayId(route);
-  }
-
-  routeColor(route: { color?: string }): string {
-    return normalizeHexColor(route.color, '5f6368');
-  }
-
-  routeTextColor(route: { textColor?: string }): string {
-    return normalizeHexColor(route.textColor, 'ffffff');
-  }
-
-  agencyIdentity(route: {
-    routeId: string;
-    shortName?: string;
-    sourceAgency?: string;
-  }): AgencyIdentity | null {
-    let agency: TransitAgency | undefined;
+  routeAgency(route: BusRouteInsight): string {
     const sourceAgency = route.sourceAgency?.trim().toLowerCase();
-
-    if (isArtespRoute({ routeId: route.routeId, sourceAgency })) {
-      agency = TransitAgency.ARTESP;
-    } else if (sourceAgency && this.isTransitAgency(sourceAgency)) {
-      agency = sourceAgency;
-    } else if (!sourceAgency) {
-      agency = route.shortName ? getRouteAgency(route.shortName) : undefined;
-      if (!agency) {
-        agency = TransitAgency.SPTRANS;
-      }
+    if (isArtespRoute(route)) {
+      return TransitAgency.ARTESP;
     }
-
-    if (agency) {
-      return {
-        name: AGENCIES_DATA[agency].shortName,
-        iconPath: getAgencyIconPath(agency),
-      };
-    }
-
-    return sourceAgency
-      ? { name: sourceAgency.toUpperCase(), iconPath: null }
-      : null;
-  }
-
-  lineName(code: number): string {
-    return getRailLineByCode(code)?.fullName ?? `Linha ${code}`;
+    return (
+      sourceAgency || getRouteAgency(route.shortName) || TransitAgency.SPTRANS
+    );
   }
 
   lineColor(code: number): string {
@@ -352,12 +315,19 @@ export class InsightsDashboardComponent {
     return station.lines.filter((line) => selectedLineIdSet.has(line.id));
   }
 
-  hasNextTrain(line: FavoriteRailLineOption): line is FavoriteRailLineOption & {
-    stationCode: string;
-    nextTrainLineCode: ExtendedNextTrainLineCode;
-  } {
-    return hasFetchableNextTrain(line);
-  }
+  readonly stationViews = computed(() =>
+    this.railStations().map((station) => ({
+      ...station,
+      selectedLines: this.getSelectedRailLines(station).map((line) => ({
+        ...line,
+        compositions: resolveStationTrainCompositionViews(
+          TRAIN_PLATFORM_CONFIGS,
+          line.lineId,
+          station.name,
+        ),
+      })),
+    })),
+  );
 
   private loadBusFavorites(
     routeIds: string[],
@@ -702,9 +672,5 @@ export class InsightsDashboardComponent {
       sourceAgency: identity?.sourceAgency,
       longName: direction ? 'Sentido não encontrado' : 'Linha não encontrada',
     };
-  }
-
-  private isTransitAgency(value: string): value is TransitAgency {
-    return Object.values(TransitAgency).includes(value as TransitAgency);
   }
 }

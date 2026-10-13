@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { LoggerService } from '@metro/shared/api';
 import { Feature } from 'ol';
+import Icon from 'ol/style/Icon';
 import { StationNameService } from '../../../geography/station-name.service';
 import { VectorTileFeatureDataService } from './vector-tile-feature-data.service';
 import { VectorTileLayerType } from './vector-tile-layer.config';
@@ -38,9 +39,11 @@ describe('VectorTileStyleService caching', () => {
 
   it('shares a bus stop icon across features and zoom levels', () => {
     const type = VectorTileLayerType.BUS_STOPS;
-    expect(service.getStyleForLayer(type, new Feature(), 12)).toBe(
-      service.getStyleForLayer(type, new Feature(), 18),
-    );
+    const style = service.getStyleForLayer(type, new Feature(), 12);
+    expect(style).toBe(service.getStyleForLayer(type, new Feature(), 18));
+    if (Array.isArray(style)) throw new Error('Expected one bus stop style');
+    expect(style.getImage()).toBeInstanceOf(Icon);
+    expect((style.getImage() as Icon).getScale()).toBe(0.32);
   });
 
   it('creates fresh bike styles when a refreshed tile has new feature data', () => {

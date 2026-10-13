@@ -23,28 +23,26 @@ import {
   catchError,
   debounceTime,
   distinctUntilChanged,
+  map,
   of,
   switchMap,
 } from 'rxjs';
 import { GeolocationService } from '@metro/shared/geolocation';
 import { LoggerService } from '@metro/shared/api';
-import {
-  ExploreLocationResult,
-  ExploreLocationSearchService,
-  PhotonLocationType,
-} from './explore-location-search.service';
+import { AddressSearchService } from './address-search.service';
+import type {
+  AddressLocationType,
+  AddressSearchResult,
+} from './address-search.service';
 
-export type ExploreDialogResult =
-  | { action: 'manual' }
-  | {
-      action: 'location';
-      latitude: number;
-      longitude: number;
-      label: string;
-    };
+export interface AddressSearchDialogResult {
+  latitude: number;
+  longitude: number;
+  label: string;
+}
 
 @Component({
-  selector: 'app-explore-dialog',
+  selector: 'app-address-search-dialog',
   imports: [
     MatButtonModule,
     MatDialogModule,
@@ -54,32 +52,34 @@ export type ExploreDialogResult =
     MatListModule,
     MatProgressSpinnerModule,
   ],
-  templateUrl: './explore-dialog.component.html',
-  styleUrl: './explore-dialog.component.scss',
+  templateUrl: './address-search-dialog.component.html',
+  styleUrl: './address-search-dialog.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ExploreDialogComponent implements AfterViewInit {
+export class AddressSearchDialogComponent implements AfterViewInit {
   readonly cityContext = inject(CityContextService);
   @ViewChild('searchInput')
   private readonly searchInputRef!: ElementRef<HTMLInputElement>;
 
   private readonly dialogRef = inject(
-    MatDialogRef<ExploreDialogComponent, ExploreDialogResult>,
+    MatDialogRef<AddressSearchDialogComponent, AddressSearchDialogResult>,
   );
-  private readonly searchService = inject(ExploreLocationSearchService);
+  private readonly searchService = inject(AddressSearchService);
   private readonly geolocationService = inject(GeolocationService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly logger = inject(LoggerService);
   private readonly searchSubject = new Subject<string>();
 
   readonly query = signal('');
-  readonly results = signal<ExploreLocationResult[]>([]);
+  readonly results = signal<AddressSearchResult[]>([]);
   readonly isSearching = signal(false);
+  readonly hasSearchError = signal(false);
   readonly hasResults = computed(() => this.results().length > 0);
   readonly showNoResults = computed(
     () =>
       this.query().trim().length > 0 &&
       !this.isSearching() &&
+      !this.hasSearchError() &&
       !this.hasResults(),
   );
 
@@ -90,9 +90,10 @@ export class ExploreDialogComponent implements AfterViewInit {
         distinctUntilChanged(),
         switchMap((query) => {
           const trimmedQuery = query.trim();
+          this.hasSearchError.set(false);
 
           if (!trimmedQuery) {
-            return of([]);
+            return of({ results: [], hasError: false });
           }
 
           this.isSearching.set(true);
@@ -105,16 +106,18 @@ export class ExploreDialogComponent implements AfterViewInit {
           return this.searchService
             .search(trimmedQuery, prioritizeLat, prioritizeLon)
             .pipe(
-              catchError((error) => {
-                this.logger.error('Explore location search error', error);
-                return of([]);
+              map((results) => ({ results, hasError: false })),
+              catchError((error: unknown) => {
+                this.logger.error('Address search error', error);
+                return of({ results: [], hasError: true });
               }),
             );
         }),
         takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe((results) => {
+      .subscribe(({ results, hasError }) => {
         this.isSearching.set(false);
+        this.hasSearchError.set(hasError);
         this.results.set(results);
       });
   }
@@ -131,20 +134,15 @@ export class ExploreDialogComponent implements AfterViewInit {
     this.searchSubject.next(query);
   }
 
-  selectManual(): void {
-    this.dialogRef.close({ action: 'manual' });
-  }
-
-  selectResult(result: ExploreLocationResult): void {
+  selectResult(result: AddressSearchResult): void {
     this.dialogRef.close({
-      action: 'location',
       latitude: result.latitude,
       longitude: result.longitude,
-      label: result.name,
+      label: result.label,
     });
   }
 
-  iconForType(type: PhotonLocationType): string {
+  iconForType(type: AddressLocationType): string {
     switch (type) {
       case 'house':
         return 'home';

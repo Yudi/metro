@@ -10,11 +10,8 @@ import {
 const state: SavedMapViewState = {
   center: [-46, -23],
   zoom: 13,
-  displayMode: 'selected',
-  nearbyCenter: null,
-  nearbyRadius: 1000,
   layers: {},
-  vectorLayers: {},
+  vectorLayers: { 'bus-stops': false },
   selections: { routeIds: ['route'], stopIds: [], bikeStationIds: [] },
 };
 

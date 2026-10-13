@@ -71,4 +71,37 @@ describe('MapDisplayService bike tile ownership', () => {
     display.updateMapDisplay();
     expect(layers.getFeaturesFromLayer(LayerType.SELECTION)).toEqual([]);
   });
+
+  it('renders only selected bus stops in the overlay and removes them on deselection', () => {
+    TestBed.configureTestingModule({ providers: [
+      MapDisplayService, MapStateService, MapLayerService,
+      MapSelectionDisplayService, FeatureFactoryService,
+      { provide: CityContextService, useValue: {} },
+      { provide: MapCameraService, useValue: {} },
+      { provide: MapLayerStyleService, useValue: {} },
+      { provide: LoggerService, useValue: { debug: jest.fn(), info: jest.fn() } },
+      {
+        provide: MapService,
+        useFactory: (layers: MapLayerService) => ({ getLayerService: () => layers }),
+        deps: [MapLayerService],
+      },
+    ] });
+    const state = TestBed.inject(MapStateService);
+    const layers = TestBed.inject(MapLayerService);
+    const display = TestBed.inject(MapDisplayService);
+    const stop = {
+      id: 'bus-stop', stopId: 'bus-stop', name: 'Praça da Sé',
+      latitude: -23.55, longitude: -46.63, isSubwayStation: false,
+    };
+    state.displayedStops.set([stop, { ...stop, id: 'other', stopId: 'other' }]);
+    state.addStopToSelection({ ...stop, id: stop.stopId });
+    display.updateMapDisplay();
+    const markers = layers.getFeaturesFromLayer(LayerType.SELECTION);
+    expect(markers).toHaveLength(1);
+    expect(markers[0].get('stopId')).toBe(stop.stopId);
+    expect(layers.layerConfigs().some((layer) => layer.id === 'bus-stops')).toBe(false);
+    state.removeStopFromSelection(stop.stopId);
+    display.updateMapDisplay();
+    expect(layers.getFeaturesFromLayer(LayerType.SELECTION)).toEqual([]);
+  });
 });

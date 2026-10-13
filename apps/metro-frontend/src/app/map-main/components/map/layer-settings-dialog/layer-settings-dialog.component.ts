@@ -121,7 +121,8 @@ export class LayerSettingsDialogComponent {
     const isVT =
       isVectorTile ??
       (layerId === VectorTileLayerType.RAIL_STATIONS ||
-        layerId === VectorTileLayerType.RAIL_ROUTES);
+        layerId === VectorTileLayerType.RAIL_ROUTES ||
+        layerId === VectorTileLayerType.BUS_STOPS);
 
     if (isVT) {
       return this.vectorTileLayerService.isLayerVisible(
@@ -144,8 +145,8 @@ export class LayerSettingsDialogComponent {
         return 'route';
       case LayerType.BUS_ROUTES:
         return 'directions_bus';
-      case LayerType.BUS_STOPS:
-        return 'place';
+      case VectorTileLayerType.BUS_STOPS:
+        return 'directions_bus';
       case LayerType.BIKE:
         return 'pedal_bike';
       case LayerType.SELECTION:

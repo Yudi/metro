@@ -81,6 +81,12 @@ export class BusRoute {
   @Field({ nullable: true })
   destination?: string;
 
+  @Field(() => Boolean, {
+    nullable: true,
+    description: 'Whether the route has exactly one distinct destination across its full feed',
+  })
+  isCircular?: boolean;
+
   @Field(() => Int, { nullable: true })
   directionId?: number;
 

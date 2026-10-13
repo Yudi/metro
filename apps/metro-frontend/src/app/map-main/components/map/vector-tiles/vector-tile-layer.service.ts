@@ -35,18 +35,8 @@ export type {
   RailStationTileData,
 } from './vector-tile-feature-data.service';
 
-export interface BusStopTileFilter {
-  routeIds: string[];
-  stopIds: string[];
-  nearby: {
-    lat: number;
-    lon: number;
-    radiusMeters: number;
-  } | null;
-}
-
 /**
- * Manages OpenLayers vector tile layer lifecycle and tile URL filtering.
+ * Manages OpenLayers vector tile layer lifecycle and tile URLs.
  * Styling and feature-data parsing live in category-specific services.
  */
 @Service()
@@ -65,11 +55,8 @@ export class VectorTileLayerService {
 
   private bikeDataRevision: number | null = null;
   private busRouteIds: string[] = [];
-  private busStopFilter: BusStopTileFilter = {
-    routeIds: [],
-    stopIds: [],
-    nearby: null,
-  };
+  private selectedBusStopIds: Set<string> = new Set();
+  private selectedBusStopIdsKey = '[]';
 
   readonly layerConfigs = signal<VectorTileLayerConfig[]>(
     createVectorTileLayerConfigs(environment.apiUrl),
@@ -143,23 +130,16 @@ export class VectorTileLayerService {
     this.refreshLayer(VectorTileLayerType.BUS_ROUTES);
   }
 
-  setBusStopFilter(filter: BusStopTileFilter): void {
-    const normalizedFilter: BusStopTileFilter = {
-      routeIds: this.normalizeIds(filter.routeIds),
-      stopIds: this.normalizeIds(filter.stopIds),
-      nearby: filter.nearby
-        ? {
-            lat: filter.nearby.lat,
-            lon: filter.nearby.lon,
-            radiusMeters: filter.nearby.radiusMeters,
-          }
-        : null,
-    };
-    if (JSON.stringify(this.busStopFilter) === JSON.stringify(normalizedFilter)) {
-      return;
-    }
-    this.busStopFilter = normalizedFilter;
-    this.refreshLayer(VectorTileLayerType.BUS_STOPS);
+  setSelectedBusStopIds(ids: string[]): void {
+    const normalizedIds = Array.from(
+      new Set(ids.map(normalizeStopIdentity).filter(Boolean)),
+    ).sort();
+    const key = JSON.stringify(normalizedIds);
+    if (this.selectedBusStopIdsKey === key) return;
+
+    this.selectedBusStopIdsKey = key;
+    this.selectedBusStopIds = new Set(normalizedIds);
+    this.layers.get(VectorTileLayerType.BUS_STOPS)?.changed();
   }
 
   /** WebSockets invalidate snapshots; HTTP validators keep unchanged bodies cached. */
@@ -252,7 +232,7 @@ export class VectorTileLayerService {
         idProperty: 'id',
       }),
       tileUrlFunction: (tileCoord) => this.buildTileUrl(config, tileCoord),
-      tileSize: 512,
+      tileSize: config.tileSize ?? 512,
       tileLoadFunction: loadVectorTile,
     });
 
@@ -263,6 +243,7 @@ export class VectorTileLayerService {
       style: (feature) => this.getStyleForLayer(config.id, feature),
       zIndex: config.zIndex,
       visible: config.visible,
+      ...(config.minZoom === undefined ? {} : { minZoom: config.minZoom }),
       renderMode: 'hybrid',
       // Let the map queue prioritize visible tiles instead of fetching parent zooms.
       preload: 0,
@@ -274,7 +255,14 @@ export class VectorTileLayerService {
   private getStyleForLayer(
     layerType: VectorTileLayerType,
     feature: FeatureLike,
-  ): Style | Style[] {
+  ): Style | Style[] | undefined {
+    if (
+      layerType === VectorTileLayerType.BUS_STOPS &&
+      this.isSelectedBusStop(feature)
+    ) {
+      return undefined;
+    }
+
     return this.styleService.getStyleForLayer(
       layerType,
       feature,
@@ -301,21 +289,8 @@ export class VectorTileLayerService {
     }
 
     if (config.id === VectorTileLayerType.BUS_STOPS) {
-      const { routeIds, stopIds, nearby } = this.busStopFilter;
-      if (routeIds.length === 0 && stopIds.length === 0 && !nearby) {
+      if (z < 15) {
         return undefined;
-      }
-
-      if (routeIds.length > 0) {
-        params.set('routeIds', routeIds.join(','));
-      }
-      if (stopIds.length > 0) {
-        params.set('stopIds', stopIds.join(','));
-      }
-      if (nearby) {
-        params.set('lat', String(nearby.lat));
-        params.set('lon', String(nearby.lon));
-        params.set('radiusMeters', String(nearby.radiusMeters));
       }
     }
 
@@ -352,4 +327,48 @@ export class VectorTileLayerService {
       ),
     ).sort();
   }
+
+  private isSelectedBusStop(feature: FeatureLike): boolean {
+    if (this.selectedBusStopIds.size === 0) return false;
+
+    const identities = new Set<string>();
+    const stopIds = [
+      ...getFeatureStrings(feature.get('stop_id')),
+      ...getFeatureStrings(feature.get('physical_stop_id')),
+      ...getFeatureStrings(feature.get('merged_stop_ids'), true),
+      ...getFeatureStrings(feature.get('source_id')),
+    ];
+    for (const stopId of stopIds) {
+      identities.add(normalizeStopIdentity(stopId));
+    }
+
+    const sourceAgency = getFeatureStrings(feature.get('source_agency'))[0];
+    if (sourceAgency) {
+      for (const stopId of stopIds) {
+        identities.add(normalizeStopIdentity(`${sourceAgency}:${stopId}`));
+      }
+    }
+
+    return Array.from(identities).some((identity) =>
+      this.selectedBusStopIds.has(identity),
+    );
+  }
+}
+
+function normalizeStopIdentity(value: string): string {
+  const trimmed = value.trim();
+  const separator = trimmed.indexOf(':');
+  return separator > 0
+    ? `${trimmed.slice(0, separator).toLowerCase()}:${trimmed.slice(separator + 1)}`
+    : trimmed;
+}
+
+function getFeatureStrings(raw: unknown, splitCsv = false): string[] {
+  if (Array.isArray(raw)) {
+    return raw.filter((value): value is string => typeof value === 'string');
+  }
+  if (typeof raw !== 'string' || raw.trim().length === 0) return [];
+  return splitCsv
+    ? raw.split(',').map((value) => value.trim()).filter(Boolean)
+    : [raw.trim()];
 }

@@ -195,59 +195,19 @@ export class BusVectorTileService {
     }
   }
 
-  /**
-   * Generate MVT tile for selected or nearby bus stops.
-   *
-   * At least one filter is required: routeIds, stopIds, or a nearby circle.
-   * This avoids sending every bus stop to the client.
-   * Resolve selected trips and tile members once; correlated joins through
-   * the feed views can otherwise rescan whole timetables for every stop.
-   * Bus eligibility uses the import-refreshed summary across all members.
-   */
+  /** Generate one compact, canonical marker for each bus-serving stop in a tile. */
   async generateBusStopsTile(
     z: number,
     x: number,
     y: number,
-    options: VectorTileOptions,
   ): Promise<Buffer | null> {
-    const routeIds = this.normalizeIds(options.routeIds);
-    const stopIds = this.normalizeIds(options.stopIds);
-    const nearby = this.normalizeNearby(options.nearby);
-
-    if (routeIds.length === 0 && stopIds.length === 0 && !nearby) {
-      throw new BadRequestException(
-        'At least one route, stop, or nearby filter is required',
-      );
+    if (z < 15) {
+      return null;
     }
 
     const { minX, minY, maxX, maxY } = tileToBounds(z, x, y);
 
     try {
-      const filters = await this.resolveRouteFilters(routeIds);
-      const hasStopFilter = stopIds.length > 0;
-      const hasNearbyFilter = nearby !== null;
-      const hasRouteFilter = routeIds.length > 0;
-      const nearbyLatitude = nearby?.latitude ?? 0;
-      const nearbyLongitude = nearby?.longitude ?? 0;
-      const nearbyRadiusMeters = nearby?.radiusMeters ?? 0;
-      const directionJson = JSON.stringify(
-        filters.directions.map((direction) => ({
-          route_id: direction.routeId,
-          direction_id: direction.directionId,
-          shape_ids: direction.shapeIds,
-        })),
-      );
-
-      if (
-        hasRouteFilter &&
-        filters.legacyRouteIds.length === 0 &&
-        filters.directions.length === 0 &&
-        !hasStopFilter &&
-        !hasNearbyFilter
-      ) {
-        return null;
-      }
-
       return await this.queryTile(Prisma.sql`
         WITH bounds AS (
           SELECT ST_Transform(
@@ -255,47 +215,7 @@ export class BusVectorTileService {
             4326
           ) AS geom
         ),
-        selected_directions AS MATERIALIZED (
-          SELECT direction.route_id, direction.direction_id, direction.shape_ids
-          FROM jsonb_to_recordset(${directionJson}::jsonb) AS direction(
-            route_id text,
-            direction_id integer,
-            shape_ids text[]
-          )
-        ),
-        selected_bus_routes AS MATERIALIZED (
-          SELECT route.route_id, TRUE AS all_directions,
-            NULL::integer AS direction_id, NULL::text[] AS shape_ids
-          FROM "public"."Gtfs_Route" route
-          WHERE ${hasRouteFilter}
-            AND route.route_id = ANY(${filters.legacyRouteIds}::text[])
-            AND NOT (route.route_type IN (1, 2) OR route.route_id LIKE 'METRÔ%' OR route.route_id LIKE 'CPTM%')
-          UNION ALL
-          SELECT route.route_id, FALSE AS all_directions,
-            direction.direction_id, direction.shape_ids
-          FROM selected_directions direction
-          INNER JOIN "public"."Gtfs_Route" route
-            ON route.route_id = direction.route_id
-            AND NOT (route.route_type IN (1, 2) OR route.route_id LIKE 'METRÔ%' OR route.route_id LIKE 'CPTM%')
-        ),
-        selected_bus_trips AS MATERIALIZED (
-          SELECT DISTINCT trip.trip_id
-          FROM "public"."Gtfs_Trip" trip
-          INNER JOIN selected_bus_routes selected_route
-            ON selected_route.route_id = trip.route_id
-          WHERE selected_route.all_directions
-            OR (
-              trip.direction_id = selected_route.direction_id
-              AND trip.shape_id = ANY(selected_route.shape_ids)
-            )
-        ),
-        selected_route_stops AS MATERIALIZED (
-          SELECT DISTINCT stop_id
-          FROM "public"."Gtfs_StopTime"
-          WHERE ${hasRouteFilter}
-            AND trip_id = ANY(ARRAY(SELECT trip_id FROM selected_bus_trips))
-        ),
-        canonical_stops AS (
+        canonical_stops AS MATERIALIZED (
           SELECT
             COALESCE(member.physical_stop_id, stop.stop_id) AS physical_stop_id,
             stop.*
@@ -322,11 +242,9 @@ export class BusVectorTileService {
         grouped_stops AS (
           SELECT canonical.physical_stop_id, canonical.stop_id
           FROM canonical_stops canonical
-          UNION ALL
-          SELECT canonical.physical_stop_id, member_stop.stop_id
+          UNION
+          SELECT member.physical_stop_id, member_stop.stop_id
           FROM tile_members member
-          INNER JOIN canonical_stops canonical
-            ON canonical.physical_stop_id = member.physical_stop_id
           INNER JOIN member_stops member_stop
             ON member_stop.stop_id = member.source_stop_id
         ),
@@ -334,17 +252,13 @@ export class BusVectorTileService {
           SELECT
             member_stop.physical_stop_id,
             ARRAY_AGG(DISTINCT member_stop.stop_id ORDER BY member_stop.stop_id) AS merged_stop_ids,
-            BOOL_OR(COALESCE(summary.serves_bus, false)) AS serves_bus,
-            BOOL_OR(member_stop.stop_id = ANY(${stopIds}::text[])) AS matches_stop,
-            BOOL_OR(route_stop.stop_id IS NOT NULL) AS matches_route
+            BOOL_OR(COALESCE(summary.serves_bus, false)) AS serves_bus
           FROM grouped_stops member_stop
           LEFT JOIN "public"."gtfs_stop_service_summary" summary
             ON summary.stop_id = member_stop.stop_id
-          LEFT JOIN selected_route_stops route_stop
-            ON route_stop.stop_id = member_stop.stop_id
           GROUP BY member_stop.physical_stop_id
         ),
-        representatives AS (
+        candidate_stops AS (
           SELECT
             canonical.physical_stop_id,
             canonical.id,
@@ -357,35 +271,10 @@ export class BusVectorTileService {
             canonical.source_id,
             canonical.platform_code,
             merged_ids.merged_stop_ids,
-            merged_ids.serves_bus,
-            merged_ids.matches_stop,
-            merged_ids.matches_route,
             ST_SetSRID(ST_MakePoint(canonical.stop_lon, canonical.stop_lat), 4326) AS geom
           FROM canonical_stops canonical
           INNER JOIN merged_ids USING (physical_stop_id)
-        ),
-        candidate_stops AS (
-          SELECT representatives.*
-          FROM representatives
-          WHERE (
-            (
-              ${hasRouteFilter}
-              AND representatives.matches_route
-            )
-            OR (
-              ${hasStopFilter}
-              AND representatives.matches_stop
-            )
-            OR (
-              ${hasNearbyFilter}
-              AND ST_DWithin(
-                representatives.geom::geography,
-                ST_SetSRID(ST_MakePoint(${nearbyLongitude}::float8, ${nearbyLatitude}::float8), 4326)::geography,
-                ${nearbyRadiusMeters}::float8
-              )
-            )
-          )
-          AND representatives.serves_bus
+          WHERE merged_ids.serves_bus
         ),
         mvtgeom AS (
           SELECT
@@ -473,46 +362,6 @@ export class BusVectorTileService {
     };
   }
 
-  normalizeNearby(
-    nearby: VectorTileOptions['nearby'],
-  ): VectorTileOptions['nearby'] | null {
-    if (!nearby) {
-      return null;
-    }
-
-    if (
-      !Number.isFinite(nearby.latitude) ||
-      !Number.isFinite(nearby.longitude) ||
-      !Number.isFinite(nearby.radiusMeters)
-    ) {
-      throw new BadRequestException(
-        'Nearby coordinates and radius must be finite',
-      );
-    }
-
-    if (
-      nearby.latitude < -90 ||
-      nearby.latitude > 90 ||
-      nearby.longitude < -180 ||
-      nearby.longitude > 180
-    ) {
-      throw new BadRequestException(
-        'Nearby coordinates are outside their valid ranges',
-      );
-    }
-
-    if (nearby.radiusMeters <= 0 || nearby.radiusMeters > 5_000) {
-      throw new BadRequestException(
-        'Nearby radius must be greater than 0 and at most 5000 meters',
-      );
-    }
-
-    return {
-      latitude: nearby.latitude,
-      longitude: nearby.longitude,
-      radiusMeters: Math.min(Math.max(nearby.radiusMeters, 50), 5000),
-    };
-  }
 }
 
 function isSafeIdentifier(value: string): boolean {

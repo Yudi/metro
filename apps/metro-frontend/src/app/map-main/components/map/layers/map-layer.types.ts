@@ -11,6 +11,5 @@ export enum LayerType {
   RAIL_STATIONS = 'rail-stations',
   RAIL_ROUTES = 'rail-routes',
   BUS_ROUTES = 'bus-routes',
-  BUS_STOPS = 'bus-stops',
   BIKE = 'bike',
 }

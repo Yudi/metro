@@ -72,7 +72,6 @@ const meta: Meta<OmniboxResultPageComponent> = {
           useValue: {
             fitToCoordinates: () => undefined,
             centerOn: () => undefined,
-            showExploreLocation: () => undefined,
           },
         },
         {

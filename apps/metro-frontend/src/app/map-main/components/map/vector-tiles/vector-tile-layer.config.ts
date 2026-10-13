@@ -19,6 +19,8 @@ export interface VectorTileLayerConfig {
   toggleable: boolean;
   zIndex: number;
   tileUrl: string;
+  tileSize?: number;
+  minZoom?: number;
 }
 
 export function createInitialLayerVisibility(): Map<
@@ -64,11 +66,13 @@ export function createVectorTileLayerConfigs(
     },
     {
       id: VectorTileLayerType.BUS_STOPS,
-      name: 'Pontos de ônibus filtrados',
+      name: 'Pontos de ônibus',
       visible: true,
-      toggleable: false,
+      toggleable: true,
       zIndex: 45,
       tileUrl: `${apiUrl}/tiles/bus-stops/{z}/{x}/{y}.pbf`,
+      tileSize: 256,
+      minZoom: 14,
     },
     {
       id: VectorTileLayerType.BIKE_STATIONS,

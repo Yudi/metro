@@ -44,7 +44,7 @@ describe('MapDataLoaderService', () => {
   let mapState: MapStateService;
   let vectorTileLayer: {
     setBusRouteIds: jest.Mock;
-    setBusStopFilter: jest.Mock;
+    setSelectedBusStopIds: jest.Mock;
   };
 
   beforeEach(() => {
@@ -61,7 +61,7 @@ describe('MapDataLoaderService', () => {
     snackBar = { open: jest.fn() };
     vectorTileLayer = {
       setBusRouteIds: jest.fn(),
-      setBusStopFilter: jest.fn(),
+      setSelectedBusStopIds: jest.fn(),
     };
 
     TestBed.configureTestingModule({
@@ -179,9 +179,7 @@ describe('MapDataLoaderService', () => {
     expect(vectorTileLayer.setBusRouteIds).toHaveBeenLastCalledWith([
       favoriteCode,
     ]);
-    expect(vectorTileLayer.setBusStopFilter).toHaveBeenLastCalledWith(
-      expect.objectContaining({ routeIds: [favoriteCode] }),
-    );
+    expect(vectorTileLayer.setSelectedBusStopIds).toHaveBeenLastCalledWith([]);
   });
 
   it('tracks directions independently when they share one feed route ID', () => {

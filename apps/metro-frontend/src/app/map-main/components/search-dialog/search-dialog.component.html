@@ -14,12 +14,12 @@
   <!-- Search Input -->
   <div class="search-input-container">
     <mat-form-field appearance="outline" class="search-field">
-      <mat-label>Buscar por paradas ou linhas</mat-label>
+      <mat-label>Buscar por linha, parada ou estação</mat-label>
       <input
         matInput
-        type="text"
+        type="search"
         #searchInput
-        placeholder="Insira o termo para pesquisa..."
+        placeholder="Digite uma linha, parada ou estação..."
         [value]="searchQuery()"
         (input)="onSearchInput($event)"
         autocomplete="off"
@@ -29,28 +29,7 @@
         <mat-spinner matSuffix diameter="20"></mat-spinner>
       }
     </mat-form-field>
-    <button
-      mat-mini-fab
-      class="nearby-button"
-      [disabled]="
-        locationPermission() === 'denied' ||
-        !isLocationSupported() ||
-        isRequestingLocation()
-      "
-      [matTooltip]="nearbyButtonTooltip()"
-      (click)="toggleNearbySearch()"
-      aria-label="Buscar paradas próximas"
-    >
-      @if (isRequestingLocation()) {
-        <mat-spinner diameter="20"></mat-spinner>
-      } @else {
-        <mat-icon>{{ nearbySearch() ? "near_me" : "my_location" }}</mat-icon>
-      }
-    </button>
   </div>
-
-  <!-- Nearby Search Button -->
-  <div class="search-options"></div>
 
   <!-- Search Results -->
   <mat-dialog-content class="search-results-container">
@@ -99,27 +78,11 @@
           </div>
         }
       </div>
-    } @else if (nearbySearch() && userLocation()) {
-      <div class="nearby-active">
-        <mat-icon class="nearby-icon">explore</mat-icon>
-        <h3>Buscando nas proximidades</h3>
-        <p>Mostrando paradas em um raio de 1 km</p>
-      </div>
-    } @else if (!searchQuery() && !nearbySearch()) {
+    } @else {
       <div class="search-help">
         <mat-icon class="help-icon">search</mat-icon>
         <h3>Busca</h3>
-
-        <div class="search-tips">
-          <h4>Dicas</h4>
-          <ul>
-            <li>Insira nomes de paradas, números de linhas ou locais</li>
-            <li>
-              Use o botão de localização para encontrar transporte próximo a
-              você
-            </li>
-          </ul>
-        </div>
+        <p>Pesquise por uma linha, parada ou estação.</p>
       </div>
     }
   </mat-dialog-content>

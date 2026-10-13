@@ -13,7 +13,6 @@ import { LoggerService } from '@metro/shared/api';
 import type {
   MapFeature,
   MapOptions,
-  MapPointSelection,
 } from './map-service.types';
 import { featureToMapFeature } from './map-feature.utils';
 import { MapBaseTileService } from './layers/map-base-tile.service';
@@ -23,7 +22,6 @@ import { MapCameraService } from './map-camera.service';
 export type {
   MapFeature,
   MapOptions,
-  MapPointSelection,
 } from './map-service.types';
 
 @Service()
@@ -43,11 +41,6 @@ export class MapService {
   readonly features = signal<Feature[]>([]);
   readonly zoomLevel = signal<number | null>(null);
   readonly center = signal<[number, number] | null>(null);
-  readonly isSelectingPoint = signal(false);
-
-  private pointSelectionCallback:
-    | ((selection: MapPointSelection) => void)
-    | null = null;
 
   // Expose layer service for components
   getLayerService(): MapLayerService {
@@ -155,16 +148,6 @@ export class MapService {
     map.on('singleclick', (event) => {
       this.logger.debug('Map clicked', { coordinate: event.coordinate });
 
-      if (this.pointSelectionCallback) {
-        const [lon, lat] = toLonLat(event.coordinate);
-        const callback = this.pointSelectionCallback;
-        this.pointSelectionCallback = null;
-        this.isSelectingPoint.set(false);
-        this.selectedFeature.set(null);
-        callback({ lat, lon });
-        return;
-      }
-
       // Get features at the clicked pixel (includes both regular and vector tile features)
       const features = map.getFeaturesAtPixel(event.pixel);
       this.logger.debug('Features at click', { count: features?.length || 0 });
@@ -190,7 +173,6 @@ export class MapService {
           ),
           railRoutes: this.layerService.isLayerVisible(LayerType.RAIL_ROUTES),
           busRoutes: this.layerService.isLayerVisible(LayerType.BUS_ROUTES),
-          busStops: this.layerService.isLayerVisible(LayerType.BUS_STOPS),
           bike: this.layerService.isLayerVisible(LayerType.BIKE),
         });
 
@@ -263,11 +245,7 @@ export class MapService {
         typeof target === 'string' ? document.getElementById(target) : target;
 
       if (targetElement instanceof HTMLElement) {
-        targetElement.style.cursor = this.isSelectingPoint()
-          ? 'crosshair'
-          : hit
-            ? 'pointer'
-            : '';
+        targetElement.style.cursor = hit ? 'pointer' : '';
       }
     });
 
@@ -355,17 +333,6 @@ export class MapService {
     }
 
     this.center.set(toLonLat(center) as [number, number]);
-  }
-
-  startPointSelection(callback: (selection: MapPointSelection) => void): void {
-    this.pointSelectionCallback = callback;
-    this.isSelectingPoint.set(true);
-    this.selectedFeature.set(null);
-  }
-
-  cancelPointSelection(): void {
-    this.pointSelectionCallback = null;
-    this.isSelectingPoint.set(false);
   }
 
   zoomToFeatures(features: Feature[], minZoom = 15): void {
@@ -457,7 +424,6 @@ export class MapService {
     });
     this.features.set([]);
     this.selectedFeature.set(null);
-    this.cancelPointSelection();
     this.isDrawing.set(false);
     this.isModifying.set(false);
   }

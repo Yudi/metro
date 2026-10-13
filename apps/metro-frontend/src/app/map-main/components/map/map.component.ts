@@ -13,6 +13,9 @@ import {
   isDevMode,
   signal,
   computed,
+  afterNextRender,
+  Injector,
+  viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
@@ -23,6 +26,7 @@ import { MapStateService } from './map-state.service';
 import { MapDataLoaderService } from './map-data-loader.service';
 import { MapDisplayService } from './map-display.service';
 import { MapInteractionService } from './map-interaction.service';
+import { MapSearchInteractionService } from './map-search-interaction.service';
 import { LayerSettingsDialogComponent } from './layer-settings-dialog/layer-settings-dialog.component';
 import { LoggerService, RailGraphqlService } from '@metro/shared/api';
 import { RealtimeVehicleLayerService } from '../../realtime/realtime-vehicle-layer.service';
@@ -64,6 +68,12 @@ export class MapComponent implements AfterViewInit, OnDestroy {
   private dataLoader = inject(MapDataLoaderService);
   private displayService = inject(MapDisplayService);
   private interactionService = inject(MapInteractionService);
+  private readonly searchInteraction = inject(MapSearchInteractionService);
+  private readonly injector = inject(Injector);
+  private readonly primaryControls = viewChild<MapHeaderComponent>('primaryControls');
+  readonly searchControl = this.searchInteraction.searchControl;
+  readonly searchOpen = this.searchInteraction.searchOpen;
+  readonly searchError = this.searchInteraction.searchError;
   readonly mapPanel = inject(MapPanelService);
   readonly sheetHeight = signal(0);
   readonly sheetExpandedProgress = signal(0);
@@ -86,7 +96,6 @@ export class MapComponent implements AfterViewInit, OnDestroy {
   private destroyed = false;
 
   // Expose state for template access
-  readonly displayMode = this.mapState.displayMode;
   readonly isLoading = this.mapState.isLoading;
   readonly selectedRoutes = this.mapState.selectedRoutes;
   readonly selectedStops = this.mapState.selectedStops;
@@ -94,12 +103,12 @@ export class MapComponent implements AfterViewInit, OnDestroy {
   readonly displayedRoutes = this.mapState.displayedRoutes;
   readonly displayedStops = this.mapState.allDisplayedStops;
   readonly displayedShapes = this.mapState.displayedShapes;
-  readonly nearbyCenter = this.mapState.nearbyCenter;
-  readonly nearbyRadius = this.mapState.nearbyRadius;
   readonly hasSelections = this.mapState.hasSelections;
   readonly hasDisplayedData = this.mapState.hasDisplayedData;
   readonly totalDisplayedStops = this.mapState.totalDisplayedStops;
   readonly totalDisplayedRoutes = this.mapState.totalDisplayedRoutes;
+
+  readonly userLocationVisible = this.userLocationLayer.isVisible;
 
   // Geolocation state
   readonly locationPermission = this.geolocationService.permission;
@@ -217,6 +226,7 @@ export class MapComponent implements AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.destroyed = true;
+    this.searchInteraction.cancelSearch();
     this.interactionService.cancelPendingStopSelections();
     this.mapPanel.clear();
     if (this.initializationTimer) {
@@ -325,28 +335,9 @@ export class MapComponent implements AfterViewInit, OnDestroy {
     this.displayService.centerOnCity();
   }
 
-  async centerOnUserLocation(): Promise<void> {
-    await this.userLocationLayer.centerOnUser();
-  }
-
-  compactMapPanel(): void {
+  toggleUserLocation(): void {
     this.mapPanel.compactOnMobile();
-  }
-
-  // Handle display mode changes from header
-  onDisplayModeChange(newMode: 'selected' | 'nearby'): void {
-    const currentMode = this.displayMode();
-    if (newMode === currentMode) {
-      return;
-    }
-
-    if (newMode === 'nearby') {
-      // Switching to nearby mode - this will set the mode and trigger geolocation
-      this.interactionService.activateNearbyMode();
-    } else {
-      // Switching to selected mode - this will clear nearby features
-      this.interactionService.deactivateNearbyMode();
-    }
+    void this.interactionService.toggleUserLocation();
   }
 
   // Get selection counts for UI display
@@ -356,11 +347,15 @@ export class MapComponent implements AfterViewInit, OnDestroy {
 
   // Delegate methods to interaction service
   openSearchModal(): void {
-    this.interactionService.openSearchModal();
+    void this.searchInteraction.openSearchModal(() => {
+      afterNextRender(() => this.primaryControls()?.focusSearch(), {
+        injector: this.injector,
+      });
+    });
   }
 
-  openExploreModal(): void {
-    this.interactionService.openExploreModal();
+  openAddressSearch(): void {
+    this.interactionService.openAddressSearch();
   }
 
   addRouteToSelection(routeId: string, shouldDisplaySnackbar: boolean): void {

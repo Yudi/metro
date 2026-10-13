@@ -1,5 +1,6 @@
-<div class="explore-dialog">
+<div class="address-search-dialog">
   <div class="dialog-header">
+    <h2 mat-dialog-title>Buscar endereço</h2>
     <button
       mat-icon-button
       mat-dialog-close
@@ -10,14 +11,18 @@
     </button>
   </div>
 
+  <p class="search-description">
+    Pesquise um endereço para centralizar o mapa nesse local.
+  </p>
+
   <div class="search-row">
     <mat-form-field appearance="outline" class="search-field">
-      <mat-label>Buscar endereço ou lugar</mat-label>
+      <mat-label>Endereço ou lugar</mat-label>
       <input
         matInput
         type="text"
         #searchInput
-        placeholder="Digite um endereço..."
+        placeholder="Digite um endereço ou local..."
         [value]="query()"
         (input)="onSearchInput($event)"
         autocomplete="off"
@@ -29,28 +34,24 @@
     </mat-form-field>
   </div>
 
-  <button
-    mat-stroked-button
-    type="button"
-    class="manual-button"
-    (click)="selectManual()"
-  >
-    <mat-icon>touch_app</mat-icon>
-    <span>Escolher no mapa</span>
-  </button>
-
   <mat-dialog-content class="results-container">
     @if (isSearching()) {
-      <div class="empty-state">
+      <div class="empty-state" aria-live="polite">
         <mat-spinner diameter="40"></mat-spinner>
         <p>Buscando...</p>
+      </div>
+    } @else if (hasSearchError()) {
+      <div class="empty-state" role="alert">
+        <mat-icon>location_off</mat-icon>
+        <h3>Não foi possível buscar endereços</h3>
+        <p>Tente novamente em instantes.</p>
       </div>
     } @else if (hasResults()) {
       <mat-nav-list class="results-list">
         @for (result of results(); track result.id) {
           <button mat-list-item type="button" (click)="selectResult(result)">
             <mat-icon matListItemIcon>{{ iconForType(result.type) }}</mat-icon>
-            <span matListItemTitle>{{ result.name }}</span>
+            <span matListItemTitle>{{ result.label }}</span>
             @if (result.description) {
               <span matListItemLine>{{ result.description }}</span>
             }
@@ -58,14 +59,14 @@
         }
       </mat-nav-list>
     } @else if (showNoResults()) {
-      <div class="empty-state">
+      <div class="empty-state" aria-live="polite">
         <mat-icon>search_off</mat-icon>
         <h3>Nenhum resultado encontrado</h3>
       </div>
     } @else {
-      <div class="empty-state">
-        <mat-icon>explore</mat-icon>
-        <h3>Explorar local</h3>
+      <div class="empty-state" aria-live="polite">
+        <mat-icon>location_searching</mat-icon>
+        <h3>Encontre um local no mapa</h3>
       </div>
     }
   </mat-dialog-content>

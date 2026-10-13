@@ -1,29 +1,121 @@
-import { provideRouter } from '@angular/router';
+import { FormControl } from '@angular/forms';
+import {
+  provideRouter,
+  withDisabledInitialNavigation,
+} from '@angular/router';
 import { applicationConfig, Meta, StoryObj } from '@storybook/angular';
-import { userEvent, within } from 'storybook/test';
+import { expect, fn, userEvent, within } from 'storybook/test';
 import { MapHeaderComponent } from './map-header.component';
 
-const meta: Meta<MapHeaderComponent> = {
+type StoryOutputHandler = (event: void) => void;
+type HeaderStoryArgs = Omit<
+  MapHeaderComponent,
+  | 'searchClick'
+  | 'addressSearchClick'
+  | 'userLocationToggle'
+  | 'layersClick'
+  | 'centerClick'
+  | 'clearClick'
+  | 'fitClick'
+> & {
+  searchValue: string;
+  onSearchClick: StoryOutputHandler;
+  onAddressSearchClick: StoryOutputHandler;
+  onUserLocationToggle: StoryOutputHandler;
+  onLayersClick: StoryOutputHandler;
+  onCenterClick: StoryOutputHandler;
+  onClearClick: StoryOutputHandler;
+  onFitClick: StoryOutputHandler;
+};
+type Story = StoryObj<HeaderStoryArgs>;
+
+function outputArgs() {
+  return {
+    onAddressSearchClick: fn(),
+    onCenterClick: fn(),
+    onClearClick: fn(),
+    onFitClick: fn(),
+    onLayersClick: fn(),
+    onSearchClick: fn(),
+    onUserLocationToggle: fn(),
+  };
+}
+
+const headerTemplate = `
+  <app-map-header
+    [controls]="controls"
+    [hasSelections]="hasSelections"
+    [hasFeatures]="hasFeatures"
+    [layersOpen]="layersOpen"
+    [userLocationVisible]="userLocationVisible"
+    [locationPermission]="locationPermission"
+    [isRequestingLocation]="isRequestingLocation"
+    [isLocationDisabled]="isLocationDisabled"
+    [searchControl]="searchControl"
+    [searchOpen]="searchOpen"
+    [searchError]="searchError"
+    (searchClick)="onSearchClick($event)"
+    (addressSearchClick)="onAddressSearchClick($event)"
+    (userLocationToggle)="onUserLocationToggle($event)"
+    (layersClick)="onLayersClick($event)"
+    (centerClick)="onCenterClick($event)"
+    (clearClick)="onClearClick($event)"
+    (fitClick)="onFitClick($event)"
+  ></app-map-header>
+`;
+
+const meta: Meta<HeaderStoryArgs> = {
   title: 'Bus/Map/MapHeader',
   component: MapHeaderComponent,
   tags: ['autodocs'],
   decorators: [
     applicationConfig({
-      providers: [provideRouter([])],
+      providers: [provideRouter([], withDisabledInitialNavigation())],
     }),
   ],
   parameters: {
     layout: 'padded',
   },
+  argTypes: {
+    onSearchClick: { action: 'Pesquisar' },
+    onAddressSearchClick: { action: 'Buscar endereço' },
+    onUserLocationToggle: { action: 'Minha localização' },
+    onLayersClick: { action: 'Camadas' },
+    onCenterClick: { action: 'Centralizar' },
+    onClearClick: { action: 'Limpar seleções' },
+    onFitClick: { action: 'Enquadrar itens' },
+    searchValue: { control: 'text' },
+  },
+  args: {
+    ...outputArgs(),
+    controls: 'all',
+    hasSelections: false,
+    hasFeatures: false,
+    layersOpen: false,
+    userLocationVisible: false,
+    locationPermission: 'prompt',
+    isRequestingLocation: false,
+    isLocationDisabled: false,
+    searchValue: '',
+    searchOpen: false,
+    searchError: '',
+  },
+  render: (args) => {
+    return {
+      props: {
+        ...args,
+        searchControl: new FormControl(args.searchValue, { nonNullable: true }),
+      },
+      template: headerTemplate,
+    };
+  },
 };
 
 export default meta;
 
-type Story = StoryObj<MapHeaderComponent>;
-
 async function openOptions(canvasElement: HTMLElement) {
   const canvas = within(canvasElement);
-  await userEvent.click(canvas.getByRole('button', { name: /^Opções(?:;|$)/ }));
+  await userEvent.click(canvas.getByRole('button', { name: 'Opções' }));
   return within(
     within(canvasElement.ownerDocument.body).getByRole('menu', {
       name: 'Opções do mapa',
@@ -33,85 +125,139 @@ async function openOptions(canvasElement: HTMLElement) {
 
 export const Default: Story = {
   args: {
-    displayMode: 'selected',
+    ...outputArgs(),
     hasSelections: false,
     hasFeatures: true,
+    searchValue: '',
     controls: 'all',
   },
-  play: async ({ canvasElement }) => {
+  play: async ({ canvasElement, args }) => {
     const canvas = within(canvasElement);
-    for (const name of [
-      'Pesquisar no mapa',
-      'Perto de mim',
-      'Camadas',
-      'Opções',
-    ]) {
-      if (!canvas.getByRole('button', { name })) {
-        throw new Error(`${name} control not found`);
-      }
+    const searchInput = canvas.getByRole('searchbox', {
+      name: 'Buscar linhas e paradas',
+    });
+    const searchButton = canvas.getByRole('button', {
+      name: 'Pesquisar linhas e paradas',
+    });
+    expect(searchInput.getAttribute('aria-haspopup')).toBe('dialog');
+    expect(searchInput.getAttribute('aria-expanded')).toBe('false');
+    await userEvent.click(searchButton);
+    expect(args.onSearchClick).toHaveBeenCalledTimes(1);
+    await userEvent.type(searchInput, 'linha');
+    expect(args.onSearchClick).toHaveBeenCalledTimes(6);
+
+    const locationButton = canvas.getByRole('button', {
+      name: 'Minha localização',
+    });
+    expect(locationButton.getAttribute('aria-pressed')).toBe('false');
+    expect(locationButton.textContent?.trim()).toBe('my_location');
+    expect(locationButton.querySelector('mat-icon')?.textContent?.trim()).toBe(
+      'my_location',
+    );
+    await userEvent.click(locationButton);
+    expect(args.onUserLocationToggle).toHaveBeenCalledTimes(1);
+
+    for (const name of ['Camadas', 'Opções']) {
+      expect(canvas.getByRole('button', { name })).toBeTruthy();
     }
 
     const menu = await openOptions(canvasElement);
+    const addressSearch = menu.getByRole('menuitem', {
+      name: 'Buscar endereço',
+    });
+    for (const removedLabel of [
+      'Escolher no mapa',
+      'Seleção manual',
+      'Paradas próximas',
+      'Próximos',
+    ]) {
+      expect(menu.queryByText(removedLabel)).toBeNull();
+    }
+
     const fitButton = menu.getByRole('menuitem', {
       name: 'Enquadrar itens visíveis',
     }) as HTMLButtonElement;
-    if (fitButton.disabled) throw new Error('Fit action should be enabled');
-    if (menu.queryByRole('menuitem', { name: 'Limpar todas as seleções' })) {
-      throw new Error('Clear action should not appear without selections');
-    }
+    expect(fitButton.disabled).toBe(false);
+    expect(
+      menu.queryByRole('menuitem', { name: 'Limpar todas as seleções' }),
+    ).toBeNull();
+    await userEvent.click(addressSearch);
+    expect(args.onAddressSearchClick).toHaveBeenCalledTimes(1);
+  },
+};
+
+export const SearchOpen: Story = {
+  args: {
+    ...outputArgs(),
+    searchValue: 'Linha 9',
+    searchOpen: true,
+    controls: 'primary',
+  },
+  play: async ({ canvasElement }) => {
+    const searchField = canvasElement.querySelector<HTMLElement>('.search-field');
+    if (!searchField) throw new Error('Search field not found');
+    expect(getComputedStyle(searchField).visibility).toBe('hidden');
+    expect(searchField.getBoundingClientRect().width).toBeGreaterThan(0);
+  },
+};
+
+export const SearchError: Story = {
+  args: {
+    ...outputArgs(),
+    searchError: 'Não foi possível pesquisar. Tente novamente.',
+    controls: 'primary',
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    expect(
+      canvas.getByText('Não foi possível pesquisar. Tente novamente.'),
+    ).toBeTruthy();
+    expect(
+      canvas
+        .getByRole('searchbox', { name: 'Buscar linhas e paradas' })
+        .getAttribute('aria-invalid'),
+    ).toBe('true');
   },
 };
 
 export const WithSelections: Story = {
   args: {
-    displayMode: 'selected',
+    ...outputArgs(),
     hasSelections: true,
     hasFeatures: true,
   },
-  play: async ({ canvasElement }) => {
+  play: async ({ canvasElement, args }) => {
     const menu = await openOptions(canvasElement);
     const clearButton = menu.getByRole('menuitem', {
       name: 'Limpar todas as seleções',
     }) as HTMLButtonElement;
-    if (clearButton.disabled) throw new Error('Clear action should be enabled');
+    expect(clearButton.disabled).toBe(false);
     await userEvent.click(clearButton);
+    expect(args.onClearClick).toHaveBeenCalledTimes(1);
   },
 };
 
-export const NearbyMode: Story = {
+export const UserLocationVisible: Story = {
   args: {
-    displayMode: 'nearby',
-    hasSelections: false,
-    hasFeatures: true,
+    ...outputArgs(),
+    userLocationVisible: true,
     locationPermission: 'granted',
-    controls: 'all',
+    controls: 'primary',
   },
   play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    const optionsButton = canvas.getByRole('button', {
-      name: 'Opções; modo Próximos ativo',
+    const locationButton = within(canvasElement).getByRole('button', {
+      name: 'Minha localização',
     });
-    if (!optionsButton.textContent?.includes('Próximos')) {
-      throw new Error('Nearby mode should be visible on the options button');
-    }
-    const nearbyButton = canvas.getByRole('button', { name: 'Perto de mim' });
-    if (nearbyButton.getAttribute('aria-pressed') !== 'true') {
-      throw new Error('Nearby action should expose its active state');
-    }
-
-    const menu = await openOptions(canvasElement);
-    const nearbyOption = menu.getByRole('menuitemradio', {
-      name: 'Paradas próximas',
-    });
-    if (nearbyOption.getAttribute('aria-checked') !== 'true') {
-      throw new Error('Nearby mode should be marked active');
-    }
+    expect(locationButton.getAttribute('aria-pressed')).toBe('true');
+    expect(locationButton.querySelector('mat-icon')?.textContent?.trim()).toBe(
+      'my_location',
+    );
   },
 };
 
 export const NoFeatures: Story = {
   args: {
-    displayMode: 'selected',
+    ...outputArgs(),
     hasSelections: false,
     hasFeatures: false,
   },
@@ -120,119 +266,113 @@ export const NoFeatures: Story = {
     const fitButton = menu.getByRole('menuitem', {
       name: 'Enquadrar itens visíveis',
     }) as HTMLButtonElement;
-    if (!fitButton.disabled) {
-      throw new Error('Fit action should be disabled without map features');
-    }
+    expect(fitButton.disabled).toBe(true);
   },
 };
 
 export const LocationDenied: Story = {
   args: {
-    displayMode: 'selected',
-    hasFeatures: true,
+    ...outputArgs(),
     locationPermission: 'denied',
     isLocationDisabled: true,
     controls: 'primary',
   },
   play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    const locationButton = canvas.getByRole('button', {
-      name: 'Perto de mim',
+    const locationButton = within(canvasElement).getByRole('button', {
+      name: 'Minha localização',
     }) as HTMLButtonElement;
-    if (!locationButton.disabled) {
-      throw new Error('Location action should be disabled after denial');
-    }
-    if (
-      !locationButton
-        .getAttribute('aria-description')
-        ?.includes('Acesso à localização negado')
-    ) {
-      throw new Error('Location action should explain the denied permission');
-    }
+    expect(locationButton.disabled).toBe(true);
+    expect(locationButton.getAttribute('aria-description')).toContain(
+      'Acesso à localização negado',
+    );
   },
 };
 
 export const LocationRequesting: Story = {
   args: {
-    displayMode: 'selected',
-    hasFeatures: true,
-    locationPermission: 'prompt',
+    ...outputArgs(),
     isRequestingLocation: true,
     controls: 'primary',
   },
   play: async ({ canvasElement }) => {
     const locationButton = within(canvasElement).getByRole('button', {
-      name: 'Perto de mim',
+      name: 'Minha localização',
     }) as HTMLButtonElement;
-    if (!locationButton.disabled) {
-      throw new Error('Location action should be disabled while requesting');
-    }
-    if (locationButton.getAttribute('aria-busy') !== 'true') {
-      throw new Error('Location action should expose its loading state');
-    }
-    if (
-      locationButton.getAttribute('aria-description') !==
-      'Obtendo sua localização.'
-    ) {
-      throw new Error('Location action should describe its loading state');
-    }
+    expect(locationButton.disabled).toBe(true);
+    expect(locationButton.getAttribute('aria-busy')).toBe('true');
+    expect(locationButton.getAttribute('aria-description')).toBe(
+      'Obtendo sua localização.',
+    );
+  },
+};
+
+export const VisibleLocationWhileRequesting: Story = {
+  args: {
+    ...outputArgs(),
+    userLocationVisible: true,
+    locationPermission: 'granted',
+    isRequestingLocation: true,
+    controls: 'primary',
+  },
+  play: async ({ canvasElement, args }) => {
+    const locationButton = within(canvasElement).getByRole('button', {
+      name: 'Minha localização',
+    }) as HTMLButtonElement;
+    expect(locationButton.disabled).toBe(false);
+    expect(locationButton.getAttribute('aria-pressed')).toBe('true');
+    expect(locationButton.getAttribute('aria-busy')).toBe('true');
+
+    await userEvent.click(locationButton);
+    expect(args.onUserLocationToggle).toHaveBeenCalledTimes(1);
   },
 };
 
 export const PrimaryControls: Story = {
   args: {
+    ...outputArgs(),
     controls: 'primary',
-    displayMode: 'selected',
     hasFeatures: true,
-    locationPermission: 'granted',
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    for (const name of ['Pesquisar no mapa', 'Perto de mim']) {
-      if (!canvas.getByRole('button', { name })) {
-        throw new Error(`${name} control not found in the primary group`);
-      }
-    }
-    if (canvas.queryByRole('button', { name: 'Camadas' })) {
-      throw new Error('Layers should not appear in the primary group');
-    }
-    if (canvas.queryByRole('button', { name: 'Opções' })) {
-      throw new Error('Options should not appear in the primary group');
-    }
+    expect(
+      canvas.getByRole('searchbox', { name: 'Buscar linhas e paradas' }),
+    ).toBeTruthy();
+    expect(
+      canvas.getByRole('button', { name: 'Pesquisar linhas e paradas' }),
+    ).toBeTruthy();
+    expect(canvas.getByRole('button', { name: 'Minha localização' })).toBeTruthy();
+    expect(canvas.queryByRole('button', { name: 'Camadas' })).toBeNull();
+    expect(canvas.queryByRole('button', { name: 'Opções' })).toBeNull();
   },
 };
 
 export const SecondaryControls: Story = {
   args: {
+    ...outputArgs(),
     controls: 'secondary',
-    displayMode: 'selected',
     hasFeatures: true,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    if (!canvas.getByRole('button', { name: 'Camadas' })) {
-      throw new Error('Layers control not found in the secondary group');
-    }
-    if (!canvas.getByRole('button', { name: 'Opções' })) {
-      throw new Error('Options control not found in the secondary group');
-    }
-    if (canvas.queryByRole('button', { name: 'Pesquisar no mapa' })) {
-      throw new Error('Search should not appear in the secondary group');
-    }
-    if (canvas.queryByRole('button', { name: 'Perto de mim' })) {
-      throw new Error('Nearby should not appear in the secondary group');
-    }
+    expect(canvas.getByRole('button', { name: 'Camadas' })).toBeTruthy();
+    expect(canvas.getByRole('button', { name: 'Opções' })).toBeTruthy();
+    expect(
+      canvas.queryByRole('searchbox', { name: 'Buscar linhas e paradas' }),
+    ).toBeNull();
+    expect(canvas.queryByRole('button', { name: 'Minha localização' })).toBeNull();
 
     const menu = await openOptions(canvasElement);
-    if (!menu.getByRole('menuitem', { name: 'Enquadrar itens visíveis' })) {
-      throw new Error('Options menu should remain available in secondary mode');
-    }
+    expect(
+      menu.getByRole('menuitem', { name: 'Enquadrar itens visíveis' }),
+    ).toBeTruthy();
+    expect(menu.getByRole('menuitem', { name: 'Buscar endereço' })).toBeTruthy();
   },
 };
 
 export const NarrowViewport: Story = {
   args: {
-    displayMode: 'selected',
+    ...outputArgs(),
     hasSelections: true,
     hasFeatures: true,
     controls: 'primary',
@@ -244,13 +384,14 @@ export const NarrowViewport: Story = {
 
     const controls = header.querySelector<HTMLElement>('.primary-actions');
     if (!controls) throw new Error('Primary controls not found');
-    if (controls.scrollWidth > controls.clientWidth) {
-      throw new Error('Primary controls should fit a 288px content width');
-    }
-    for (const name of ['Pesquisar no mapa', 'Perto de mim']) {
-      if (!within(canvasElement).getByRole('button', { name })) {
-        throw new Error(`${name} control not found at narrow width`);
-      }
-    }
+    expect(controls.scrollWidth).toBeLessThanOrEqual(controls.clientWidth);
+    expect(
+      within(canvasElement).getByRole('searchbox', {
+        name: 'Buscar linhas e paradas',
+      }),
+    ).toBeTruthy();
+    expect(
+      within(canvasElement).getByRole('button', { name: 'Minha localização' }),
+    ).toBeTruthy();
   },
 };

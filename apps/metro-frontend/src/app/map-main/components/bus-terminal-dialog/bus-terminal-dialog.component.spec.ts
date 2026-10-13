@@ -82,7 +82,6 @@ describe('BusTerminalDialogComponent', () => {
           useValue: {
             fitToCoordinates,
             centerOn: jest.fn(),
-            showExploreLocation: jest.fn(),
           },
         },
         {

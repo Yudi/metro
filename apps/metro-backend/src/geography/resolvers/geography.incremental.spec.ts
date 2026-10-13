@@ -13,7 +13,7 @@ import {
 } from './geography.resolver';
 
 describe('geography incremental GraphQL delivery', () => {
-  it('delivers stop fields before the deferred route resolver finishes', async () => {
+  it.each([true, false, undefined])('delivers stop fields before deferred routes with isCircular=%s', async (isCircular) => {
     const module = await Test.createTestingModule({
       imports: [GraphQLSchemaBuilderModule],
     }).compile();
@@ -86,7 +86,7 @@ describe('geography incremental GraphQL delivery', () => {
                 stop { stopId }
                 ... @defer {
                   routes {
-                    route { shortName }
+                    route { shortName isCircular }
                     trips { tripId }
                   }
                 }
@@ -113,7 +113,7 @@ describe('geography incremental GraphQL delivery', () => {
 
       releaseRoutes([
         {
-          route: { routeId: 'route-1', shortName: '123A-10' },
+          route: { routeId: 'route-1', shortName: '123A-10', isCircular },
           trips: [{ tripId: 'trip-1' }],
           shapes: [],
           stops: [],
@@ -122,6 +122,7 @@ describe('geography incremental GraphQL delivery', () => {
 
       const deferredPayload = await readUntil(reader, '"tripId":"trip-1"');
       expect(deferredPayload).toContain('"routes"');
+      expect(deferredPayload).toContain(`"isCircular":${isCircular ?? null}`);
       expect(geographyService.getStopRoutesFullData).toHaveBeenCalledWith(
         'stop-1',
         { includeTrips: true, includeShapes: false, includeStops: false },

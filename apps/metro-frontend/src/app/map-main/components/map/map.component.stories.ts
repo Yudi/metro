@@ -30,6 +30,8 @@ import {
 } from '@metro/storybook-mocks';
 import type { SelectedRoute } from './map.types';
 import { PARAISO } from '../subway-station-dialog/subway-station-dialog.stories.fixtures';
+import { TypesenseSearchService } from '../../../search/typesense-search.service';
+import { of } from 'rxjs';
 
 const LONG_STATION_NAME_FIXTURE = {
   ...PARAISO,
@@ -245,7 +247,7 @@ async function verifyMapShell(canvasElement: HTMLElement): Promise<void> {
 
 function withMapState(
   state: Parameters<typeof createMapStoryProviders>[0],
-): Story['decorators'] {
+) {
   return [applicationConfig({ providers: createMapStoryProviders(state) })];
 }
 
@@ -263,7 +265,7 @@ export const CityOverview: Story = {
     await verifyMapShell(canvasElement);
 
     const canvas = within(canvasElement);
-    for (const label of ['Pesquisar no mapa', 'Camadas', 'Opções']) {
+    for (const label of ['Pesquisar linhas e paradas', 'Camadas', 'Opções']) {
       if (
         !canvasElement.ownerDocument.querySelector(`[aria-label="${label}"]`)
       ) {
@@ -294,6 +296,13 @@ export const CityOverview: Story = {
         throw new Error('The map layer panel did not open');
       }
     });
+    const busStops = page.getByRole('checkbox', {
+      name: 'Pontos de ônibus',
+    }) as HTMLInputElement;
+    if (!busStops.checked) throw new Error('Bus stops should be enabled by default');
+    await userEvent.click(busStops);
+    if (busStops.checked) throw new Error('Bus stops should be hidden after toggling');
+    await userEvent.click(busStops);
     const stations = page.getByRole('checkbox', {
       name: 'Estações de trem',
     }) as HTMLInputElement;
@@ -307,6 +316,38 @@ export const CityOverview: Story = {
         throw new Error('The layer panel is still open');
       }
     });
+  },
+};
+
+export const SearchInputHandoff: Story = {
+  decorators: [
+    ...(withMapState({}) ?? []),
+    applicationConfig({ providers: [{
+      provide: TypesenseSearchService,
+      useValue: { search: () => of({ success: true, results: [] }) },
+    }] }),
+  ],
+  play: async ({ canvasElement }) => {
+    await verifyMapShell(canvasElement);
+    const canvas = within(canvasElement);
+    const page = within(canvasElement.ownerDocument.body);
+    const launcher = canvas.getByRole('searchbox', {
+      name: 'Buscar linhas e paradas',
+    }) as HTMLInputElement;
+    await userEvent.type(launcher, 'Pinheiros');
+    const dialogInput = await page.findByRole('searchbox', {
+      name: 'Buscar por linha, parada ou estação',
+    }) as HTMLInputElement;
+    await waitFor(() => {
+      if (dialogInput.value !== 'Pinheiros') throw new Error('Typing was lost during the dialog handoff');
+      if (canvasElement.ownerDocument.activeElement !== dialogInput) throw new Error('The dialog search input did not receive focus');
+    });
+    await userEvent.click(page.getByRole('button', { name: /^Fechar$/ }));
+    await waitFor(() => {
+      if (page.queryByRole('dialog')) throw new Error('The search dialog is still closing');
+      if (canvasElement.ownerDocument.activeElement !== launcher) throw new Error('Search focus was not restored');
+      if (launcher.value !== 'Pinheiros') throw new Error('The launcher did not retain the dialog query');
+    }, { timeout: 5000 });
   },
 };
 
@@ -566,7 +607,7 @@ export const LocationDenied: Story = {
     await verifyMapShell(canvasElement);
     const canvas = within(canvasElement);
     const locationButton = canvas.getByRole('button', {
-      name: 'Perto de mim',
+      name: 'Minha localização',
     }) as HTMLButtonElement;
     if (!locationButton.disabled) {
       throw new Error('The location action should be disabled after denial');
@@ -576,11 +617,8 @@ export const LocationDenied: Story = {
     const menu = within(canvasElement.ownerDocument.body).getByRole('menu', {
       name: 'Opções do mapa',
     });
-    const nearby = within(menu).getByRole('menuitemradio', {
-      name: /Paradas próximas/,
-    }) as HTMLButtonElement;
-    if (!nearby.disabled) {
-      throw new Error('Nearby mode should be disabled after location denial');
+    if (within(menu).queryByRole('menuitemradio')) {
+      throw new Error('Removed map modes should not be listed');
     }
   },
 };
@@ -601,7 +639,7 @@ export const LocationRequesting: Story = {
   play: async ({ canvasElement }) => {
     await verifyMapShell(canvasElement);
     const locationButton = within(canvasElement).getByRole('button', {
-      name: 'Perto de mim',
+      name: 'Minha localização',
     }) as HTMLButtonElement;
     if (locationButton.getAttribute('aria-busy') !== 'true') {
       throw new Error('The location action should expose its busy state');

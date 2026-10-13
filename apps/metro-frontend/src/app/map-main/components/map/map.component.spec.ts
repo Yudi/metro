@@ -116,7 +116,7 @@ describe('MapComponent', () => {
             addToMap: jest.fn(),
             stopTracking: jest.fn(),
             removeFromMap: jest.fn(),
-            centerOnUser: () => Promise.resolve(),
+            isVisible: signal(false),
           },
         },
         {
@@ -277,7 +277,7 @@ describe('MapComponent', () => {
               addToMap: jest.fn(),
               stopTracking: jest.fn(),
               removeFromMap: jest.fn(),
-              centerOnUser: () => Promise.resolve(),
+              isVisible: signal(false),
             },
           },
           {

@@ -5,8 +5,6 @@ import {
 } from '../../geography/geography-graphql.service';
 import {
   BusShapeWithRoute,
-  DisplayMode,
-  NearbyCenter,
   MapSelectionCounts,
   BikeStation,
   SelectedRoute,
@@ -30,8 +28,6 @@ export class MapStateService {
     }
   }
 
-  // Display mode
-  readonly displayMode = signal<DisplayMode>('selected');
   readonly isLoading = signal(false);
 
   // Selection signals - cumulative user selections with metadata
@@ -61,10 +57,6 @@ export class MapStateService {
   readonly subwayStations = signal<BusStopGraphQL[]>([]); // Permanently displayed subway stations
   readonly bikeStations = signal<BikeStation[]>([]);
 
-  // Nearby mode data
-  readonly nearbyCenter = signal<NearbyCenter | null>(null);
-  readonly nearbyRadius = signal(1000);
-
   // Computed properties
   readonly hasSelections = computed(
     () =>
@@ -73,7 +65,7 @@ export class MapStateService {
       this.selectedBikeStations().size > 0,
   );
 
-  // Computed: Get selected route IDs as a Set (for backward compatibility)
+  // Selection identities used by map display
   readonly selectedRouteIds = computed(
     () => new Set(this.selectedRoutes().keys()),
   );
@@ -109,6 +101,7 @@ export class MapStateService {
     const newStops = new Map(this.selectedStops());
     newStops.set(stop.id, stop);
     this.selectedStops.set(newStops);
+    this.triggerDisplayUpdate();
   }
 
   addBikeStationToSelection(station: SelectedBikeStation): void {
@@ -128,6 +121,7 @@ export class MapStateService {
     const newStops = new Map(this.selectedStops());
     newStops.delete(stopId);
     this.selectedStops.set(newStops);
+    this.triggerDisplayUpdate();
   }
 
   removeBikeStationFromSelection(stationId: string): void {
@@ -274,28 +268,6 @@ export class MapStateService {
 
   setBikeStations(stations: BikeStation[]): void {
     this.bikeStations.set(stations);
-    this.triggerDisplayUpdate();
-  }
-
-  /**
-   * Special source ID for nearby stops - used to distinguish them from selection-sourced stops
-   */
-  static readonly NEARBY_SOURCE_ID = '__nearby__';
-
-  /**
-   * Set nearby stops with proper source tracking.
-   * This removes old nearby-sourced stops and adds new ones,
-   * while preserving stops that were added by user selections.
-   */
-  setNearbyStops(stops: BusStopGraphQL[]): void {
-    // First, remove all stops that only have 'nearby' as their source
-    this.removeDisplayDataBySource(MapStateService.NEARBY_SOURCE_ID);
-
-    // Add new nearby stops with source tracking
-    for (const stop of stops) {
-      this.addStopToDisplay(stop, MapStateService.NEARBY_SOURCE_ID);
-    }
-
     this.triggerDisplayUpdate();
   }
 

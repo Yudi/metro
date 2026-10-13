@@ -96,7 +96,6 @@ function createProviders(
       useValue: {
         fitToCoordinates: () => undefined,
         centerOn: () => undefined,
-        showExploreLocation: () => undefined,
       },
     },
     {

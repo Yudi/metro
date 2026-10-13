@@ -25,15 +25,13 @@
     class="map-secondary-controls"
     [attr.inert]="sheetExpandedProgress() >= 1 ? '' : null"
     controls="secondary"
-    [displayMode]="displayMode()"
     [hasSelections]="hasSelections()"
     [hasFeatures]="features().length > 0"
     [layersOpen]="layersOpen()"
     [locationPermission]="locationPermission()"
     [isRequestingLocation]="isRequestingLocation()"
     [isLocationDisabled]="isLocationDisabled()"
-    (displayModeChange)="onDisplayModeChange($event)"
-    (exploreClick)="openExploreModal()"
+    (addressSearchClick)="openAddressSearch()"
     (layersClick)="openLayerSettings()"
     (centerClick)="centerOnCity()"
     (fitClick)="fitToAllFeatures()"
@@ -54,12 +52,9 @@
         <summary>Diagnóstico</summary>
         <app-map-status-bar
           [isLoading]="isLoading()"
-          [displayMode]="displayMode()"
           [routeCount]="selectedRoutes().size"
           [stopCount]="selectedStops().size"
           [visibleCount]="displayedRoutes().length + displayedStops().length"
-          [nearbyRadius]="nearbyRadius()"
-          [nearbyStopsCount]="displayedStops().length"
         />
       </details>
     }
@@ -73,16 +68,18 @@
     (clearSelections)="clearAllSelections()"
   >
     <app-map-header
+      #primaryControls
       mapPrimaryControls
       controls="primary"
-      [displayMode]="displayMode()"
       [locationPermission]="locationPermission()"
       [isRequestingLocation]="isRequestingLocation()"
       [isLocationDisabled]="isLocationDisabled()"
+      [searchControl]="searchControl"
+      [searchOpen]="searchOpen()"
+      [searchError]="searchError()"
       (searchClick)="openSearchModal()"
-      (nearbyClick)="compactMapPanel()"
-      (displayModeChange)="onDisplayModeChange($event)"
-      (centerOnUserClick)="centerOnUserLocation()"
+      [userLocationVisible]="userLocationVisible()"
+      (userLocationToggle)="toggleUserLocation()"
     />
     @if (hasSelections()) {
       <app-map-selections-panel

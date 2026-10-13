@@ -74,10 +74,13 @@ const fixtures = `
 
 interface TileRow {
   physical_stop_id?: string;
+  stop_id?: string;
   merged_stop_ids?: string;
+  source_agency?: string;
+  source_id?: string;
+  platform_code?: string;
   route_id?: string;
   shape_id?: string;
-  source_id?: string;
   destination?: string;
   favorite_code?: string;
   direction_id?: number;
@@ -105,7 +108,7 @@ describeDatabase('bus vector tile SQL feature parity', () => {
 
   async function tileRows(
     layer: 'stops' | 'routes',
-    options: VectorTileOptions,
+    options: VectorTileOptions = {},
     directions: Array<{
       routeId: string;
       directionId: number;
@@ -128,7 +131,7 @@ describeDatabase('bus vector tile SQL feature parity', () => {
         operation(transaction),
     } as never, busDirections as never);
     if (layer === 'stops') {
-      await service.generateBusStopsTile(14, 6069, 9296, options);
+      await service.generateBusStopsTile(15, 12138, 18593);
     } else {
       await service.generateBusRoutesTile(14, 6069, 9296, options);
     }
@@ -162,7 +165,6 @@ describeDatabase('bus vector tile SQL feature parity', () => {
     return result.rows;
   }
 
-  const nearby = { latitude: -23.575, longitude: -46.64, radiusMeters: 100 };
   const outboundCode =
     'bus:v1:sptrans:123A:-23.5000~-46.6000:-23.5100~-46.6100:-23.5200~-46.6200';
   const inboundCode =
@@ -184,61 +186,22 @@ describeDatabase('bus vector tile SQL feature parity', () => {
   const ids = (rows: TileRow[]) =>
     rows.map((row) => row.physical_stop_id).sort();
 
-  it('retains bus and mixed stops while excluding rail-only and unserved stops', async () => {
-    expect(ids(await tileRows('stops', { nearby }))).toEqual(['bus', 'mixed']);
+  it('returns only in-bounds bus-serving stops and excludes rail-only or unserved stops', async () => {
+    const rows = await tileRows('stops');
+    expect(ids(rows)).toEqual(['bus', 'mixed']);
+    expect(ids(rows)).not.toContain('far');
   });
 
-  it('matches a selected merged member and emits its representative only once', async () => {
-    const rows = await tileRows('stops', { stopIds: ['artesp:mixed'] });
-    expect(ids(rows)).toEqual(['mixed']);
-    expect(rows[0].merged_stop_ids).toBe('artesp:mixed,mixed');
-  });
+  it('emits one physical-stop representative with merged source IDs', async () => {
+    const rows = await tileRows('stops');
+    const mergedStop = rows.find((row) => row.physical_stop_id === 'mixed');
 
-  it('keeps the serves-bus requirement for explicitly selected stops', async () => {
-    expect(
-      ids(
-        await tileRows('stops', {
-          stopIds: ['bus', 'rail', 'metro', 'train', 'unknown'],
-        }),
-      ),
-    ).toEqual(['bus']);
-  });
-
-  it('matches routes through merged members from either feed', async () => {
-    expect(
-      ids(
-        await tileRows('stops', {
-          routeIds: ['artesp:bus-route'],
-        }),
-      ),
-    ).toEqual(['mixed']);
-    expect(
-      ids(
-        await tileRows('stops', {
-          routeIds: ['bus-route'],
-        }),
-      ),
-    ).toEqual(['bus', 'far']);
-  });
-
-  it('combines route, stop, and nearby selections with OR semantics', async () => {
-    expect(
-      ids(
-        await tileRows('stops', {
-          routeIds: ['artesp:bus-route'],
-          stopIds: ['far'],
-          nearby,
-        }),
-      ),
-    ).toEqual(['bus', 'far', 'mixed']);
-  });
-
-  it('does not treat rail routes as selected bus routes', async () => {
-    expect(
-      await tileRows('stops', {
-        routeIds: ['rail-route', 'METRÔ1', 'CPTM1'],
-      }),
-    ).toEqual([]);
+    expect(ids(rows)).toEqual(['bus', 'mixed']);
+    expect(ids(rows).filter((stopId) => stopId === 'mixed')).toHaveLength(1);
+    expect(mergedStop?.stop_id).toBe('mixed');
+    expect(mergedStop?.merged_stop_ids).toBe('artesp:mixed,mixed');
+    expect(mergedStop?.source_agency).toBe('sptrans');
+    expect(mergedStop?.source_id).toBe('mixed');
   });
 
   it('keeps one shape per selected bus route and excludes rail shapes', async () => {
@@ -292,27 +255,5 @@ describeDatabase('bus vector tile SQL feature parity', () => {
     expect(inboundRows.map((row) => [row.route_id, row.shape_id])).toEqual([
       [inboundCode, 'shape-in'],
     ]);
-  });
-
-  it('filters stop features by direction ID as well as selected shape IDs', async () => {
-    expect(
-      ids(
-        await tileRows(
-          'stops',
-          { routeIds: [outboundCode] },
-          [outbound, inbound],
-        ),
-      ),
-    ).toEqual(['out-only', 'shared-direction']);
-
-    expect(
-      ids(
-        await tileRows(
-          'stops',
-          { routeIds: [inboundCode] },
-          [outbound, inbound],
-        ),
-      ),
-    ).toEqual(['in-only']);
   });
 });

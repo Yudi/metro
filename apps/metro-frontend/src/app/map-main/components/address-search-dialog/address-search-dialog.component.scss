@@ -1,4 +1,4 @@
-.explore-dialog {
+.address-search-dialog {
   display: flex;
   flex-direction: column;
   width: auto;
@@ -16,9 +16,23 @@
   justify-content: flex-end;
   padding: 8px 0;
 
+  h2 {
+    flex: 1 1 auto;
+    margin: 0;
+    color: var(--mat-sys-on-surface);
+    font-size: 1.375rem;
+    font-weight: 400;
+  }
+
   .close-button {
     margin-right: -8px;
   }
+}
+
+.search-description {
+  margin: 0 0 16px;
+  color: var(--mat-sys-on-surface-variant);
+  line-height: 1.5;
 }
 
 .search-row {
@@ -33,16 +47,6 @@
 
   ::ng-deep .mat-mdc-form-field-subscript-wrapper {
     display: none;
-  }
-}
-
-.manual-button {
-  align-self: flex-start;
-  flex-shrink: 0;
-  margin-bottom: 16px;
-
-  mat-icon {
-    margin-right: 8px;
   }
 }
 
@@ -96,7 +100,7 @@
 }
 
 @media (max-width: 600px) {
-  .explore-dialog {
+  .address-search-dialog {
     max-height: 80vh;
   }
 }

@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { VectorTilesService } from './vector-tiles.service';
+import { VectorTileLayer, VectorTilesService } from './vector-tiles.service';
 import { RailVectorTileService } from './services/rail-vector-tile.service';
 import { SubwayStationProcessorService } from './services/subway-station-processor.service';
 import { VectorTilesController } from './vector-tiles.controller';
@@ -20,45 +20,45 @@ describe('VectorTilesController input validation', () => {
         parseCsv: (value: string | undefined, argumentName: string) => string[];
       }
     ).parseCsv(value, argumentName);
-  const parseNearby = (
-    lat: string | undefined,
-    lon: string | undefined,
-    radius: string | undefined,
-  ) =>
-    (
-      controller as unknown as {
-        parseNearby: (
-          lat: string | undefined,
-          lon: string | undefined,
-          radius: string | undefined,
-        ) => unknown;
-      }
-    ).parseNearby(lat, lon, radius);
 
   it('rejects empty CSV elements instead of silently broadening the query', () => {
     expect(() => parseCsv('route-1,,route-2', 'routeIds')).toThrow(
       BadRequestException,
     );
   });
+});
 
-  it('rejects partial or non-finite nearby filters', () => {
-    expect(() => parseNearby('-23.5', undefined, '100')).toThrow(
-      BadRequestException,
-    );
-    expect(() => parseNearby('NaN', '-46.6', '100')).toThrow(
-      BadRequestException,
-    );
-    expect(() => parseNearby('-23.5', '-46.6', '0')).toThrow(
-      BadRequestException,
-    );
-  });
+describe('VectorTilesController bus stop tiles', () => {
+  it('serves an unfiltered bus stop tile for the requested bounds', async () => {
+    const tile = Buffer.from('ambient-bus-stops');
+    const getTile = jest.fn().mockResolvedValue(tile);
+    const module = await Test.createTestingModule({
+      controllers: [VectorTilesController],
+      providers: [
+        { provide: VectorTilesService, useValue: { getTile } },
+        { provide: RailVectorTileService, useValue: {} },
+        { provide: SubwayStationProcessorService, useValue: {} },
+      ],
+    }).compile();
+    const app = module.createNestApplication();
+    await app.listen(0, '127.0.0.1');
+    try {
+      const response = await fetch(
+        `${await app.getUrl()}/tiles/bus-stops/15/12138/18593.pbf`,
+      );
 
-  it('keeps valid nearby filters intact', () => {
-    expect(parseNearby('-23.5', '-46.6', '100')).toEqual({
-      latitude: -23.5,
-      longitude: -46.6,
-      radiusMeters: 100,
-    });
+      expect(response.status).toBe(200);
+      expect(Buffer.from(await response.arrayBuffer())).toEqual(tile);
+      expect(getTile).toHaveBeenCalledWith(
+        VectorTileLayer.BUS_STOPS,
+        15,
+        12138,
+        18593,
+        undefined,
+      );
+    } finally {
+      await app.close();
+    }
   });
 });
 

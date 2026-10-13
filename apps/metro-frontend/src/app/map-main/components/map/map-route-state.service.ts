@@ -104,13 +104,13 @@ export class MapRouteStateService {
     return {
       center,
       zoom,
-      displayMode: this.mapState.displayMode(),
-      nearbyCenter: this.mapState.nearbyCenter(),
-      nearbyRadius: this.mapState.nearbyRadius(),
       layers: {
         [LayerType.BIKE]: layerService.isLayerVisible(LayerType.BIKE),
       },
       vectorLayers: {
+        [VectorTileLayerType.BUS_STOPS]: vectorTileService.isLayerVisible(
+          VectorTileLayerType.BUS_STOPS,
+        ),
         [VectorTileLayerType.RAIL_STATIONS]: vectorTileService.isLayerVisible(
           VectorTileLayerType.RAIL_STATIONS,
         ),
@@ -166,6 +166,11 @@ export class MapRouteStateService {
         state.vectorLayers[VectorTileLayerType.RAIL_ROUTES] ?? false,
       );
 
+      vectorTileService.setLayerVisibility(
+        VectorTileLayerType.BUS_STOPS,
+        state.vectorLayers[VectorTileLayerType.BUS_STOPS] ?? true,
+      );
+
       if (state.layers[LayerType.BIKE]) {
         await this.bikeStationsService.activate();
         this.mapState.setBikeStations(this.bikeStationsService.stations());
@@ -180,17 +185,7 @@ export class MapRouteStateService {
         this.interactionService.addBikeStationToSelection(stationId, false);
       }
 
-      this.mapState.nearbyRadius.set(state.nearbyRadius);
-      this.mapState.nearbyCenter.set(state.nearbyCenter);
-      this.mapState.displayMode.set(state.displayMode);
-      if (state.displayMode === 'nearby' && state.nearbyCenter) {
-        this.dataLoader.loadNearbyStops(
-          state.nearbyCenter.lat,
-          state.nearbyCenter.lon,
-        );
-      } else {
-        this.dataLoader.syncVectorTileFilters();
-      }
+      this.dataLoader.syncVectorTileFilters();
       this.mapService.centerOn(state.center, state.zoom);
       this.displayService.updateMapDisplay();
     } catch (error) {
@@ -222,11 +217,7 @@ export class MapRouteStateService {
     this.isApplyingSavedState = true;
     try {
       this.interactionService.clearAllSelections(false);
-      this.mapState.displayMode.set('selected');
-      this.mapState.nearbyCenter.set(null);
-      this.mapState.nearbyRadius.set(1000);
-      this.displayService.clearExploreLocation();
-      this.displayService.clearNearbyFeatures();
+      this.displayService.clearAddressLocation();
       this.mapService
         .getLayerService()
         .setLayerVisibility(LayerType.BIKE, false);
@@ -236,6 +227,9 @@ export class MapRouteStateService {
       this.mapService
         .getVectorTileLayerService()
         .setLayerVisibility(VectorTileLayerType.RAIL_ROUTES, false);
+      this.mapService
+        .getVectorTileLayerService()
+        .setLayerVisibility(VectorTileLayerType.BUS_STOPS, true);
       this.mapService.centerOn(
         this.cityContext.center(),
         this.cityContext.city().map.zoom,
@@ -405,6 +399,7 @@ export class MapRouteStateService {
         kind: 'vector',
         id: VectorTileLayerType.RAIL_ROUTES,
       },
+      { param: 'busStopsLayer', kind: 'vector', id: VectorTileLayerType.BUS_STOPS },
       { param: 'busStops', kind: 'feature' },
       { param: 'busRoutes', kind: 'feature' },
       { param: 'railStations', kind: 'feature' },

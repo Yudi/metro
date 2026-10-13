@@ -2,19 +2,25 @@ import { CityContextService } from '../../../../cities/city-context.service';
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   computed,
+  effect,
   inject,
   input,
   output,
+  viewChild,
 } from '@angular/core';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import type { ErrorStateMatcher } from '@angular/material/core';
 import { MatDividerModule } from '@angular/material/divider';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import type { LocationPermissionState } from '@metro/shared/geolocation';
-import type { DisplayMode } from '../map.types';
 
 export type MapHeaderControls = 'primary' | 'secondary' | 'all';
 
@@ -23,10 +29,13 @@ export type MapHeaderControls = 'primary' | 'secondary' | 'all';
   imports: [
     MatButtonModule,
     MatDividerModule,
+    MatFormFieldModule,
     MatIconModule,
+    MatInputModule,
     MatMenuModule,
     MatProgressSpinnerModule,
     MatTooltipModule,
+    ReactiveFormsModule,
   ],
   templateUrl: './map-header.component.html',
   styleUrl: './map-header.component.scss',
@@ -35,23 +44,32 @@ export type MapHeaderControls = 'primary' | 'secondary' | 'all';
 export class MapHeaderComponent {
   readonly cityContext = inject(CityContextService);
   readonly controls = input<MapHeaderControls>('all');
-  readonly displayMode = input.required<DisplayMode>();
   readonly hasSelections = input<boolean>(false);
   readonly hasFeatures = input<boolean>(false);
   readonly layersOpen = input(false);
+  readonly userLocationVisible = input<boolean>(false);
   readonly locationPermission = input<LocationPermissionState>('prompt');
   readonly isRequestingLocation = input<boolean>(false);
   readonly isLocationDisabled = input<boolean>(false);
+  readonly searchControl = input(new FormControl('', { nonNullable: true }));
+  readonly searchOpen = input(false);
+  readonly searchError = input('');
 
-  readonly displayModeChange = output<DisplayMode>();
   readonly searchClick = output<void>();
-  readonly nearbyClick = output<void>();
-  readonly exploreClick = output<void>();
+  readonly addressSearchClick = output<void>();
+  readonly userLocationToggle = output<void>();
   readonly layersClick = output<void>();
   readonly centerClick = output<void>();
-  readonly centerOnUserClick = output<void>();
   readonly clearClick = output<void>();
   readonly fitClick = output<void>();
+  readonly searchErrorMatcher: ErrorStateMatcher = {
+    isErrorState: (control) =>
+      this.searchError().length > 0 || Boolean(control?.invalid),
+  };
+
+  private readonly searchInput = viewChild<ElementRef<HTMLInputElement>>(
+    'searchInput',
+  );
 
   readonly showPrimaryControls = computed(
     () => this.controls() !== 'secondary',
@@ -60,7 +78,7 @@ export class MapHeaderComponent {
     () => this.controls() !== 'primary',
   );
 
-  readonly isNearbyDisabled = computed(() => {
+  readonly isLocationUnavailable = computed(() => {
     const permission = this.locationPermission();
     return (
       this.isLocationDisabled() ||
@@ -70,70 +88,43 @@ export class MapHeaderComponent {
   });
 
   readonly isLocationActionDisabled = computed(() => {
-    const permission = this.locationPermission();
     return (
-      this.isRequestingLocation() ||
-      this.isLocationDisabled() ||
-      permission === 'denied' ||
-      permission === 'unavailable'
+      !this.userLocationVisible() &&
+      (this.isRequestingLocation() || this.isLocationUnavailable())
     );
   });
 
   readonly locationMessage = computed(() => {
-    if (this.isRequestingLocation()) return 'Obtendo sua localização.';
+    if (this.isRequestingLocation()) {
+      return 'Obtendo sua localização.';
+    }
 
     const permission = this.locationPermission();
     if (permission === 'denied') {
-      return 'Acesso à localização negado. Permita nas configurações do navegador.';
+      return this.userLocationVisible()
+        ? 'A localização está visível no mapa. Permita o acesso novamente nas configurações do navegador.'
+        : 'Acesso à localização negado. Permita nas configurações do navegador.';
     }
     if (permission === 'unavailable' || this.isLocationDisabled()) {
-      return 'Localização não disponível neste dispositivo.';
+      return this.userLocationVisible()
+        ? 'A localização está visível no mapa, mas não pode ser atualizada neste dispositivo.'
+        : 'Localização não disponível neste dispositivo.';
     }
-    if (permission === 'granted') {
-      return this.displayMode() === 'nearby'
-        ? 'Centralizar novamente na minha localização.'
-        : 'Mostrar paradas próximas à minha localização.';
-    }
-    return 'Ativar paradas próximas usando minha localização.';
+    return this.userLocationVisible()
+      ? 'Ocultar minha localização no mapa.'
+      : 'Mostrar minha localização no mapa.';
   });
 
-  readonly locationIcon = computed(() =>
-    this.displayMode() === 'nearby' ? 'my_location' : 'near_me',
-  );
-
-  readonly nearbyDisabledMessage = computed(() => {
-    if (this.locationPermission() === 'denied') {
-      return 'Permita o acesso à localização nas configurações do navegador para ativar este modo.';
-    }
-    return 'A localização não está disponível neste dispositivo.';
-  });
-
-  readonly optionsLabel = computed(() =>
-    this.displayMode() === 'nearby' ? 'Próximos' : 'Opções',
-  );
-
-  readonly optionsIcon = computed(() =>
-    this.displayMode() === 'nearby' ? 'near_me' : 'tune',
-  );
-
-  readonly optionsAriaLabel = computed(() =>
-    this.displayMode() === 'nearby' ? 'Opções; modo Próximos ativo' : 'Opções',
-  );
-
-  onDisplayModeChange(value: DisplayMode): void {
-    this.displayModeChange.emit(value);
+  constructor() {
+    effect((onCleanup) => {
+      const subscription = this.searchControl().valueChanges.subscribe((value) => {
+        if (value.trim() && !this.searchOpen()) this.searchClick.emit();
+      });
+      onCleanup(() => subscription.unsubscribe());
+    });
   }
 
-  onNearbyClick(): void {
-    if (this.isLocationActionDisabled()) return;
-
-    this.nearbyClick.emit();
-
-    if (this.displayMode() === 'nearby') {
-      this.centerOnUserClick.emit();
-      return;
-    }
-
-    this.displayModeChange.emit('nearby');
+  focusSearch(): void {
+    this.searchInput()?.nativeElement.focus({ preventScroll: true });
   }
 }

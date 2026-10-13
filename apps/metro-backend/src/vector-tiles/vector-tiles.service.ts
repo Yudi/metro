@@ -53,7 +53,7 @@ export class VectorTilesService implements OnModuleInit, OnModuleDestroy {
     y: number,
     options: VectorTileOptions = {},
   ): Promise<Buffer | null> {
-    const cacheKey = `${layer}/${z}/${x}/${y}/${this.getOptionsCacheKey(options)}`;
+    const cacheKey = `${layer}/${z}/${x}/${y}/${this.getOptionsCacheKey(layer, options)}`;
 
     const cached = this.cache.get(cacheKey);
     if (cached !== undefined) {
@@ -129,7 +129,7 @@ export class VectorTilesService implements OnModuleInit, OnModuleDestroy {
       case VectorTileLayer.BUS_ROUTES:
         return this.busTiles.generateBusRoutesTile(z, x, y, options);
       case VectorTileLayer.BUS_STOPS:
-        return this.busTiles.generateBusStopsTile(z, x, y, options);
+        return this.busTiles.generateBusStopsTile(z, x, y);
       case VectorTileLayer.BIKE_STATIONS:
         return this.bikeTiles.generateBikeStationsTile(z, x, y);
       default:
@@ -138,22 +138,15 @@ export class VectorTilesService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private getOptionsCacheKey(options: VectorTileOptions): string {
-    const routeIds = this.busTiles.normalizeIds(options.routeIds).sort();
-    const stopIds = this.busTiles.normalizeIds(options.stopIds).sort();
-    const nearby = this.busTiles.normalizeNearby(options.nearby);
+  private getOptionsCacheKey(
+    layer: VectorTileLayer,
+    options: VectorTileOptions,
+  ): string {
+    const routeIds = layer === VectorTileLayer.BUS_ROUTES
+      ? this.busTiles.normalizeIds(options.routeIds).sort()
+      : [];
 
-    return JSON.stringify({
-      routeIds,
-      stopIds,
-      nearby: nearby
-        ? {
-            latitude: nearby.latitude.toFixed(6),
-            longitude: nearby.longitude.toFixed(6),
-            radiusMeters: Math.round(nearby.radiusMeters),
-          }
-        : null,
-    });
+    return JSON.stringify({ routeIds });
   }
 
   private handleBikePollComplete(): void {

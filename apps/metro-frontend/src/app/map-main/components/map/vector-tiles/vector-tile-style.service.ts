@@ -2,7 +2,7 @@ import { Service, inject } from '@angular/core';
 import { LoggerService } from '@metro/shared/api';
 import { getRailLineByCode, TransitAgency } from '@metro/shared/utils';
 import { FeatureLike } from 'ol/Feature';
-import { Fill, Stroke, Style, Text, Circle as CircleStyle } from 'ol/style';
+import { Stroke, Style } from 'ol/style';
 import Icon from 'ol/style/Icon';
 import {
   createCenteredAgencyIconStyles,
@@ -11,6 +11,7 @@ import {
 import { StationNameService } from '../../../geography/station-name.service';
 import { VectorTileFeatureDataService } from './vector-tile-feature-data.service';
 import { VectorTileLayerType } from './vector-tile-layer.config';
+import { createBikeMarkerStyles } from '../layers/bike-marker-style.utils';
 
 @Service()
 export class VectorTileStyleService {
@@ -55,7 +56,7 @@ export class VectorTileStyleService {
       case VectorTileLayerType.BUS_STOPS:
         return this.createBusStopStyle();
       case VectorTileLayerType.BIKE_STATIONS:
-        return this.createBikeStationStyle(feature, currentZoom);
+        return this.createBikeStationStyle(feature);
       default:
         return new Style();
     }
@@ -121,7 +122,7 @@ export class VectorTileStyleService {
     return new Style({
       image: new Icon({
         src: '/app/icons/bus-stop.svg',
-        scale: 0.55,
+        scale: 0.32,
         anchor: [0.5, 0.5],
         anchorXUnits: 'fraction',
         anchorYUnits: 'fraction',
@@ -131,78 +132,14 @@ export class VectorTileStyleService {
 
   private createBikeStationStyle(
     feature: FeatureLike,
-    currentZoom: number | null,
   ): Style[] {
-    const bikesAvailable = Number(feature.get('num_bikes_available') ?? 0);
-    const electricBikesAvailable = Number(
-      feature.get('electric_bikes_available') ?? 0,
-    );
-    const effectiveCapacity = Number(feature.get('effective_capacity') ?? 0);
-    const label =
-      effectiveCapacity > 0
-        ? `${bikesAvailable}/${effectiveCapacity}`
-        : String(bikesAvailable);
-
-    if (this.featureData.isBikeStationCluster(feature)) {
-      const stationCount = Number(feature.get('station_count') ?? 1);
-      const radius = Math.min(24, 12 + Math.sqrt(stationCount) * 3.5);
-
-      return [
-        new Style({
-          image: new CircleStyle({
-            radius,
-            fill: new Fill({ color: '#2e7d32' }),
-            stroke: new Stroke({
-              color: electricBikesAvailable > 0 ? '#fdd835' : '#ffffff',
-              width: electricBikesAvailable > 0 ? 3 : 2,
-            }),
-          }),
-          text: new Text({
-            text: label,
-            font: '700 11px "Inter", "Roboto", sans-serif',
-            fill: new Fill({ color: '#ffffff' }),
-            stroke: new Stroke({ color: '#1b5e20', width: 3 }),
-            textAlign: 'center',
-            textBaseline: 'middle',
-          }),
-        }),
-      ];
-    }
-
-    const iconPath =
-      electricBikesAvailable > 0
-        ? '/app/icons/bike-electric.svg'
-        : '/app/icons/bike.svg';
-
-    const styles = [
-      new Style({
-        image: new Icon({
-          src: iconPath,
-          scale: 0.55,
-          anchor: [0.5, 0.5],
-          anchorXUnits: 'fraction',
-          anchorYUnits: 'fraction',
-        }),
-      }),
-    ];
-
-    if ((currentZoom || 0) >= 14) {
-      styles.push(
-        new Style({
-          text: new Text({
-            text: label,
-            font: '600 11px "Inter", "Roboto", sans-serif',
-            fill: new Fill({ color: '#1565c0' }),
-            stroke: new Stroke({ color: '#ffffff', width: 3.5 }),
-            offsetY: 14,
-            textAlign: 'center',
-            textBaseline: 'top',
-          }),
-        }),
-      );
-    }
-
-    return styles;
+    return createBikeMarkerStyles({
+      bikesAvailable: Number(feature.get('num_bikes_available') ?? 0),
+      effectiveCapacity: Number(feature.get('effective_capacity') ?? 0),
+      hasElectricBikes: Number(feature.get('electric_bikes_available') ?? 0) > 0,
+      clustered: this.featureData.isBikeStationCluster(feature),
+      stationCount: Number(feature.get('station_count') ?? 1),
+    });
   }
 
   private parseTransitAgencies(raw: unknown): TransitAgency[] {

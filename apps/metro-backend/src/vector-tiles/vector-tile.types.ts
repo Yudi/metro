@@ -11,12 +11,6 @@ export enum VectorTileLayer {
 
 export interface VectorTileOptions {
   routeIds?: string[];
-  stopIds?: string[];
-  nearby?: {
-    latitude: number;
-    longitude: number;
-    radiusMeters: number;
-  };
 }
 
 /**

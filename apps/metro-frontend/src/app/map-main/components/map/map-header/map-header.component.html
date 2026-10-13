@@ -1,42 +1,64 @@
 <header class="map-header">
   @if (showPrimaryControls()) {
     <div class="primary-actions">
-      <button
-        matButton="filled"
-        type="button"
-        class="search-button"
-        (click)="searchClick.emit()"
-        matTooltip="Pesquisar linhas e paradas"
-        matTooltipPosition="above"
-        aria-label="Pesquisar no mapa"
+      <mat-form-field
+        appearance="outline"
+        subscriptSizing="dynamic"
+        class="search-field"
+        [class.is-search-open]="searchOpen()"
       >
-        <mat-icon aria-hidden="true">search</mat-icon>
-        <span>Pesquisar</span>
-      </button>
+        <mat-label>Buscar linhas e paradas</mat-label>
+        <input
+          matInput
+          type="search"
+          #searchInput
+          [formControl]="searchControl()"
+          [errorStateMatcher]="searchErrorMatcher"
+          aria-haspopup="dialog"
+          [attr.aria-expanded]="searchOpen()"
+          [attr.aria-invalid]="searchError() ? 'true' : null"
+          autocomplete="off"
+        />
+        <button
+          matIconButton
+          matSuffix
+          class="search-action"
+          type="button"
+          aria-label="Pesquisar linhas e paradas"
+          matTooltip="Pesquisar linhas e paradas"
+          matTooltipPosition="above"
+          (click)="searchClick.emit()"
+        >
+          <mat-icon aria-hidden="true">search</mat-icon>
+        </button>
+        @if (searchError()) {
+          <mat-error>{{ searchError() }}</mat-error>
+        }
+      </mat-form-field>
 
       <span
-        class="nearby-button-container"
+        class="location-button-container"
         [matTooltip]="locationMessage()"
         matTooltipPosition="above"
         [attr.title]="isLocationActionDisabled() ? locationMessage() : null"
       >
         <button
-          matButton="tonal"
+          matIconButton
           type="button"
-          class="nearby-button"
-          (click)="onNearbyClick()"
+          class="location-button"
+          [class.is-visible]="userLocationVisible()"
+          (click)="userLocationToggle.emit()"
           [disabled]="isLocationActionDisabled()"
-          aria-label="Perto de mim"
+          aria-label="Minha localização"
           [attr.aria-description]="locationMessage()"
-          [attr.aria-pressed]="displayMode() === 'nearby'"
+          [attr.aria-pressed]="userLocationVisible()"
           [attr.aria-busy]="isRequestingLocation() ? 'true' : null"
         >
           @if (isRequestingLocation()) {
             <mat-spinner diameter="20" aria-hidden="true"></mat-spinner>
           } @else {
-            <mat-icon aria-hidden="true">{{ locationIcon() }}</mat-icon>
+            <mat-icon aria-hidden="true">my_location</mat-icon>
           }
-          <span>Perto de mim</span>
         </button>
       </span>
     </div>
@@ -62,72 +84,26 @@
         type="button"
         class="options-button"
         [matMenuTriggerFor]="optionsMenu"
-        [matTooltip]="optionsAriaLabel()"
+        matTooltip="Opções do mapa"
         matTooltipPosition="below"
-        [attr.aria-label]="optionsAriaLabel()"
+        aria-label="Opções"
       >
-        <mat-icon aria-hidden="true">{{ optionsIcon() }}</mat-icon>
-        <span>{{ optionsLabel() }}</span>
+        <mat-icon aria-hidden="true">tune</mat-icon>
+        <span>Opções</span>
       </button>
     </div>
   }
 </header>
 
 <mat-menu #optionsMenu="matMenu" aria-label="Opções do mapa">
-  <button mat-menu-item type="button" (click)="exploreClick.emit()">
-    <mat-icon aria-hidden="true">explore</mat-icon>
-    <span>Explorar outro local</span>
+  <button mat-menu-item type="button" (click)="addressSearchClick.emit()">
+    <mat-icon aria-hidden="true">search</mat-icon>
+    <span>Buscar endereço</span>
   </button>
 
   <button mat-menu-item type="button" (click)="centerClick.emit()">
     <mat-icon aria-hidden="true">location_city</mat-icon>
     <span>Centralizar em {{ cityContext.city().name }}</span>
-  </button>
-
-  <mat-divider></mat-divider>
-
-  <button
-    mat-menu-item
-    type="button"
-    role="menuitemradio"
-    [attr.aria-checked]="displayMode() === 'selected'"
-    (click)="onDisplayModeChange('selected')"
-  >
-    <mat-icon aria-hidden="true">
-      {{
-        displayMode() === "selected"
-          ? "radio_button_checked"
-          : "radio_button_unchecked"
-      }}
-    </mat-icon>
-    <span>Seleção manual</span>
-  </button>
-
-  <button
-    mat-menu-item
-    type="button"
-    class="nearby-menu-item"
-    role="menuitemradio"
-    [attr.aria-checked]="displayMode() === 'nearby'"
-    [attr.aria-description]="
-      isNearbyDisabled() ? nearbyDisabledMessage() : null
-    "
-    [disabled]="isNearbyDisabled()"
-    (click)="onDisplayModeChange('nearby')"
-  >
-    <mat-icon aria-hidden="true">
-      {{
-        displayMode() === "nearby"
-          ? "radio_button_checked"
-          : "radio_button_unchecked"
-      }}
-    </mat-icon>
-    <span class="menu-item-copy">
-      <span>Paradas próximas</span>
-      @if (isNearbyDisabled()) {
-        <span class="menu-item-detail">{{ nearbyDisabledMessage() }}</span>
-      }
-    </span>
   </button>
 
   <mat-divider></mat-divider>

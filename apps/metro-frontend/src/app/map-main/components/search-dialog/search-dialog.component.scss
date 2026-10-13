@@ -21,89 +21,12 @@
     }
   }
 
-  // .search-input-container {
-  //   flex-shrink: 0;
-  //   padding-bottom: 8px;
-
-  //   .search-field {
-  //     width: 100%;
-
-  //     ::ng-deep .mat-mdc-form-field-subscript-wrapper {
-  //       display: none;
-  //     }
-  //   }
-  // }
-
   .search-input-container {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
     margin-bottom: 24px;
     width: 100%;
+
     .search-field {
-      flex: 1;
-      max-width: 600px;
-    }
-
-    .nearby-button {
-      margin-top: 8px; // Align with form field input
-      flex-shrink: 0;
-    }
-  }
-
-  .search-options {
-    // display: flex;
-    display: none;
-    align-items: center;
-    gap: 12px;
-    padding: 8px 0 16px;
-    flex-shrink: 0;
-
-    .nearby-button {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 16px;
-      border-radius: 24px;
-      font-weight: 500;
-      transition: all 0.2s ease;
-
-      mat-icon {
-        font-size: 20px;
-        width: 20px;
-        height: 20px;
-      }
-
-      mat-spinner {
-        --mdc-circular-progress-active-indicator-color: var(--mat-sys-primary);
-      }
-
-      .status-icon {
-        font-size: 16px;
-        width: 16px;
-        height: 16px;
-        margin-left: 4px;
-
-        &.denied {
-          color: var(--mat-sys-error);
-        }
-      }
-
-      &.active {
-        background-color: var(--mat-sys-primary-container);
-        color: var(--mat-sys-on-primary-container);
-        border-color: var(--mat-sys-primary);
-      }
-
-      &.loading {
-        pointer-events: none;
-        opacity: 0.8;
-      }
-
-      &:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-      }
+      width: 100%;
     }
   }
 
@@ -142,8 +65,7 @@
     }
 
     .no-results,
-    .search-help,
-    .nearby-active {
+    .search-help {
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -196,53 +118,7 @@
       .help-icon {
         color: var(--mat-sys-primary);
       }
-
-      .search-tips {
-        text-align: left;
-        max-width: 320px;
-        margin-top: 24px;
-
-        h4 {
-          margin: 0 0 12px;
-          font-size: 0.875rem;
-          font-weight: 600;
-          color: var(--mat-sys-on-surface);
-        }
-
-        ul {
-          margin: 0;
-          padding-left: 20px;
-          color: var(--mat-sys-on-surface-variant);
-
-          li {
-            margin-bottom: 8px;
-            font-size: 0.8125rem;
-            line-height: 1.5;
-
-            &:last-child {
-              margin-bottom: 0;
-            }
-          }
-        }
-      }
     }
-
-    .nearby-active {
-      .nearby-icon {
-        color: var(--mat-sys-primary);
-        animation: pulse 2s infinite;
-      }
-    }
-  }
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 0.6;
-  }
-  50% {
-    opacity: 1;
   }
 }
 

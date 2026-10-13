@@ -173,36 +173,17 @@ export class VectorTilesController {
   @Header('Cache-Control', 'public, max-age=300')
   @Header('Access-Control-Allow-Origin', '*')
   @ApiOperation({
-    summary: 'Get selected or nearby bus stop vector tile',
+    summary: 'Get bus stop vector tile',
     description:
-      'Returns a Mapbox Vector Tile (MVT) containing bus stops filtered by route IDs, stop IDs, or a nearby circle.',
+      'Returns a Mapbox Vector Tile (MVT) containing bus-serving stops in the requested tile bounds at zoom level 15 or higher.',
   })
   async getBusStopsTile(
     @Param('z', ParseIntPipe) z: number,
     @Param('x', ParseIntPipe) x: number,
     @Param('y', ParseIntPipe) y: number,
-    @Query('routeIds') routeIds: string | undefined,
-    @Query('stopIds') stopIds: string | undefined,
-    @Query('lat') lat: string | undefined,
-    @Query('lon') lon: string | undefined,
-    @Query('radiusMeters') radiusMeters: string | undefined,
     @Res() res: Response,
   ): Promise<void> {
-    const parsedRouteIds = this.parseCsv(routeIds, 'routeIds');
-    const parsedStopIds = this.parseCsv(stopIds, 'stopIds');
-    const nearby = this.parseNearby(lat, lon, radiusMeters);
-
-    if (parsedRouteIds.length === 0 && parsedStopIds.length === 0 && !nearby) {
-      throw new BadRequestException(
-        'At least one routeIds, stopIds, or complete nearby filter is required',
-      );
-    }
-
-    await this.sendVectorTile(res, VectorTileLayer.BUS_STOPS, z, x, y, {
-      routeIds: parsedRouteIds,
-      stopIds: parsedStopIds,
-      nearby,
-    });
+    await this.sendVectorTile(res, VectorTileLayer.BUS_STOPS, z, x, y);
   }
 
   @Get('bike-stations/:z/:x/:y.pbf')
@@ -314,60 +295,6 @@ export class VectorTilesController {
     }
 
     return Array.from(new Set(items));
-  }
-
-  private parseNearby(
-    lat: string | undefined,
-    lon: string | undefined,
-    radiusMeters: string | undefined,
-  ): { latitude: number; longitude: number; radiusMeters: number } | undefined {
-    const provided = [lat, lon, radiusMeters].filter(
-      (value) => value !== undefined,
-    ).length;
-    if (provided === 0) {
-      return undefined;
-    }
-    if (provided !== 3) {
-      throw new BadRequestException(
-        'lat, lon, and radiusMeters must be provided together',
-      );
-    }
-
-    const latitude = this.parseFiniteNumber(lat as string, 'lat');
-    const longitude = this.parseFiniteNumber(lon as string, 'lon');
-    const radius = this.parseFiniteNumber(
-      radiusMeters as string,
-      'radiusMeters',
-    );
-    if (latitude < -90 || latitude > 90) {
-      throw new BadRequestException('lat must be between -90 and 90');
-    }
-    if (longitude < -180 || longitude > 180) {
-      throw new BadRequestException('lon must be between -180 and 180');
-    }
-    if (radius <= 0 || radius > 5_000) {
-      throw new BadRequestException(
-        'radiusMeters must be greater than 0 and at most 5000',
-      );
-    }
-
-    return { latitude, longitude, radiusMeters: radius };
-  }
-
-  private parseFiniteNumber(value: string, argumentName: string): number {
-    if (
-      typeof value !== 'string' ||
-      !/^-?(?:\d+\.?\d*|\.\d+)$/.test(value.trim())
-    ) {
-      throw new BadRequestException(`${argumentName} must be a finite number`);
-    }
-
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed)) {
-      throw new BadRequestException(`${argumentName} must be a finite number`);
-    }
-
-    return parsed;
   }
 }
 

@@ -14,8 +14,3 @@ export interface MapOptions {
   showControls?: boolean;
   additionalLayers?: import('ol/layer/Base').default[];
 }
-
-export interface MapPointSelection {
-  lat: number;
-  lon: number;
-}

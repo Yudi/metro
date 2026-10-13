@@ -10,7 +10,6 @@ import { FeatureFactoryService } from './feature-factory.service';
 import { LoggerService } from '@metro/shared/api';
 import { isSubwayShape } from '../../geography/transit-utils';
 import { MapSelectionDisplayService } from './map-selection-display.service';
-import { updatePreservedFeaturesCreationSource } from './map-feature-source.utils';
 import { getBusRouteIdentity } from '@metro/shared/utils';
 
 @Service()
@@ -23,13 +22,7 @@ export class MapDisplayService {
   private logger = inject(LoggerService);
   private readonly selectionDisplayService = inject(MapSelectionDisplayService);
 
-  /**
-   * Update map display with layered approach
-   * - Subway stations go to subway-stations layer
-   * - Subway routes go to subway-routes layer (if not selected)
-   * - Selected items go to selection layer
-   * - Regular stops/routes use legacy system
-   */
+  /** Refresh loaded route shapes and selected feature overlays. */
   updateMapDisplay(): void {
     this.logger.debug('updateMapDisplay() called', {
       subwayStations: this.mapState.subwayStations().length,
@@ -42,7 +35,7 @@ export class MapDisplayService {
     // Use modular approach - only update what's actually changed
     this.updateSubwayStations();
     this.updateSubwayRoutes();
-    this.updateBusRoutesAndStops();
+    this.updateBusRoutes();
     this.selectionDisplayService.updateSelectedFeatures();
   }
 
@@ -172,103 +165,15 @@ export class MapDisplayService {
     }
   }
 
-  /**
-   * Update bus routes and stops layers (mode-dependent content)
-   */
-  private updateBusRoutesAndStops(): void {
+  private updateBusRoutes(): void {
     const layerService = this.mapService.getLayerService();
-
-    this.logger.debug('Updating bus routes and stops');
-
-    // Get currently selected route and stop IDs to preserve them
     const selectedRouteIds = this.mapState.selectedRouteIds();
-    const selectedStopIds = this.mapState.selectedStopIds();
-    const allSelectedIds = new Set([...selectedRouteIds, ...selectedStopIds]);
-
-    // Clear features based on display mode
-    if (this.mapState.displayMode() === 'nearby') {
-      // Clear NEARBY features - these will be re-added from current displayedStops
-      layerService.removeFeaturesByCreationSource(
-        LayerType.BUS_ROUTES,
-        FeatureCreationSource.NEARBY,
-      );
-      layerService.removeFeaturesByCreationSource(
-        LayerType.BUS_STOPS,
-        FeatureCreationSource.NEARBY,
-      );
-      // Clear ROUTE_DISPLAY features, BUT preserve selected ones
-      layerService.removeFeaturesByCreationSourceExceptSelected(
-        LayerType.BUS_ROUTES,
-        FeatureCreationSource.ROUTE_DISPLAY,
-        allSelectedIds,
-      );
-      layerService.removeFeaturesByCreationSourceExceptSelected(
-        LayerType.BUS_STOPS,
-        FeatureCreationSource.ROUTE_DISPLAY,
-        allSelectedIds,
-      );
-      // Also clear SELECTION features that are no longer selected
-      layerService.removeFeaturesByCreationSourceExceptSelected(
-        LayerType.BUS_ROUTES,
-        FeatureCreationSource.SELECTION,
-        allSelectedIds,
-      );
-      layerService.removeFeaturesByCreationSourceExceptSelected(
-        LayerType.BUS_STOPS,
-        FeatureCreationSource.SELECTION,
-        allSelectedIds,
-      );
-      // Update preserved features to have SELECTION as creation source
-      updatePreservedFeaturesCreationSource(
-        layerService,
-        this.logger,
-        LayerType.BUS_ROUTES,
-        allSelectedIds,
-      );
-      updatePreservedFeaturesCreationSource(
-        layerService,
-        this.logger,
-        LayerType.BUS_STOPS,
-        allSelectedIds,
-      );
-    } else {
-      // In selected mode: clear NEARBY, ROUTE_DISPLAY, and SELECTION features
-      // This ensures removed routes/stops are properly cleared from the map
-      layerService.removeFeaturesByCreationSource(
-        LayerType.BUS_ROUTES,
-        FeatureCreationSource.NEARBY,
-      );
-      layerService.removeFeaturesByCreationSource(
-        LayerType.BUS_ROUTES,
-        FeatureCreationSource.ROUTE_DISPLAY,
-      );
-      layerService.removeFeaturesByCreationSource(
-        LayerType.BUS_ROUTES,
-        FeatureCreationSource.SELECTION,
-      );
-      layerService.removeFeaturesByCreationSource(
-        LayerType.BUS_STOPS,
-        FeatureCreationSource.NEARBY,
-      );
-      layerService.removeFeaturesByCreationSource(
-        LayerType.BUS_STOPS,
-        FeatureCreationSource.ROUTE_DISPLAY,
-      );
-      layerService.removeFeaturesByCreationSource(
-        LayerType.BUS_STOPS,
-        FeatureCreationSource.SELECTION,
-      );
-    }
+    layerService.clearLayer(LayerType.BUS_ROUTES);
 
     // Add bus route shapes (non-subway routes from displayed shapes)
     // Exclude SPTrans rail data as it now comes from GPKG vector tiles
     let regularShapeCount = 0;
     const routesDerivedFromStops = this.mapState.routesDerivedFromStops();
-    const defaultCreationSource =
-      this.mapState.displayMode() === 'nearby'
-        ? FeatureCreationSource.NEARBY
-        : FeatureCreationSource.ROUTE_DISPLAY;
-
     this.mapState.displayedShapes().forEach((shape) => {
       if (!isSubwayShape(shape)) {
         // Exclude SPTrans rail data explicitly
@@ -290,7 +195,7 @@ export class MapDisplayService {
         const creationSource =
           isExplicitlySelected || isFromStopSelection
             ? FeatureCreationSource.SELECTION
-            : defaultCreationSource;
+            : FeatureCreationSource.ROUTE_DISPLAY;
 
         const feature = this.featureFactory.createShapeFeature(
           shape,
@@ -301,24 +206,7 @@ export class MapDisplayService {
       }
     });
 
-    // Add bus stops to BUS_STOPS layer (non-subway stops from displayed stops)
-    // Exclude SPTrans rail stations as they now come from GPKG vector tiles
-    let busStopCount = 0;
-    this.mapState.displayedStops().forEach((stop) => {
-      // Exclude rail stations using multiple checks
-      if (!stop.isSubwayStation && !this.isRailStopFromSPTrans(stop)) {
-        const feature = this.featureFactory.createStopFeature(
-          stop,
-          defaultCreationSource,
-        );
-        layerService.addFeature(LayerType.BUS_STOPS, feature);
-        busStopCount++;
-      }
-    });
-
-    this.logger.info(
-      `Updated BUS layers: ${regularShapeCount} shapes in BUS_ROUTES, ${busStopCount} stops in BUS_STOPS`,
-    );
+    this.logger.debug('Updated bus route overlays', { shapes: regularShapeCount });
   }
 
   /** Add a feature to the dedicated selection layer. */
@@ -334,19 +222,6 @@ export class MapDisplayService {
   /** Clear the dedicated selection layer. */
   clearSelectionLayer(): void {
     this.selectionDisplayService.clearSelectionLayer();
-  }
-
-  /**
-   * Check if a stop is a rail station (SPTrans data - should be excluded)
-   * Rail stations from SPTrans GTFS have stop_id <= 19045
-   */
-  private isRailStopFromSPTrans(stop: {
-    stopId: string;
-    isSubwayStation?: boolean;
-  }): boolean {
-    if (stop.isSubwayStation) return true;
-    const stopIdNum = parseInt(stop.stopId, 10);
-    return !isNaN(stopIdNum) && stopIdNum <= 19045;
   }
 
   // Map navigation controls
@@ -377,24 +252,14 @@ export class MapDisplayService {
     this.mapService.clearSelection();
   }
 
-  /**
-   * Clear features created by nearby mode from all layers
-   */
-  clearNearbyFeatures(): void {
-    const layerService = this.mapService.getLayerService();
-    layerService.removeFeaturesByCreationSourceFromAllLayers(
-      FeatureCreationSource.NEARBY,
-    );
-  }
-
-  showExploreLocation(lat: number, lon: number, name?: string): void {
+  showAddressLocation(lat: number, lon: number, name?: string): void {
     const layerService = this.mapService.getLayerService();
     layerService.removeFeaturesByCreationSource(
       LayerType.SELECTION,
-      FeatureCreationSource.EXPLORE,
+      FeatureCreationSource.ADDRESS_SEARCH,
     );
 
-    const feature = this.featureFactory.createExploreLocationFeature(
+    const feature = this.featureFactory.createAddressLocationFeature(
       lat,
       lon,
       name,
@@ -402,11 +267,11 @@ export class MapDisplayService {
     layerService.addFeature(LayerType.SELECTION, feature);
   }
 
-  clearExploreLocation(): void {
+  clearAddressLocation(): void {
     this.mapService
       .getLayerService()
       .removeFeaturesByCreationSourceFromAllLayers(
-        FeatureCreationSource.EXPLORE,
+        FeatureCreationSource.ADDRESS_SEARCH,
       );
   }
 

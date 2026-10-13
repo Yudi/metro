@@ -54,7 +54,7 @@ export class MapSelectionDisplayService {
         | FeatureCreationSource
         | undefined;
 
-      if (creationSource === FeatureCreationSource.EXPLORE) return false;
+      if (creationSource === FeatureCreationSource.ADDRESS_SEARCH) return false;
       if (featureId && targetSelectionIds.has(featureId)) return false;
       if (routeId && selectedRouteIds.has(routeId)) return false;
       if (stopId && selectedStopIds.has(stopId)) return false;
@@ -123,19 +123,18 @@ export class MapSelectionDisplayService {
       }
     });
 
-    // Rail stations from search are backed by vector tiles rather than
-    // displayedStops, so their selected marker needs the URL coordinates.
+    // URL selections can have coordinates before their detail data arrives.
     const displayedStopIds = new Set(
       this.mapState.displayedStops().map((stop) => stop.stopId),
     );
     this.mapState.selectedStops().forEach((stop) => {
-      if (!stop.isSubwayStation || displayedStopIds.has(stop.id)) return;
+      if (displayedStopIds.has(stop.id)) return;
       const alreadyExists = currentSelectionFeatures.some(
         (feature) => feature.getId() === stop.id,
       );
       if (alreadyExists) return;
       const feature = this.featureFactory.createStopFeature(
-        { ...stop, stopId: stop.id, isSubwayStation: true },
+        { ...stop, stopId: stop.id, isSubwayStation: stop.isSubwayStation ?? false },
         FeatureCreationSource.SELECTION,
       );
       layerService.addFeature(LayerType.SELECTION, feature);

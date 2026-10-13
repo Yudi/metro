@@ -277,25 +277,6 @@ export class MapDataLoaderService {
     request.subscription.add(subscription);
     return initialResult;
   }
-  async loadNearbyStops(lat: number, lon: number): Promise<void> {
-    const finishLoading = this.beginLoading();
-    this.mapState.nearbyCenter.set({ lat, lon });
-
-    try {
-      this.syncVectorTileFilters();
-      this.snackBar.open('Paradas próximas carregadas no mapa', 'Fechar', {
-        duration: 3000,
-      });
-    } catch (error) {
-      this.logger.error('Error loading nearby stops', error);
-      this.snackBar.open('Error loading nearby stops', 'Close', {
-        duration: 3000,
-      });
-    } finally {
-      finishLoading();
-    }
-  }
-
   refreshDisplayedData(): void {
     this.activeRouteRequests.clear();
     // Rebuild displayed data based on current selections
@@ -357,22 +338,8 @@ export class MapDataLoaderService {
       new Set([...selectedRoutes, ...displayedRoutes]),
     );
     const stopIds = Array.from(this.mapState.selectedStops().keys());
-    const nearbyCenter = this.mapState.nearbyCenter();
-    const nearby =
-      this.mapState.displayMode() === 'nearby' && nearbyCenter
-        ? {
-            lat: nearbyCenter.lat,
-            lon: nearbyCenter.lon,
-            radiusMeters: this.mapState.nearbyRadius(),
-          }
-        : null;
-
     this.vectorTileLayerService.setBusRouteIds(routeIds);
-    this.vectorTileLayerService.setBusStopFilter({
-      routeIds,
-      stopIds,
-      nearby,
-    });
+    this.vectorTileLayerService.setSelectedBusStopIds(stopIds);
   }
 
   cancelStopDataLoad(stopId: string): void {

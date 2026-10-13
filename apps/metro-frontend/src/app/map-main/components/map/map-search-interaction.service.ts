@@ -1,9 +1,13 @@
-import { Service, inject } from '@angular/core';
+import { DestroyRef, Service, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormControl } from '@angular/forms';
+import { BehaviorSubject } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
+import type { MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { LoggerService } from '@metro/shared/api';
 import { BikeStationsService } from '../../geography/bike-stations.service';
-import { SearchDialogComponent } from '../search-dialog/search-dialog.component';
+import type { SearchDialogComponent, SearchDialogData } from '../search-dialog/search-dialog.component';
 import { MapDetailsDialogService } from './map-details-dialog.service';
 import { MapDisplayService } from './map-display.service';
 import { MapSelectionService } from './map-selection.service';
@@ -23,36 +27,84 @@ export class MapSearchInteractionService {
   private readonly detailsService = inject(MapDetailsDialogService);
   private readonly panelService = inject(MapPanelService);
 
-  openSearchModal(): void {
-    const dialogRef = this.dialog.open(SearchDialogComponent, {
-      width: '600px',
-      maxWidth: '90vw',
-      maxHeight: '80vh',
-      panelClass: 'search-dialog-panel',
-      autoFocus: 'input',
-      delayFocusTrap: false,
-    });
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly searchQueries = new BehaviorSubject('');
+  private openingSearch = false;
+  private searchRequest = 0;
+  private activeDialog: MatDialogRef<SearchDialogComponent, SearchResult | undefined> | null = null;
+  readonly searchControl = new FormControl('', { nonNullable: true });
+  readonly searchOpen = signal(false);
+  readonly searchError = signal('');
 
-    dialogRef.afterClosed().subscribe((result) => {
-      if (!result) {
-        return;
-      }
+  constructor() {
+    this.searchControl.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((query) => this.searchQueries.next(query));
+  }
 
-      if ('showAll' in result) {
-        this.logger.debug('Showing all results on map', {
-          count: result.results.length,
+  async openSearchModal(restoreFocus?: () => void): Promise<void> {
+    if (this.openingSearch || this.searchOpen()) return;
+    const request = ++this.searchRequest;
+    this.openingSearch = true;
+    this.searchError.set('');
+
+    try {
+      const { SearchDialogComponent } = await import(
+        '../search-dialog/search-dialog.component'
+      );
+      if (this.destroyRef.destroyed || request !== this.searchRequest) return;
+
+      // Replay all typing received while the dialog chunk was loading.
+      this.searchQueries.next(this.searchControl.value);
+      const dialogRef = this.dialog.open<
+        SearchDialogComponent, SearchDialogData, SearchResult | undefined
+      >(SearchDialogComponent, {
+        width: '600px',
+        maxWidth: '90vw',
+        maxHeight: '80vh',
+        panelClass: 'search-dialog-panel',
+        autoFocus: 'input',
+        delayFocusTrap: false,
+        restoreFocus: false,
+        data: {
+          queryChanges: this.searchQueries.asObservable(),
+          onQueryChange: (query) => {
+            this.searchControl.setValue(query, { emitEvent: false });
+          },
+        },
+      });
+      this.activeDialog = dialogRef;
+      // Focus before hiding the launcher so the next keystroke reaches the dialog.
+      dialogRef.componentInstance.focusSearch();
+      this.searchOpen.set(true);
+      dialogRef.afterClosed()
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe((result) => {
+          if (request !== this.searchRequest) return;
+          this.activeDialog = null;
+          this.searchOpen.set(false);
+          if (result) {
+            this.handleSearchResult(result);
+            this.panelService.compactOnMobile();
+          }
+          restoreFocus?.();
         });
-        this.snackBar.open(
-          `Showing ${result.results.length} results on map`,
-          'Close',
-          { duration: 3000 },
-        );
-        return;
-      }
+    } catch (error) {
+      if (request !== this.searchRequest) return;
+      this.searchOpen.set(false);
+      this.searchError.set('Não foi possível abrir a busca. Tente novamente.');
+      this.logger.error('Could not open map search', error);
+    } finally {
+      if (request === this.searchRequest) this.openingSearch = false;
+    }
+  }
 
-      this.handleSearchResult(result);
-      this.panelService.compactOnMobile();
-    });
+  cancelSearch(): void {
+    this.searchRequest++;
+    this.activeDialog?.close();
+    this.activeDialog = null;
+    this.openingSearch = false;
+    this.searchOpen.set(false);
   }
 
   private handleSearchResult(result: SearchResult): void {

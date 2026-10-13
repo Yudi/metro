@@ -69,7 +69,6 @@ describe('VectorTilesService rail tile cache and request coalescing', () => {
       { generateRailRoutesTile } as never,
       {
         normalizeIds: jest.fn().mockReturnValue([]),
-        normalizeNearby: jest.fn().mockReturnValue(undefined),
       } as never,
       {} as never,
     );
@@ -107,7 +106,6 @@ describe('VectorTilesService rail tile cache and request coalescing', () => {
       { generateRailRoutesTile } as never,
       {
         normalizeIds: jest.fn().mockReturnValue([]),
-        normalizeNearby: jest.fn().mockReturnValue(undefined),
       } as never,
       {} as never,
     );

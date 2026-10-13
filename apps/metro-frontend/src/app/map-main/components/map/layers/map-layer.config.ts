@@ -10,13 +10,6 @@ export function createMapLayerConfigs(): LayerConfig[] {
       zIndex: 25,
     },
     {
-      id: LayerType.BUS_STOPS,
-      name: 'Pontos de ônibus',
-      visible: true,
-      toggleable: false,
-      zIndex: 45,
-    },
-    {
       id: LayerType.BUS_ROUTES,
       name: 'Rotas de ônibus',
       visible: true,

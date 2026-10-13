@@ -1,36 +1,44 @@
 import {
+  ChangeDetectorRef,
   Component,
+  ElementRef,
   inject,
   DestroyRef,
   signal,
   computed,
   isDevMode,
   ChangeDetectionStrategy,
-  effect,
+  viewChild,
 } from '@angular/core';
 
-import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import {
+  MAT_DIALOG_DATA,
+  MatDialogModule,
+  MatDialogRef,
+} from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatTooltipModule } from '@angular/material/tooltip';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
+  EMPTY,
+  Observable,
   Subject,
-  debounceTime,
-  distinctUntilChanged,
-  switchMap,
+  catchError,
+  defer,
+  forkJoin,
   of,
+  shareReplay,
+  switchMap,
+  timer,
 } from 'rxjs';
 
 import {
   TypesenseSearchService,
   TypesenseSearchResponse,
-  NearbyStopsResponse,
 } from '../../../search/typesense-search.service';
-import { GeolocationService } from '@metro/shared/geolocation';
 
 import {
   hardNormalizeString,
@@ -44,13 +52,16 @@ import {
   SearchResultCardComponent,
 } from './search-result-card/search-result-card.component';
 import { LoggerService, RailGraphqlService } from '@metro/shared/api';
-import { forkJoin } from 'rxjs';
 import {
-  mapNearbyStop,
   mapTypesenseResult,
   mergeSubwayStationResults,
   orderSearchResults,
 } from './search-dialog.utils';
+
+export interface SearchDialogData {
+  queryChanges?: Observable<string>;
+  onQueryChange?: (query: string) => void;
+}
 
 @Component({
   selector: 'app-search-dialog',
@@ -61,7 +72,6 @@ import {
     MatFormFieldModule,
     MatIconModule,
     MatProgressSpinnerModule,
-    MatTooltipModule,
     SearchResultCardComponent,
   ],
   templateUrl: './search-dialog.component.html',
@@ -70,24 +80,30 @@ import {
 })
 export class SearchDialogComponent {
   private readonly dialogRef = inject(MatDialogRef<SearchDialogComponent>);
+  private readonly dialogData = inject<SearchDialogData>(MAT_DIALOG_DATA, {
+    optional: true,
+  });
   private readonly typesenseService = inject(TypesenseSearchService);
   private readonly geographyService = inject(GeographyGraphQLService);
-  private readonly geolocationService = inject(GeolocationService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly logger = inject(LoggerService);
   private readonly railService = inject(RailGraphqlService);
+  private readonly specialServices$ = defer(() => {
+    const cachedServices = this.railService.specialServices();
+    return cachedServices.length > 0
+      ? of(cachedServices)
+      : this.railService.fetchSpecialServices();
+  }).pipe(shareReplay({ bufferSize: 1, refCount: false }));
+  private readonly changeDetector = inject(ChangeDetectorRef);
+  private readonly searchInput = viewChild<ElementRef<HTMLInputElement>>(
+    'searchInput',
+  );
 
   // Search state
   readonly searchQuery = signal('');
   readonly searchResults = signal<SearchResult[]>([]);
   readonly isSearching = signal(false);
   readonly isReindexing = signal(false);
-  readonly nearbySearch = signal(false);
-
-  // Expose geolocation service signals for template
-  readonly locationPermission = this.geolocationService.permission;
-  readonly isLocationSupported = this.geolocationService.isSupported;
-  readonly isRequestingLocation = this.geolocationService.isRequesting;
 
   // Search subject for debouncing
   private readonly searchSubject = new Subject<string>();
@@ -104,143 +120,72 @@ export class SearchDialogComponent {
       !this.isReindexing(),
   );
 
-  /** Whether the nearby search button should be disabled */
-  readonly isNearbyDisabled = this.geolocationService.isDisabled;
-
-  /** Tooltip message for the nearby button */
-  readonly nearbyButtonTooltip = this.geolocationService.permissionMessage;
-
-  /** User location from geolocation service */
-  readonly userLocation = computed(() => {
-    const loc = this.geolocationService.location();
-    return loc ? { lat: loc.latitude, lng: loc.longitude } : null;
-  });
-
   constructor() {
     this.setupSearchPipeline();
-    this.setupNearbySearchEffect();
+    this.dialogData?.queryChanges
+      ?.pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((query) => this.setQuery(query));
   }
 
   /** Set up the search observable with debouncing */
   private setupSearchPipeline(): void {
     this.searchSubject
       .pipe(
-        debounceTime(300),
-        distinctUntilChanged(),
         switchMap((query) => {
           if (!query.trim()) {
-            return of(null);
+            this.isSearching.set(false);
+            this.searchResults.set([]);
+            return EMPTY;
           }
 
           this.isSearching.set(true);
-          return forkJoin({
-            response: this.typesenseService.search(query),
-            specialServices: this.railService.fetchSpecialServices(),
-          });
+          return timer(250).pipe(
+            switchMap(() =>
+              forkJoin({
+                response: this.typesenseService.search(query),
+                specialServices: this.specialServices$,
+              }),
+            ),
+            catchError((error: unknown) => {
+              this.logger.error('Search error', error);
+              return of(null);
+            }),
+          );
         }),
         takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe({
-        next: (response) => {
-          this.isSearching.set(false);
-          if (response) {
-            this.processSearchResults(
-              response.response,
-              response.specialServices,
-            );
-          } else {
-            this.searchResults.set([]);
-          }
-        },
-        error: (error) => {
-          this.logger.error('Search error', error);
-          this.isSearching.set(false);
+      .subscribe((response) => {
+        this.isSearching.set(false);
+        if (response) {
+          this.processSearchResults(
+            response.response,
+            response.specialServices,
+          );
+        } else {
           this.searchResults.set([]);
-        },
-      });
-  }
-
-  /** Set up effect to trigger nearby search when toggle is enabled */
-  private setupNearbySearchEffect(): void {
-    effect(() => {
-      const isNearby = this.nearbySearch();
-      const location = this.userLocation();
-
-      if (isNearby && location) {
-        this.performNearbySearch(location.lat, location.lng);
-      }
-    });
-  }
-
-  /** Request geolocation access and get current position */
-  async requestLocation(): Promise<void> {
-    if (this.isRequestingLocation()) return;
-
-    const location = await this.geolocationService.requestLocation();
-
-    if (location) {
-      this.nearbySearch.set(true);
-    } else {
-      this.nearbySearch.set(false);
-    }
-  }
-
-  /** Toggle nearby search mode */
-  toggleNearbySearch(): void {
-    const permission = this.locationPermission();
-
-    if (this.nearbySearch()) {
-      // Turning off nearby search
-      this.nearbySearch.set(false);
-      // Re-run regular search if there's a query
-      if (this.searchQuery()) {
-        this.searchSubject.next(this.searchQuery());
-      } else {
-        this.searchResults.set([]);
-      }
-      return;
-    }
-
-    // Turning on nearby search
-    if (permission === 'granted' && this.userLocation()) {
-      this.nearbySearch.set(true);
-    } else if (permission === 'prompt' || permission === 'granted') {
-      // Need to request permission or get fresh location
-      this.requestLocation();
-    }
-    // If denied or unavailable, button is disabled so this won't be called
-  }
-
-  /** Perform a nearby stops search */
-  private performNearbySearch(lat: number, lng: number): void {
-    this.isSearching.set(true);
-    this.typesenseService
-      .searchNearbyStops(lat, lng, 1000)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (response) => {
-          this.isSearching.set(false);
-          this.processNearbyResults(response);
-        },
-        error: (error) => {
-          this.logger.error('Nearby search error', error);
-          this.isSearching.set(false);
-          this.searchResults.set([]);
-        },
+        }
       });
   }
 
   onSearchInput(event: Event): void {
-    const target = event.target as HTMLInputElement;
-    const query = target.value;
+    this.setQuery((event.target as HTMLInputElement).value);
+  }
+
+  setQuery(query: string): void {
+    if (query === this.searchQuery()) return;
+
     this.searchQuery.set(query);
-
-    // Disable nearby search when user types
-    if (query && this.nearbySearch()) {
-      this.nearbySearch.set(false);
-    }
-
+    this.dialogData?.onQueryChange?.(query);
     this.searchSubject.next(query);
+  }
+
+  focusSearch(): void {
+    this.changeDetector.detectChanges();
+    const input = this.searchInput()?.nativeElement;
+    if (!input) return;
+
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
   }
 
   reindexData(): void {
@@ -360,26 +305,6 @@ export class SearchDialogComponent {
         source: 'rail',
         specialService: service,
       }));
-  }
-
-  private processNearbyResults(response: NearbyStopsResponse): void {
-    if (!response.stops || response.stops.length === 0) {
-      this.searchResults.set([]);
-      return;
-    }
-
-    const results = response.stops
-      .map(mapNearbyStop)
-      .filter((result): result is SearchResult => result !== null);
-    const mergedResults = mergeSubwayStationResults(results);
-    this.searchResults.set(mergedResults);
-
-    const gtfsStops = mergedResults.filter(
-      (result) => result.source === 'gtfs',
-    );
-    if (gtfsStops.length > 0) {
-      this.fetchRoutesForStops(gtfsStops);
-    }
   }
 
   /** Fetch route information for stop results using batched GraphQL query */

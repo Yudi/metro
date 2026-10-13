@@ -1,17 +1,17 @@
-import { Service, inject, effect } from '@angular/core';
+import { Service, inject, effect, signal } from '@angular/core';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
 import { Feature } from 'ol';
 import { Map as OLMap } from 'ol';
 import { Point, Circle as CircleGeom } from 'ol/geom';
 import { fromLonLat } from 'ol/proj';
+import type { EventsKey } from 'ol/events';
+import { unByKey } from 'ol/Observable';
 import { Style, Fill, Stroke, Circle as CircleStyle, Icon } from 'ol/style';
 import { GeolocationService } from '@metro/shared/geolocation';
 import { LoggerService } from '@metro/shared/api';
-import { MapCameraService } from './map-camera.service';
 
 /** Z-index for user location layer (above most features but below popups) */
-// const USER_LOCATION_Z_INDEX = 1000;
 const USER_LOCATION_Z_INDEX = 10;
 
 /** Minimum zoom level to show accuracy circle */
@@ -36,11 +36,11 @@ const ACCURACY_CIRCLE_BORDER_COLOR = 'rgba(0, 122, 255, 0.3)';
 export class UserLocationLayerService {
   private readonly geolocationService = inject(GeolocationService);
   private readonly logger = inject(LoggerService);
-  private readonly camera = inject(MapCameraService);
 
   private map: OLMap | null = null;
   private layer: VectorLayer<VectorSource> | null = null;
   private source: VectorSource | null = null;
+  private resolutionListener: EventsKey | null = null;
 
   /** Feature IDs */
   private readonly ACCURACY_CIRCLE_ID = 'user-location-accuracy';
@@ -51,7 +51,9 @@ export class UserLocationLayerService {
   private currentZoom: number | null = null;
 
   /** Whether the location layer should be visible */
-  private isVisible = false;
+  readonly isVisible = signal(false);
+  private pendingTracking: Promise<boolean> | null = null;
+  private visibilityRequest = 0;
 
   /** SVG for direction cone indicator */
   private readonly directionConeSvg = this.createDirectionConeSvg();
@@ -62,7 +64,7 @@ export class UserLocationLayerService {
       const location = this.geolocationService.location();
       const orientation = this.geolocationService.orientation();
 
-      if (location && this.source && this.isVisible) {
+      if (location && this.source && this.isVisible()) {
         this.updateLocationFeatures(location, orientation?.heading ?? null);
       }
     });
@@ -89,7 +91,7 @@ export class UserLocationLayerService {
     map.addLayer(this.layer);
 
     // Track zoom level changes
-    map.getView().on('change:resolution', () => {
+    this.resolutionListener = map.getView().on('change:resolution', () => {
       this.currentZoom = map.getView().getZoom() ?? null;
       this.updateAccuracyCircleVisibility();
     });
@@ -98,7 +100,7 @@ export class UserLocationLayerService {
 
     // If we already have a location, show it
     const location = this.geolocationService.location();
-    if (location) {
+    if (location && this.isVisible()) {
       const orientation = this.geolocationService.orientation();
       this.updateLocationFeatures(location, orientation?.heading ?? null);
     }
@@ -110,6 +112,8 @@ export class UserLocationLayerService {
    * Remove the user location layer from the map.
    */
   removeFromMap(): void {
+    if (this.resolutionListener) unByKey(this.resolutionListener);
+    this.resolutionListener = null;
     if (this.layer && this.map) {
       this.map.removeLayer(this.layer);
     }
@@ -118,98 +122,53 @@ export class UserLocationLayerService {
     this.map = null;
   }
 
-  /**
-   * Start tracking and displaying user location.
-   */
-  async startTracking(): Promise<boolean> {
-    this.isVisible = true;
-    const success = await this.geolocationService.startTracking({
-      trackOrientation: true,
-    });
-
-    if (success) {
-      this.logger.info('User location tracking started');
-      // Immediately show location if available
-      const location = this.geolocationService.location();
-      if (location) {
-        const orientation = this.geolocationService.orientation();
-        this.updateLocationFeatures(location, orientation?.heading ?? null);
+  /** Enable the marker and continuous updates from a single location request. */
+  async show(): Promise<boolean> {
+    this.isVisible.set(true);
+    const request = ++this.visibilityRequest;
+    // Finish a previous request before starting another geolocation watch.
+    if (this.pendingTracking) {
+      await this.pendingTracking;
+      if (request !== this.visibilityRequest) return false;
+    }
+    if (!this.geolocationService.isTracking()) {
+      const pending = this.geolocationService.startTracking({
+        trackOrientation: true,
+      });
+      this.pendingTracking = pending;
+      const success = await pending;
+      if (this.pendingTracking === pending) this.pendingTracking = null;
+      if (!this.isVisible()) {
+        this.geolocationService.stopTracking();
+        return false;
+      }
+      if (request !== this.visibilityRequest) return false;
+      if (!success) {
+        this.hide();
+        return false;
       }
     }
 
-    return success;
-  }
-
-  /**
-   * Stop tracking user location and hide features.
-   */
-  stopTracking(): void {
-    this.geolocationService.stopTracking();
-    this.hide();
-    this.logger.info('User location tracking stopped');
-  }
-
-  /**
-   * Show the user location layer (starts tracking if not already).
-   */
-  async show(): Promise<boolean> {
-    this.isVisible = true;
-
-    // Start geolocation tracking if not already
-    if (!this.geolocationService.isTracking()) {
-      return this.geolocationService.startTracking({ trackOrientation: true });
-    }
-
-    // If already have location, show it
     const location = this.geolocationService.location();
     if (location && this.source) {
       const orientation = this.geolocationService.orientation();
       this.updateLocationFeatures(location, orientation?.heading ?? null);
     }
-
     return true;
+  }
+
+  stopTracking(): void {
+    this.visibilityRequest++;
+    this.hide();
+    this.geolocationService.stopTracking();
   }
 
   /**
    * Hide the user location layer without stopping tracking.
    */
   hide(): void {
-    this.isVisible = false;
+    this.isVisible.set(false);
     this.clearFeatures();
-  }
-
-  /**
-   * Check if tracking is currently active.
-   */
-  isTracking(): boolean {
-    return this.geolocationService.isTracking();
-  }
-
-  /**
-   * Center the map on the user's current location.
-   * If location is not available, requests it first.
-   * @returns true if centered successfully, false if location unavailable
-   */
-  async centerOnUser(zoom?: number): Promise<boolean> {
-    const focus = this.camera.createFocusRequest();
-    let location = this.geolocationService.location();
-
-    // If no location, request it first
-    if (!location) {
-      const result = await this.geolocationService.requestLocation();
-      if (!result) {
-        this.logger.warn('Could not get user location for centering');
-        return false;
-      }
-      location = result;
-    }
-
-    if (!this.map) return false;
-
-    if (!focus.isCurrent()) return false;
-    focus.point([location.longitude, location.latitude], zoom ?? 16);
-
-    return true;
   }
 
   /**

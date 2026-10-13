@@ -10,9 +10,6 @@ import { MatInputModule } from '@angular/material/input';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatCardModule } from '@angular/material/card';
-import { MatChipsModule } from '@angular/material/chips';
-import { MatTooltipModule } from '@angular/material/tooltip';
 import { SearchDialogComponent } from './search-dialog.component';
 import { TypesenseSearchService } from '../../../search/typesense-search.service';
 import { GeographyGraphQLService } from '../../geography/geography-graphql.service';
@@ -75,44 +72,6 @@ const MOCK_SEARCH_RESULTS = {
     },
   ],
 };
-
-const MOCK_NEARBY_STOPS = {
-  stops: [
-    {
-      stop_id: '340015325',
-      stop_name: 'Av. Paulista, 1000',
-      stop_desc: 'Em frente ao MASP',
-      stop_lat: -23.5614,
-      stop_lon: -46.656,
-      distance: 150,
-    },
-    {
-      stop_id: '340015326',
-      stop_name: 'Av. Paulista, 1500',
-      stop_desc: 'Próximo ao Conjunto Nacional',
-      stop_lat: -23.559,
-      stop_lon: -46.659,
-      distance: 320,
-    },
-    {
-      stop_id: '340015327',
-      stop_name: 'Rua Augusta, 500',
-      stop_desc: null,
-      stop_lat: -23.558,
-      stop_lon: -46.657,
-      distance: 450,
-    },
-    {
-      stop_id: '99001',
-      stop_name: 'Consolação',
-      stop_desc: 'Estação de metrô Consolação',
-      stop_lat: -23.5563,
-      stop_lon: -46.6602,
-      distance: 580,
-    },
-  ],
-};
-
 const MOCK_ROUTE_RESULTS = {
   results: [
     {
@@ -204,7 +163,6 @@ type SearchScenario =
   | 'no-results'
   | 'loading'
   | 'error'
-  | 'nearby'
   | 'routes'
   | 'artesp';
 
@@ -225,13 +183,6 @@ function createMockTypesenseService(scenario: SearchScenario, delayMs = 0) {
         return of(MOCK_ARTESP_RESULTS).pipe(delay(delayMs));
       }
       return of(MOCK_SEARCH_RESULTS).pipe(delay(delayMs));
-    },
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    searchNearbyStops: (lat: number, lng: number, radius: number) => {
-      if (scenario === 'nearby') {
-        return of(MOCK_NEARBY_STOPS).pipe(delay(delayMs));
-      }
-      return of({ stops: [] }).pipe(delay(delayMs));
     },
     reindexData: () => of({ success: true, message: 'Reindex complete' }),
   };
@@ -301,9 +252,6 @@ const meta: Meta<SearchDialogComponent> = {
         MatFormFieldModule,
         MatIconModule,
         MatProgressSpinnerModule,
-        MatCardModule,
-        MatChipsModule,
-        MatTooltipModule,
       ],
     }),
   ],
@@ -313,10 +261,8 @@ const meta: Meta<SearchDialogComponent> = {
         component: `
 The SearchDialog component provides search functionality for stops and routes.
 It includes:
-- Text search with debouncing
-- Nearby stops search using geolocation
+- Debounced text search for stops, stations, and routes
 - Results grouped by type (bus stops, subway stations, routes)
-- Distance display for nearby results
 - Route chips showing lines at each stop
 
 The component uses Typesense for fast full-text search.
@@ -430,30 +376,5 @@ export const ArtespResults: Story = {
       input.value = 'Artesp';
       input.dispatchEvent(new Event('input'));
     }
-  },
-};
-
-/**
- * Nearby search active (simulated).
- * Note: In Storybook, geolocation is not available.
- */
-export const NearbySearchInfo: Story = {
-  decorators: [
-    applicationConfig({
-      providers: createProviders('nearby'),
-    }),
-  ],
-  parameters: {
-    docs: {
-      description: {
-        story: `
-In the real app, clicking "Proximidades" would request geolocation access
-and show nearby stops with distance indicators.
-
-This story shows the search dialog in its initial state since geolocation
-is not available in Storybook's iframe environment.
-        `,
-      },
-    },
   },
 };

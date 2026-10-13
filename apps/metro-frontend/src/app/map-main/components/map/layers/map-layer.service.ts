@@ -27,7 +27,6 @@ export class MapLayerService {
     new Map<LayerType, boolean>([
       [LayerType.SELECTION, true], // Always visible, not toggleable
       [LayerType.BUS_ROUTES, true], // Visible by default
-      [LayerType.BUS_STOPS, true], // Visible by default
       [LayerType.BIKE, false], // Hidden by default
     ]),
   );
@@ -37,7 +36,6 @@ export class MapLayerService {
   private sources = new Map<LayerType, VectorSource>([
     [LayerType.SELECTION, new VectorSource()],
     [LayerType.BUS_ROUTES, new VectorSource()],
-    [LayerType.BUS_STOPS, new VectorSource()],
     [LayerType.BIKE, new VectorSource()],
   ]);
 
@@ -68,7 +66,7 @@ export class MapLayerService {
       LayerType.SELECTION,
       new VectorLayer({
         source: this.sources.get(LayerType.SELECTION),
-        style: (feature) => this.styleService.createSelectionStyle(feature),
+        style: (feature) => this.styleService.createSelectionStyle(feature, this.currentZoomLevel() ?? 0),
         zIndex: 25, // Below stops so stops appear on top of selected routes
       }),
     );
@@ -80,16 +78,6 @@ export class MapLayerService {
         source: this.sources.get(LayerType.BUS_ROUTES),
         style: (feature) => this.styleService.createBusRouteStyle(feature),
         zIndex: 20, // Low - route shapes only
-      }),
-    );
-
-    // Bus stops layer (separate from route shapes for proper z-ordering)
-    this.layers.set(
-      LayerType.BUS_STOPS,
-      new VectorLayer({
-        source: this.sources.get(LayerType.BUS_STOPS),
-        style: () => this.styleService.createBusStopStyle(),
-        zIndex: 45, // Above bike stations, below subway stations
       }),
     );
 
@@ -348,47 +336,6 @@ export class MapLayerService {
   }
 
   /**
-   * Remove features by creation source from a specific layer, but preserve selected ones
-   */
-  removeFeaturesByCreationSourceExceptSelected(
-    layerType: LayerType,
-    creationSource: FeatureCreationSource,
-    selectedIds: Set<string>,
-  ): void {
-    const source = this.sources.get(layerType);
-    if (!source) return;
-
-    const features = source.getFeatures();
-    const featuresToRemove = features.filter((feature) => {
-      const hasMatchingSource =
-        feature.getProperties()['creationSource'] === creationSource;
-      const featureId = feature.getId()?.toString();
-      const isSelected = featureId && selectedIds.has(featureId);
-
-      // Remove if it has the matching source BUT is not selected
-      return hasMatchingSource && !isSelected;
-    });
-
-    featuresToRemove.forEach((feature) => {
-      source.removeFeature(feature);
-    });
-
-    const preservedCount =
-      features.length -
-      featuresToRemove.length -
-      features.filter(
-        (f) => f.getProperties()['creationSource'] !== creationSource,
-      ).length;
-
-    this.logger.debug('Removed features except selected', {
-      removed: featuresToRemove.length,
-      creationSource,
-      layerType,
-      preserved: preservedCount,
-    });
-  }
-
-  /**
    * Remove features by creation source from all layers
    */
   removeFeaturesByCreationSourceFromAllLayers(
@@ -429,7 +376,10 @@ export class MapLayerService {
     const previousZoom = this.currentZoomLevel();
     if (previousZoom === zoom) return;
     this.currentZoomLevel.set(zoom);
-    // Only station labels depend on zoom.
+    if (((previousZoom ?? 0) >= 12) !== ((zoom ?? 0) >= 12)) {
+      this.layers.get(LayerType.SELECTION)?.changed();
+    }
+    // Station labels depend on zoom.
     if (((previousZoom ?? 0) >= 14) !== ((zoom ?? 0) >= 14)) {
       this.layers.get(LayerType.RAIL_STATIONS)?.changed();
     }

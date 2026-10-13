@@ -1,4 +1,3 @@
-import { BadRequestException } from '@nestjs/common';
 import { BusVectorTileService } from './bus-vector-tile.service';
 import type { BusRouteDirection } from '../../geography/entities/bus-route-direction.entity';
 
@@ -156,46 +155,6 @@ describe('BusVectorTileService', () => {
     ]);
   });
 
-  it('filters stop trips by direction and shape IDs', async () => {
-    const outbound = direction(
-      outboundCode,
-      0,
-      ['shape-out'],
-      'Terminal Norte',
-    );
-    const inbound = direction(
-      inboundCode,
-      1,
-      ['shape-in'],
-      'Terminal Sul',
-    );
-    const { service, query } = createService([outbound, inbound]);
-
-    await service.generateBusStopsTile(12, 1000, 1000, {
-      routeIds: [outboundCode],
-    });
-
-    const statement = query.mock.calls[0][0] as {
-      strings: readonly string[];
-      values: unknown[];
-    };
-    const sql = statement.strings.join('?');
-    expect(sql).toContain('selected_directions AS MATERIALIZED');
-    expect(sql).toContain('trip.direction_id = selected_route.direction_id');
-    expect(sql).toContain('trip.shape_id = ANY(selected_route.shape_ids)');
-    const serializedDirections = statement.values.find(
-      (value): value is string =>
-        typeof value === 'string' && value.includes('directional-route'),
-    );
-    expect(JSON.parse(serializedDirections ?? '[]')).toEqual([
-      {
-        route_id: 'directional-route',
-        direction_id: 0,
-        shape_ids: ['shape-out'],
-      },
-    ]);
-  });
-
   it('ignores malformed versioned direction codes instead of treating them as route IDs', async () => {
     const { service, query, forFavorites } = createService();
 
@@ -219,30 +178,40 @@ describe('BusVectorTileService', () => {
     ).rejects.toBe(databaseError);
   });
 
-  it('reads normalized feed views and emits one physical stop marker per tile', async () => {
+  it('queries bus-serving canonical stops through spatial tile bounds', async () => {
     const { service, query } = createService();
 
     await expect(
-      service.generateBusStopsTile(12, 1000, 1000, {
-        stopIds: ['artesp:2'],
-      }),
+      service.generateBusStopsTile(15, 12138, 18593),
     ).resolves.toEqual(Buffer.from('tile'));
 
     const sql = query.mock.calls[0][0].strings.join('?');
     expect(sql).toContain('Gtfs_Stop');
-    expect(sql).toContain('Gtfs_StopTime');
-    expect(sql).toContain('Gtfs_Route');
     expect(sql).toContain('physical_stop_members');
-    expect(sql).toContain('canonical_stops');
+    expect(sql).toContain('canonical_stops AS MATERIALIZED');
+    expect(sql).toContain('stop.location && bounds.geom::geography');
     expect(sql).toContain('gtfs_stop_service_summary');
     expect(sql).toContain('BOOL_OR(COALESCE(summary.serves_bus, false))');
-    // Only selected trips may read timetables; bus eligibility must use the
-    // summary instead of joining every timetable once per physical stop.
-    expect(sql.match(/"Gtfs_StopTime"/g)).toHaveLength(1);
-    expect(sql).toContain('selected_route_stops AS MATERIALIZED');
-    expect(sql).toContain(
-      'trip_id = ANY(ARRAY(SELECT trip_id FROM selected_bus_trips))',
-    );
+    expect(sql).toContain('ST_Intersects(cs.geom, b.geom)');
+    expect(sql).toContain('cs.physical_stop_id');
+    expect(sql).toContain('cs.source_agency');
+    expect(sql).toContain('cs.source_id');
+    expect(sql).toContain('cs.platform_code');
+    expect(sql).toContain('cs.merged_stop_ids');
+    expect(sql).not.toContain('Gtfs_StopTime');
+    expect(sql).not.toContain('ST_DWithin');
+    expect(sql).not.toContain('stopIds');
+    expect(sql).not.toContain('routeIds');
+  });
+
+  it('returns no bus stop tile below zoom 15 without starting a database transaction', async () => {
+    const { service, query, execute, transaction } = createService();
+
+    await expect(service.generateBusStopsTile(14, 6069, 9296)).resolves.toBeNull();
+
+    expect(transaction).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalled();
+    expect(query).not.toHaveBeenCalled();
   });
 
   it.each(['routes', 'stops'] as const)(
@@ -254,9 +223,7 @@ describe('BusVectorTileService', () => {
           routeIds: ['route-1'],
         });
       } else {
-        await service.generateBusStopsTile(12, 1000, 1000, {
-          stopIds: ['stop-1'],
-        });
+        await service.generateBusStopsTile(15, 12138, 18593);
       }
 
       expect(execute.mock.calls[0][0].join('')).toBe(
@@ -278,27 +245,8 @@ describe('BusVectorTileService', () => {
     execute.mockRejectedValue(error);
 
     await expect(
-      service.generateBusStopsTile(12, 1000, 1000, { stopIds: ['stop-1'] }),
+      service.generateBusStopsTile(15, 12138, 18593),
     ).rejects.toBe(error);
     expect(query).not.toHaveBeenCalled();
-  });
-
-  it('rejects invalid proximity values rather than treating them as absent', () => {
-    const service = new BusVectorTileService({} as never, {} as never);
-
-    expect(() =>
-      service.normalizeNearby({
-        latitude: Number.NaN,
-        longitude: -46.6,
-        radiusMeters: 100,
-      }),
-    ).toThrow(BadRequestException);
-    expect(() =>
-      service.normalizeNearby({
-        latitude: -23.5,
-        longitude: -46.6,
-        radiusMeters: 0,
-      }),
-    ).toThrow(BadRequestException);
   });
 });

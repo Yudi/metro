@@ -14,7 +14,7 @@ import LineString from 'ol/geom/LineString';
 import Point from 'ol/geom/Point';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
-import { Circle as CircleStyle, Fill, Stroke, Style, Text } from 'ol/style';
+import { Circle as CircleStyle, Fill, Stroke, Style, Text, Icon } from 'ol/style';
 import { provideRouter, withDisabledInitialNavigation } from '@angular/router';
 import { APP_BASE_HREF } from '@angular/common';
 import {
@@ -44,7 +44,6 @@ import { RealtimeVehicleLayerService } from '../../realtime/realtime-vehicle-lay
 import { CptmVehicleLayerService } from '../../realtime/cptm-vehicle-layer.service';
 import { UserLocationLayerService } from './user-location-layer.service';
 import { MapStateService } from './map-state.service';
-import { MapCameraService } from './map-camera.service';
 import {
   MapPanelService,
   type MapPanelSnap,
@@ -67,6 +66,7 @@ import {
   type BikeStationTileData,
 } from './vector-tiles/vector-tile-layer.service';
 import type { SelectedRoute } from './map.types';
+import { createBikeMarkerStyles } from './layers/bike-marker-style.utils';
 
 const STORY_FEATURE_KIND = 'map-story-feature';
 const STORY_LAYER_PROPERTY = 'map-story-layer';
@@ -186,6 +186,17 @@ export class StoryVectorTileLayerService extends VectorTileLayerService {
     VectorLayer<VectorSource>
   >();
 
+  private selectedStopIds = new Set<string>();
+  private readonly busStopStyle = new Style({
+    image: new Icon({ src: '/app/icons/bus-stop.svg', scale: 0.32, anchor: [0.5, 0.5] }),
+  });
+
+  override setSelectedBusStopIds(ids: string[]): void {
+    super.setSelectedBusStopIds(ids);
+    this.selectedStopIds = new Set(ids);
+    this.storyLayers.get(VectorTileLayerType.BUS_STOPS)?.changed();
+  }
+
   override addLayersToMap(map: OpenLayersMap): void {
     const routeFeatures = STORY_ROUTES.map((route) => {
       const feature = new Feature({
@@ -266,7 +277,6 @@ export class StoryVectorTileLayerService extends VectorTileLayerService {
         points: [
           { ...PINHEIROS_BUS_STOP, featureId: PINHEIROS_BUS_STOP.stopId },
         ],
-        color: '#d56a23',
       },
       {
         type: VectorTileLayerType.BIKE_STATIONS,
@@ -274,10 +284,9 @@ export class StoryVectorTileLayerService extends VectorTileLayerService {
           ...station,
           featureId: station.stationId,
         })),
-        color: '#2e7d32',
       },
     ];
-    for (const { type, points, color } of pointLayers) {
+    for (const { type, points } of pointLayers) {
       const layer = new VectorLayer({
         source: new VectorSource({
           features: points.map((point) => {
@@ -292,28 +301,28 @@ export class StoryVectorTileLayerService extends VectorTileLayerService {
               name: point.name,
               ...(type === VectorTileLayerType.BUS_STOPS
                 ? { stopId: PINHEIROS_BUS_STOP.stopId }
-                : { stationId: point.featureId }),
+                : {
+                    stationId: point.featureId,
+                    stationData: point,
+                  }),
             });
             return feature;
           }),
         }),
         zIndex: type === VectorTileLayerType.BUS_STOPS ? 45 : 24,
         visible: this.isLayerVisible(type),
-        style: (feature) =>
-          new Style({
-            image: new CircleStyle({
-              radius: 8,
-              fill: new Fill({ color }),
-              stroke: new Stroke({ color: '#ffffff', width: 2 }),
-            }),
-            text: new Text({
-              text: String(feature.get('name') ?? ''),
-              font: '500 12px Roboto, sans-serif',
-              offsetY: -17,
-              fill: new Fill({ color: '#202124' }),
-              stroke: new Stroke({ color: '#ffffff', width: 3 }),
-            }),
-          }),
+        minZoom: type === VectorTileLayerType.BUS_STOPS ? 14 : undefined,
+        style: (feature) => {
+          if (type === VectorTileLayerType.BUS_STOPS) {
+            return this.selectedStopIds.has(PINHEIROS_BUS_STOP.stopId) ? [] : this.busStopStyle;
+          }
+          const station = feature.get('stationData') as typeof BIKE_STATION_FULL;
+          return createBikeMarkerStyles({
+            bikesAvailable: station.numBikesAvailable,
+            effectiveCapacity: station.effectiveCapacity,
+            hasElectricBikes: station.hasElectricBikesAvailable,
+          });
+        },
       });
       this.storyLayers.set(type, layer);
       map.addLayer(layer);
@@ -558,6 +567,8 @@ export function createMapStoryProviders(scenario: MapStoryScenario = {}) {
       provide: GeolocationService,
       useValue: {
         permission: signal(scenario.locationPermission ?? 'prompt'),
+        location: signal({ latitude: PARAISO.latitude, longitude: PARAISO.longitude }),
+        permissionMessage: () => "Localização indisponível",
         isSupported: () => true,
         requestLocation: () =>
           Promise.resolve({
@@ -575,13 +586,13 @@ export function createMapStoryProviders(scenario: MapStoryScenario = {}) {
     {
       provide: UserLocationLayerService,
       useFactory: () => {
-        const camera = inject(MapCameraService);
+        const isVisible = signal(false);
         return {
+          isVisible,
           addToMap: () => undefined,
-          stopTracking: () => undefined,
+          show: async () => { isVisible.set(true); return true; },
+          stopTracking: () => isVisible.set(false),
           removeFromMap: () => undefined,
-          centerOnUser: async () =>
-            camera.focusPoint([PARAISO.longitude, PARAISO.latitude], 16),
         };
       },
     },

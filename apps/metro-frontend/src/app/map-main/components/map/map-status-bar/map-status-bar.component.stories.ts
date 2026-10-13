@@ -18,12 +18,6 @@ const meta: Meta<MapStatusBarComponent> = {
       description: 'Whether the status bar should show a loading state',
       table: { type: { summary: 'boolean' } },
     },
-    displayMode: {
-      control: { type: 'inline-radio' },
-      options: ['selected', 'nearby'],
-      description: "Display mode - 'selected' or 'nearby'",
-      table: { type: { summary: "'selected' | 'nearby'" } },
-    },
     routeCount: {
       control: 'number',
       description: 'Number of selected routes',
@@ -39,16 +33,6 @@ const meta: Meta<MapStatusBarComponent> = {
       description: 'Number of currently visible features',
       table: { type: { summary: 'number' } },
     },
-    nearbyStopsCount: {
-      control: 'number',
-      description: 'Number of nearby stops found',
-      table: { type: { summary: 'number' } },
-    },
-    nearbyRadius: {
-      control: 'number',
-      description: 'Nearby search radius in meters',
-      table: { type: { summary: 'number' } },
-    },
   },
 };
 
@@ -59,12 +43,9 @@ type Story = StoryObj<MapStatusBarComponent>;
 export const SelectedSummary: Story = {
   args: {
     isLoading: false,
-    displayMode: 'selected',
     routeCount: 3,
     stopCount: 12,
     visibleCount: 9,
-    nearbyRadius: 500,
-    nearbyStopsCount: 0,
   },
   play: async ({ canvasElement }) => {
     // Ensure the selected-mode chips are rendered and contain expected counts
@@ -88,40 +69,14 @@ export const SelectedSummary: Story = {
 export const Loading: Story = {
   args: {
     isLoading: true,
-    displayMode: 'selected',
     routeCount: 0,
     stopCount: 0,
     visibleCount: 0,
-    nearbyRadius: 500,
-    nearbyStopsCount: 0,
   },
   play: async ({ canvasElement }) => {
     const loading = canvasElement.querySelector('.status-chip.loading');
     if (!loading) throw new Error('Loading chip not shown');
     if (!loading.textContent?.includes('Carregando'))
       throw new Error('Loading text missing');
-  },
-};
-
-export const NearbySummary: Story = {
-  args: {
-    isLoading: false,
-    displayMode: 'nearby',
-    routeCount: 0,
-    stopCount: 0,
-    visibleCount: 0,
-    nearbyRadius: 750,
-    nearbyStopsCount: 18,
-  },
-  play: async ({ canvasElement }) => {
-    const chips = canvasElement.querySelectorAll('.status-chip');
-    const nearbyChip = Array.from(chips).find((c) =>
-      c.textContent?.includes('pontos'),
-    );
-    const radiusChip = Array.from(chips).find((c) =>
-      c.textContent?.includes('m'),
-    );
-    if (!nearbyChip) throw new Error('Nearby points chip missing');
-    if (!radiusChip) throw new Error('Nearby radius chip missing');
   },
 };

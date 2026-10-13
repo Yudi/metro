@@ -36,6 +36,12 @@ class OpenLayersMockObject {
     this.distance = options.distance ?? 60;
     this.tileUrlFunction = options.tileUrlFunction;
 
+    for (const [key, value] of Object.entries(
+      options as unknown as Record<string, unknown>,
+    )) {
+      if (key !== 'properties') this.properties.set(key, value);
+    }
+
     options.features?.forEach((feature) => this.addFeature(feature));
     options.layers?.forEach((layer) => this.addLayer(layer));
 
@@ -80,6 +86,20 @@ class OpenLayersMockObject {
 
   getVisible(): boolean {
     return this.visible;
+  }
+
+  getMinZoom(): number {
+    const minZoom = this.properties.get('minZoom');
+    return typeof minZoom === 'number' ? minZoom : Number.NEGATIVE_INFINITY;
+  }
+
+  getStyleFunction():
+    | ((feature: unknown, resolution: number) => unknown)
+    | undefined {
+    const style = this.properties.get('style');
+    return typeof style === 'function'
+      ? (style as (feature: unknown, resolution: number) => unknown)
+      : undefined;
   }
 
   setVisible(visible: boolean): void {
@@ -203,6 +223,14 @@ class OpenLayersMockObject {
 
   setStyle(style: unknown): void {
     this.properties.set('style', style);
+  }
+
+  getImage(): unknown {
+    return this.properties.get('image');
+  }
+
+  getScale(): unknown {
+    return this.properties.get('scale');
   }
 
   updateSize(): void {

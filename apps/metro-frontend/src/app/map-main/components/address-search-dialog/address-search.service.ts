@@ -3,7 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Service, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 
-export type PhotonLocationType =
+export type AddressLocationType =
   | 'house'
   | 'street'
   | 'locality'
@@ -44,24 +44,24 @@ interface PhotonProperties {
   postcode?: string;
 }
 
-export interface ExploreLocationResult {
+export interface AddressSearchResult {
   id: string;
-  name: string;
+  label: string;
   description: string;
-  type: PhotonLocationType;
+  type: AddressLocationType;
   latitude: number;
   longitude: number;
   city?: string;
   state?: string;
 }
 
-interface RankedExploreLocationResult extends ExploreLocationResult {
+interface RankedAddressSearchResult extends AddressSearchResult {
   priority: number;
   index: number;
 }
 
 @Service()
-export class ExploreLocationSearchService {
+export class AddressSearchService {
   readonly cityContext = inject(CityContextService);
   private readonly http = inject(HttpClient);
   private readonly photonUrl = 'https://photon.komoot.io/api/';
@@ -70,7 +70,7 @@ export class ExploreLocationSearchService {
     query: string,
     prioritizeLat: number = this.cityContext.city().map.center.latitude,
     prioritizeLon: number = this.cityContext.city().map.center.longitude,
-  ): Observable<ExploreLocationResult[]> {
+  ): Observable<AddressSearchResult[]> {
     const params = new HttpParams()
       .set('q', query)
       .set('lat', String(prioritizeLat))
@@ -85,7 +85,7 @@ export class ExploreLocationSearchService {
             .sort((a, b) => a.priority - b.priority || a.index - b.index)
             .map((result) => ({
               id: result.id,
-              name: result.name,
+              label: result.label,
               description: result.description,
               type: result.type,
               latitude: result.latitude,
@@ -100,17 +100,17 @@ export class ExploreLocationSearchService {
   private toResult(
     feature: PhotonFeature,
     index: number,
-  ): RankedExploreLocationResult {
+  ): RankedAddressSearchResult {
     const properties = feature.properties;
     const [longitude, latitude] = feature.geometry.coordinates;
     const type = this.toLocationType(properties.type);
-    const name = this.getName(properties);
+    const label = this.getName(properties);
     const city = properties.city ?? properties.county;
     const state = properties.state;
 
     return {
       id: `${properties.osm_type ?? 'photon'}-${properties.osm_id ?? index}`,
-      name,
+      label,
       description: this.getDescription(properties),
       type,
       latitude,
@@ -162,7 +162,7 @@ export class ExploreLocationSearchService {
     return this.normalize(state) === 'sao paulo' ? 2 : 3;
   }
 
-  private toLocationType(type: string | undefined): PhotonLocationType {
+  private toLocationType(type: string | undefined): AddressLocationType {
     switch (type) {
       case 'house':
       case 'street':

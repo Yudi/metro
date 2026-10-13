@@ -4,24 +4,18 @@ import { FeatureLike } from 'ol/Feature';
 import { SpecialRailService } from '@metro/shared/utils';
 import { MapDetailsDialogService } from './map-details-dialog.service';
 import { MapFeatureInteractionService } from './map-feature-interaction.service';
-import { MapNearbyModeService } from './map-nearby-mode.service';
-import { MapSearchInteractionService } from './map-search-interaction.service';
+import { MapLocationService } from './map-location.service';
 import { MapSelectionService } from './map-selection.service';
 
 @Service()
 export class MapInteractionService {
-  private readonly searchService = inject(MapSearchInteractionService);
   private readonly selectionService = inject(MapSelectionService);
   private readonly featureService = inject(MapFeatureInteractionService);
   private readonly detailsService = inject(MapDetailsDialogService);
-  private readonly nearbyService = inject(MapNearbyModeService);
+  private readonly locationService = inject(MapLocationService);
 
-  openSearchModal(): void {
-    this.searchService.openSearchModal();
-  }
-
-  openExploreModal(): void {
-    this.nearbyService.openExploreModal();
+  openAddressSearch(): void {
+    this.locationService.openAddressSearch();
   }
 
   focusRouteOnMap(routeId: string, isRail: boolean): void {
@@ -113,11 +107,7 @@ export class MapInteractionService {
     );
   }
 
-  activateNearbyMode(): void {
-    this.nearbyService.activateNearbyMode();
-  }
-
-  deactivateNearbyMode(): void {
-    this.nearbyService.deactivateNearbyMode();
+  toggleUserLocation(): Promise<void> {
+    return this.locationService.toggleUserLocation();
   }
 }

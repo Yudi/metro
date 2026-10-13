@@ -129,24 +129,24 @@ export class FeatureFactoryService {
     return feature;
   }
 
-  createExploreLocationFeature(
+  createAddressLocationFeature(
     lat: number,
     lon: number,
-    name = 'Local explorado',
+    name = 'Endereço encontrado',
   ): Feature {
     const geometry = new Point(fromLonLat([lon, lat]));
     const feature = new Feature({ geometry });
 
     feature.setProperties({
-      id: 'explore-location',
+      id: 'address-location',
       name,
       latitude: lat,
       longitude: lon,
-      type: 'explore_location',
-      creationSource: FeatureCreationSource.EXPLORE,
+      type: 'address_location',
+      creationSource: FeatureCreationSource.ADDRESS_SEARCH,
     });
 
-    feature.setId('explore-location');
+    feature.setId('address-location');
     return feature;
   }
 }

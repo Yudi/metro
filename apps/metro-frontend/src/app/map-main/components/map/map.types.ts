@@ -104,13 +104,6 @@ export interface MapSelectionCounts {
   displayed: number;
 }
 
-export type DisplayMode = 'selected' | 'nearby';
-
-export interface NearbyCenter {
-  lat: number;
-  lon: number;
-}
-
 export interface BikeStation {
   stationId: string;
   name: string;
@@ -143,9 +136,8 @@ export interface BikeStation {
  */
 export enum FeatureCreationSource {
   SELECTION = 'selection', // User manually selected this feature
-  NEARBY = 'nearby', // Feature created by nearby mode
   ROUTE_DISPLAY = 'route_display', // Feature created when displaying routes
   SUBWAY_SYSTEM = 'subway_system', // Feature created as part of subway system display
   BIKE = 'bike', // Feature created for bike layer
-  EXPLORE = 'explore', // Feature created for manually selected explore location
+  ADDRESS_SEARCH = 'address_search', // Pin for a searched address
 }

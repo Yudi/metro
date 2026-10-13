@@ -4,16 +4,12 @@ import { Service, PLATFORM_ID, inject, signal } from '@angular/core';
 import Dexie, { Table } from 'dexie';
 import { LayerType } from './layers/map-layer.service';
 import { VectorTileLayerType } from './vector-tiles/vector-tile-layer.service';
-import { DisplayMode, NearbyCenter } from './map.types';
 
 export const MAP_VIEW_STATE_RESTORE_PARAM = 'restoreMapState';
 
 export interface SavedMapViewState {
   center: [number, number];
   zoom: number;
-  displayMode: DisplayMode;
-  nearbyCenter: NearbyCenter | null;
-  nearbyRadius: number;
   layers: Partial<Record<LayerType, boolean>>;
   vectorLayers: Partial<Record<VectorTileLayerType, boolean>>;
   selections: {
@@ -64,6 +60,7 @@ export class MapViewStateStorageService {
       subwayStations: '1',
       subwayRoutes: '0',
       bike: '0',
+      busStopsLayer: '1',
       lat: String(city.map.center.latitude),
       lon: String(city.map.center.longitude),
       z: String(city.map.zoom),
@@ -95,9 +92,6 @@ export class MapViewStateStorageService {
     return {
       center: record.center,
       zoom: record.zoom,
-      displayMode: record.displayMode,
-      nearbyCenter: record.nearbyCenter,
-      nearbyRadius: record.nearbyRadius,
       layers: record.layers,
       vectorLayers: record.vectorLayers,
       selections: record.selections,

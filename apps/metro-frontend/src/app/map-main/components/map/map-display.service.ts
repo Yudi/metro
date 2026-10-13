@@ -3,6 +3,7 @@ import { Service, inject } from '@angular/core';
 import { Feature } from 'ol';
 import { Point } from 'ol/geom';
 import { MapService } from './map.service';
+import { MapCameraService, MapFocusRequest } from './map-camera.service';
 import { LayerType } from './layers/map-layer.service';
 import { MapStateService } from './map-state.service';
 import { FeatureCreationSource } from './map.types';
@@ -19,6 +20,7 @@ import { getBusRouteIdentity } from '@metro/shared/utils';
 export class MapDisplayService {
   readonly cityContext = inject(CityContextService);
   private mapService = inject(MapService);
+  private readonly camera = inject(MapCameraService);
   private mapState = inject(MapStateService);
   private featureFactory = inject(FeatureFactoryService);
   private logger = inject(LoggerService);
@@ -440,14 +442,15 @@ export class MapDisplayService {
   }
 
   centerOnCity(): void {
-    this.mapService.centerOn(
-      this.cityContext.center(),
-      this.cityContext.city().map.zoom,
-    );
+    this.camera.showOverview(this.cityContext.center(), this.cityContext.city().map.zoom);
   }
 
   centerOn(coordinates: [number, number], zoom: number): void {
-    this.mapService.centerOn(coordinates, zoom);
+    this.camera.focusPoint(coordinates, zoom);
+  }
+
+  createFocusRequest(): MapFocusRequest {
+    return this.camera.createFocusRequest();
   }
 
   fitToCoordinates(
@@ -457,6 +460,7 @@ export class MapDisplayService {
   }
 
   clearSelection(): void {
+    this.camera.cancel();
     this.mapService.clearSelection();
   }
 

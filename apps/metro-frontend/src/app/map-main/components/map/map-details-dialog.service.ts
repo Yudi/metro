@@ -407,6 +407,8 @@ export class MapDetailsDialogService {
   ): void {
     const title = signal(summary?.name ?? 'Terminal de ônibus');
     const panelSummary = signal('');
+    const focus = fitOnLoad ? this.displayService.createFocusRequest() : null;
+    let focused = false;
     const data: BusTerminalDialogData = {
       terminalId,
       summary,
@@ -414,8 +416,12 @@ export class MapDetailsDialogService {
       platformCode: viewState?.platformCode ?? 'all',
       scrollTop: viewState?.scrollTop ?? 0,
       expandedPlatformKeys: viewState?.expandedPlatformKeys ?? [],
-      fitOnLoad,
+      fitOnLoad: false,
       onDetailsLoaded: (detail) => {
+        if (focus && !focused) {
+          focus.coordinates(detail.stops.map((stop) => [stop.longitude, stop.latitude]), 16);
+          focused = true;
+        }
         title.set(detail.name);
         const boardingPoints = detail.stops.filter(
           (stop) => stop.boardingAllowed,

@@ -59,7 +59,7 @@ describe('map destinations from the omnibox', () => {
     state.applyRouteState(params);
     state.applyRouteState(params);
     expect(addRailLineToSelection).toHaveBeenCalledTimes(1);
-    expect(addRailLineToSelection).toHaveBeenCalledWith('L9');
+    expect(addRailLineToSelection).toHaveBeenCalledWith('L9', false);
     expect(setLayerVisibility).toHaveBeenCalledWith('rail-routes', true);
   });
 

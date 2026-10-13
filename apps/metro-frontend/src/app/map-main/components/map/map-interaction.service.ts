@@ -24,6 +24,10 @@ export class MapInteractionService {
     this.nearbyService.openExploreModal();
   }
 
+  focusRouteOnMap(routeId: string, isRail: boolean): void {
+    this.selectionService.focusRouteOnMap(routeId, isRail);
+  }
+
   addRouteToSelection(
     routeId: string,
     shouldDisplaySnackbar: boolean,

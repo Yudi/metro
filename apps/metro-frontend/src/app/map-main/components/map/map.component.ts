@@ -258,8 +258,10 @@ export class MapComponent implements AfterViewInit, OnDestroy {
           const layer = this.route.snapshot.queryParamMap.has('railRoutes')
             ? VectorTileLayerType.RAIL_ROUTES
             : VectorTileLayerType.BUS_ROUTES;
-          this.mapService.centerOn(this.cityContext.center(), 9);
-          this.mapService.focusVectorRoute(focusRoute, layer);
+          this.interactionService.focusRouteOnMap(
+            focusRoute,
+            layer === VectorTileLayerType.RAIL_ROUTES,
+          );
         }
       } catch (err) {
         this.logger.error('Failed to apply query params after map init', err);

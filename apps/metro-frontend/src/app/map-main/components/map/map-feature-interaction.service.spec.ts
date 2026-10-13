@@ -36,7 +36,7 @@ describe('MapFeatureInteractionService', () => {
         },
         {
           provide: MapService,
-          useValue: { zoomToFeatures: jest.fn(), zoomLevel: jest.fn(() => 12) },
+          useValue: { focusFeature: jest.fn(), zoomToFeatures: jest.fn(), zoomLevel: jest.fn(() => 12) },
         },
         {
           provide: BikeStationsService,

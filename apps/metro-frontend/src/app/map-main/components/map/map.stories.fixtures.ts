@@ -44,7 +44,7 @@ import { RealtimeVehicleLayerService } from '../../realtime/realtime-vehicle-lay
 import { CptmVehicleLayerService } from '../../realtime/cptm-vehicle-layer.service';
 import { UserLocationLayerService } from './user-location-layer.service';
 import { MapStateService } from './map-state.service';
-import { MapService } from './map.service';
+import { MapCameraService } from './map-camera.service';
 import {
   MapPanelService,
   type MapPanelSnap,
@@ -574,13 +574,13 @@ export function createMapStoryProviders(scenario: MapStoryScenario = {}) {
     {
       provide: UserLocationLayerService,
       useFactory: () => {
-        const map = inject(MapService);
+        const camera = inject(MapCameraService);
         return {
           addToMap: () => undefined,
           stopTracking: () => undefined,
           removeFromMap: () => undefined,
           centerOnUser: async () =>
-            map.centerOn([PARAISO.longitude, PARAISO.latitude], 14),
+            camera.focusPoint([PARAISO.longitude, PARAISO.latitude], 16),
         };
       },
     },

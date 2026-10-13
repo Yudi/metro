@@ -55,6 +55,7 @@ export class MapFeatureInteractionService {
         : (feature as Feature);
 
     const properties = targetFeature.getProperties();
+    this.mapService.focusFeature(targetFeature);
 
     if (properties['estimatedPosition'] === true) {
       this.showEstimatedVehicleInfo(properties);

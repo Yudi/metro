@@ -29,6 +29,33 @@
           (error)="onHeaderImageError()"
         />
       </div>
+      <footer class="station-photo-credit">
+        Foto:
+        @if (image.sourceUrl) {
+          <a
+            [href]="image.sourceUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            [attr.title]="image.title"
+            >{{ image.author }}</a
+          >
+        } @else {
+          {{ image.author }}
+        }.&#32;
+        <span>
+          Licença:&#32;
+          @if (image.licenseUrl; as licenseUrl) {
+            <a
+              [href]="licenseUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              >{{ image.license }}</a
+            >
+          } @else {
+            {{ image.license }}
+          }
+        </span>
+      </footer>
     }
     <app-dialog-header
       icon="train"
@@ -296,35 +323,6 @@
               </div>
             }
 
-            @if (headerImage(); as image) {
-              <footer class="station-photo-credit">
-                Foto:
-                @if (image.sourceUrl) {
-                  <a
-                    [href]="image.sourceUrl"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    [attr.title]="image.title"
-                    >{{ image.author }}</a
-                  >
-                } @else {
-                  {{ image.author }}
-                }.&#32;
-                <span
-                  >Licença:&#32;
-                  @if (image.licenseUrl; as licenseUrl) {
-                    <a
-                      [href]="licenseUrl"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      >{{ image.license }}</a
-                    >
-                  } @else {
-                    {{ image.license }}
-                  }
-                </span>
-              </footer>
-            }
           </div>
         </ng-template>
       </mat-tab>

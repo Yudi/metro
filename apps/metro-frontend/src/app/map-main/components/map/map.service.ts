@@ -2,17 +2,13 @@ import { Service, Signal, signal, inject } from '@angular/core';
 import { Map, View } from 'ol';
 import { fromLonLat, toLonLat } from 'ol/proj';
 import { createEmpty, extend, isEmpty } from 'ol/extent';
-import { unByKey } from 'ol/Observable';
 import { Feature } from 'ol';
 import { FeatureLike } from 'ol/Feature';
 import Overlay from 'ol/Overlay';
 import { defaults as defaultControls } from 'ol/control/defaults';
 import { defaults as defaultInteractions } from 'ol/interaction/defaults';
 import { MapLayerService, LayerType } from './layers/map-layer.service';
-import {
-  VectorTileLayerService,
-  VectorTileLayerType,
-} from './vector-tiles/vector-tile-layer.service';
+import { VectorTileLayerService } from './vector-tiles/vector-tile-layer.service';
 import { LoggerService } from '@metro/shared/api';
 import type {
   MapFeature,
@@ -22,6 +18,7 @@ import type {
 import { featureToMapFeature } from './map-feature.utils';
 import { MapBaseTileService } from './layers/map-base-tile.service';
 import { getProjectedCoordinateExtent } from './map-coordinate-extent.utils';
+import { MapCameraService } from './map-camera.service';
 
 export type {
   MapFeature,
@@ -35,6 +32,7 @@ export class MapService {
   private vectorTileLayerService = inject(VectorTileLayerService);
   private logger = inject(LoggerService);
   private baseTileService = inject(MapBaseTileService);
+  private readonly camera = inject(MapCameraService);
 
   private map = signal<Map | null>(null);
 
@@ -271,6 +269,7 @@ export class MapService {
     });
 
     this.map.set(map);
+    this.camera.attach(map);
     this.logger.info('Map initialized with interactions and click handler');
 
     return map;
@@ -305,10 +304,7 @@ export class MapService {
 
     // Fit map to extent
     if (!isEmpty(extent)) {
-      map.getView().fit(extent, {
-        padding: [20, 20, 20, 20],
-        maxZoom: 16,
-      });
+      this.camera.fitExtent(extent);
     }
   }
 
@@ -318,12 +314,23 @@ export class MapService {
   centerOn(coordinates: [number, number], zoom?: number): void {
     const view = this.map()?.getView();
     if (view) {
+      this.camera.cancel();
       view.setCenter(fromLonLat(coordinates));
       this.center.set(coordinates);
       if (zoom !== undefined) {
         view.setZoom(zoom);
       }
     }
+  }
+
+  /** Focus a tapped point after its information panel has rendered. */
+  focusFeature(feature: FeatureLike): void {
+    const geometry = feature.getGeometry();
+    if (geometry?.getType() !== 'Point') return;
+    const extent = geometry.getExtent();
+    const coordinates = toLonLat([extent[0], extent[1]]) as [number, number];
+    const minimumZoom = feature.get('vehicleId') ? 0 : 16;
+    this.camera.focusPoint(coordinates, minimumZoom);
   }
 
   /** Fit a set of geographic points, such as the physical stops in a terminal. */
@@ -334,52 +341,7 @@ export class MapService {
     const extent = getProjectedCoordinateExtent(coordinates);
     if (!map || !extent) return;
 
-    map.getView().fit(extent, {
-      padding: [64, 64, 64, 64],
-      maxZoom: 16,
-      duration: 250,
-    });
-  }
-
-  /** Fit a route loaded from vector tiles after the selection filter has rendered. */
-  focusVectorRoute(routeId: string, layerType: VectorTileLayerType): void {
-    const map = this.map();
-    const layer = this.vectorTileLayerService.getLayer(layerType);
-    if (!map || !layer) return;
-
-    const lineCode = Number(routeId.replace(/^L/i, ''));
-    const fit = () => {
-      const extent = createEmpty();
-      const features = layer.getFeaturesInExtent(
-        map.getView().calculateExtent(map.getSize()),
-      );
-      for (const feature of features) {
-        const matches =
-          layerType === VectorTileLayerType.RAIL_ROUTES
-            ? Number(feature.get('line_code') ?? feature.get('line_number')) ===
-              lineCode
-            : String(feature.get('route_id')) === routeId;
-        if (!matches) continue;
-        const geometry = feature.getGeometry();
-        if (geometry) extend(extent, geometry.getExtent());
-      }
-      if (isEmpty(extent)) return false;
-      map.getView().fit(extent, {
-        padding: [48, 48, 48, 48],
-        maxZoom: 15,
-      });
-      return true;
-    };
-
-    if (fit()) return;
-    const key = map.on('rendercomplete', () => {
-      if (fit()) {
-        unByKey(key);
-        clearTimeout(timeout);
-      }
-    });
-    const timeout = setTimeout(() => unByKey(key), 10_000);
-    map.render();
+    this.camera.fitExtent(extent, 16);
   }
 
   private updateCenterSignal(): void {
@@ -421,16 +383,9 @@ export class MapService {
       return;
     }
 
-    const view = map.getView();
-    view.fit(extent, {
-      padding: [40, 40, 40, 40],
-      maxZoom: Math.max(minZoom, view.getZoom() ?? minZoom),
-      duration: 250,
-    });
-
-    if ((view.getZoom() ?? 0) < minZoom) {
-      view.setZoom(minZoom);
-    }
+    // A cluster click requests expansion, but its members must still fit.
+    const currentZoom = map.getView().getZoom() ?? minZoom;
+    this.camera.fitExtent(extent, Math.min(18, Math.max(minZoom, currentZoom + 2)), 18);
   }
 
   /**
@@ -485,6 +440,7 @@ export class MapService {
    */
   destroy(): void {
     const map = this.map();
+    this.camera.detach();
     if (map) {
       map.setTarget(undefined);
       this.map.set(null);

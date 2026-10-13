@@ -384,7 +384,7 @@ export class MapRouteStateService {
       .split(',')
       .filter(Boolean)) {
       this.applyFavoriteSelection(`queryRailRoute:${lineId}`, () => {
-        this.interactionService.addRailLineToSelection(lineId);
+        this.interactionService.addRailLineToSelection(lineId, false);
       });
     }
 
@@ -424,10 +424,10 @@ export class MapRouteStateService {
           this.interactionService.addRouteToSelection(routeId, false),
         );
         parseIds('busStops').forEach((stopId) =>
-          this.interactionService.addStopToSelection(stopId),
+          this.interactionService.addStopToSelection(stopId, false),
         );
         parseIds('railStations').forEach((stationId) =>
-          this.interactionService.addStopToSelection(stationId),
+          this.interactionService.addStopToSelection(stationId, false),
         );
       } else if (mapping.kind === 'vector') {
         vectorTileService.setLayerVisibility(

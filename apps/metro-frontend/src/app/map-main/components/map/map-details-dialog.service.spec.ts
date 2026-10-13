@@ -104,7 +104,12 @@ describe('MapDetailsDialogService map-panel lifecycle', () => {
         { provide: MapSelectionService, useValue: selectionService },
         {
           provide: MapDisplayService,
-          useValue: { updateMapDisplay: jest.fn() },
+          useValue: {
+            updateMapDisplay: jest.fn(),
+            createFocusRequest: jest.fn(() => ({
+              point: jest.fn(), coordinates: jest.fn(), isCurrent: () => true,
+            })),
+          },
         },
         { provide: MatSnackBar, useValue: { open: jest.fn() } },
         {

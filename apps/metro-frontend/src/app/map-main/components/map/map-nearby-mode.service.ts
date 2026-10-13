@@ -101,12 +101,15 @@ export class MapNearbyModeService {
       duration: 2000,
     });
 
+    const focus = this.displayService.createFocusRequest();
     const location = await this.geolocationService.requestLocation();
+
+    if (this.mapState.displayMode() !== 'nearby') return;
 
     if (location) {
       this.logger.debug('Geolocation success', location);
       this.dataLoader.loadNearbyStops(location.latitude, location.longitude);
-      this.displayService.centerOn([location.longitude, location.latitude], 14);
+      focus.point([location.longitude, location.latitude], 14);
       this.snackBar.open('Mostrando paradas próximas', 'Fechar', {
         duration: 2000,
       });
@@ -121,7 +124,9 @@ export class MapNearbyModeService {
       }
 
       this.snackBar.open(errorMessage, 'Fechar', { duration: 4000 });
-      this.fallbackToDefaultLocation();
+      const [longitude, latitude] = this.cityContext.center();
+      this.dataLoader.loadNearbyStops(latitude, longitude);
+      focus.point(this.cityContext.center(), 14);
     }
   }
 

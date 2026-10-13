@@ -11,9 +11,16 @@ import { GeographyCacheService } from '../../geography/geography-cache.service';
 import { GeographyGraphQLService } from '../../geography/geography-graphql.service';
 import type { BusRouteGraphQL } from '../../geography/geography-graphql.service';
 import { MapDataLoaderService } from './map-data-loader.service';
+import type { StopDataLoadResult } from './map-data-loader.service';
 import { MapDisplayService } from './map-display.service';
 import { MapSelectionService } from './map-selection.service';
 import { MapStateService } from './map-state.service';
+
+function deferred<T>() {
+  let resolve: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((complete) => { resolve = complete; });
+  return { promise, resolve };
+}
 
 function createBusDirection(
   favoriteCode: string,
@@ -38,7 +45,11 @@ describe('MapSelectionService', () => {
   let service: MapSelectionService;
   let mapState: MapStateService;
   let cache: { getRoute: jest.Mock };
-  let geography: { getBusRouteDirections: jest.Mock };
+  let geography: {
+    getBusRouteDirections: jest.Mock;
+    getRouteFocusCoordinates: jest.Mock;
+    getRailLineFocusCoordinates: jest.Mock;
+  };
   let dataLoader: {
     syncVectorTileFilters: jest.Mock;
     loadRouteData: jest.Mock;
@@ -55,13 +66,27 @@ describe('MapSelectionService', () => {
     error: jest.Mock;
   };
   let snackBar: { open: jest.Mock };
+  let focus: {
+    point: jest.Mock;
+    coordinates: jest.Mock;
+    isCurrent: jest.Mock;
+    cancel: jest.Mock;
+  };
 
   beforeEach(() => {
+    focus = {
+      point: jest.fn(),
+      coordinates: jest.fn(),
+      isCurrent: jest.fn(() => true),
+      cancel: jest.fn(() => focus.isCurrent.mockReturnValue(false)),
+    };
     cache = {
       getRoute: jest.fn(() => of(null)),
     };
     geography = {
       getBusRouteDirections: jest.fn(() => of([])),
+      getRouteFocusCoordinates: jest.fn(() => of([])),
+      getRailLineFocusCoordinates: jest.fn(() => of([])),
     };
     dataLoader = {
       syncVectorTileFilters: jest.fn(),
@@ -92,6 +117,8 @@ describe('MapSelectionService', () => {
         {
           provide: MapDisplayService,
           useValue: {
+            createFocusRequest: jest.fn(() => focus),
+            centerOn: jest.fn(),
             clearSelection: jest.fn(),
             updateMapDisplay: jest.fn(),
           },
@@ -128,6 +155,165 @@ describe('MapSelectionService', () => {
     mapState = TestBed.inject(MapStateService);
   });
 
+  it('frames complete route geometry when the user adds a route', async () => {
+    const route = {
+      ...createBusDirection('gtfs:100', 0, 'Terminal B'),
+      geometry: { type: 'LineString', coordinates: [[-46.6, -23.5], [-46.7, -23.6]] },
+    };
+    cache.getRoute.mockReturnValue(of(route));
+
+    await service.addRouteToSelection(route.routeId, true);
+
+    expect(focus.coordinates).toHaveBeenCalledWith(route.geometry.coordinates);
+    expect(geography.getRouteFocusCoordinates).not.toHaveBeenCalled();
+  });
+
+  it('focuses a rail link using all line stations without resetting the city view', () => {
+    const points = [[-46.6, -23.5], [-46.7, -23.6]];
+    geography.getRailLineFocusCoordinates.mockReturnValue(of(points));
+
+    service.focusRouteOnMap('L1', true);
+
+    expect(geography.getRailLineFocusCoordinates).toHaveBeenCalledWith('L1');
+    expect(focus.coordinates).toHaveBeenCalledWith(points);
+    expect(TestBed.inject(MapDisplayService).centerOn).not.toHaveBeenCalled();
+  });
+
+  it('focuses a bus link using complete geometry without waiting for visible tiles', () => {
+    const points = [[-46.6, -23.5], [-46.7, -23.6]];
+    geography.getRouteFocusCoordinates.mockReturnValue(of(points));
+
+    service.focusRouteOnMap('gtfs:100', false);
+
+    expect(geography.getRouteFocusCoordinates).toHaveBeenCalledWith('gtfs:100');
+    expect(focus.coordinates).toHaveBeenCalledWith(points);
+  });
+
+  it('cancels route-link focus when the route is removed before geometry arrives', () => {
+    const geometry = new Subject<[number, number][]>();
+    geography.getRouteFocusCoordinates.mockReturnValue(geometry.asObservable());
+    mapState.addRouteToSelection({ id: 'route-a', shortName: '100', longName: 'Route A' });
+    service.focusRouteOnMap('route-a', false);
+
+    service.removeRouteFromSelection('route-a');
+    geometry.next([[-46.6, -23.5], [-46.7, -23.6]]);
+
+    expect(focus.cancel).toHaveBeenCalledTimes(1);
+    expect(focus.coordinates).not.toHaveBeenCalled();
+  });
+
+  it('does not cancel another route focus when removing an older selection', () => {
+    const geometry = new Subject<[number, number][]>();
+    geography.getRouteFocusCoordinates.mockReturnValue(geometry.asObservable());
+    mapState.addRouteToSelection({ id: 'route-a', shortName: '100', longName: 'Route A' });
+    mapState.addRouteToSelection({ id: 'route-b', shortName: '200', longName: 'Route B' });
+    service.focusRouteOnMap('route-b', false);
+
+    service.removeRouteFromSelection('route-a');
+    const points: [number, number][] = [[-46.6, -23.5], [-46.7, -23.6]];
+    geometry.next(points);
+
+    expect(focus.cancel).not.toHaveBeenCalled();
+    expect(focus.coordinates).toHaveBeenCalledWith(points);
+  });
+
+  it('cancels focus already queued for a removed selection', async () => {
+    const route = {
+      ...createBusDirection('gtfs:100', 0, 'Terminal B'),
+      geometry: { type: 'LineString', coordinates: [[-46.6, -23.5], [-46.7, -23.6]] },
+    };
+    cache.getRoute.mockReturnValue(of(route));
+    await service.addRouteToSelection(route.routeId, true);
+    expect(focus.coordinates).toHaveBeenCalled();
+
+    service.removeRouteFromSelection(route.routeId);
+
+    expect(focus.cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['older-first', 'newer-first'])('focuses the latest stop alias when loads complete %s', async (order) => {
+    const older = deferred<StopDataLoadResult>();
+    const newer = deferred<StopDataLoadResult>();
+    dataLoader.loadStopData
+      .mockReturnValueOnce(older.promise)
+      .mockReturnValueOnce(newer.promise);
+    let generation = 0;
+    const acceptedFocus = jest.fn();
+    jest.mocked(TestBed.inject(MapDisplayService).createFocusRequest).mockImplementation(() => {
+      const requestGeneration = ++generation;
+      const isCurrent = () => requestGeneration === generation;
+      return {
+        isCurrent,
+        cancel: () => { if (isCurrent()) generation++; },
+        point: (coordinates) => { if (isCurrent()) acceptedFocus(coordinates); },
+        coordinates: () => undefined,
+      };
+    });
+    const firstSelection = service.addStopToSelection('alias-a');
+    const secondSelection = service.addStopToSelection('alias-b');
+    const result: StopDataLoadResult = {
+      status: 'loaded',
+      stop: {
+        id: 'canonical', stopId: 'canonical', name: 'Stop',
+        latitude: -23.5, longitude: -46.6, isSubwayStation: false,
+      },
+    };
+
+    if (order === 'older-first') {
+      older.resolve(result);
+      await firstSelection;
+      newer.resolve(result);
+      await secondSelection;
+    } else {
+      newer.resolve(result);
+      await secondSelection;
+      older.resolve(result);
+      await firstSelection;
+    }
+
+    expect(mapState.selectedStops().size).toBe(1);
+    expect(acceptedFocus).toHaveBeenCalledTimes(1);
+    expect(acceptedFocus).toHaveBeenCalledWith([-46.6, -23.5]);
+    expect(dataLoader.syncVectorTileFilters).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels queued stop focus when its canonical selection is removed', async () => {
+    dataLoader.loadStopData.mockResolvedValue({
+      status: 'loaded',
+      stop: {
+        id: 'canonical', stopId: 'canonical', name: 'Stop',
+        latitude: -23.5, longitude: -46.6, isSubwayStation: false,
+      },
+    });
+    await service.addStopToSelection('alias-a');
+
+    service.removeStopFromSelection('canonical');
+
+    expect(focus.cancel).toHaveBeenCalledTimes(1);
+    expect(mapState.selectedStops().size).toBe(0);
+  });
+
+  it('restores a saved selection without requesting camera movement', async () => {
+    const route = createBusDirection('gtfs:100', 0, 'Terminal B');
+    cache.getRoute.mockReturnValue(of(route));
+
+    await service.addRouteToSelection(route.routeId, false);
+
+    expect(TestBed.inject(MapDisplayService).createFocusRequest).not.toHaveBeenCalled();
+    expect(focus.coordinates).not.toHaveBeenCalled();
+  });
+
+  it('still adds a route after a gesture, without requesting late camera geometry', async () => {
+    const route = createBusDirection('gtfs:100', 0, 'Terminal B');
+    cache.getRoute.mockReturnValue(of(route));
+    focus.isCurrent.mockReturnValue(false);
+
+    await service.addRouteToSelection(route.routeId, true);
+
+    expect(mapState.selectedRoutes().has(route.favoriteCode ?? route.routeId)).toBe(true);
+    expect(geography.getRouteFocusCoordinates).not.toHaveBeenCalled();
+  });
+
   it('does not add a second selection when a feed update slightly moves the same saved direction', async () => {
     const snapshot = {
       sourceAgency: 'sptrans', shortName: '001',
@@ -143,6 +329,33 @@ describe('MapSelectionService', () => {
     await service.addRouteToSelection(fresh, false);
     expect([...mapState.selectedRoutes().keys()]).toEqual([saved]);
     expect(dataLoader.loadRouteData).not.toHaveBeenCalled();
+  });
+
+  it('cancels focus using the existing direction key after a feed identity changes', async () => {
+    const identity = {
+      sourceAgency: 'sptrans', shortName: '001',
+      originLatitude: -23.5, originLongitude: -46.6,
+      viaLatitude: -23.51, viaLongitude: -46.61,
+      destinationLatitude: -23.53, destinationLongitude: -46.63,
+    };
+    const saved = encodeBusDirectionFavorite(identity);
+    const fresh = encodeBusDirectionFavorite({ ...identity, originLatitude: -23.5002 });
+    if (!saved || !fresh) throw new Error('Invalid fixtures');
+    mapState.addRouteToSelection({
+      id: saved, routeId: 'old-id', shortName: '001', longName: 'Old direction',
+    });
+    cache.getRoute.mockReturnValue(of({
+      ...createBusDirection(fresh, 0, 'Terminal B'),
+      shortName: '001',
+      geometry: { type: 'LineString', coordinates: [[-46.6, -23.5], [-46.63, -23.53]] },
+    }));
+
+    await service.addRouteToSelection(fresh, true);
+    service.removeRouteFromSelection(saved);
+
+    expect(focus.coordinates).toHaveBeenCalled();
+    expect(focus.cancel).toHaveBeenCalledTimes(1);
+    expect(mapState.selectedRoutes().size).toBe(0);
   });
 
   it('does not restore a whole-line selection after its pending lookup was replaced', async () => {

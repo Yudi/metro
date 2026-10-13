@@ -8,6 +8,7 @@ import { fromLonLat } from 'ol/proj';
 import { Style, Fill, Stroke, Circle as CircleStyle, Icon } from 'ol/style';
 import { GeolocationService } from '@metro/shared/geolocation';
 import { LoggerService } from '@metro/shared/api';
+import { MapCameraService } from './map-camera.service';
 
 /** Z-index for user location layer (above most features but below popups) */
 // const USER_LOCATION_Z_INDEX = 1000;
@@ -35,6 +36,7 @@ const ACCURACY_CIRCLE_BORDER_COLOR = 'rgba(0, 122, 255, 0.3)';
 export class UserLocationLayerService {
   private readonly geolocationService = inject(GeolocationService);
   private readonly logger = inject(LoggerService);
+  private readonly camera = inject(MapCameraService);
 
   private map: OLMap | null = null;
   private layer: VectorLayer<VectorSource> | null = null;
@@ -189,6 +191,7 @@ export class UserLocationLayerService {
    * @returns true if centered successfully, false if location unavailable
    */
   async centerOnUser(zoom?: number): Promise<boolean> {
+    const focus = this.camera.createFocusRequest();
     let location = this.geolocationService.location();
 
     // If no location, request it first
@@ -203,12 +206,8 @@ export class UserLocationLayerService {
 
     if (!this.map) return false;
 
-    const view = this.map.getView();
-    view.animate({
-      center: fromLonLat([location.longitude, location.latitude]),
-      zoom: zoom ?? view.getZoom(),
-      duration: 500,
-    });
+    if (!focus.isCurrent()) return false;
+    focus.point([location.longitude, location.latitude], zoom ?? 16);
 
     return true;
   }

@@ -12,6 +12,9 @@ import {
   input,
 } from '@angular/core';
 import { Router, RouterOutlet } from '@angular/router';
+import { MatButtonModule } from '@angular/material/button';
+import { MapService } from './map.service';
+import { MapCameraService } from './map-camera.service';
 import { userEvent, waitFor, within } from 'storybook/test';
 import { MapMainComponent } from '../../map-main.component';
 import {
@@ -49,21 +52,57 @@ const SORTED_AGENCY_LINES_FIXTURE = {
 
 @Component({
   selector: 'app-map-story-host',
-  imports: [RouterOutlet],
-  template: '<router-outlet />',
+  imports: [RouterOutlet, MatButtonModule],
+  template: `
+    @if (cameraControls()) {
+      <nav class="camera-preview" aria-label="Teste da câmera">
+        <button mat-button (click)="setCameraZoom(9)">Visão ampla</button>
+        <button mat-button (click)="setCameraZoom(18)">Visão próxima</button>
+        <button mat-button (click)="focusStation()">Focar estação</button>
+        <output aria-label="Zoom atual">{{ map.zoomLevel()?.toFixed(2) }}</output>
+      </nav>
+    }
+    <router-outlet />
+  `,
   host: { '[class.map-story-dark]': 'dark()' },
-  styles:
-    ':host { display: block; } :host(.map-story-dark) { color-scheme: dark; }',
+  styles: `
+    :host { display: block; }
+    :host(.map-story-dark) { color-scheme: dark; }
+    .camera-preview {
+      position: absolute;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      width: max-content;
+      max-width: calc(100% - 24px);
+      background: var(--mat-sys-surface-container-low);
+    }
+  `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 class MapStoryHostComponent {
   readonly dark = input(false);
+  readonly cameraControls = input(false);
+  readonly map = inject(MapService);
+  private readonly camera = inject(MapCameraService);
   private readonly router = inject(Router);
 
   constructor() {
     afterNextRender(() => {
       void this.router.navigateByUrl('/sp/mapa', { skipLocationChange: true });
     });
+  }
+
+  setCameraZoom(zoom: number): void {
+    this.map.centerOn([PARAISO.longitude - 0.1, PARAISO.latitude], zoom);
+  }
+
+  focusStation(): void {
+    this.camera.focusPoint([PARAISO.longitude, PARAISO.latitude], 16);
   }
 }
 
@@ -90,6 +129,33 @@ const meta: Meta<MapMainComponent> = {
 export default meta;
 
 type Story = StoryObj<MapMainComponent>;
+
+export const IntelligentCamera: Story = {
+  decorators: withMapState({}),
+  render: () => ({ template: '<app-map-story-host [cameraControls]="true" />' }),
+  parameters: {
+    docs: {
+      description: {
+        story: 'Focuses an offscreen station: a nearby view retains zoom 18, while a wide view moves to zoom 16. Framing accounts for the mobile sheet or desktop panel. The controls are exclusive to this preview.',
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    await verifyMapShell(canvasElement);
+    const canvas = within(canvasElement);
+    const zoom = canvas.getByLabelText('Zoom atual');
+    await userEvent.click(canvas.getByRole('button', { name: 'Visão próxima' }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Focar estação' }));
+    await waitFor(() => {
+      if (zoom.textContent?.trim() !== '18.00') throw new Error('A close view should retain its zoom');
+    });
+    await userEvent.click(canvas.getByRole('button', { name: 'Visão ampla' }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Focar estação' }));
+    await waitFor(() => {
+      if (zoom.textContent?.trim() !== '16.00') throw new Error('A wide view should gain enough detail');
+    });
+  },
+};
 
 function renderMapStoryHost(dark = false) {
   return {

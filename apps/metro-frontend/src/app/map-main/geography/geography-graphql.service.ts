@@ -21,7 +21,7 @@ import {
   convertToBusShape,
   convertToBusStop,
 } from './geography-graphql.mapper';
-import { isBusDirectionFavorite, isBusLineFavorite } from '@metro/shared/utils';
+import { isBusDirectionFavorite, isBusLineFavorite, parseRailLineCode } from '@metro/shared/utils';
 import { ROUTE_FIELDS, STOP_FIELDS } from './geography-graphql.queries';
 
 export type {
@@ -134,6 +134,49 @@ export class GeographyGraphQLService {
     return this.executeGraphQL<{ busStop: BusStopGraphQL | null }>(query, {
       id,
     }).pipe(map((data) => data.busStop));
+  }
+
+  /** Fetch complete geometry for camera framing, independent of visible tiles. */
+  getRouteFocusCoordinates(routeId: string): Observable<[number, number][]> {
+    if (isBusDirectionFavorite(routeId) || isBusLineFavorite(routeId)) {
+      return this.getBusRoute(routeId).pipe(map((route) =>
+        (route?.geometry?.coordinates ?? []).map(([longitude, latitude]) =>
+          [longitude, latitude] as [number, number],
+        ),
+      ));
+    }
+    return this.executeGraphQL<{ routeFullData: RouteFullDataGraphQL | null }>(`
+      query RouteFocusCoordinates($routeId: String!) {
+        routeFullData(routeId: $routeId) {
+          route { geometry { type coordinates } }
+          shapes { geometry { type coordinates } }
+        }
+      }
+    `, { routeId }).pipe(map((data) => {
+      const route = data.routeFullData;
+      return [
+        ...(route?.route.geometry?.coordinates ?? []),
+        ...(route?.shapes ?? []).flatMap((shape) => shape.geometry.coordinates),
+      ].map(([longitude, latitude]) => [longitude, latitude] as [number, number]);
+    }));
+  }
+
+  /** Station bounds can frame a rail line even when its tiles are offscreen. */
+  getRailLineFocusCoordinates(lineId: string): Observable<[number, number][]> {
+    const lineCode = parseRailLineCode(lineId);
+    if (lineCode === undefined) return of([]);
+    return this.executeGraphQL<{ railStations: {
+      lines: string[] | null;
+      latitude: number;
+      longitude: number;
+    }[] }>(`
+      query RailLineFocusCoordinates {
+        railStations { lines latitude longitude }
+      }
+    `).pipe(map((data) => data.railStations
+      .filter((station) => station.lines?.some((line) => parseRailLineCode(line) === lineCode))
+      .map((station) => [station.longitude, station.latitude] as [number, number]),
+    ));
   }
 
   // Bus Routes

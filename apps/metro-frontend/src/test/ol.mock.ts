@@ -136,6 +136,18 @@ class OpenLayersMockObject {
     }
   }
 
+  getViewport(): HTMLElement {
+    return this.getTargetElement() ?? document.createElement('div');
+  }
+
+  getTargetElement(): HTMLElement | null {
+    return typeof this.target === 'string' ? document.getElementById(this.target) : this.target ?? null;
+  }
+
+  getSize(): [number, number] {
+    return [1000, 800];
+  }
+
   getView(): View {
     if (!this.view) {
       this.view = new View();
@@ -185,6 +197,31 @@ export class View extends OpenLayersMockObject {
     super(options);
     this.center = options.center;
     this.zoom = options.zoom;
+  }
+
+  cancelAnimations(): void {
+    return undefined;
+  }
+
+  animate(options: { center?: unknown; zoom?: number }): void {
+    if (options.center) this.center = options.center;
+    if (options.zoom !== undefined) this.zoom = options.zoom;
+  }
+
+  getRotation(): number {
+    return 0;
+  }
+
+  getConstrainedZoom(zoom: number): number {
+    return zoom;
+  }
+
+  getResolutionForZoom(zoom: number): number {
+    return 156543.03392804097 / 2 ** zoom;
+  }
+
+  getZoomForResolution(resolution: number): number {
+    return Math.log2(156543.03392804097 / resolution);
   }
 
   getZoom(): number | undefined {

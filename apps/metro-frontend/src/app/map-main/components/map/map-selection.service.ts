@@ -27,12 +27,15 @@ import type {
 } from '../../geography/geography-graphql.service';
 import { MapDataLoaderService } from './map-data-loader.service';
 import { MapDisplayService } from './map-display.service';
+import type { MapFocusRequest } from './map-camera.service';
 import { MapStateService } from './map-state.service';
 import { SelectedRoute, SelectedStop } from './map.types';
 
 interface PendingStopSelection {
   canonicalStopId?: string;
 }
+
+type SelectionKind = 'route' | 'stop' | 'bike';
 
 interface BusDirectionCandidate {
   favoriteCode: string;
@@ -68,12 +71,34 @@ export class MapSelectionService {
   >();
   private readonly pendingRouteSelections = new Map<string, object>();
   private readonly pendingOppositeDirectionSelections = new Map<string, object>();
+  private selectionFocus: {
+    kind: SelectionKind;
+    ids: Set<string>;
+    request: MapFocusRequest;
+  } | null = null;
+
+  focusRouteOnMap(routeId: string, isRail: boolean): void {
+    const focus = this.createSelectionFocus('route', routeId);
+    const coordinates = isRail
+      ? this.geography.getRailLineFocusCoordinates(routeId)
+      : this.geography.getRouteFocusCoordinates(routeId);
+    coordinates.subscribe({
+      next: (points) => {
+        if (focus.isCurrent()) focus.coordinates(points);
+      },
+      error: (error: unknown) =>
+        this.logger.warn('Could not frame route from map link', error),
+    });
+  }
 
   async addRouteToSelection(
     routeId: string,
     shouldDisplaySnackbar: boolean,
     shouldContinue?: () => boolean,
   ): Promise<void> {
+    const focus = shouldDisplaySnackbar
+      ? this.createSelectionFocus('route', routeId)
+      : null;
     this.logger.debug('Adding route to selection', { routeId });
     const request = {};
     this.pendingRouteSelections.set(routeId, request);
@@ -114,6 +139,7 @@ export class MapSelectionService {
     }
 
     const selectionId = getBusRouteIdentity(route);
+    this.addFocusIdentity(focus, selectionId);
     const currentIdentity = parseBusDirectionFavorite(selectionId);
     if (currentIdentity) {
       const candidates = [...this.mapState.selectedRoutes().values()].flatMap((selection) => {
@@ -124,15 +150,26 @@ export class MapSelectionService {
           identity.destinationLatitude - identity.originLatitude,
           identity.destinationLongitude - identity.originLongitude,
         ) < 0.001) return [];
-        return [{ ...identity, directionId: selection.directionId ?? -1, destination: selection.destination ?? '' }];
+        return [{
+          ...identity,
+          selectionId: selection.id,
+          directionId: selection.directionId ?? -1,
+          destination: selection.destination ?? '',
+        }];
       });
-      if (matchBusDirectionFavorite(selectionId, candidates)) return;
+      const existingDirection = matchBusDirectionFavorite(selectionId, candidates);
+      if (existingDirection) {
+        this.addFocusIdentity(focus, existingDirection.selectionId);
+        this.focusRoute(routeId, route, focus, existingDirection.selectionId);
+        return;
+      }
     }
 
     // The lookup is asynchronous, so two callers can pass the initial
     // selection check before either one updates map state. Only the first
     // completed lookup owns the realtime route subscription.
     if (this.mapState.selectedRoutes().has(selectionId)) {
+      this.focusRoute(routeId, route, focus);
       return;
     }
 
@@ -159,6 +196,7 @@ export class MapSelectionService {
     this.dataLoader.syncVectorTileFilters();
     void this.dataLoader.loadRouteData(routeId, shouldDisplaySnackbar);
     this.subscribeToRouteRealtime(route);
+    this.focusRoute(routeId, route, focus);
 
     if (shouldDisplaySnackbar) {
       this.snackBar.open(`Rota adicionada`, 'Fechar', { duration: 2000 });
@@ -272,6 +310,7 @@ export class MapSelectionService {
     }
 
     if (this.mapState.selectedRoutes().has(railLine.lineId)) {
+      if (shouldDisplaySnackbar) this.focusRailLine(railLine.lineId);
       this.logger.debug('Rail line already selected', { lineId });
       if (shouldDisplaySnackbar) {
         this.snackBar.open('Linha já selecionada', 'Fechar', {
@@ -289,6 +328,7 @@ export class MapSelectionService {
       textColor: 'FFFFFF',
     };
     this.mapState.addRouteToSelection(selectedRoute);
+    if (shouldDisplaySnackbar) this.focusRailLine(railLine.lineId);
 
     this.logger.debug('Selected routes after rail line addition', {
       selectedRoutes: Array.from(this.mapState.selectedRoutes().keys()),
@@ -348,10 +388,19 @@ export class MapSelectionService {
     shouldDisplaySnackbar = true,
     stopUpdates?: Observable<StopFullDataSnapshot>,
   ): Promise<void> {
-    if (this.mapState.selectedStops().has(stopId)) {
+    const selectedStop = this.mapState.selectedStops().get(stopId);
+    if (selectedStop) {
+      if (shouldDisplaySnackbar) {
+        this.createSelectionFocus('stop', stopId).point([
+          selectedStop.longitude, selectedStop.latitude,
+        ]);
+      }
       return;
     }
 
+    const focus = shouldDisplaySnackbar
+      ? this.createSelectionFocus('stop', stopId)
+      : null;
     const pendingRequest: PendingStopSelection = {};
     this.pendingStopSelections.set(stopId, pendingRequest);
     try {
@@ -359,7 +408,10 @@ export class MapSelectionService {
         stopId,
         shouldDisplaySnackbar,
         stopUpdates,
-        (stop) => (pendingRequest.canonicalStopId = stop.stopId),
+        (stop) => {
+          pendingRequest.canonicalStopId = stop.stopId;
+          this.addFocusIdentity(focus, stop.stopId);
+        },
       );
       if (!this.isCurrentStopSelection(stopId, pendingRequest)) {
         return;
@@ -375,7 +427,9 @@ export class MapSelectionService {
 
       const { stop } = loadResult;
       pendingRequest.canonicalStopId = stop.stopId;
+      this.addFocusIdentity(focus, stop.stopId);
       if (this.mapState.selectedStops().has(stop.stopId)) {
+        focus?.point([stop.longitude, stop.latitude]);
         return;
       }
 
@@ -387,6 +441,7 @@ export class MapSelectionService {
         isSubwayStation: stop.isSubwayStation,
       };
       this.mapState.addStopToSelection(selectedStop);
+      focus?.point([stop.longitude, stop.latitude]);
       this.dataLoader.syncVectorTileFilters();
 
       if (shouldDisplaySnackbar) {
@@ -403,6 +458,8 @@ export class MapSelectionService {
     this.pendingRouteSelections.delete(routeId);
     this.pendingOppositeDirectionSelections.delete(routeId);
     const route = this.mapState.selectedRoutes().get(routeId);
+    this.cancelSelectionFocus('route', routeId);
+    if (route?.routeId) this.cancelSelectionFocus('route', route.routeId);
     this.unsubscribeFromRouteRealtime(route);
 
     this.mapState.removeRouteFromSelection(routeId);
@@ -414,6 +471,7 @@ export class MapSelectionService {
   }
 
   removeStopFromSelection(stopId: string): void {
+    this.cancelSelectionFocus('stop', stopId);
     for (const [requestedStopId, pendingRequest] of this
       .pendingStopSelections) {
       if (
@@ -451,17 +509,22 @@ export class MapSelectionService {
     });
     this.displayService.updateMapDisplay();
     if (shouldDisplaySnackbar) {
+      this.createSelectionFocus('bike', stationId).point([
+        station.longitude, station.latitude,
+      ], 17);
       this.snackBar.open('Estação fixada', 'Fechar', { duration: 2000 });
     }
   }
 
   removeBikeStationFromSelection(stationId: string): void {
+    this.cancelSelectionFocus('bike', stationId);
     this.mapState.removeBikeStationFromSelection(stationId);
     this.displayService.updateMapDisplay();
     this.snackBar.open('Estação removida', 'Fechar', { duration: 2000 });
   }
 
   clearAllSelections(shouldDisplaySnackbar = true): void {
+    this.selectionFocus = null;
     this.pendingRouteSelections.clear();
     this.pendingOppositeDirectionSelections.clear();
     for (const route of this.mapState.selectedRoutes().values()) {
@@ -482,6 +545,60 @@ export class MapSelectionService {
   cancelPendingStopSelections(): void {
     this.pendingStopSelections.clear();
     this.dataLoader.cancelStopDataLoads();
+  }
+
+  private focusRailLine(lineId: string): void {
+    const focus = this.createSelectionFocus('route', lineId);
+    this.geography.getRailLineFocusCoordinates(lineId).subscribe({
+      next: (coordinates) => {
+        if (this.mapState.selectedRoutes().has(lineId)) {
+          focus.coordinates(coordinates);
+        }
+      },
+      error: (error: unknown) =>
+        this.logger.warn('Could not frame selected rail line', error),
+    });
+  }
+
+  private focusRoute(
+    routeId: string,
+    route: BusRouteGraphQL,
+    focus: MapFocusRequest | null,
+    selectionId = getBusRouteIdentity(route),
+  ): void {
+    if (!focus?.isCurrent()) return;
+    const coordinates = route.geometry?.coordinates;
+    if (coordinates?.length) {
+      focus.coordinates(coordinates.map(([longitude, latitude]) => [longitude, latitude]));
+      return;
+    }
+    this.geography.getRouteFocusCoordinates(routeId).subscribe({
+      next: (coordinates) => {
+        if (this.mapState.selectedRoutes().has(selectionId)) {
+          focus.coordinates(coordinates);
+        }
+      },
+      error: (error: unknown) => this.logger.warn('Could not frame selected route', error),
+    });
+  }
+
+  private createSelectionFocus(kind: SelectionKind, id: string): MapFocusRequest {
+    const request = this.displayService.createFocusRequest();
+    this.selectionFocus = { kind, ids: new Set([id]), request };
+    return request;
+  }
+
+  private addFocusIdentity(request: MapFocusRequest | null, id: string): void {
+    if (request && this.selectionFocus?.request === request) {
+      this.selectionFocus.ids.add(id);
+    }
+  }
+
+  private cancelSelectionFocus(kind: SelectionKind, id: string): void {
+    const focus = this.selectionFocus;
+    if (focus?.kind !== kind || !focus.ids.has(id)) return;
+    focus.request.cancel();
+    this.selectionFocus = null;
   }
 
   private isCurrentStopSelection(

@@ -17,11 +17,10 @@
     </div>
     <p class="terminal-photo-credit">
       @if (image.sourceUrl) {
-        <a [href]="image.sourceUrl" target="_blank" rel="noopener noreferrer">{{ image.title }}</a>
+        <a [href]="image.sourceUrl" target="_blank" rel="noopener noreferrer">{{ image.title }}</a>, {{ image.author }}.
       } @else {
-        {{ image.title }}
-      },
-      {{ image.author }}.
+        {{ image.title }}, {{ image.author }}.
+      }
       @if (image.licenseUrl) {
         <a [href]="image.licenseUrl" target="_blank" rel="noopener noreferrer">{{ image.license }}</a>
       } @else { {{ image.license }} }

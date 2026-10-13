@@ -14,7 +14,7 @@ export interface ParsedAdminImageInput {
   readonly author: string;
   readonly title: string;
   readonly label?: string;
-  readonly sourceUrl: string;
+  readonly sourceUrl?: string;
   readonly copyrightId: string;
   readonly lineIds: readonly string[];
   readonly stopIds: readonly string[];
@@ -79,7 +79,7 @@ export function parseAdminImageInput(value: unknown): ParsedAdminImageInput {
   );
   const author = requiredText(parsed['author'], 256, 'author');
   const title = requiredText(parsed['title'], 1024, 'title');
-  const sourceUrl = webUrl(parsed['sourceUrl'], 'sourceUrl');
+  const sourceUrl = optionalWebUrl(parsed['sourceUrl'], 'sourceUrl');
   const copyrightId = requiredText(
     parsed['copyrightId'],
     LICENSE_ID_MAX_LENGTH,
@@ -121,7 +121,7 @@ export function parseAdminImageInput(value: unknown): ParsedAdminImageInput {
     author,
     title,
     ...(label !== undefined ? { label } : {}),
-    sourceUrl,
+    ...(sourceUrl !== undefined ? { sourceUrl } : {}),
     copyrightId,
     lineIds,
     stopIds,
@@ -219,6 +219,16 @@ function webUrl(value: unknown, field: string, maxLength = 2048): string {
     throw new BadRequestException(`${field} must be an HTTP or HTTPS URL`);
   }
   return url.toString();
+}
+
+function optionalWebUrl(
+  value: unknown,
+  field: string,
+  maxLength = 2048,
+): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === 'string' && !value.trim()) return undefined;
+  return webUrl(value, field, maxLength);
 }
 
 function stringArray(

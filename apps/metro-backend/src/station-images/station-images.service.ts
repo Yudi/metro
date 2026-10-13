@@ -85,7 +85,7 @@ export class StationImagesService implements OnModuleDestroy {
         isDefault: row.isDefault ?? false,
         author: row.author,
         title: row.title,
-        sourceUrl: row.sourceUrl,
+        ...(row.sourceUrl ? { sourceUrl: row.sourceUrl } : {}),
         license: row.copyright?.license ?? row.license,
         licenseUrl: row.copyright
           ? row.copyright.licenseUrl ?? undefined

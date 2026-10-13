@@ -57,7 +57,7 @@ export class AdminImageConversionService {
         })
         .toColourspace('srgb')
         .avif({
-          quality: 60,
+          quality: 50,
           effort: 6,
           chromaSubsampling: '4:4:4',
           bitdepth: 8,

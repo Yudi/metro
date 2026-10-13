@@ -17,7 +17,11 @@
         (error)="onHeaderImageError()" />
     </div>
     <p class="stop-photo-credit">
-      <a [href]="image.sourceUrl" target="_blank" rel="noopener noreferrer">{{ image.title }}</a>,
+      @if (image.sourceUrl) {
+        <a [href]="image.sourceUrl" target="_blank" rel="noopener noreferrer">{{ image.title }}</a>
+      } @else {
+        {{ image.title }}
+      },
       {{ image.author }}.
       @if (image.licenseUrl) {
         <a [href]="image.licenseUrl" target="_blank" rel="noopener noreferrer">{{ image.license }}</a>

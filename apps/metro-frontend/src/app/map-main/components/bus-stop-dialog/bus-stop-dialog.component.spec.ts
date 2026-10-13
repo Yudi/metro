@@ -110,13 +110,35 @@ describe('BusStopDialogComponent', () => {
 
   afterEach(() => fixture.destroy());
 
-  it('shows an attributed stop photo and hides it when the proxy cannot load it', () => {
+  it('keeps the photo attribution readable when its source URL is absent', () => {
     const image = { ...IMAGE_ENTRY_FIXTURE, src: '/api/media/station-images/files/stop/fixture.avif' };
     images.stopImage.mockReturnValue(image);
     component.stop.set({ ...stop });
     fixture.detectChanges();
     expect(images.stopImage).toHaveBeenLastCalledWith(stop.stopId, terminalReturn.terminalId, stop.sourceAgency, stop.sourceId);
-    expect(fixture.nativeElement.querySelector('.stop-photo-credit').textContent).toContain(image.author);
+
+    let credit = fixture.nativeElement.querySelector('.stop-photo-credit') as HTMLElement;
+    expect(credit.textContent).toContain(image.author);
+    expect(
+      Array.from(credit.querySelectorAll('a')).some(
+        (link) => link.textContent?.trim() === image.title,
+      ),
+    ).toBe(true);
+
+    const imageWithoutSource = { ...image, sourceUrl: undefined };
+    images.stopImage.mockReturnValue(imageWithoutSource);
+    component.stop.set({ ...stop });
+    fixture.detectChanges();
+
+    credit = fixture.nativeElement.querySelector('.stop-photo-credit') as HTMLElement;
+    expect(credit.textContent).toContain(imageWithoutSource.title);
+    expect(credit.textContent).toContain(imageWithoutSource.author);
+    expect(
+      Array.from(credit.querySelectorAll('a')).some(
+        (link) => link.textContent?.trim() === imageWithoutSource.title,
+      ),
+    ).toBe(false);
+
     component.onHeaderImageError();
     expect(images.markUnavailable).toHaveBeenCalledWith(image.key);
     images.stopImage.mockReturnValue(undefined);

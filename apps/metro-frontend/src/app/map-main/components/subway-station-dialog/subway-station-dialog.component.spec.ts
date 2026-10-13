@@ -13,7 +13,15 @@ import type { BusStopGraphQL } from '../../geography/geography-graphql.service';
 import { NextTrainWebsocketService } from '../../../next-train/next-train-websocket.service';
 import { NextTrainCardComponent } from '../../../next-train/components/next-train-card/next-train-card.component';
 import { BreathingAnimationService } from '../../../shared/services/breathing-animation.service';
+import { IMAGE_ENTRY_FIXTURE } from '@metro/shared/admin-contracts';
+import type { StationHeaderImage } from './station-images';
 import { SubwayStationDialogComponent } from './subway-station-dialog.component';
+
+const stationImages = {
+  load: jest.fn(),
+  image: jest.fn((): StationHeaderImage | undefined => undefined),
+  markUnavailable: jest.fn(),
+};
 
 const osasco: BusStopGraphQL = {
   id: 'osasco',
@@ -47,12 +55,14 @@ describe('SubwayStationDialogComponent train lines', () => {
     currentStop = osasco;
     releases.length = 0;
     subscribe.mockClear();
+    stationImages.image.mockReset();
+    stationImages.image.mockReturnValue(undefined);
     TestBed.configureTestingModule({
       imports: [SubwayStationDialogComponent],
       providers: [
         {
           provide: StationImagesService,
-          useValue: { load: jest.fn(), image: () => undefined },
+          useValue: stationImages,
         },
         { provide: MAT_DIALOG_DATA, useFactory: () => ({ stop: currentStop }) },
         {
@@ -135,6 +145,30 @@ describe('SubwayStationDialogComponent train lines', () => {
     expect(releases.every((release) => release.mock.calls.length === 1)).toBe(
       true,
     );
+  });
+
+  it('shows station photo attribution without a source link when no URL is supplied', () => {
+    const image: StationHeaderImage = {
+      ...IMAGE_ENTRY_FIXTURE,
+      sourceUrl: null,
+      src: '/api/media/station-images/files/metro/example.avif',
+    };
+    stationImages.image.mockReturnValue(image);
+
+    const fixture = TestBed.createComponent(SubwayStationDialogComponent);
+    fixture.detectChanges();
+
+    const credit = fixture.nativeElement.querySelector(
+      '.station-photo-credit',
+    ) as HTMLElement | null;
+    expect(credit?.textContent).toContain(`Foto: ${image.author}.`);
+    expect(
+      Array.from(credit?.querySelectorAll('a') ?? []).some(
+        (link) => link.getAttribute('title') === image.title,
+      ),
+    ).toBe(false);
+
+    fixture.destroy();
   });
 
   it('sorts and switches other numbered lines through the same selector', () => {

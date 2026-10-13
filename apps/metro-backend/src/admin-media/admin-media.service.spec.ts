@@ -26,7 +26,7 @@ type ImageRow = {
   service: string | null;
   author: string;
   title: string;
-  sourceUrl: string;
+  sourceUrl: string | null;
   license: string;
   licenseUrl: string | null;
   copyrightId: string | null;
@@ -169,6 +169,21 @@ describe('AdminMediaService', () => {
     expect(parsed).toMatchObject({ lineIds: [], stopIds: [], isDefault: false });
     expect(parsed).not.toHaveProperty('label');
     expect(parsed).not.toHaveProperty('service');
+  });
+
+  it('stores images without a source URL and omits it from the public entry', async () => {
+    const { service, rows } = createHarness();
+    const inputWithoutSourceUrl = Object.fromEntries(
+      Object.entries(imageInput()).filter(([field]) => field !== 'sourceUrl'),
+    );
+
+    const parsed = parseAdminImageInput(inputWithoutSourceUrl);
+    expect(parsed).not.toHaveProperty('sourceUrl');
+
+    const entry = await service.uploadImage(validAvif(), inputWithoutSourceUrl);
+
+    expect(rows.get(entry.key)?.sourceUrl).toBeNull();
+    expect(entry).not.toHaveProperty('sourceUrl');
   });
 
   it('uploads immutable files, replaces the explicit default, and preserves positions on edit', async () => {

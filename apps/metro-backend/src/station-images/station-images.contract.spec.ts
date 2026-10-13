@@ -4,6 +4,26 @@ import {
 } from './station-images.contract';
 
 describe('station image metadata contract', () => {
+  it('accepts images without a source URL', () => {
+    const manifest = parseStationImageManifest(
+      JSON.stringify({
+        version: 1,
+        stations: {
+          luz: [
+            {
+              key: 'station-images/metro/luz.avif',
+              author: 'Photographer',
+              title: 'Luz station platform',
+              license: 'CC BY 4.0',
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(manifest.stations['luz']?.[0]).not.toHaveProperty('sourceUrl');
+  });
+
   it('accepts the public manifest shape and station image keys', () => {
     const manifest = parseStationImageManifest(
       JSON.stringify({

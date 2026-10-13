@@ -408,7 +408,7 @@ describe('NextTrainCardComponent', () => {
     );
     expect(fixture.nativeElement.textContent).toContain('a cada 5 min');
     expect(fixture.nativeElement.querySelectorAll('.train-chip')).toHaveLength(
-      3,
+      0,
     );
   });
 
@@ -437,8 +437,8 @@ describe('NextTrainCardComponent', () => {
     });
 
     const table = fixture.nativeElement.querySelector(
-      '.train-schedule-table',
-    ) as HTMLTableElement;
+      '.scheduled-train',
+    ).closest('table') as HTMLTableElement;
 
     expect(table.textContent).toContain('Programado');
     expect(table.textContent).not.toContain('Agora');
@@ -463,6 +463,75 @@ describe('NextTrainCardComponent', () => {
     expect(
       fixture.nativeElement.querySelector('.schedule-indicator'),
     ).toBeNull();
+  });
+
+  it('keeps empty direction tables visible without schedule data', () => {
+    fixture.componentRef.setInput('displayMode', 'schedule');
+    setSnapshot('L9', 'HBR', { trains: [] });
+
+    const tables = fixture.nativeElement.querySelectorAll(
+      '.train-schedule-table',
+    ) as NodeListOf<HTMLTableElement>;
+
+    expect(tables.length).toBeGreaterThan(0);
+    for (const table of tables) {
+      expect(table.querySelectorAll('tbody tr')).toHaveLength(1);
+      expect(table.textContent).toContain(
+        'Nenhuma previsão em tempo real para este sentido.',
+      );
+    }
+    expect(fixture.nativeElement.querySelector('.empty-state')).toBeNull();
+  });
+
+  it('replaces the empty row and single scheduled entry when live arrivals update', () => {
+    fixture.componentRef.setInput('displayMode', 'schedule');
+    const service = createScheduledService({
+      followingDepartures: [
+        {
+          departureAt: new Date(Date.now() + 17 * 60_000).toISOString(),
+          arrivalAt: new Date(Date.now() + 24 * 60_000).toISOString(),
+        },
+      ],
+    });
+    setSnapshot('L9', 'HBR', {
+      trains: [],
+      scheduledServices: [service],
+    });
+
+    const scheduledRow = fixture.nativeElement.querySelector('.scheduled-train');
+    const table = scheduledRow.closest('table') as HTMLTableElement;
+    expect(table.querySelectorAll('tbody tr')).toHaveLength(2);
+    expect(table.textContent).toContain(
+      'Nenhuma previsão em tempo real para este sentido.',
+    );
+    expect(table.textContent).toContain('Programado');
+    expect(fixture.nativeElement.querySelectorAll('.scheduled-train')).toHaveLength(1);
+
+    setSnapshot('L9', 'HBR', {
+      trains: [createArrival({
+        destinationCode: 'VAG',
+        destinationName: 'Varginha',
+        isAtPlatform: true,
+      })],
+      scheduledServices: [service],
+    });
+
+    const liveTable = fixture.nativeElement.querySelector(
+      '.train-schedule-table__next',
+    ).closest('table') as HTMLTableElement;
+    expect(liveTable.textContent).toContain('Na plataforma');
+    expect(liveTable.querySelector('.train-schedule-table__empty')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.scheduled-train')).toBeNull();
+  });
+
+  it('distinguishes failed live predictions from an empty result in the table', () => {
+    fixture.componentRef.setInput('displayMode', 'schedule');
+    setSnapshot('L9', 'HBR', { trains: [], hasError: true });
+
+    expect(fixture.nativeElement.querySelector('.train-schedule-table').textContent)
+      .toContain('Não foi possível obter previsões em tempo real.');
+    expect(fixture.nativeElement.textContent)
+      .not.toContain('Nenhuma previsão em tempo real para este sentido.');
   });
 
   it('prefers a measured direction headway over the scheduled interval', () => {

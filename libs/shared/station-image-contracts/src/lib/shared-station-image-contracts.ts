@@ -7,7 +7,7 @@ export interface StationImage {
   readonly isDefault?: boolean;
   readonly author: string;
   readonly title: string;
-  readonly sourceUrl: string;
+  readonly sourceUrl?: string | null;
   readonly license: string;
   readonly licenseUrl?: string;
 }

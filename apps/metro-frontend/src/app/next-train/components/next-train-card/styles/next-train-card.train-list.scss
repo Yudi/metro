@@ -173,6 +173,10 @@
     color: var(--mat-sys-on-primary-container, #173b73);
   }
 
+  &__empty {
+    color: var(--mat-sys-on-surface-variant, #666);
+  }
+
   &__next.scheduled-train,
   .scheduled-train:not(&__next) {
     background: var(--mat-sys-surface, #fff);

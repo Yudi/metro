@@ -102,7 +102,7 @@ function isStationImage(value: unknown, category: ImageCategory): value is Stati
     keyIsValid &&
     isRequiredText(value['author'], 256) &&
     isRequiredText(value['title'], 1024) &&
-    isWebUrl(value['sourceUrl']) &&
+    isOptionalWebUrl(value['sourceUrl']) &&
     isRequiredText(value['license'], 128) &&
     isOptionalText(value['label'], 160) &&
     isLineIds(value['lineIds']) &&
@@ -156,7 +156,8 @@ function isWebUrl(value: unknown): value is string {
 }
 
 function isOptionalWebUrl(value: unknown): boolean {
-  return value === undefined || isWebUrl(value);
+  return value === undefined || value === null ||
+    (typeof value === 'string' && !value.trim()) || isWebUrl(value);
 }
 
 /** Explicit line assignments outrank service photos; manifest order is the fallback. */

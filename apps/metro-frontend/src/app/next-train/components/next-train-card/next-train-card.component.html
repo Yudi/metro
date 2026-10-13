@@ -113,7 +113,11 @@
           @if (displayMode() === "schedule") {
             @if (
               direction.nextDisplay ||
-              (direction.followingDisplays?.length ?? 0) > 0
+              (direction.followingDisplays?.length ?? 0) > 0 ||
+              (!state.loading &&
+                !state.processing &&
+                !state.operationClosed &&
+                !state.outOfSchedule)
             ) {
               <table class="train-schedule-table">
                 <thead>
@@ -123,6 +127,17 @@
                   </tr>
                 </thead>
                 <tbody>
+                  @if (!direction.nextTrain) {
+                    <tr class="train-schedule-table__empty">
+                      <td colspan="2">
+                        {{
+                          state.hasApiError
+                            ? "Não foi possível obter previsões em tempo real."
+                            : "Nenhuma previsão em tempo real."
+                        }}
+                      </td>
+                    </tr>
+                  }
                   @if (direction.nextDisplay; as next) {
                     <tr
                       class="train-schedule-table__next"
@@ -238,7 +253,8 @@
     !state.processing &&
     !state.loading &&
     !state.outOfSchedule &&
-    !state.operationClosed
+    !state.operationClosed &&
+    (displayMode() !== "schedule" || state.directions.length === 0)
   ) {
     @if (state.hasApiError) {
       <div class="error-state">

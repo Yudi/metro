@@ -100,7 +100,12 @@ function validateImageGroups(groups, identityPattern, isTerminal, images, keys) 
         if (!isRequiredText(image[field], maxLength))
           throw new Error(`Invalid ${field} for ${image.key}`);
       }
-      if (!isWebUrl(image.sourceUrl))
+      if (
+        image.sourceUrl !== undefined &&
+        image.sourceUrl !== null &&
+        image.sourceUrl !== "" &&
+        !isWebUrl(image.sourceUrl)
+      )
         throw new Error(`Invalid sourceUrl for ${image.key}`);
       if (image.label !== undefined && !isRequiredText(image.label, 160))
         throw new Error(`Invalid label for ${image.key}`);
@@ -130,9 +135,9 @@ export function buildStationImageObjectMetadata(image) {
     position: String(image.position),
     author: image.author,
     title: image.title,
-    "source-url": image.sourceUrl,
     license: image.license,
   };
+  if (image.sourceUrl) fields["source-url"] = image.sourceUrl;
   if (image.label !== undefined) fields.label = image.label;
   if (image.lineIds?.length) fields["line-ids"] = image.lineIds.join(",");
   if (image.service !== undefined) fields.service = image.service;
@@ -172,7 +177,7 @@ export function toStationImageDatabaseRow(image) {
     service: image.service ?? null,
     author: image.author,
     title: image.title,
-    sourceUrl: image.sourceUrl,
+    sourceUrl: image.sourceUrl ?? null,
     license: image.license,
     licenseUrl: image.licenseUrl ?? null,
   };

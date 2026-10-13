@@ -570,19 +570,7 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
         };
       },
     );
-    const scheduledDisplays = (direction.followingScheduledDepartures ?? [])
-      .slice(0, 3)
-      .map(
-        (departure, index): FollowingTrainDisplay => ({
-          key: `scheduled-${index}-${departure.departureAt}`,
-          label: this.getScheduledDepartureDisplay(departure),
-          tooltip: this.getScheduledDepartureTooltip(departure),
-          isAtPlatform: false,
-          scheduled: true,
-        }),
-      );
-
-    return [...liveDisplays, ...scheduledDisplays];
+    return liveDisplays;
   }
 
   private getHeadwayForScheduledDirection(

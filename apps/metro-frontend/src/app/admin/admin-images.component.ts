@@ -128,7 +128,7 @@ export class AdminImagesComponent {
     }),
     sourceUrl: new FormControl('', {
       nonNullable: true,
-      validators: [Validators.required, Validators.pattern(WEB_URL_PATTERN), Validators.maxLength(2048)],
+      validators: [Validators.pattern(WEB_URL_PATTERN), Validators.maxLength(2048)],
     }),
     copyrightId: new FormControl('', {
       nonNullable: true,
@@ -278,7 +278,7 @@ export class AdminImagesComponent {
       author: entry.author,
       title: entry.title,
       label: entry.label ?? '',
-      sourceUrl: entry.sourceUrl,
+      sourceUrl: entry.sourceUrl ?? '',
       copyrightId: entry.copyrightId ?? '',
       lineIds: entry.isDefault ? [] : [...(entry.lineIds ?? [])],
       stopIds: entry.isDefault ? [] : [...entry.stopIds],
@@ -537,7 +537,7 @@ export class AdminImagesComponent {
       author: controls.author.value.trim(),
       title: controls.title.value.trim(),
       label: controls.label.value,
-      sourceUrl: controls.sourceUrl.value.trim(),
+      sourceUrl: controls.sourceUrl.value.trim() || undefined,
       copyrightId: controls.copyrightId.value,
       lineIds: controls.lineIds.value,
       stopIds: controls.stopIds.value,

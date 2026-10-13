@@ -299,13 +299,17 @@
             @if (headerImage(); as image) {
               <footer class="station-photo-credit">
                 Foto:
-                <a
-                  [href]="image.sourceUrl"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  [attr.title]="image.title"
-                  >{{ image.author }}</a
-                >.&#32;
+                @if (image.sourceUrl) {
+                  <a
+                    [href]="image.sourceUrl"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    [attr.title]="image.title"
+                    >{{ image.author }}</a
+                  >
+                } @else {
+                  {{ image.author }}
+                }.&#32;
                 <span
                   >Licença:&#32;
                   @if (image.licenseUrl; as licenseUrl) {

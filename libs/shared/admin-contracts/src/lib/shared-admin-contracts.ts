@@ -35,7 +35,7 @@ export interface AdminImageInput {
   readonly author: string;
   readonly title: string;
   readonly label?: string;
-  readonly sourceUrl: string;
+  readonly sourceUrl?: string | null;
   readonly copyrightId: string;
   readonly lineIds?: readonly string[];
   readonly stopIds?: readonly string[];

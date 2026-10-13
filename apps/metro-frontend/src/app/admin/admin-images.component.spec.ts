@@ -123,6 +123,27 @@ describe('AdminImagesComponent', () => {
     expect(component.form.controls.serviceTrain.value).toBe(true);
   });
 
+  it('uploads valid image metadata without a source URL', async () => {
+    const file = new File(['image fixture'], 'station.png', {
+      type: 'image/png',
+    });
+    component.selectedResource.set(MEDIA_STATION_FIXTURE);
+    component.startUpload();
+    component.form.patchValue({
+      author: 'Autora de teste',
+      title: 'Imagem sem fonte',
+      copyrightId: COPYRIGHT_FIXTURE.id,
+    });
+    component.selectedFile.set(file);
+
+    expect(component.form.controls.sourceUrl.valid).toBe(true);
+
+    await component.save();
+
+    expect(api.uploadImage).toHaveBeenCalledTimes(1);
+    expect(api.uploadImage.mock.calls[0]?.[1].sourceUrl).toBeUndefined();
+  });
+
   it('keeps a non-previewable HEIC file selected and clears its fallback when removed', () => {
     const file = new File(['heic fixture'], 'station.heic', {
       type: 'image/heic',

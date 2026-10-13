@@ -217,7 +217,7 @@ export class AdminMediaService {
             service: input.service ?? null,
             author: input.author,
             title: input.title,
-            sourceUrl: input.sourceUrl,
+            sourceUrl: input.sourceUrl ?? null,
             license: currentCopyright.license,
             licenseUrl: currentCopyright.licenseUrl ?? null,
             copyrightId: currentCopyright.id,
@@ -290,7 +290,7 @@ export class AdminMediaService {
           service: input.service ?? null,
           author: input.author,
           title: input.title,
-          sourceUrl: input.sourceUrl,
+          sourceUrl: input.sourceUrl ?? null,
           license: currentCopyright.license,
           licenseUrl: currentCopyright.licenseUrl ?? null,
           copyrightId: currentCopyright.id,
@@ -640,7 +640,7 @@ function toAdminImageEntry(
     readonly service: string | null;
     readonly author: string;
     readonly title: string;
-    readonly sourceUrl: string;
+    readonly sourceUrl: string | null;
     readonly license: string;
     readonly licenseUrl: string | null;
     readonly copyrightId: string | null;
@@ -667,7 +667,7 @@ function toAdminImageEntry(
     isDefault: row.isDefault,
     author: row.author,
     title: row.title,
-    sourceUrl: row.sourceUrl,
+    ...(row.sourceUrl ? { sourceUrl: row.sourceUrl } : {}),
     license,
     ...(licenseUrl ? { licenseUrl } : {}),
   };

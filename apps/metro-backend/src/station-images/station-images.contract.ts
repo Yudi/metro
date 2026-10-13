@@ -111,7 +111,7 @@ function isStationImageMetadataEntry(
     (value['service'] === undefined || value['service'] === 'train') &&
     isRequiredText(value['author'], 256) &&
     isRequiredText(value['title'], 1024) &&
-    isWebUrl(value['sourceUrl']) &&
+    isOptionalWebUrl(value['sourceUrl']) &&
     isRequiredText(value['license'], 128) &&
     isOptionalWebUrl(value['licenseUrl'])
   );
@@ -182,5 +182,6 @@ function isWebUrl(value: unknown): value is string {
 }
 
 function isOptionalWebUrl(value: unknown): boolean {
-  return value === undefined || isWebUrl(value);
+  return value === undefined || value === null ||
+    (typeof value === 'string' && !value.trim()) || isWebUrl(value);
 }

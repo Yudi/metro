@@ -18,6 +18,7 @@ import type {
 } from '../../geography/geography-graphql.service';
 import { MapDisplayService } from '../map/map-display.service';
 import { StationImagesService } from '../subway-station-dialog/station-images.service';
+import { IMAGE_ENTRY_FIXTURE } from '@metro/shared/admin-contracts';
 import { BusTerminalDialogComponent } from './bus-terminal-dialog.component';
 import type { BusTerminalDialogData } from './bus-terminal-dialog.types';
 import { StopArrivalsComponent } from '../stop-arrivals/stop-arrivals.component';
@@ -39,6 +40,7 @@ describe('BusTerminalDialogComponent', () => {
   let fixture: ComponentFixture<BusTerminalDialogComponent>;
   let component: BusTerminalDialogComponent;
   let getTerminalDetail: jest.Mock;
+  let terminalImage: jest.Mock;
   let fitToCoordinates: jest.Mock;
   let detailsRequest: Subject<BusTerminalDetail | null>;
   let data: BusTerminalDialogData;
@@ -46,6 +48,7 @@ describe('BusTerminalDialogComponent', () => {
   beforeEach(async () => {
     detailsRequest = new Subject<BusTerminalDetail | null>();
     getTerminalDetail = jest.fn(() => detailsRequest.asObservable());
+    terminalImage = jest.fn(() => undefined);
     fitToCoordinates = jest.fn();
     data = {
       terminalId: BUS_TERMINAL_SUMMARY_FIXTURE.id,
@@ -77,7 +80,7 @@ describe('BusTerminalDialogComponent', () => {
           provide: StationImagesService,
           useValue: {
             load: jest.fn(),
-            terminalImage: jest.fn(() => undefined),
+            terminalImage,
             markUnavailable: jest.fn(),
           },
         },
@@ -126,6 +129,27 @@ describe('BusTerminalDialogComponent', () => {
     expect(fixture.nativeElement.textContent).toContain(
       'Ponto central-alighting',
     );
+  });
+
+  it('keeps terminal photo attribution readable when no source URL is supplied', () => {
+    const image = {
+      ...IMAGE_ENTRY_FIXTURE,
+      sourceUrl: null,
+      src: '/api/media/station-images/files/terminal/example.avif',
+    };
+    terminalImage.mockReturnValue(image);
+    fixture.componentRef.setInput('embedded', true);
+    fixture.detectChanges();
+
+    const credit = fixture.nativeElement.querySelector(
+      '.terminal-photo-credit',
+    ) as HTMLElement | null;
+    expect(credit?.textContent).toContain(`${image.title}, ${image.author}.`);
+    expect(
+      Array.from(credit?.querySelectorAll('a') ?? []).some(
+        (link) => link.textContent?.trim() === image.title,
+      ),
+    ).toBe(false);
   });
 
   it('loads regular stop-arrival content automatically inside an expanded platform', async () => {

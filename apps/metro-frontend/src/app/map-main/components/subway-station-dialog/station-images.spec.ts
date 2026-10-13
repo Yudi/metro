@@ -75,6 +75,18 @@ describe('stop image selection', () => {
 });
 
 describe('station image manifest', () => {
+  it('accepts images without a source URL', () => {
+    const imageWithoutSource = { ...primary };
+    delete imageWithoutSource.sourceUrl;
+
+    expect(
+      isStationImageManifest({
+        version: 1,
+        stations: { luz: [imageWithoutSource] },
+      }),
+    ).toBe(true);
+  });
+
   it('accepts stop images and rejects malformed selectors and duplicate keys', () => {
     const stop = { ...IMAGE_ENTRY_FIXTURE, key: 'station-images/stop/test.avif' };
     const metadata = { version: 1, stations: {}, stops: { 'stop:sptrans:10001': [stop] } };

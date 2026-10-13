@@ -330,7 +330,7 @@
 
             <div class="editor-fields">
               <mat-form-field appearance="outline">
-                <mat-label>Titular</mat-label>
+                <mat-label>Autor</mat-label>
                 <input
                   matInput
                   [formControl]="form.controls.author"
@@ -340,7 +340,9 @@
                   form.controls.author.hasError("required") &&
                   form.controls.author.touched
                 ) {
-                  <mat-error>Informe o titular.</mat-error>
+                  <mat-error
+                    >Informe o titular dos direitos autorais.</mat-error
+                  >
                 }
               </mat-form-field>
               <mat-form-field appearance="outline">
@@ -366,7 +368,7 @@
                 />
               </mat-form-field>
               <mat-form-field appearance="outline">
-                <mat-label>Fonte (URL)</mat-label>
+                <mat-label>Fonte (URL, opcional)</mat-label>
                 <input
                   matInput
                   type="url"
@@ -374,11 +376,6 @@
                   maxlength="2048"
                 />
                 @if (
-                  form.controls.sourceUrl.hasError("required") &&
-                  form.controls.sourceUrl.touched
-                ) {
-                  <mat-error>Informe a URL da fonte.</mat-error>
-                } @else if (
                   form.controls.sourceUrl.hasError("pattern") &&
                   form.controls.sourceUrl.touched
                 ) {

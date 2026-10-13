@@ -93,8 +93,8 @@ export class AdminImageEntryType implements AdminImageEntry {
   @Field(() => String)
   title!: string;
 
-  @Field(() => String)
-  sourceUrl!: string;
+  @Field(() => String, { nullable: true })
+  sourceUrl?: string | null;
 
   @Field(() => String)
   license!: string;
@@ -117,8 +117,11 @@ export class AdminImageInputType implements AdminImageInput {
   @Field(() => String, { nullable: true })
   label?: string;
 
-  @Field(() => String, { description: 'HTTP or HTTPS page identifying the source image.' })
-  sourceUrl!: string;
+  @Field(() => String, {
+    nullable: true,
+    description: 'Optional HTTP or HTTPS page identifying the source image.',
+  })
+  sourceUrl?: string | null;
 
   @Field(() => String, { description: 'Reusable license ID from adminImageLicenses.' })
   copyrightId!: string;

@@ -339,6 +339,22 @@ export const ScheduledFallback: Story = {
   ],
 };
 
+export const ScheduleTableWithoutLiveTrains: Story = {
+  ...ScheduledFallback,
+  args: {
+    ...ScheduledFallback.args,
+    displayMode: 'schedule',
+  },
+};
+
+export const ScheduleTableWithoutPredictions: Story = {
+  ...NoTrains,
+  args: {
+    ...NoTrains.args,
+    displayMode: 'schedule',
+  },
+};
+
 export const ScheduledOriginDeparture: Story = {
   args: {
     lineCode: 'L4',

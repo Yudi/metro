@@ -4,6 +4,7 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { BikeApiService } from './bike-api.service';
 import {
   BikeStationDto,
@@ -26,7 +27,9 @@ interface DeltaChanges {
 export class BikePollingService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(BikePollingService.name);
   private latestPayload: BikeStationsPayloadDto | null = null;
-  private latestSummary: BikeStationsSummaryPayloadDto | null = null;
+  private latestSummary:
+    (BikeStationsSummaryPayloadDto & { mapRevision: string }) | null = null;
+  private mapChanged = false;
   private latestDelta: DeltaChanges | null = null;
   private previousSummaryMap: Map<string, BikeStationSummaryDto> = new Map();
   private readonly pollingCoordinator = new PollingCoordinator(
@@ -62,6 +65,10 @@ export class BikePollingService implements OnModuleInit, OnModuleDestroy {
     return this.latestSummary;
   }
 
+  getMapRevision(): string | null {
+    return this.latestSummary?.mapRevision ?? null;
+  }
+
   /**
    * Get a lightweight refresh payload for initial connection.
    * Station summaries are now served through vector tiles.
@@ -75,6 +82,7 @@ export class BikePollingService implements OnModuleInit, OnModuleDestroy {
       lastUpdated: this.latestSummary.lastUpdated,
       ttl: this.latestSummary.ttl,
       fetchedAt: this.latestSummary.fetchedAt,
+      mapRevision: this.latestSummary.mapRevision,
     };
   }
 
@@ -92,7 +100,7 @@ export class BikePollingService implements OnModuleInit, OnModuleDestroy {
       this.latestDelta.updated.length > 0 ||
       this.latestDelta.removed.length > 0;
 
-    if (!hasChanges) {
+    if (!hasChanges && !this.mapChanged) {
       return null;
     }
 
@@ -101,6 +109,7 @@ export class BikePollingService implements OnModuleInit, OnModuleDestroy {
       lastUpdated: this.latestSummary.lastUpdated,
       ttl: this.latestSummary.ttl,
       fetchedAt: this.latestSummary.fetchedAt,
+      mapRevision: this.latestSummary.mapRevision,
     };
   }
 
@@ -150,6 +159,7 @@ export class BikePollingService implements OnModuleInit, OnModuleDestroy {
   private async pollStations(): Promise<void> {
     const payload = await this.bikeApi.fetchStations();
     const newSummary = this.buildSummaryPayload(payload);
+    this.mapChanged = newSummary.mapRevision !== this.latestSummary?.mapRevision;
 
     // Compute delta before updating caches
     this.latestDelta = this.computeDelta(newSummary);
@@ -245,14 +255,23 @@ export class BikePollingService implements OnModuleInit, OnModuleDestroy {
 
   private buildSummaryPayload(
     payload: BikeStationsPayloadDto,
-  ): BikeStationsSummaryPayloadDto {
+  ): BikeStationsSummaryPayloadDto & { mapRevision: string } {
+    const stations = payload.stations.map((station) =>
+      this.toStationSummary(station),
+    );
+    // Hash only fields emitted in MVT, independent of fetch time and feed order.
+    const orderedStations = [...stations].sort((a, b) =>
+      a.stationId.localeCompare(b.stationId),
+    );
+    const mapRevision = createHash('sha256')
+      .update(JSON.stringify(orderedStations))
+      .digest('hex');
     return {
       lastUpdated: payload.lastUpdated,
       ttl: payload.ttl,
       fetchedAt: payload.fetchedAt,
-      stations: payload.stations.map((station) =>
-        this.toStationSummary(station),
-      ),
+      stations,
+      mapRevision,
     };
   }
 

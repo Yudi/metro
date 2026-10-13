@@ -33,6 +33,7 @@ export class MapService {
 
   private map = signal<Map | null>(null);
   private selectionTimer: ReturnType<typeof setTimeout> | null = null;
+  private hoverFrame: number | null = null;
 
   readonly selectedFeature = signal<FeatureLike | null>(null);
   readonly features = signal<Feature[]>([]);
@@ -136,9 +137,14 @@ export class MapService {
 
     // Keep animation frames free of layer invalidation and persistence effects.
     // OpenLayers renders the moving view itself; publish only the settled camera.
+    map.on('movestart', () => {
+      this.cancelHoverCheck();
+      this.vectorTileLayerService.setMapMoving(true);
+    });
     map.on('moveend', () => {
       updateZoomLevel();
       this.updateCenterSignal();
+      this.vectorTileLayerService.setMapMoving(false);
     });
 
     // Add direct click handler for feature selection
@@ -170,22 +176,24 @@ export class MapService {
       }
     });
 
-    // Add pointer move handler for hover feedback
+    // Coalesce pointer events and hit-test only the latest position per frame.
+    let hoverPixel: number[] = [];
     map.on('pointermove', (event) => {
       const view = map.getView();
-      if (event.dragging || view.getAnimating() || view.getInteracting()) return;
-
-      const pixel = map.getEventPixel(event.originalEvent);
-      const hit = map.hasFeatureAtPixel(pixel);
-
-      // Change cursor to pointer when hovering over features
-      const target = map.getTarget();
-      const targetElement =
-        typeof target === 'string' ? document.getElementById(target) : target;
-
-      if (targetElement instanceof HTMLElement) {
-        targetElement.style.cursor = hit ? 'pointer' : '';
+      if (event.dragging || view.getAnimating() || view.getInteracting()) {
+        this.cancelHoverCheck();
+        return;
       }
+      hoverPixel = event.pixel;
+      if (this.hoverFrame !== null) return;
+
+      this.hoverFrame = requestAnimationFrame(() => {
+        this.hoverFrame = null;
+        if (this.map() !== map || view.getAnimating() || view.getInteracting()) return;
+        const cursor = map.hasFeatureAtPixel(hoverPixel) ? 'pointer' : '';
+        const target = map.getTargetElement();
+        if (target && target.style.cursor !== cursor) target.style.cursor = cursor;
+      });
     });
 
     this.map.set(map);
@@ -333,6 +341,7 @@ export class MapService {
    * Destroy the map and clean up resources
    */
   destroy(): void {
+    this.cancelHoverCheck();
     if (this.selectionTimer) clearTimeout(this.selectionTimer);
     this.selectionTimer = null;
     const map = this.map();
@@ -350,5 +359,12 @@ export class MapService {
     });
     this.features.set([]);
     this.selectedFeature.set(null);
+    this.vectorTileLayerService.setMapMoving(false);
+  }
+
+  private cancelHoverCheck(): void {
+    if (this.hoverFrame === null) return;
+    cancelAnimationFrame(this.hoverFrame);
+    this.hoverFrame = null;
   }
 }

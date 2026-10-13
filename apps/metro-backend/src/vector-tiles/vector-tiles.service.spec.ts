@@ -137,3 +137,33 @@ describe('VectorTilesService rail tile cache and request coalescing', () => {
     expect(cache.getStats().size).toBe(1);
   });
 });
+
+describe('VectorTilesService bike content cache', () => {
+  it('retains tiles on unchanged polls and invalidates them when content changes', async () => {
+    let revision = 'first';
+    let pollComplete: (() => void) | undefined;
+    const generateBikeStationsTile = jest.fn().mockResolvedValue(Buffer.from('bike'));
+    const service = new VectorTilesService(
+      new VectorTileCacheService(),
+      {
+        onPollComplete: (listener: () => void) => { pollComplete = listener; },
+        offPollComplete: jest.fn(),
+        getMapRevision: () => revision,
+      } as never,
+      {} as never,
+      { normalizeIds: () => [] } as never,
+      { generateBikeStationsTile } as never,
+    );
+    service.onModuleInit();
+    pollComplete?.();
+    await service.getTile(VectorTileLayer.BIKE_STATIONS, 15, 1000, 1000);
+    pollComplete?.();
+    await service.getTile(VectorTileLayer.BIKE_STATIONS, 15, 1000, 1000);
+    expect(generateBikeStationsTile).toHaveBeenCalledTimes(1);
+    revision = 'second';
+    pollComplete?.();
+    await service.getTile(VectorTileLayer.BIKE_STATIONS, 15, 1000, 1000);
+    expect(generateBikeStationsTile).toHaveBeenCalledTimes(2);
+    service.onModuleDestroy();
+  });
+});

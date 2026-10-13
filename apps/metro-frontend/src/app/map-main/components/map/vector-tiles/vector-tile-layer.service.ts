@@ -53,7 +53,10 @@ export class VectorTileLayerService {
   private readonly layers = new Map<VectorTileLayerType, VectorTileLayer>();
   private currentZoomLevel = signal<number | null>(null);
 
-  private bikeDataRevision: number | null = null;
+  private bikeDataRevision: string | number | null = null;
+  private pendingBikeRevision: string | number | null = null;
+  private mapMoving = false;
+  private readonly busStopIdentities = new WeakMap<FeatureLike, string[]>();
   private busRouteIds: string[] = [];
   private selectedBusStopIds: Set<string> = new Set();
   private selectedBusStopIdsKey = '[]';
@@ -143,8 +146,22 @@ export class VectorTileLayerService {
   }
 
   /** WebSockets invalidate snapshots; HTTP validators keep unchanged bodies cached. */
-  refreshBikeStations(revision: number | null): void {
-    if (revision === null || revision === this.bikeDataRevision) return;
+  refreshBikeStations(revision: string | number | null): void {
+    if (revision === null) return;
+    this.pendingBikeRevision = revision;
+    this.flushBikeRefresh();
+  }
+
+  setMapMoving(moving: boolean): void {
+    this.mapMoving = moving;
+    this.flushBikeRefresh();
+  }
+
+  private flushBikeRefresh(): void {
+    if (this.mapMoving || this.pendingBikeRevision === null) return;
+    const revision = this.pendingBikeRevision;
+    this.pendingBikeRevision = null;
+    if (revision === this.bikeDataRevision) return;
     this.bikeDataRevision = revision;
     this.refreshLayer(VectorTileLayerType.BIKE_STATIONS);
   }
@@ -162,7 +179,6 @@ export class VectorTileLayerService {
     this.currentZoomLevel.set(zoom);
     if (((previousZoom ?? 0) >= 14) !== ((zoom ?? 0) >= 14)) {
       this.layers.get(VectorTileLayerType.RAIL_STATIONS)?.changed();
-      this.layers.get(VectorTileLayerType.BIKE_STATIONS)?.changed();
     }
   }
 
@@ -289,7 +305,7 @@ export class VectorTileLayerService {
     }
 
     if (config.id === VectorTileLayerType.BUS_STOPS) {
-      if (z < 15) {
+      if (z < 16) {
         return undefined;
       }
     }
@@ -331,6 +347,15 @@ export class VectorTileLayerService {
   private isSelectedBusStop(feature: FeatureLike): boolean {
     if (this.selectedBusStopIds.size === 0) return false;
 
+    return this.getBusStopIdentities(feature).some((identity) =>
+      this.selectedBusStopIds.has(identity),
+    );
+  }
+
+  private getBusStopIdentities(feature: FeatureLike): string[] {
+    const cached = this.busStopIdentities.get(feature);
+    if (cached) return cached;
+
     const identities = new Set<string>();
     const stopIds = [
       ...getFeatureStrings(feature.get('stop_id')),
@@ -349,9 +374,9 @@ export class VectorTileLayerService {
       }
     }
 
-    return Array.from(identities).some((identity) =>
-      this.selectedBusStopIds.has(identity),
-    );
+    const normalized = Array.from(identities);
+    this.busStopIdentities.set(feature, normalized);
+    return normalized;
   }
 }
 

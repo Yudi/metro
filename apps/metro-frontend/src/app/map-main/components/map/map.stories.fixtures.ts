@@ -66,7 +66,7 @@ import {
   type BikeStationTileData,
 } from './vector-tiles/vector-tile-layer.service';
 import type { SelectedRoute } from './map.types';
-import { createBikeMarkerStyles } from './layers/bike-marker-style.utils';
+import { createBikeMarkerStyles, getBikeMarkerDepth } from './layers/bike-marker-style.utils';
 
 const STORY_FEATURE_KIND = 'map-story-feature';
 const STORY_LAYER_PROPERTY = 'map-story-layer';
@@ -271,6 +271,7 @@ export class StoryVectorTileLayerService extends VectorTileLayerService {
     map.addLayer(routeLayer);
     map.addLayer(stationLayer);
 
+    const stopDetailResolution = map.getView().getResolutionForZoom(16);
     const pointLayers = [
       {
         type: VectorTileLayerType.BUS_STOPS,
@@ -309,15 +310,17 @@ export class StoryVectorTileLayerService extends VectorTileLayerService {
             return feature;
           }),
         }),
-        zIndex: type === VectorTileLayerType.BUS_STOPS ? 45 : 24,
+        zIndex: type === VectorTileLayerType.BUS_STOPS ? 45 : 47,
         visible: this.isLayerVisible(type),
-        minZoom: type === VectorTileLayerType.BUS_STOPS ? 14 : undefined,
-        style: (feature) => {
+        minZoom: type === VectorTileLayerType.BUS_STOPS ? 15 : undefined,
+        style: (feature, resolution) => {
           if (type === VectorTileLayerType.BUS_STOPS) {
+            if (resolution > stopDetailResolution) return [];
             return this.selectedStopIds.has(PINHEIROS_BUS_STOP.stopId) ? [] : this.busStopStyle;
           }
           const station = feature.get('stationData') as typeof BIKE_STATION_FULL;
           return createBikeMarkerStyles({
+            depth: getBikeMarkerDepth(feature),
             bikesAvailable: station.numBikesAvailable,
             effectiveCapacity: station.effectiveCapacity,
             hasElectricBikes: station.hasElectricBikesAvailable,
@@ -550,6 +553,7 @@ export function createMapStoryProviders(scenario: MapStoryScenario = {}) {
         stations: signal([BIKE_STATION_FULL, BIKE_STATION_EMPTY]),
         refreshTick: signal(0),
         fetchedAt: signal<number | null>(null),
+        mapRevision: signal<string | number | null>(null),
         activate: () => Promise.resolve(),
         disconnect: () => undefined,
         getStation: (id: string) =>

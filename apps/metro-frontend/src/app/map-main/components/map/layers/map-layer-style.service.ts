@@ -9,7 +9,7 @@ import {
   createCenteredStationLabelStyle,
   createSelectedPointStyle,
 } from './map-style.utils';
-import { createBikeMarkerStyles } from './bike-marker-style.utils';
+import { createBikeMarkerStyles, getBikeMarkerDepth } from './bike-marker-style.utils';
 
 /** Owns OpenLayers styles so layer lifecycle and visual presentation stay separate. */
 @Service()
@@ -69,6 +69,7 @@ export class MapLayerStyleService {
         cached.hasElectricBikes === hasElectricBikes) return cached.styles;
       const styles = createBikeMarkerStyles({
         bikesAvailable, effectiveCapacity, hasElectricBikes, selected: true,
+        depth: getBikeMarkerDepth(feature),
       });
       this.selectedBikeStyles.set(feature, {
         bikesAvailable, effectiveCapacity, hasElectricBikes, styles,

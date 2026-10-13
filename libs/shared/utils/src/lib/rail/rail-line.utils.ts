@@ -22,7 +22,7 @@ export interface RailLineInfo {
   fullName: string; // e.g., "Linha 1 - Azul"
   stations: StaticRailStation[];
   carCount: number; // Number of cars in a train on this line
-  carDoorCount: number; // Number of doors per car
+  carDoorCount: number; // Number of doors per car on each side
 }
 
 export type RailLineTrafficHand = 'LHT' | 'RHT';

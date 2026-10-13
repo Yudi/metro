@@ -175,7 +175,7 @@ export class VectorTilesController {
   @ApiOperation({
     summary: 'Get bus stop vector tile',
     description:
-      'Returns a Mapbox Vector Tile (MVT) containing bus-serving stops in the requested tile bounds at zoom level 15 or higher.',
+      'Returns a Mapbox Vector Tile (MVT) containing bus-serving stops in the requested tile bounds at zoom level 16 or higher.',
   })
   async getBusStopsTile(
     @Param('z', ParseIntPipe) z: number,

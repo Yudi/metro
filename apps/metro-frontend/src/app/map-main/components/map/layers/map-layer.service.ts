@@ -39,6 +39,15 @@ export class MapLayerService {
   // Current zoom level for styling
   private currentZoomLevel = signal<number | null>(null);
 
+  // Share the selection source so bike highlights retain the same lifecycle.
+  private readonly selectedBikeLayer = new VectorLayer({
+    source: this.sources.get(LayerType.SELECTION),
+    zIndex: 48,
+    style: (feature) => feature.get('type') === 'bike_station'
+      ? this.styleService.createSelectionStyle(feature, this.currentZoomLevel() ?? 0)
+      : [],
+  });
+
   readonly layerConfigs = signal<LayerConfig[]>(createMapLayerConfigs());
 
   // Computed toggleable layers for UI
@@ -59,7 +68,9 @@ export class MapLayerService {
       LayerType.SELECTION,
       new VectorLayer({
         source: this.sources.get(LayerType.SELECTION),
-        style: (feature) => this.styleService.createSelectionStyle(feature, this.currentZoomLevel() ?? 0),
+        style: (feature) => feature.get('type') === 'bike_station'
+          ? []
+          : this.styleService.createSelectionStyle(feature, this.currentZoomLevel() ?? 0),
         zIndex: 25, // Below stops so stops appear on top of selected routes
       }),
     );
@@ -70,9 +81,7 @@ export class MapLayerService {
    * Add all layers to the map
    */
   addLayersToMap(map: OLMap): void {
-    this.layers.forEach((layer) => {
-      map.addLayer(layer);
-    });
+    this.getAllLayers().forEach((layer) => map.addLayer(layer));
   }
 
   /**
@@ -123,6 +132,7 @@ export class MapLayerService {
     if (!layer) return;
 
     layer.setVisible(visible);
+    if (layerType === LayerType.SELECTION) this.selectedBikeLayer.setVisible(visible);
 
     // Update visibility state
     const newMap = new Map(this.layerVisibility());
@@ -349,7 +359,7 @@ export class MapLayerService {
    * Get all layers array (for adding to map)
    */
   getAllLayers(): VectorLayer<VectorSource>[] {
-    return Array.from(this.layers.values());
+    return [...this.layers.values(), this.selectedBikeLayer];
   }
 
   /**

@@ -17,6 +17,7 @@ describe('MapService zoom initialization', () => {
   const vectorTileLayers = {
     addLayersToMap: jest.fn(),
     setZoomLevel: jest.fn(),
+    setMapMoving: jest.fn(),
   };
 
   beforeEach(() => {
@@ -46,6 +47,7 @@ describe('MapService zoom initialization', () => {
   afterEach(() => {
     service.destroy();
     jest.restoreAllMocks();
+    jest.useRealTimers();
   });
 
   it.each([0, 12, 14, 16])('initializes layer styling at zoom %s before attaching layers', (zoom) => {
@@ -119,5 +121,39 @@ describe('MapService zoom initialization', () => {
     if (typeof listener === 'function') {
       expect(() => listener.call(map, { dragging: state === 'dragging' })).not.toThrow();
     }
+  });
+
+  it('hit-tests the latest hover position once per frame and cancels queued work on movement', () => {
+    jest.useFakeTimers();
+    const on = jest.spyOn(OLMap.prototype, 'on');
+    const map = service.initializeMap('map', { showControls: false });
+    const hit = jest.fn().mockReturnValue(false);
+    Object.assign(map, { hasFeatureAtPixel: hit });
+    const pointer = on.mock.calls.find(([event]) => event === 'pointermove')?.[1];
+    const start = on.mock.calls.find(([event]) => event === 'movestart')?.[1];
+    const end = on.mock.calls.find(([event]) => event === 'moveend')?.[1];
+    if (typeof pointer !== 'function' || typeof start !== 'function' || typeof end !== 'function') {
+      throw new Error('Missing movement listeners');
+    }
+    pointer.call(map, { pixel: [1, 1] });
+    pointer.call(map, { pixel: [2, 2] });
+    pointer.call(map, { pixel: [3, 3] });
+    expect(hit).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(16);
+    expect(hit).toHaveBeenCalledTimes(1);
+    expect(hit).toHaveBeenCalledWith([3, 3]);
+
+    pointer.call(map, { pixel: [4, 4] });
+    start.call(map, { type: 'movestart' });
+    expect(vectorTileLayers.setMapMoving).toHaveBeenLastCalledWith(true);
+    jest.advanceTimersByTime(16);
+    expect(hit).toHaveBeenCalledTimes(1);
+    end.call(map, { type: 'moveend' });
+    expect(vectorTileLayers.setMapMoving).toHaveBeenLastCalledWith(false);
+
+    pointer.call(map, { pixel: [5, 5] });
+    service.destroy();
+    jest.advanceTimersByTime(16);
+    expect(hit).toHaveBeenCalledTimes(1);
   });
 });

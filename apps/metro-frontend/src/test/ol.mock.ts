@@ -404,3 +404,30 @@ export default OpenLayersMockObject;
 export function defaults(): unknown[] {
   return [];
 }
+
+/** Canvas drawing is verified in browser previews; service tests only need dimensions. */
+export function createCanvasContext2D() {
+  return {
+    canvas: { width: 0, height: 0 },
+    font: '',
+    fillStyle: '',
+    strokeStyle: '',
+    shadowColor: '',
+    shadowOffsetY: 0,
+    shadowBlur: 0,
+    lineWidth: 0,
+    measureText: (text: string) => ({ width: text.length * 7 }),
+    scale: () => undefined,
+    translate: () => undefined,
+    textAlign: 'left',
+    textBaseline: 'middle',
+    fillText: () => undefined,
+    beginPath: () => undefined,
+    moveTo: () => undefined,
+    lineTo: () => undefined,
+    roundRect: () => undefined,
+    arc: () => undefined,
+    fill: () => undefined,
+    stroke: () => undefined,
+  };
+}

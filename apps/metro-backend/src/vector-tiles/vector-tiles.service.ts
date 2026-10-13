@@ -26,6 +26,7 @@ export class VectorTilesService implements OnModuleInit, OnModuleDestroy {
   private readonly bikePollListener = this.handleBikePollComplete.bind(this);
   private readonly inFlightTiles = new Map<string, Promise<Buffer | null>>();
   private cacheGeneration = 0;
+  private bikeMapRevision: string | null = null;
 
   constructor(
     private readonly cache: VectorTileCacheService,
@@ -150,6 +151,9 @@ export class VectorTilesService implements OnModuleInit, OnModuleDestroy {
   }
 
   private handleBikePollComplete(): void {
+    const revision = this.bikePolling.getMapRevision();
+    if (revision === null || revision === this.bikeMapRevision) return;
+    this.bikeMapRevision = revision;
     this.clearLayerCache(VectorTileLayer.BIKE_STATIONS);
   }
 }

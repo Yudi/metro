@@ -34,13 +34,13 @@ describe('VectorTileLayerService repeated navigation', () => {
 
     service.setZoomLevel(14);
     expect(service.getLayer(VectorTileLayerType.RAIL_STATIONS)?.changed).toHaveBeenCalledTimes(1);
-    expect(service.getLayer(VectorTileLayerType.BIKE_STATIONS)?.changed).toHaveBeenCalledTimes(1);
+    expect(service.getLayer(VectorTileLayerType.BIKE_STATIONS)?.changed).not.toHaveBeenCalled();
     expect(service.getLayer(VectorTileLayerType.BUS_ROUTES)?.changed).not.toHaveBeenCalled();
     service.setZoomLevel(13);
     expect(service.getLayer(VectorTileLayerType.RAIL_STATIONS)?.changed).toHaveBeenCalledTimes(2);
   });
 
-  it('shows toggleable bus stops by default and loads unfiltered tiles only at zoom 15+', () => {
+  it('shows toggleable bus stops by default and loads unfiltered tiles only at zoom 16+', () => {
     const config = service
       .layerConfigs()
       .find((layer) => layer.id === VectorTileLayerType.BUS_STOPS);
@@ -53,16 +53,17 @@ describe('VectorTileLayerService repeated navigation', () => {
       visible: true,
       toggleable: true,
       tileSize: 256,
-      minZoom: 14,
+      minZoom: 15,
     });
     expect(service.isLayerVisible(VectorTileLayerType.BUS_STOPS)).toBe(true);
-    expect(layer.getMinZoom()).toBe(14);
+    expect(layer.getMinZoom()).toBe(15);
     expect(source.get('tileSize')).toBe(256);
 
     const getUrl = source.getTileUrlFunction();
     expect(getUrl([14, 6069, 9296], 1, {} as never)).toBeUndefined();
-    const tileUrl = getUrl([15, 12138, 18593], 1, {} as never);
-    expect(tileUrl).toContain('/tiles/bus-stops/15/12138/18593.pbf');
+    expect(getUrl([15, 12138, 18593], 1, {} as never)).toBeUndefined();
+    const tileUrl = getUrl([16, 24276, 37186], 1, {} as never);
+    expect(tileUrl).toContain('/tiles/bus-stops/16/24276/37186.pbf');
     expect(tileUrl).not.toContain('?');
 
     service.toggleLayer(VectorTileLayerType.BUS_STOPS);
@@ -131,6 +132,37 @@ describe('VectorTileLayerService repeated navigation', () => {
     service.refreshBikeStations(200);
     expect(refresh).toHaveBeenCalledTimes(2);
     expect(url()).toBe(initialUrl);
+  });
+
+  it('coalesces bike revisions until movement ends without refreshing unchanged data', () => {
+    const source = service.getLayer(VectorTileLayerType.BIKE_STATIONS)?.getSource();
+    if (!source) throw new Error('Missing bike source');
+    const refresh = jest.spyOn(source, 'refresh');
+    service.refreshBikeStations('initial');
+    refresh.mockClear();
+
+    service.setMapMoving(true);
+    service.refreshBikeStations('second');
+    service.refreshBikeStations('latest');
+    expect(refresh).not.toHaveBeenCalled();
+    service.setMapMoving(false);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    service.refreshBikeStations('latest');
+    service.setMapMoving(false);
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('reuses parsed stop identities across renders and selection changes', () => {
+    const style = service.getLayer(VectorTileLayerType.BUS_STOPS)?.getStyleFunction();
+    if (!style) throw new Error('Missing bus stop style');
+    const feature = new Feature({ merged_stop_ids: 'artesp:member', source_agency: 'sptrans' });
+    const get = jest.spyOn(feature, 'get');
+    service.setSelectedBusStopIds(['other']);
+    expect(style(feature, 1)).toBeInstanceOf(Style);
+    const reads = get.mock.calls.length;
+    service.setSelectedBusStopIds(['ARTESP:member']);
+    expect(style(feature, 1)).toBeUndefined();
+    expect(get).toHaveBeenCalledTimes(reads);
   });
 
 });

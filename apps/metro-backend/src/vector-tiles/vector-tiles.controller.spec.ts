@@ -44,16 +44,16 @@ describe('VectorTilesController bus stop tiles', () => {
     await app.listen(0, '127.0.0.1');
     try {
       const response = await fetch(
-        `${await app.getUrl()}/tiles/bus-stops/15/12138/18593.pbf`,
+        `${await app.getUrl()}/tiles/bus-stops/16/24276/37186.pbf`,
       );
 
       expect(response.status).toBe(200);
       expect(Buffer.from(await response.arrayBuffer())).toEqual(tile);
       expect(getTile).toHaveBeenCalledWith(
         VectorTileLayer.BUS_STOPS,
-        15,
-        12138,
-        18593,
+        16,
+        24276,
+        37186,
         undefined,
       );
     } finally {

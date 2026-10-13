@@ -172,7 +172,7 @@ export class MapComponent implements OnDestroy {
     });
 
     effect(() => {
-      const revision = this.bikeStationsService.fetchedAt();
+      const revision = this.bikeStationsService.mapRevision();
       untracked(() => {
         this.mapService.getVectorTileLayerService().refreshBikeStations(revision);
       });

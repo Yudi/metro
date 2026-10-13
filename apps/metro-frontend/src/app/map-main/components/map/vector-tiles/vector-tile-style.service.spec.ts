@@ -50,6 +50,9 @@ describe('VectorTileStyleService caching', () => {
     const type = VectorTileLayerType.BIKE_STATIONS;
     const before = new Feature({ num_bikes_available: 1, effective_capacity: 10 });
     const after = new Feature({ num_bikes_available: 8, effective_capacity: 10 });
+    expect(service.getStyleForLayer(type, before, 13)).toBe(
+      service.getStyleForLayer(type, before, 16),
+    );
     expect(service.getStyleForLayer(type, after, 16)).not.toBe(
       service.getStyleForLayer(type, before, 16),
     );

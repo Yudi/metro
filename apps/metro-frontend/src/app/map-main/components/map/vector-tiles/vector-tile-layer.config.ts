@@ -72,14 +72,15 @@ export function createVectorTileLayerConfigs(
       zIndex: 45,
       tileUrl: `${apiUrl}/tiles/bus-stops/{z}/{x}/{y}.pbf`,
       tileSize: 256,
-      minZoom: 14,
+      // Exclusive layer gate; the 256px source only supplies tiles at zoom 16+.
+      minZoom: 15,
     },
     {
       id: VectorTileLayerType.BIKE_STATIONS,
       name: 'Estações de bicicleta',
       visible: false,
       toggleable: true,
-      zIndex: 24, // Below selected markers, above route shapes
+      zIndex: 47, // Above bus stops, below rail stations
       tileUrl: `${apiUrl}/tiles/bike-stations/{z}/{x}/{y}.pbf`,
     },
   ];

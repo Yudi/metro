@@ -11,7 +11,8 @@ import { tileToBounds } from '../utils/vector-tile-geometry.util';
 export class BikeVectorTileService {
   private readonly logger = new Logger(BikeVectorTileService.name);
   private readonly tileScreenPixels = 512;
-  private readonly clusterMaxZoom = 14;
+  // A 512px bike tile at zoom 15 corresponds to map zoom 16 (256px view).
+  private readonly clusterMaxZoom = 15;
   private readonly clusterDistancePixels = 72;
   private readonly clusterTightDistancePixels = 32;
 

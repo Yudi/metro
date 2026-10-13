@@ -86,7 +86,11 @@ describe('MapDisplayService bike tile ownership', () => {
     state.setBikeStations(stations);
     display.updateMapDisplay();
     expect(createBike).not.toHaveBeenCalled();
-    expect(layers.getAllLayers()).toHaveLength(1);
+    expect(layers.getAllLayers()).toHaveLength(2);
+
+    const bikeLayer = layers.getAllLayers()[1];
+    expect(bikeLayer.getZIndex()).toBe(48);
+    expect(bikeLayer.getSource()).toBe(layers.getSource(LayerType.SELECTION));
 
     const station = stations[0];
     state.selectedBikeStations.set(new Map([[station.stationId, {
@@ -97,7 +101,7 @@ describe('MapDisplayService bike tile ownership', () => {
     const marker = layers.getFeaturesFromLayer(LayerType.SELECTION)[0];
     expect(marker.get('stationData')).toBe(station);
     expect(createBike).toHaveBeenCalledTimes(1);
-    expect(layers.getAllLayers()).toHaveLength(1);
+    expect(layers.getAllLayers()).toHaveLength(2);
 
     const setProperties = jest.spyOn(marker, 'setProperties');
     display.updateMapDisplay();

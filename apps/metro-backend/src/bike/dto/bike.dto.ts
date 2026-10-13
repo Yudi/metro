@@ -297,6 +297,9 @@ export class BikeStationDeltaDto {
  * - 'delta': Contains only changes since last update (sent on subsequent broadcasts)
  */
 export class BikeStationsUpdatePayloadDto {
+  @ApiProperty({ description: 'Content revision of the station fields served in map tiles' })
+  mapRevision!: string;
+
   @ApiProperty({
     description: 'Update type: full for initial load, delta for incremental',
     enum: ['full', 'delta'],

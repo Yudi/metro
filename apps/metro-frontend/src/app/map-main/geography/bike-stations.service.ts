@@ -31,6 +31,7 @@ interface BikeStationsUpdatePayloadApi {
   lastUpdated: number;
   ttl: number;
   fetchedAt: number;
+  mapRevision?: string;
 }
 
 interface BikeStationDetailsPayloadApi {
@@ -65,6 +66,8 @@ export class BikeStationsService implements OnDestroy {
   readonly lastUpdated = signal<number | null>(null);
   readonly ttl = signal<number | null>(null);
   readonly fetchedAt = signal<number | null>(null);
+  // Numeric fallback supports older backends during a rolling deployment.
+  readonly mapRevision = signal<string | number | null>(null);
   readonly connected = signal(false);
   readonly active = signal(false);
   readonly pendingDetailsCount = signal(0);
@@ -237,6 +240,7 @@ export class BikeStationsService implements OnDestroy {
     }
 
     this.updateTimestamps(payload);
+    this.mapRevision.set(payload.mapRevision ?? payload.fetchedAt);
     this.refreshTick.update((value) => value + 1);
   }
 

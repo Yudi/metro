@@ -131,7 +131,7 @@ describeDatabase('bus vector tile SQL feature parity', () => {
         operation(transaction),
     } as never, busDirections as never);
     if (layer === 'stops') {
-      await service.generateBusStopsTile(15, 12138, 18593);
+      await service.generateBusStopsTile(16, 24277, 37186);
     } else {
       await service.generateBusRoutesTile(14, 6069, 9296, options);
     }

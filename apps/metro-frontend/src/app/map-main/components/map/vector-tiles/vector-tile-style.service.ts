@@ -11,7 +11,7 @@ import {
 import { StationNameService } from '../../../geography/station-name.service';
 import { VectorTileFeatureDataService } from './vector-tile-feature-data.service';
 import { VectorTileLayerType } from './vector-tile-layer.config';
-import { createBikeMarkerStyles } from '../layers/bike-marker-style.utils';
+import { createBikeMarkerStyles, getBikeMarkerDepth } from '../layers/bike-marker-style.utils';
 
 @Service()
 export class VectorTileStyleService {
@@ -30,7 +30,7 @@ export class VectorTileStyleService {
     currentZoom: number | null,
   ): Style | Style[] {
     if (layerType === VectorTileLayerType.BUS_STOPS) return this.busStopStyle;
-    const cache = (currentZoom ?? 0) >= 14
+    const cache = layerType === VectorTileLayerType.RAIL_STATIONS && (currentZoom ?? 0) >= 14
       ? this.stylesWithLabels
       : this.stylesWithoutLabels;
     const cached = cache.get(feature);
@@ -134,6 +134,7 @@ export class VectorTileStyleService {
     feature: FeatureLike,
   ): Style[] {
     return createBikeMarkerStyles({
+      depth: getBikeMarkerDepth(feature),
       bikesAvailable: Number(feature.get('num_bikes_available') ?? 0),
       effectiveCapacity: Number(feature.get('effective_capacity') ?? 0),
       hasElectricBikes: Number(feature.get('electric_bikes_available') ?? 0) > 0,

@@ -147,4 +147,19 @@ describe('BikeStationsService', () => {
     expect(socket.emit).toHaveBeenCalledWith('station_details_request', { stationId: 'station-1' });
   });
 
+  it('keeps the map revision stable across reconnects and detail responses', async () => {
+    const service = TestBed.inject(BikeStationsService);
+    await service.activate();
+    listeners.get('stations_update')?.({
+      type: 'full', lastUpdated: 100, ttl: 15, fetchedAt: 100, mapRevision: 'same',
+    });
+    listeners.get('stations_update')?.({
+      type: 'full', lastUpdated: 200, ttl: 15, fetchedAt: 200, mapRevision: 'same',
+    });
+    expect(service.fetchedAt()).toBe(200);
+    expect(service.mapRevision()).toBe('same');
+    listeners.get('station_details')?.({ stationId: 'missing', station: null, fetchedAt: 300 });
+    expect(service.mapRevision()).toBe('same');
+  });
+
 });

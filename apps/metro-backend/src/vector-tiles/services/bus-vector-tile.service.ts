@@ -201,7 +201,7 @@ export class BusVectorTileService {
     x: number,
     y: number,
   ): Promise<Buffer | null> {
-    if (z < 15) {
+    if (z < 16) {
       return null;
     }
 

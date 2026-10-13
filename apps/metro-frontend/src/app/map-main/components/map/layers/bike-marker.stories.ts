@@ -14,7 +14,7 @@ import { Feature, Map as OpenLayersMap, View } from 'ol';
 import Point from 'ol/geom/Point';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
-import { createBikeMarkerStyles } from './bike-marker-style.utils';
+import { createBikeMarkerStyles, getBikeMarkerDepth } from './bike-marker-style.utils';
 
 @Component({
   selector: 'app-bike-marker-preview',
@@ -34,8 +34,10 @@ class BikeMarkerPreviewComponent {
   readonly hasElectricBikes = input(false);
   readonly stationCount = input(1);
   readonly selected = input(false);
+  readonly crowded = input(false);
   private readonly mapHost = viewChild.required<ElementRef<HTMLElement>>('mapHost');
   private readonly feature = new Feature({ geometry: new Point([0, 0]) });
+  private readonly source = new VectorSource({ features: [this.feature] });
   private readonly destroyRef = inject(DestroyRef);
 
   constructor() {
@@ -46,15 +48,30 @@ class BikeMarkerPreviewComponent {
         hasElectricBikes: this.hasElectricBikes(),
         stationCount: this.stationCount(),
         selected: this.selected(),
+        depth: this.selected() ? 100 : getBikeMarkerDepth(this.feature),
       }));
+      this.source.clear();
+      if (this.crowded()) {
+        for (const [x, y, bikesAvailable] of [[-28, 12, 8], [28, -12, 3]]) {
+          const neighbor = new Feature({ geometry: new Point([x, y]) });
+          neighbor.setStyle(createBikeMarkerStyles({
+            bikesAvailable,
+            effectiveCapacity: 19,
+            hasElectricBikes: true,
+            depth: getBikeMarkerDepth(neighbor),
+          }));
+          this.source.addFeature(neighbor);
+        }
+      }
+      this.source.addFeature(this.feature);
     });
     afterNextRender(() => {
       const map = new OpenLayersMap({
         target: this.mapHost().nativeElement,
         layers: [new VectorLayer({
-          source: new VectorSource({ features: [this.feature] }),
+          source: this.source,
         })],
-        view: new View({ center: [0, 0], zoom: 16 }),
+        view: new View({ center: [0, 0], resolution: 1 }),
         controls: [],
         interactions: [],
       });
@@ -73,6 +90,7 @@ const meta: Meta<BikeMarkerPreviewComponent> = {
     hasElectricBikes: false,
     stationCount: 1,
     selected: false,
+    crowded: false,
   },
   argTypes: {
     bikesAvailable: { control: { type: 'number', min: 0 } },
@@ -80,6 +98,7 @@ const meta: Meta<BikeMarkerPreviewComponent> = {
     hasElectricBikes: { control: 'boolean' },
     stationCount: { control: { type: 'number', min: 1 } },
     selected: { control: 'boolean' },
+    crowded: { control: 'boolean' },
   },
   parameters: {
     docs: { description: { component: 'Real OpenLayers bike markers. Colors depend only on electric bike availability; cluster rings are solid.' } },
@@ -96,4 +115,9 @@ export const SelectedElectricStation: Story = { args: { selected: true, hasElect
 export const Cluster: Story = { args: { stationCount: 4, bikesAvailable: 48, effectiveCapacity: 76 } };
 export const ElectricCluster: Story = { args: { stationCount: 4, bikesAvailable: 48, effectiveCapacity: 76, hasElectricBikes: true } };
 export const LargeCluster: Story = { args: { stationCount: 120, bikesAvailable: 1234, effectiveCapacity: 5678 } };
+export const ShortCount: Story = { args: { bikesAvailable: 1, effectiveCapacity: 9 } };
+export const LongCount: Story = { args: { bikesAvailable: 123, effectiveCapacity: 150 } };
 export const UnknownCapacity: Story = { args: { effectiveCapacity: 0 } };
+
+export const CrowdedStations: Story = { args: { crowded: true } };
+export const SelectedCrowdedStation: Story = { args: { crowded: true, selected: true } };

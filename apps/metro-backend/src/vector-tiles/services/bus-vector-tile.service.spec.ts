@@ -182,7 +182,7 @@ describe('BusVectorTileService', () => {
     const { service, query } = createService();
 
     await expect(
-      service.generateBusStopsTile(15, 12138, 18593),
+      service.generateBusStopsTile(16, 24276, 37186),
     ).resolves.toEqual(Buffer.from('tile'));
 
     const sql = query.mock.calls[0][0].strings.join('?');
@@ -204,10 +204,10 @@ describe('BusVectorTileService', () => {
     expect(sql).not.toContain('routeIds');
   });
 
-  it('returns no bus stop tile below zoom 15 without starting a database transaction', async () => {
+  it('returns no bus stop tile below zoom 16 without starting a database transaction', async () => {
     const { service, query, execute, transaction } = createService();
 
-    await expect(service.generateBusStopsTile(14, 6069, 9296)).resolves.toBeNull();
+    await expect(service.generateBusStopsTile(15, 12138, 18593)).resolves.toBeNull();
 
     expect(transaction).not.toHaveBeenCalled();
     expect(execute).not.toHaveBeenCalled();
@@ -223,7 +223,7 @@ describe('BusVectorTileService', () => {
           routeIds: ['route-1'],
         });
       } else {
-        await service.generateBusStopsTile(15, 12138, 18593);
+        await service.generateBusStopsTile(16, 24276, 37186);
       }
 
       expect(execute.mock.calls[0][0].join('')).toBe(
@@ -245,7 +245,7 @@ describe('BusVectorTileService', () => {
     execute.mockRejectedValue(error);
 
     await expect(
-      service.generateBusStopsTile(15, 12138, 18593),
+      service.generateBusStopsTile(16, 24276, 37186),
     ).rejects.toBe(error);
     expect(query).not.toHaveBeenCalled();
   });

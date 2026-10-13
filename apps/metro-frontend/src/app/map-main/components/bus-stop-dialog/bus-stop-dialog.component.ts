@@ -41,13 +41,18 @@ import {
 import type { BusTerminalReturnData } from '../bus-terminal-dialog/bus-terminal-dialog.types';
 import type { BusTerminalViewState } from '../bus-terminal-dialog/bus-terminal-dialog.types';
 import { BusTerminalsService } from '../../geography/bus-terminals.service';
-import { NgOptimizedImage } from '@angular/common';
 import { StationImagesService } from '../subway-station-dialog/station-images.service';
+import {
+  TransitPlacePhotoComponent,
+  TransitPlacePhotoCreditComponent,
+} from '../../../shared/components/transit-place-photo/transit-place-photo.component';
 
 export interface BusStopDialogData {
   stop: BusStopGraphQL;
   routes: BusRouteGraphQL[];
   selectedRoutes: Set<string>;
+  selectedRouteIds?: () => Set<string>;
+  onSelectRoute?: (routeId: string) => void;
   routesLoading?: boolean;
   routesError?: boolean;
   terminalReturn?: BusTerminalReturnData;
@@ -71,7 +76,8 @@ export type BusStopDialogResult =
     MatDividerModule,
     StopArrivalsComponent,
     DialogHeaderComponent,
-    NgOptimizedImage,
+    TransitPlacePhotoComponent,
+    TransitPlacePhotoCreditComponent,
   ],
   templateUrl: './bus-stop-dialog.component.html',
   styleUrls: ['./bus-stop-dialog.component.scss'],
@@ -87,6 +93,10 @@ export class BusStopDialogComponent {
     { optional: true },
   );
   readonly data = inject<BusStopDialogData>(MAT_DIALOG_DATA);
+  private readonly panelData = signal(this.data);
+  readonly selectedRouteIds = computed(() =>
+    this.panelData().selectedRouteIds?.() ?? this.panelData().selectedRoutes,
+  );
   readonly stop = signal(this.data.stop);
   readonly routes = signal(this.data.routes);
   readonly routesLoading = signal(this.data.routesLoading ?? false);
@@ -231,6 +241,7 @@ export class BusStopDialogComponent {
   }
 
   updateDetails(data: BusStopDialogData): void {
+    this.panelData.set(data);
     this.explicitTerminalReturn.set(data.terminalReturn);
     this.stop.set(data.stop);
     this.routes.set(data.routes);
@@ -245,7 +256,11 @@ export class BusStopDialogComponent {
 
   /** Whether to show map-specific actions */
   get showMapActions(): boolean {
-    return this.data.showMapActions !== false;
+    return this.panelData().showMapActions !== false;
+  }
+
+  get showRouteMapActions(): boolean {
+    return this.showMapActions || !!this.panelData().onSelectRoute;
   }
 
   get stopDisplayId(): string {
@@ -254,13 +269,13 @@ export class BusStopDialogComponent {
 
   get selectedRoutes(): BusRouteGraphQL[] {
     return this.routesSortedByFavorite().filter((route) => {
-      return this.data.selectedRoutes.has(getBusRouteIdentity(route));
+      return this.selectedRouteIds().has(getBusRouteIdentity(route));
     });
   }
 
   get availableRoutes(): BusRouteGraphQL[] {
     return this.routesSortedByFavorite().filter(
-      (route) => !this.data.selectedRoutes.has(getBusRouteIdentity(route)),
+      (route) => !this.selectedRouteIds().has(getBusRouteIdentity(route)),
     );
   }
 
@@ -278,8 +293,9 @@ export class BusStopDialogComponent {
   returnToTerminal(): void {
     const terminalReturn = this.terminalReturn();
     if (!terminalReturn) return;
-    if (this.data.onOpenTerminal) {
-      this.data.onOpenTerminal(terminalReturn);
+    const onOpenTerminal = this.panelData().onOpenTerminal;
+    if (onOpenTerminal) {
+      onOpenTerminal(terminalReturn);
       return;
     }
     closeMapPanelOrDialog(this.panelRef, this.dialogRef, {
@@ -320,18 +336,16 @@ export class BusStopDialogComponent {
   }
 
   selectRoute(route: BusRouteGraphQL): void {
-    const routeId = getBusRouteIdentity(route);
-    if (this.data.selectedRoutes.has(routeId)) {
-      return;
-    }
-    closeMapPanelOrDialog(this.panelRef, this.dialogRef, {
-      action: 'selectRoute',
-      routeId,
-    });
+    this.selectRouteById(getBusRouteIdentity(route));
   }
 
   selectRouteById(routeId: string): void {
-    if (this.data.selectedRoutes.has(routeId)) {
+    if (this.selectedRouteIds().has(routeId)) {
+      return;
+    }
+    const onSelectRoute = this.panelData().onSelectRoute;
+    if (onSelectRoute) {
+      onSelectRoute(routeId);
       return;
     }
     closeMapPanelOrDialog(this.panelRef, this.dialogRef, {

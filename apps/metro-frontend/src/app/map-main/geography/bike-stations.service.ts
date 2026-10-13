@@ -113,7 +113,8 @@ export class BikeStationsService implements OnDestroy {
   ensureStationDetails(stationId: string): void {
     const station = this.getStation(stationId);
     if (
-      station?.detailsLoaded ||
+      (station?.detailsLoaded &&
+        station.fetchedAt >= (this.fetchedAt() ?? 0)) ||
       this.inFlightDetailRequests.has(stationId) ||
       (this.detailRetryAfter.get(stationId) ?? 0) > Date.now()
     ) {

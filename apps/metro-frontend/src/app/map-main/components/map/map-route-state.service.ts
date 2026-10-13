@@ -47,6 +47,7 @@ export class MapRouteStateService {
   readonly favorites = this.favoritesService.favorites;
   private readonly persistenceReady = signal(false);
   private readonly appliedFavoriteSelections = new Set<string>();
+  private lastDetailHandoff: string | null = null;
   private isApplyingSavedState = false;
   private appliedSavedStateForNavigation = false;
   private lastDefaultStateRequest =
@@ -470,6 +471,15 @@ export class MapRouteStateService {
       value !== null && value >= -180 && value <= 180;
     const isValidZoom = (value: number | null) =>
       value !== null && value >= 0 && value <= 28;
+    const terminalId = paramGet('openTerminal')?.trim();
+    const stopId = paramGet('openStop')?.trim();
+    const handoff = terminalId
+      ? `terminal:${terminalId}`
+      : stopId
+        ? `stop:${stopId}`
+        : null;
+    const isRepeatedDetailHandoff =
+      handoff !== null && handoff === this.lastDetailHandoff;
 
     const railStationId = paramGet('railStationId');
     if (railStationId && isValidLat(lat) && isValidLon(lon)) {
@@ -507,36 +517,65 @@ export class MapRouteStateService {
       });
     }
 
-    if (isValidLat(lat) && isValidLon(lon)) {
-      const useZoom = isValidZoom(zoom) ? (zoom as number) : undefined;
-      try {
-        this.mapService.centerOn([lon as number, lat as number], useZoom);
-        this.logger.debug('Applied query param center/zoom', {
+    if (!isRepeatedDetailHandoff) {
+      if (isValidLat(lat) && isValidLon(lon)) {
+        const useZoom = isValidZoom(zoom) ? (zoom as number) : undefined;
+        try {
+          this.mapService.centerOn([lon as number, lat as number], useZoom);
+          this.logger.debug('Applied query param center/zoom', {
+            lat,
+            lon,
+            zoom: useZoom,
+          });
+        } catch (error) {
+          this.logger.error(
+            'Failed to apply center/zoom from query params',
+            error,
+          );
+        }
+      } else if (isValidZoom(zoom) && (lat === null || lon === null)) {
+        try {
+          this.mapService.centerOn(this.cityContext.center(), zoom as number);
+          this.logger.debug('Applied query param zoom with default center', {
+            zoom,
+          });
+        } catch (error) {
+          this.logger.error('Failed to apply zoom from query params', error);
+        }
+      } else if (lat !== null || lon !== null || zoom !== null) {
+        this.logger.warn('Ignoring invalid center/zoom query params', {
           lat,
           lon,
-          zoom: useZoom,
-        });
-      } catch (error) {
-        this.logger.error(
-          'Failed to apply center/zoom from query params',
-          error,
-        );
-      }
-    } else if (isValidZoom(zoom) && (lat === null || lon === null)) {
-      try {
-        this.mapService.centerOn(this.cityContext.center(), zoom as number);
-        this.logger.debug('Applied query param zoom with default center', {
           zoom,
         });
-      } catch (error) {
-        this.logger.error('Failed to apply zoom from query params', error);
       }
-    } else if (lat !== null || lon !== null || zoom !== null) {
-      this.logger.warn('Ignoring invalid center/zoom query params', {
-        lat,
-        lon,
-        zoom,
-      });
+    }
+
+    if (!handoff) {
+      this.lastDetailHandoff = null;
+      return;
+    }
+    if (!this.mapService.getMap()) {
+      // This service survives route changes. A newly created map must accept
+      // the same detail link after the previous map has been destroyed.
+      this.lastDetailHandoff = null;
+      return;
+    }
+    if (handoff === this.lastDetailHandoff) {
+      return;
+    }
+
+    this.lastDetailHandoff = handoff;
+    if (terminalId) {
+      this.interactionService.showBusTerminalDetails(terminalId);
+    } else if (stopId) {
+      void this.interactionService.showRoutesForStop(stopId);
+      if (isValidLat(lat) && isValidLon(lon)) {
+        this.displayService.centerOn(
+          [lon as number, lat as number],
+          isValidZoom(zoom) ? (zoom as number) : 16,
+        );
+      }
     }
   }
 }

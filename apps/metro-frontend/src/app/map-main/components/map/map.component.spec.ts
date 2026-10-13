@@ -48,6 +48,8 @@ describe('MapComponent', () => {
     const mockBikeStationsService: Partial<BikeStationsService> = {
       stations: () => [],
       refreshTick: () => 0,
+      fetchedAt: () => null,
+      ensureStationDetails: jest.fn(),
       activate: () => Promise.resolve(),
       disconnect: jest.fn(),
     };
@@ -207,6 +209,8 @@ describe('MapComponent', () => {
       const mockBikeStationsService: Partial<BikeStationsService> = {
         stations: () => [],
         refreshTick: () => 0,
+        fetchedAt: () => null,
+        ensureStationDetails: jest.fn(),
         activate: () => Promise.resolve(),
         disconnect: jest.fn(),
       };

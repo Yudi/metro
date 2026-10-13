@@ -54,6 +54,17 @@ interface IllustratedPanelContent {
   onHeaderImageError(): void;
 }
 
+interface TerminalMapContent {
+  detail(): unknown;
+  showAllStopsOnMap(): void;
+}
+
+function isTerminalMapContent(value: unknown): value is TerminalMapContent {
+  return !!value && typeof value === 'object' &&
+    'detail' in value && typeof value.detail === 'function' &&
+    'showAllStopsOnMap' in value && typeof value.showAllStopsOnMap === 'function';
+}
+
 function isIllustrated(value: unknown): value is IllustratedPanelContent {
   return (
     !!value &&
@@ -140,6 +151,10 @@ export class MapPanelComponent {
   });
   readonly favoriteContent = signal<FavoritablePanelContent | null>(null);
   readonly illustratedContent = signal<IllustratedPanelContent | null>(null);
+  readonly terminalMapContent = computed(() => {
+    const content = this.illustratedContent();
+    return isTerminalMapContent(content) ? content : null;
+  });
   readonly headerImage = computed(() =>
     this.illustratedContent()?.headerImage(),
   );

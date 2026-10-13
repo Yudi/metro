@@ -1,4 +1,4 @@
-import { Service, computed, effect, inject, signal } from '@angular/core';
+import { Service, computed, effect, inject, signal, untracked } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { shareReplay, takeWhile } from 'rxjs/operators';
 import { MatSnackBar } from '@angular/material/snack-bar';
@@ -66,6 +66,7 @@ export class MapDetailsDialogService {
   constructor() {
     effect(() => {
       const stations = this.mapState.bikeStations();
+      this.bikeStationsService.refreshTick();
       const panelRef = this.bikeStationPanelRef;
       const stationId = this.activeBikeStationId;
 
@@ -76,6 +77,8 @@ export class MapDetailsDialogService {
       ) {
         return;
       }
+
+      untracked(() => this.bikeStationsService.ensureStationDetails(stationId));
 
       const nextStation = stations.find(
         (station) => station.stationId === stationId,
@@ -231,6 +234,10 @@ export class MapDetailsDialogService {
           routesLoading,
           routesError,
           selectedRoutes: this.mapState.selectedRouteIds(),
+          selectedRouteIds: () => this.mapState.selectedRouteIds(),
+          onSelectRoute: (routeId) => {
+            void this.selectionService.addRouteToSelection(routeId, true);
+          },
           terminalReturn,
         };
         panelTitle.set(stop.name);
@@ -417,6 +424,10 @@ export class MapDetailsDialogService {
       scrollTop: viewState?.scrollTop ?? 0,
       expandedPlatformKeys: viewState?.expandedPlatformKeys ?? [],
       fitOnLoad: false,
+      selectedRouteIds: () => this.mapState.selectedRouteIds(),
+      onSelectRoute: (routeId) => {
+        void this.selectionService.addRouteToSelection(routeId, true);
+      },
       onDetailsLoaded: (detail) => {
         if (focus && !focused) {
           focus.coordinates(detail.stops.map((stop) => [stop.longitude, stop.latitude]), 16);
@@ -439,6 +450,26 @@ export class MapDetailsDialogService {
             summary,
             viewState: currentState,
           },
+        );
+      },
+      onShowStopOnMap: (stop, currentState) => {
+        void this.showRoutesForStop(
+          stop.stopId,
+          this.toBusStopGraphQL(stop),
+          {
+            terminalId,
+            summary,
+            viewState: currentState ?? {
+              query: viewState?.query ?? '',
+              platformCode: viewState?.platformCode ?? 'all',
+              scrollTop: viewState?.scrollTop ?? 0,
+              expandedPlatformKeys: viewState?.expandedPlatformKeys ?? [],
+            },
+          },
+        );
+        this.displayService.centerOn(
+          [stop.longitude, stop.latitude],
+          17,
         );
       },
     };

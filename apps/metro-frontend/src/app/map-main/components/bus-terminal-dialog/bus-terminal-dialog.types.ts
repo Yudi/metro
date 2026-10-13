@@ -18,12 +18,18 @@ export interface BusTerminalDialogData extends BusTerminalViewState {
   terminalId: string;
   summary?: BusTerminalSummary;
   fitOnLoad: boolean;
+  showMapActions?: boolean;
+  selectedRouteIds?: () => Set<string>;
   onDetailsLoaded?: (detail: BusTerminalDetail) => void;
   onSelectStop?: (
     stop: BusTerminalStop,
     viewState: BusTerminalViewState,
   ) => void;
-  onShowStopOnMap?: (stop: BusTerminalStop) => void;
+  onSelectRoute?: (routeId: string) => void;
+  onShowStopOnMap?: (
+    stop: BusTerminalStop,
+    viewState?: BusTerminalViewState,
+  ) => void;
   onShowTerminalOnMap?: () => void;
 }
 

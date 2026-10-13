@@ -93,7 +93,7 @@ describe('NextTrainCardComponent', () => {
   }
 
   function setSnapshot(
-    lineCode: 'L4' | 'L9' | 'L10',
+    lineCode: 'L4' | 'L5' | 'L9' | 'L10',
     stationCode: string,
     data: Partial<StationTrainData> & Pick<StationTrainData, 'trains'>,
   ): void {
@@ -532,6 +532,76 @@ describe('NextTrainCardComponent', () => {
     expect(
       fixture.nativeElement.querySelector('.train-schedule-table').textContent,
     ).toContain('Não foi possível obter previsões em tempo real.');
+    expect(fixture.nativeElement.textContent).not.toContain(
+      'Nenhuma previsão em tempo real.',
+    );
+  });
+
+  it.each([
+    ['loading', { dataReceived: false }],
+    ['processing', { processing: true }],
+    ['operation closed', { operationClosed: true }],
+    ['out of schedule', { outOfSchedule: true }],
+  ] as const)('does not report empty live predictions while %s', (_label, flags) => {
+    fixture.componentRef.setInput('displayMode', 'schedule');
+    setSnapshot('L9', 'HBR', {
+      trains: [],
+      scheduledServices: [createScheduledService()],
+      ...flags,
+    });
+
+    expect(fixture.nativeElement.textContent).not.toContain(
+      'Nenhuma previsão em tempo real.',
+    );
+  });
+
+  it('does not report empty live predictions before receiving station data', () => {
+    fixture.componentRef.setInput('displayMode', 'schedule');
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).not.toContain(
+      'Nenhuma previsão em tempo real.',
+    );
+  });
+
+  it('does not report empty live predictions while disconnected', () => {
+    fixture.componentRef.setInput('displayMode', 'schedule');
+    setSnapshot('L9', 'HBR', { trains: [] });
+    TestBed.inject(NextTrainWebsocketService).connected.set(false);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).not.toContain(
+      'Nenhuma previsão em tempo real.',
+    );
+  });
+
+  it('does not report empty live predictions for schedule-only lines', () => {
+    fixture.componentRef.setInput('displayMode', 'schedule');
+    setSnapshot('L5', 'CAP', {
+      trains: [],
+      scheduledServices: [createScheduledService()],
+    });
+
+    expect(
+      fixture.nativeElement.querySelector('.scheduled-train'),
+    ).not.toBeNull();
+    expect(fixture.nativeElement.textContent).not.toContain(
+      'Nenhuma previsão em tempo real.',
+    );
+  });
+
+  it('does not report an empty snapshot for an unused direction when live trains exist', () => {
+    fixture.componentRef.setInput('displayMode', 'schedule');
+    setSnapshot('L9', 'HBR', {
+      trains: [createArrival({
+        destinationCode: 'VAG',
+        destinationName: 'Varginha',
+      })],
+    });
+
+    expect(
+      fixture.nativeElement.querySelector('.train-schedule-table__next'),
+    ).not.toBeNull();
     expect(fixture.nativeElement.textContent).not.toContain(
       'Nenhuma previsão em tempo real.',
     );

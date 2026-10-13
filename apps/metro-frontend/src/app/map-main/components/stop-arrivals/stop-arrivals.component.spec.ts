@@ -120,6 +120,36 @@ describe('StopArrivalsComponent', () => {
     return header;
   }
 
+  it('keeps the supplied line color when a live destination has no exact indexed match', () => {
+    fixture.componentRef.setInput('routes', [{ ...route, favoriteCode: 'direction-key', destination: 'Outro destino', textColor: '' }]);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.getLineRouteColor(line)).toBe('#006341');
+    expect(fixture.componentInstance.getLineRouteTextColor(line)).toBe('#ffffff');
+  });
+
+  it('uses readable fallback colors for blank feed colors and unmatched arrival lines', () => {
+    fixture.componentRef.setInput('routes', [{ ...route, color: '', textColor: '' }]);
+    fixture.detectChanges();
+    const badge = fixture.nativeElement.querySelector('.route-badge') as HTMLElement;
+    expect(badge.style.backgroundColor).toBe('rgb(25, 118, 210)');
+    expect(badge.style.color).toBe('rgb(255, 255, 255)');
+    expect(fixture.componentInstance.getLineRouteColor({ ...line, c: 'UNKNOWN' })).toBe('#1976d2');
+  });
+
+  it('only selects a route through its explicit map action, keeping header clicks for expansion', () => {
+    fixture.componentRef.setInput('showMapActions', true);
+    const select = jest.fn();
+    fixture.componentInstance.selectRoute.subscribe(select);
+    expandRoute();
+    expect(select).not.toHaveBeenCalled();
+    const action = fixture.nativeElement.querySelector('.route-detail-actions button') as HTMLButtonElement;
+    action.click();
+    expect(select).toHaveBeenCalledWith(route.routeId);
+    fixture.componentRef.setInput('selectedRoutes', new Set([route.routeId]));
+    fixture.detectChanges();
+    expect(action.disabled).toBe(true);
+  });
+
   it('uses Circular for arrival and schedule labels without changing the schedule headsign', () => {
     fixture.componentRef.setInput('routes', [{
       ...route, isCircular: true, destination: 'Term. Pirituba', directionId: 0,

@@ -1,0 +1,11 @@
+@use '../../../../../../../libs/shared/styles/transit-place-photo' as photo;
+
+:host { display: block; min-width: 0; }
+
+.place-photo {
+  position: relative;
+  height: clamp(144px, 24vw, 260px);
+  overflow: hidden;
+}
+
+img { @include photo.image; }

@@ -18,42 +18,9 @@
 @if (!panelRef) {
   <header class="station-heading">
     @if (headerImage(); as image) {
-      <div class="station-heading__photo">
-        <img
-          class="station-heading__image"
-          [ngSrc]="image.src"
-          fill
-          sizes="100vw"
-          alt=""
-          priority
-          (error)="onHeaderImageError()"
-        />
-      </div>
-      <footer class="station-photo-credit">
-        <span>Foto: </span>
-        @if (image.sourceUrl) {
-          <a
-            [href]="image.sourceUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            [attr.title]="image.title"
-            >{{ image.author + '.' }}</a
-          >
-        } @else {
-          <span>{{ image.author + '.' }}</span>
-        }
-        <span> Licença: </span>
-        @if (image.licenseUrl; as licenseUrl) {
-          <a
-            [href]="licenseUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            >{{ image.license }}</a
-          >
-        } @else {
-          {{ image.license }}
-        }
-      </footer>
+      <app-transit-place-photo [image]="image" [priority]="true"
+        (imageError)="onHeaderImageError()" />
+      <app-transit-place-photo-credit class="station-photo-credit" [image]="image" />
     }
     <app-dialog-header
       icon="train"

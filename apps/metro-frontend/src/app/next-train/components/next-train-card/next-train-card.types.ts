@@ -45,5 +45,6 @@ export interface NextTrainCardViewModel {
   readonly operationClosed: boolean;
   readonly outOfSchedule: boolean;
   readonly hasLiveTrains: boolean;
+  readonly hasEmptyLivePredictions: boolean;
   readonly showSchedule: boolean;
 }

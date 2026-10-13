@@ -1,5 +1,6 @@
 import { BusInformationComponent } from '../bus-information/bus-information.component';
 import { routeNoticeView } from '../bus-information/bus-notice-view';
+import { getRouteColor, getRouteTextColor } from '../../geography/transit-utils';
 import {
   BusInformationService,
   BusNoticesResult,
@@ -56,7 +57,6 @@ import {
   VISIBLE_VEHICLE_COUNT,
   findRailConnectionByShortName,
   findRouteForArrivalLine,
-  formatHexColor,
   formatStationDistance,
   getAgencyLogo,
   getArrivalLineKey,
@@ -162,6 +162,8 @@ export class StopArrivalsComponent {
   readonly displayRoutes = computed(() =>
     sortBusRoutesByAgency(this.routes()).map((route) => ({
       ...route,
+      color: getRouteColor(route),
+      textColor: getRouteTextColor(route),
       agencyName: this.formatRouteAgency(route),
       agencyLogo: this.getAgencyLogo(this.formatRouteAgency(route)),
       fareLabel: this.formatRouteFare(route),
@@ -181,8 +183,8 @@ export class StopArrivalsComponent {
         key: this.getScheduledDepartureKey(departure),
         timeLabel,
         dayLabel,
-        color: route ? formatHexColor(route.color) : null,
-        textColor: route ? formatHexColor(route.textColor) : null,
+        color: getRouteColor(route ?? { color: '' }),
+        textColor: getRouteTextColor(route ?? { color: '', textColor: '' }),
       };
     }),
   );
@@ -510,14 +512,23 @@ export class StopArrivalsComponent {
     this.expandedArrivalLines.set(expanded);
   }
 
-  getLineRouteColor(line: LineWithVehicles): string | null {
-    const route = findRouteForArrivalLine(line, this.routes());
-    return route ? formatHexColor(route.color) : null;
+  getLineRouteColor(line: LineWithVehicles): string {
+    const route = this.getArrivalColorRoute(line);
+    return getRouteColor(route ?? { color: '' });
   }
 
-  getLineRouteTextColor(line: LineWithVehicles): string | null {
-    const route = findRouteForArrivalLine(line, this.routes());
-    return route ? formatHexColor(route.textColor) : null;
+  getLineRouteTextColor(line: LineWithVehicles): string {
+    const route = this.getArrivalColorRoute(line);
+    return getRouteTextColor(route ?? { color: '', textColor: '' });
+  }
+
+  private getArrivalColorRoute(line: LineWithVehicles): BusRouteGraphQL | undefined {
+    // The line keeps its color even when its live destination cannot be matched
+    // to a particular indexed direction. Arrival assignment stays conservative.
+    return findRouteForArrivalLine(line, this.routes()) ?? this.routes().find(
+      (route) => supportsSptransRealtime(route) &&
+        normalizeRouteCode(route.shortName) === normalizeRouteCode(line.c),
+    );
   }
 
   getRouteKey(route: BusRouteGraphQL): string {

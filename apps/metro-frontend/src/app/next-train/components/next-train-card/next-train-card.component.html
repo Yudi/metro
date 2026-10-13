@@ -127,7 +127,15 @@
                   </tr>
                 </thead>
                 <tbody>
-                  @if (!direction.nextTrain) {
+                  @if (
+                    !direction.nextTrain &&
+                    (state.hasEmptyLivePredictions ||
+                      (state.hasApiError &&
+                        !state.loading &&
+                        !state.processing &&
+                        !state.operationClosed &&
+                        !state.outOfSchedule))
+                  ) {
                     <tr class="train-schedule-table__empty">
                       <td colspan="2">
                         {{

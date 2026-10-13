@@ -249,7 +249,7 @@ test('opens arrival details from a bus stop result', async ({ page }) => {
   ).toBeVisible();
   await expect(
     stopDetail.getByRole('link', { name: 'Ver no mapa' }),
-  ).toHaveAttribute('href', /busStops=340015325/);
+  ).toHaveAttribute('href', /openStop=340015325/);
 });
 
 for (const delay of [0, 1, 20]) {

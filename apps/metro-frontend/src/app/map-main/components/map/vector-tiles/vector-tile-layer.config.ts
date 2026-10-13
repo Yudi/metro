@@ -75,7 +75,7 @@ export function createVectorTileLayerConfigs(
       name: 'Estações de bicicleta',
       visible: false,
       toggleable: false,
-      zIndex: 30,
+      zIndex: 24, // Below selected markers, above route shapes
       tileUrl: `${apiUrl}/tiles/bike-stations/{z}/{x}/{y}.pbf`,
     },
   ];

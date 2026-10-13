@@ -117,4 +117,34 @@ describe('BikeStationsService', () => {
       expect.objectContaining({ detailsLoaded: true, detailsError: false }),
     );
   });
+
+  it('refreshes details on demand after a WebSocket snapshot without loading the network', async () => {
+    const service = TestBed.inject(BikeStationsService);
+    await service.activate();
+    service.ensureStationDetails('station-1');
+    listeners.get('station_details')?.({
+      stationId: 'station-1',
+      station: {
+        stationId: 'station-1', latitude: -23.55, longitude: -46.63,
+        capacity: 20, effectiveCapacity: 20, numBikesAvailable: 5,
+        electricBikesAvailable: 1, numBikesDisabled: 0,
+        numDocksDisabled: 0, isInstalled: true, vehicleAvailability: [],
+      },
+      lastUpdated: 100, fetchedAt: 100,
+    });
+    socket.emit.mockClear();
+    service.ensureStationDetails('station-1');
+    expect(socket.emit).not.toHaveBeenCalled();
+
+    listeners.get('stations_update')?.({
+      type: 'delta', lastUpdated: 200, ttl: 15, fetchedAt: 200,
+    });
+    expect(service.stations()).toHaveLength(1);
+    expect(socket.emit).not.toHaveBeenCalled();
+    service.ensureStationDetails('station-1');
+    service.ensureStationDetails('station-1');
+    expect(socket.emit).toHaveBeenCalledTimes(1);
+    expect(socket.emit).toHaveBeenCalledWith('station_details_request', { stationId: 'station-1' });
+  });
+
 });

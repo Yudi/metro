@@ -182,11 +182,19 @@ export class MapComponent implements AfterViewInit, OnDestroy {
     });
 
     effect(() => {
-      this.bikeStationsService.refreshTick();
+      const revision = this.bikeStationsService.fetchedAt();
       untracked(() => {
-        this.mapService
-          .getVectorTileLayerService()
-          .refreshLayer(VectorTileLayerType.BIKE_STATIONS);
+        this.mapService.getVectorTileLayerService().refreshBikeStations(revision);
+      });
+    });
+
+    effect(() => {
+      this.bikeStationsService.refreshTick();
+      const selectedStations = this.mapState.selectedBikeStations();
+      untracked(() => {
+        for (const stationId of selectedStations.keys()) {
+          this.bikeStationsService.ensureStationDetails(stationId);
+        }
       });
     });
 

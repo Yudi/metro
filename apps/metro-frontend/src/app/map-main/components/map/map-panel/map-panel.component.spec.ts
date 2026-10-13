@@ -25,6 +25,12 @@ class PanelContentStub {
   );
 }
 
+@Component({ template: '' })
+class TerminalContentStub extends PanelContentStub {
+  readonly detail = signal<object | null>({});
+  readonly showAllStopsOnMap = jest.fn();
+}
+
 describe('MapPanelComponent', () => {
   let fixture: ComponentFixture<MapPanelComponent>;
   let panels: MapPanelService;
@@ -61,6 +67,17 @@ describe('MapPanelComponent', () => {
     fixture.detectChanges();
     return ref;
   }
+
+  it('places the terminal map action immediately before the close action', () => {
+    const ref = panels.openComponent({ component: TerminalContentStub, data: 'terminal-id', title: 'Terminal Centro' });
+    fixture.detectChanges();
+    const button = fixture.nativeElement.querySelector('.map-panel__terminal-map') as HTMLButtonElement;
+    expect(button.nextElementSibling?.classList.contains('map-panel__dismiss')).toBe(true);
+    button.click();
+    const content = fixture.componentInstance.terminalMapContent() as TerminalContentStub;
+    expect(content.showAllStopsOnMap).toHaveBeenCalledTimes(1);
+    expect(panels.panel()?.id).toBe(ref.id);
+  });
 
   function handle(): HTMLButtonElement {
     return fixture.nativeElement.querySelector('.map-panel__handle');
@@ -175,24 +192,24 @@ describe('MapPanelComponent', () => {
       false,
     );
 
-    const favorite: HTMLButtonElement = frame.querySelector(
+    const favorite = frame.querySelector<HTMLButtonElement>(
       '.map-panel__favorite',
-    )!;
-    const dismiss: HTMLButtonElement = frame.querySelector(
+    );
+    const dismiss = frame.querySelector<HTMLButtonElement>(
       '.map-panel__dismiss',
-    )!;
+    );
     expect(favorite).toBeTruthy();
     expect(dismiss).toBeTruthy();
     expect(
       favorite.compareDocumentPosition(dismiss) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    favorite.click();
+    favorite?.click();
     expect(
       (fixture.componentInstance.favoriteContent() as PanelContentStub)
         .toggleFavorite,
     ).toHaveBeenCalled();
-    dismiss.click();
+    dismiss?.click();
     expect(panels.panel()).toBeNull();
   });
 

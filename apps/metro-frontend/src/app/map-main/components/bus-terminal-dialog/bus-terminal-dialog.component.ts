@@ -1,4 +1,4 @@
-import { NgOptimizedImage } from '@angular/common';
+import { NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -29,6 +29,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { TransitAgencyLogoComponent, TransitRouteIdentityComponent } from '../../../shared/components/transit-route-identity/transit-route-identity.component';
+import { FavoritesService } from '@metro/shared/api';
+import { getBusStopIdentityAliases } from '@metro/shared/utils';
 import type {
   BusTerminalDetail,
   BusTerminalRoute,
@@ -45,6 +47,10 @@ import {
   closeMapPanelOrDialog,
 } from '../map/map-panel/map-panel-ref';
 import { StopArrivalsComponent } from '../stop-arrivals/stop-arrivals.component';
+import {
+  TransitPlacePhotoComponent,
+  TransitPlacePhotoCreditComponent,
+} from '../../../shared/components/transit-place-photo/transit-place-photo.component';
 import { StationImagesService } from '../subway-station-dialog/station-images.service';
 import type { StationHeaderImage } from '../subway-station-dialog/station-images';
 import {
@@ -99,7 +105,9 @@ interface MutableBoardingPoint {
 @Component({
   selector: 'app-bus-terminal-dialog',
   imports: [
-    NgOptimizedImage,
+    NgTemplateOutlet,
+    TransitPlacePhotoComponent,
+    TransitPlacePhotoCreditComponent,
     MatDialogModule,
     MatButtonModule,
     MatExpansionModule,
@@ -150,7 +158,15 @@ export class BusTerminalDialogComponent {
       this.panelData().platformCode ??
       ALL_TERMINAL_PLATFORMS,
   );
-  readonly selectedRouteIds = signal(new Set<string>());
+  readonly selectedRouteIds = computed(
+    () => new Set(this.panelData().selectedRouteIds?.() ?? []),
+  );
+  readonly showMapActions = computed(
+    () =>
+      (this.panelData().showMapActions ?? true) &&
+      !!this.panelData().onSelectRoute,
+  );
+  private readonly favoriteService = inject(FavoritesService);
   readonly expandedPlatforms = linkedSignal(() =>
     new Set(this.panelData().expandedPlatformKeys ?? []),
   );
@@ -181,7 +197,10 @@ export class BusTerminalDialogComponent {
       ),
     ];
     return {
-      codes,
+      codes: codes.sort((left, right) => left.localeCompare(right, 'pt-BR', {
+        numeric: true,
+        sensitivity: 'base',
+      })),
       hasUnknown: stops.some((stop) => !stop.platformCode?.trim()),
     };
   });
@@ -295,15 +314,28 @@ export class BusTerminalDialogComponent {
       groups.set(key, group);
     }
 
-    return [...groups.entries()].map(([key, group]) => ({
-      key,
-      code: group.code,
-      label: group.code
-        ? `Plataforma ${group.code}`
-        : 'Plataforma não informada',
-      points: group.points,
-      lineBadges: this.getLineBadges(group.points),
-    }));
+    return [...groups.entries()]
+      .map(([key, group]) => ({
+        key,
+        code: group.code,
+        label: group.code
+          ? `Plataforma ${group.code}`
+          : 'Plataforma não informada',
+        points: group.points,
+        lineBadges: this.getLineBadges(group.points),
+      }))
+      .sort((left, right) => {
+        if (left.code === null) return right.code === null ? 0 : 1;
+        if (right.code === null) return -1;
+        return left.code.localeCompare(right.code, 'pt-BR', {
+          numeric: true,
+          sensitivity: 'base',
+        });
+      });
+  });
+  readonly showPlatformAccordion = computed(() => {
+    const groups = this.platformGroups();
+    return !(groups.length === 1 && groups[0]?.code === null);
   });
   readonly hasRoutes = computed(() => (this.detail()?.routes.length ?? 0) > 0);
 
@@ -399,11 +431,6 @@ export class BusTerminalDialogComponent {
     });
   }
 
-  platformLabel(stop: BusTerminalStop): string {
-    const code = stop.platformCode?.trim();
-    return code ? `Plataforma ${code}` : 'Plataforma não informada';
-  }
-
   agencyLabel(agency: string): string {
     switch (agency.trim().toUpperCase()) {
       case 'SPTRANS':
@@ -415,8 +442,60 @@ export class BusTerminalDialogComponent {
     }
   }
 
-  pointIdentity(stop: BusTerminalStop): string {
-    return `Ponto ${stop.sourceId || stop.stopId}`;
+  pointIdentity(stop: BusTerminalStop): string | null {
+    return (
+      this.getDistinctPlaceReference(stop, stop.name) ??
+      this.getDistinctPlaceReference(stop, stop.description ?? '')
+    );
+  }
+
+  pointDescription(stop: BusTerminalStop): string | null {
+    const description = this.getDistinctPlaceReference(
+      stop,
+      stop.description ?? '',
+    );
+    return description && description !== this.pointIdentity(stop)
+      ? description
+      : null;
+  }
+
+  pointAccessibleName(stop: BusTerminalStop): string {
+    return (
+      this.pointIdentity(stop) ??
+      (stop.name.trim() ||
+        (stop.boardingAllowed ? 'ponto de embarque' : 'ponto de desembarque'))
+    );
+  }
+
+  isFavorite(stop: BusTerminalStop): boolean {
+    return getBusStopIdentityAliases(stop).some((stopId) =>
+      this.favoriteService.isFavorite(stopId, 'busStop'),
+    );
+  }
+
+  toggleFavorite(stop: BusTerminalStop): void {
+    const favoriteIds = getBusStopIdentityAliases(stop).filter((stopId) =>
+      this.favoriteService.isFavorite(stopId, 'busStop'),
+    );
+    if (favoriteIds.length > 0) {
+      for (const stopId of favoriteIds) {
+        this.favoriteService.removeFavorite(stopId, 'busStop');
+      }
+      return;
+    }
+
+    this.favoriteService.addFavorite(stop.stopId, 'busStop');
+  }
+
+  favoriteActionLabel(stop: BusTerminalStop): string {
+    return this.isFavorite(stop)
+      ? `Remover ${this.pointAccessibleName(stop)} dos favoritos`
+      : `Adicionar ${this.pointAccessibleName(stop)} aos favoritos`;
+  }
+
+  selectRouteById(routeId: string): void {
+    if (!this.showMapActions() || this.selectedRouteIds().has(routeId)) return;
+    this.panelData().onSelectRoute?.(routeId);
   }
 
   showStop(stop: BusTerminalStop): void {
@@ -425,17 +504,17 @@ export class BusTerminalDialogComponent {
 
   showStopOnMap(stop: BusTerminalStop): void {
     const onShowStopOnMap = this.panelData().onShowStopOnMap;
-    if (this.embedded() && onShowStopOnMap) {
-      onShowStopOnMap(stop);
+    if (onShowStopOnMap) {
+      onShowStopOnMap(stop, this.currentViewState());
       return;
     }
-    this.display.showExploreLocation(stop.latitude, stop.longitude, stop.name);
+    this.showStop(stop);
     this.display.centerOn([stop.longitude, stop.latitude], 17);
   }
 
   showAllStopsOnMap(): void {
     const onShowTerminalOnMap = this.panelData().onShowTerminalOnMap;
-    if (this.embedded() && onShowTerminalOnMap) {
+    if (onShowTerminalOnMap) {
       onShowTerminalOnMap();
       return;
     }
@@ -469,6 +548,56 @@ export class BusTerminalDialogComponent {
     return filter === UNKNOWN_TERMINAL_PLATFORM
       ? !code
       : code === filter;
+  }
+
+  private getDistinctPlaceReference(
+    stop: BusTerminalStop,
+    value: string,
+  ): string | null {
+    const label = value.trim();
+    if (!label) return null;
+
+    const stripTerminalWord = (text: string) =>
+      text.replace(/^(?:terminal|term\.?)\s+/i, '');
+    const terminalPrefix = stripTerminalWord(this.terminalName()).trim();
+    let reference = label
+      .replace(/^ponto\s+\d+\b(?:\s*[-–—,:]\s*|\s*)/i, '')
+      .trim();
+    if (!reference) return null;
+    reference = stripTerminalWord(reference).trim();
+    if (terminalPrefix && reference) {
+      if (
+        normalizeTerminalSearch(reference) ===
+        normalizeTerminalSearch(terminalPrefix)
+      ) {
+        return null;
+      }
+      const prefixPattern = new RegExp(
+        `^${this.escapeRegExp(terminalPrefix)}(?:\\s*[-–—,:]\\s*|\\s+)`,
+        'i',
+      );
+      reference = reference.replace(prefixPattern, '').trim();
+    }
+
+    if (!reference) return null;
+    const normalized = normalizeTerminalSearch(reference).replace(/[.]/g, '');
+    const platformCode = stop.platformCode?.trim();
+    if (
+      platformCode &&
+      [
+        `pl ${platformCode}`,
+        `plat ${platformCode}`,
+        `plataforma ${platformCode}`,
+      ].includes(normalized)
+    ) {
+      return null;
+    }
+
+    return reference;
+  }
+
+  private escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   private getOrCreatePoint(

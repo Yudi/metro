@@ -1,4 +1,4 @@
-import { Component, input } from '@angular/core';
+import { Component, input, output, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA } from '@angular/material/dialog';
 import {
@@ -22,6 +22,7 @@ import { IMAGE_ENTRY_FIXTURE } from '@metro/shared/admin-contracts';
 import { BusTerminalDialogComponent } from './bus-terminal-dialog.component';
 import type { BusTerminalDialogData } from './bus-terminal-dialog.types';
 import { StopArrivalsComponent } from '../stop-arrivals/stop-arrivals.component';
+import { FavoritesService } from '@metro/shared/api';
 
 @Component({
   selector: 'app-stop-arrivals',
@@ -33,7 +34,9 @@ class StopArrivalsStubComponent {
   readonly selectedRoutes = input<Set<string>>(new Set());
   readonly selectedRouteKeys = input<string[]>([]);
   readonly showMapActions = input(false);
+  readonly embedded = input(false);
   readonly compact = input(false);
+  readonly selectRoute = output<string>();
 }
 
 describe('BusTerminalDialogComponent', () => {
@@ -42,6 +45,9 @@ describe('BusTerminalDialogComponent', () => {
   let getTerminalDetail: jest.Mock;
   let terminalImage: jest.Mock;
   let fitToCoordinates: jest.Mock;
+  let isFavorite: jest.Mock;
+  let addFavorite: jest.Mock;
+  let removeFavorite: jest.Mock;
   let detailsRequest: Subject<BusTerminalDetail | null>;
   let data: BusTerminalDialogData;
 
@@ -50,6 +56,9 @@ describe('BusTerminalDialogComponent', () => {
     getTerminalDetail = jest.fn(() => detailsRequest.asObservable());
     terminalImage = jest.fn(() => undefined);
     fitToCoordinates = jest.fn();
+    isFavorite = jest.fn(() => false);
+    addFavorite = jest.fn();
+    removeFavorite = jest.fn();
     data = {
       terminalId: BUS_TERMINAL_SUMMARY_FIXTURE.id,
       summary: BUS_TERMINAL_SUMMARY_FIXTURE,
@@ -83,6 +92,10 @@ describe('BusTerminalDialogComponent', () => {
             terminalImage,
             markUnavailable: jest.fn(),
           },
+        },
+        {
+          provide: FavoritesService,
+          useValue: { isFavorite, addFavorite, removeFavorite },
         },
       ],
     });
@@ -127,7 +140,7 @@ describe('BusTerminalDialogComponent', () => {
     expect(component.platformGroups()[2].lineBadges[0].agency).toBe('ARTESP');
     expect(fixture.nativeElement.textContent).toContain('Somente desembarque');
     expect(fixture.nativeElement.textContent).toContain(
-      'Ponto central-alighting',
+      'Desembarque',
     );
   });
 
@@ -139,12 +152,13 @@ describe('BusTerminalDialogComponent', () => {
     };
     terminalImage.mockReturnValue(image);
     fixture.componentRef.setInput('embedded', true);
+    component.updateTerminal({ ...data });
     fixture.detectChanges();
 
     const credit = fixture.nativeElement.querySelector(
       '.terminal-photo-credit',
     ) as HTMLElement | null;
-    expect(credit?.textContent).toContain(`${image.title}, ${image.author}.`);
+    expect(credit?.textContent).toContain(`Foto: ${image.author}.`);
     expect(
       Array.from(credit?.querySelectorAll('a') ?? []).some(
         (link) => link.textContent?.trim() === image.title,
@@ -228,6 +242,121 @@ describe('BusTerminalDialogComponent', () => {
     expect(component.rows()[0].stops.map((stop) => stop.stopId)).toEqual([
       'sptrans-central-platform-1',
     ]);
+  });
+
+  it('hides technical and repeated terminal names from platform stop identity', () => {
+    detailsRequest.next(BUS_TERMINAL_DETAIL_FIXTURE);
+
+    const firstPlatform = BUS_TERMINAL_DETAIL_FIXTURE.stops[0];
+    const thirdPlatform = BUS_TERMINAL_DETAIL_FIXTURE.stops[2];
+    const alightingStop = BUS_TERMINAL_DETAIL_FIXTURE.stops[3];
+    if (!firstPlatform || !thirdPlatform || !alightingStop) {
+      throw new Error('Expected terminal platform and alighting fixtures');
+    }
+
+    expect(component.pointIdentity(firstPlatform)).toBeNull();
+    expect(component.pointIdentity(thirdPlatform)).toBe(
+      'Acesso pelo terminal principal',
+    );
+    expect(component.pointIdentity(alightingStop)).toBe('Desembarque');
+    expect(
+      component.pointIdentity({
+        ...firstPlatform,
+        name: 'Ponto 1234 - Acesso lateral',
+      }),
+    ).toBe('Acesso lateral');
+    expect(
+      component.pointIdentity({ ...firstPlatform, name: 'Ponto 1234' }),
+    ).toBeNull();
+  });
+
+  it('sorts numbered platforms numerically and keeps unknown platforms last', () => {
+    detailsRequest.next({
+      ...BUS_TERMINAL_DETAIL_FIXTURE,
+      stops: BUS_TERMINAL_DETAIL_FIXTURE.stops.map((stop) =>
+        stop.stopId === 'sptrans-central-platform-1'
+          ? { ...stop, platformCode: '10' }
+          : stop.stopId === 'sptrans-central-platform-2'
+            ? { ...stop, platformCode: '2' }
+            : stop.stopId === 'artesp:central-platform-3'
+              ? { ...stop, platformCode: undefined }
+              : stop,
+      ),
+    });
+
+    expect(component.platformGroups().map((group) => group.label)).toEqual([
+      'Plataforma 2',
+      'Plataforma 10',
+      'Plataforma não informada',
+    ]);
+  });
+
+  it('shows a single unknown platform as a flat list and keeps stop favorites available', () => {
+    detailsRequest.next({
+      ...BUS_TERMINAL_DETAIL_FIXTURE,
+      stops: BUS_TERMINAL_DETAIL_FIXTURE.stops.map((stop) =>
+        stop.boardingAllowed ? { ...stop, platformCode: undefined } : stop,
+      ),
+    });
+    fixture.detectChanges();
+
+    expect(component.showPlatformAccordion()).toBe(false);
+    expect(fixture.nativeElement.querySelector('.platform-accordion')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.platform-flat')).not.toBeNull();
+
+    const boardingFavorite = fixture.nativeElement.querySelector(
+      '.platform-flat .favorite-action',
+    ) as HTMLButtonElement | null;
+    boardingFavorite?.click();
+    expect(addFavorite).toHaveBeenCalledWith(
+      'sptrans-central-platform-1',
+      'busStop',
+    );
+
+    const alightingFavorite = fixture.nativeElement.querySelector(
+      '.alighting-point .favorite-action',
+    ) as HTMLButtonElement | null;
+    expect(alightingFavorite?.getAttribute('aria-pressed')).toBe('false');
+    alightingFavorite?.click();
+    expect(addFavorite).toHaveBeenCalledWith(
+      'sptrans-central-alighting',
+      'busStop',
+    );
+  });
+
+  it('forwards explicit route selection and respects live map selection', () => {
+    const selectRoute = jest.fn();
+    const selectedRouteIds = signal(new Set<string>());
+    component.updateTerminal({
+      ...data,
+      onSelectRoute: selectRoute,
+      selectedRouteIds: () => selectedRouteIds(),
+    });
+
+    component.selectRouteById('sptrans-route-direction');
+    expect(selectRoute).toHaveBeenCalledWith('sptrans-route-direction');
+
+    selectedRouteIds.update((selected) =>
+      new Set(selected).add('sptrans-route-direction'),
+    );
+    component.selectRouteById('sptrans-route-direction');
+    expect(selectRoute).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes the current filter and scroll state to the map stop callback', () => {
+    const showStopOnMap = jest.fn();
+    component.updateTerminal({ ...data, onShowStopOnMap: showStopOnMap });
+    component.setQuery('123 jardim');
+    component.setPlatform('2');
+    const stop = BUS_TERMINAL_DETAIL_FIXTURE.stops[0];
+    if (!stop) throw new Error('Expected fixture stop');
+
+    component.showStopOnMap(stop);
+
+    expect(showStopOnMap).toHaveBeenCalledWith(
+      stop,
+      expect.objectContaining({ query: '123 jardim', platformCode: '2' }),
+    );
   });
 
   it('shows retry after a failed request and reloads the terminal', () => {

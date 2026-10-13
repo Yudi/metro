@@ -1,0 +1,5 @@
+@mixin image {
+  object-fit: cover;
+  object-position: center 45%;
+  mask-image: linear-gradient(to bottom, #000 90%, transparent 100%);
+}

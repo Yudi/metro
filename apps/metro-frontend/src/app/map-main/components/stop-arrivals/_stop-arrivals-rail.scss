@@ -54,7 +54,7 @@
 }
 
 .route-rail-section {
-  container-type: inline-size;
+  min-width: 0;
 }
 
 .route-rail-header {
@@ -259,10 +259,8 @@
 
 .route-detail-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
-  margin-top: 12px;
-
-  button {
-    border-radius: 8px;
-  }
+  gap: 8px;
+  padding-top: 8px;
 }

@@ -1,7 +1,6 @@
 import { CityContextService } from '../../../cities/city-context.service';
 import { Service, inject } from '@angular/core';
 import { Feature } from 'ol';
-import { Point } from 'ol/geom';
 import { MapService } from './map.service';
 import { MapCameraService, MapFocusRequest } from './map-camera.service';
 import { LayerType } from './layers/map-layer.service';
@@ -10,8 +9,6 @@ import { FeatureCreationSource } from './map.types';
 import { FeatureFactoryService } from './feature-factory.service';
 import { LoggerService } from '@metro/shared/api';
 import { isSubwayShape } from '../../geography/transit-utils';
-import { fromLonLat } from 'ol/proj';
-import { createBikeStationFeatureProperties } from './layers/bike-feature-properties.utils';
 import { MapSelectionDisplayService } from './map-selection-display.service';
 import { updatePreservedFeaturesCreationSource } from './map-feature-source.utils';
 import { getBusRouteIdentity } from '@metro/shared/utils';
@@ -44,7 +41,6 @@ export class MapDisplayService {
 
     // Use modular approach - only update what's actually changed
     this.updateSubwayStations();
-    this.updateBikeStations();
     this.updateSubwayRoutes();
     this.updateBusRoutesAndStops();
     this.selectionDisplayService.updateSelectedFeatures();
@@ -173,89 +169,6 @@ export class MapDisplayService {
       this.logger.info(`Updated ${targetStations.length} subway stations`);
     } else {
       this.logger.debug('Subway stations unchanged, skipping update');
-    }
-  }
-
-  /**
-   * Update bike stations layer with cached bike share data
-   */
-  private updateBikeStations(): void {
-    const layerService = this.mapService.getLayerService();
-    const bikeStations = this.mapState.bikeStations();
-
-    if (bikeStations.length === 0) {
-      if (layerService.getFeaturesFromLayer(LayerType.BIKE).length > 0) {
-        layerService.clearLayer(LayerType.BIKE);
-      }
-      return;
-    }
-
-    const existingFeatures = layerService.getFeaturesFromLayer(LayerType.BIKE);
-    const existingMap = new Map(
-      existingFeatures
-        .map((feature) => {
-          const id = feature.getId()?.toString();
-          return id ? ([id, feature] as const) : null;
-        })
-        .filter((entry): entry is readonly [string, Feature] => !!entry),
-    );
-
-    let added = 0;
-    let updated = 0;
-    const seen = new Set<string>();
-    const selectedBikeStations = this.mapState.selectedBikeStations();
-
-    bikeStations.forEach((station) => {
-      const featureId = station.stationId;
-      seen.add(featureId);
-      const existing = existingMap.get(featureId);
-      const isSelected = selectedBikeStations.has(station.stationId);
-
-      if (existing) {
-        const props = existing.getProperties();
-        existing.setProperties({
-          ...props,
-          ...createBikeStationFeatureProperties(station, isSelected),
-        });
-
-        const geometry = existing.getGeometry();
-        if (geometry instanceof Point) {
-          const current = geometry.getCoordinates();
-          const target = fromLonLat([station.longitude, station.latitude]);
-          if (current[0] !== target[0] || current[1] !== target[1]) {
-            geometry.setCoordinates(target);
-          }
-        }
-
-        updated++;
-      } else {
-        const feature = this.featureFactory.createBikeStationFeature(
-          station,
-          isSelected,
-        );
-        layerService.addFeature(LayerType.BIKE, feature);
-        added++;
-      }
-    });
-
-    const removedFeatures = existingFeatures.filter((feature) => {
-      const id = feature.getId()?.toString();
-      return id ? !seen.has(id) : true;
-    });
-
-    removedFeatures.forEach((feature) => {
-      layerService.removeFeature(LayerType.BIKE, feature);
-    });
-
-    const removed = removedFeatures.length;
-
-    if (added || removed || updated) {
-      this.logger.info('Updated BIKE layer', {
-        stations: bikeStations.length,
-        added,
-        removed,
-        updated,
-      });
     }
   }
 

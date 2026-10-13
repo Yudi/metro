@@ -52,7 +52,6 @@ import { BikeStationsService } from '../map-main/geography/bike-stations.service
 import { BusTerminalsService } from '../map-main/geography/bus-terminals.service';
 import type { BusTerminalDetail } from '@metro/shared/bus-terminal-contracts';
 import type {
-  BusRouteGraphQL,
   BusStopGraphQL,
   StopFullDataSnapshot,
 } from '../map-main/geography/geography-graphql.service';
@@ -276,6 +275,11 @@ export class OmniboxResultPageComponent {
         routes,
         selectedRoutes: new Set<string>(),
         showMapActions: false,
+        onSelectRoute: (routeId) => {
+          void this.router.navigate([this.cityContext.path('/mapa')], {
+            queryParams: { busRoutes: routeId, focusRoute: routeId },
+          });
+        },
         terminalViewState: this.terminalViewState(),
         onOpenTerminal: (terminal) => {
           void this.router.navigate(
@@ -293,7 +297,7 @@ export class OmniboxResultPageComponent {
         routesError,
       },
       mapParams: {
-        busStops: stop.stopId || requestedStopId,
+        openStop: stop.stopId || requestedStopId,
         lat: String(stop.latitude),
         lon: String(stop.longitude),
         z: '16',
@@ -345,7 +349,7 @@ export class OmniboxResultPageComponent {
           );
           if (!terminal) break;
           const mapParams = {
-            busStops: terminal.stopIds.join(','),
+            openTerminal: terminal.id,
             lat: String(terminal.latitude),
             lon: String(terminal.longitude),
             z: '14',
@@ -363,10 +367,19 @@ export class OmniboxResultPageComponent {
             onShowStopOnMap: (stop) => {
               void this.router.navigate([this.cityContext.path('/mapa')], {
                 queryParams: {
-                  busStops: stop.stopId,
+                  openStop: stop.stopId,
                   lat: String(stop.latitude),
                   lon: String(stop.longitude),
                   z: '17',
+                },
+              });
+            },
+            selectedRouteIds: () => new Set<string>(),
+            onSelectRoute: (routeId) => {
+              void this.router.navigate([this.cityContext.path('/mapa')], {
+                queryParams: {
+                  busRoutes: routeId,
+                  focusRoute: routeId,
                 },
               });
             },

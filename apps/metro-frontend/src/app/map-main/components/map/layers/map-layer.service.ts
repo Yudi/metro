@@ -1,7 +1,6 @@
 import { Service, signal, computed, inject } from '@angular/core';
 import VectorLayer from 'ol/layer/Vector';
 import VectorSource from 'ol/source/Vector';
-import ClusterSource from 'ol/source/Cluster';
 import { Feature } from 'ol';
 import { Map as OLMap } from 'ol';
 import { FeatureCreationSource } from '../map.types';
@@ -21,8 +20,6 @@ export type { LayerConfig } from './map-layer.types';
 export class MapLayerService {
   private logger = inject(LoggerService);
   private readonly styleService = inject(MapLayerStyleService);
-
-  private readonly clusterSources = new Map<LayerType, ClusterSource>();
 
   // Layer visibility state
   // Note: SUBWAY_STATIONS and SUBWAY_ROUTES are now managed by VectorTileLayerService
@@ -96,26 +93,16 @@ export class MapLayerService {
       }),
     );
 
-    const bikeSource = this.sources.get(LayerType.BIKE);
-    if (bikeSource) {
-      const bikeClusterSource = new ClusterSource({
-        distance: this.styleService.getClusterDistanceForZoom(
-          this.currentZoomLevel(),
-        ),
-        source: bikeSource,
-      });
-      this.clusterSources.set(LayerType.BIKE, bikeClusterSource);
-
-      this.layers.set(
-        LayerType.BIKE,
-        new VectorLayer({
-          source: bikeClusterSource,
-          style: (feature) => this.styleService.createBikeStyle(feature),
-          zIndex: 30, // Above route shapes, below stops
-          visible: false,
-        }),
-      );
-    }
+    // This empty layer owns the existing bike toggle. Station data and clusters
+    // are rendered by VectorTileLayerService; selected markers use SELECTION.
+    this.layers.set(
+      LayerType.BIKE,
+      new VectorLayer({
+        source: this.sources.get(LayerType.BIKE),
+        zIndex: 30,
+        visible: false,
+      }),
+    );
   }
 
   /**
@@ -439,16 +426,13 @@ export class MapLayerService {
    * Update zoom level for styling
    */
   setZoomLevel(zoom: number | null): void {
+    const previousZoom = this.currentZoomLevel();
+    if (previousZoom === zoom) return;
     this.currentZoomLevel.set(zoom);
-    const bikeClusterSource = this.clusterSources.get(LayerType.BIKE);
-    if (bikeClusterSource) {
-      const targetDistance = this.styleService.getClusterDistanceForZoom(zoom);
-      if (bikeClusterSource.getDistance() !== targetDistance) {
-        bikeClusterSource.setDistance(targetDistance);
-      }
+    // Only station labels depend on zoom.
+    if (((previousZoom ?? 0) >= 14) !== ((zoom ?? 0) >= 14)) {
+      this.layers.get(LayerType.RAIL_STATIONS)?.changed();
     }
-    // Trigger layer refresh to update labels
-    this.layers.forEach((layer) => layer.changed());
   }
 
   /**

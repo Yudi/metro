@@ -297,7 +297,7 @@ export class StoryVectorTileLayerService extends VectorTileLayerService {
             return feature;
           }),
         }),
-        zIndex: type === VectorTileLayerType.BUS_STOPS ? 45 : 30,
+        zIndex: type === VectorTileLayerType.BUS_STOPS ? 45 : 24,
         visible: this.isLayerVisible(type),
         style: (feature) =>
           new Style({
@@ -540,6 +540,7 @@ export function createMapStoryProviders(scenario: MapStoryScenario = {}) {
       useValue: {
         stations: signal([BIKE_STATION_FULL, BIKE_STATION_EMPTY]),
         refreshTick: signal(0),
+        fetchedAt: signal<number | null>(null),
         activate: () => Promise.resolve(),
         disconnect: () => undefined,
         getStation: (id: string) =>

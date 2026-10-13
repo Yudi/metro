@@ -156,4 +156,124 @@ describe('map destinations from the omnibox', () => {
     expect(ensureStationDetails).toHaveBeenCalledWith('bike-35');
     expect(centerOn).toHaveBeenCalledWith([-46.6822, -23.5731], 17);
   });
+
+  it('opens a linked stop detail without adding a map selection', () => {
+    const centerOn = jest.fn();
+    const focusOn = jest.fn();
+    const addStopToSelection = jest.fn();
+    const showRoutesForStop = jest.fn();
+    const layers = { setLayerVisibility: jest.fn() };
+    let mapReady = false;
+    TestBed.configureTestingModule({
+      providers: [
+        MapRouteStateService,
+        {
+          provide: MapService,
+          useValue: {
+            center: signal(null),
+            zoomLevel: signal(null),
+            getMap: () => (mapReady ? {} : null),
+            centerOn,
+            getLayerService: () => layers,
+            getVectorTileLayerService: () => layers,
+          },
+        },
+        { provide: MapStateService, useValue: { addStopToSelection } },
+        { provide: MapDataLoaderService, useValue: {} },
+        { provide: MapDisplayService, useValue: { centerOn: focusOn } },
+        {
+          provide: MapInteractionService,
+          useValue: { showRoutesForStop },
+        },
+        { provide: BikeStationsService, useValue: {} },
+        { provide: RailGraphqlService, useValue: {} },
+        { provide: FavoritesService, useValue: { favorites: signal({}) } },
+        {
+          provide: MapViewStateStorageService,
+          useValue: { defaultStateRequests: signal(0) },
+        },
+        { provide: LoggerService, useValue: { debug: jest.fn() } },
+      ],
+    });
+    const state = TestBed.inject(MapRouteStateService);
+    const params = convertToParamMap({
+      openStop: 'stop-42',
+      lat: '-23.5614',
+      lon: '-46.656',
+      z: '17',
+    });
+
+    state.applyRouteState(params);
+    expect(showRoutesForStop).not.toHaveBeenCalled();
+    mapReady = true;
+    state.applyRouteState(params);
+    state.applyRouteState(params);
+
+    expect(centerOn).toHaveBeenCalledWith([-46.656, -23.5614], 17);
+    expect(focusOn).toHaveBeenCalledTimes(1);
+    expect(focusOn).toHaveBeenCalledWith([-46.656, -23.5614], 17);
+    expect(showRoutesForStop).toHaveBeenCalledTimes(1);
+    expect(showRoutesForStop).toHaveBeenCalledWith('stop-42');
+    expect(addStopToSelection).not.toHaveBeenCalled();
+    expect(layers.setLayerVisibility).not.toHaveBeenCalled();
+    mapReady = false;
+    state.applyRouteState(params);
+    mapReady = true;
+    state.applyRouteState(params);
+    expect(showRoutesForStop).toHaveBeenCalledTimes(2);
+  });
+
+  it('opens a linked terminal once and leaves bus-stop visibility unchanged', () => {
+    const centerOn = jest.fn();
+    const showBusTerminalDetails = jest.fn();
+    const addStopToSelection = jest.fn();
+    const layers = { setLayerVisibility: jest.fn() };
+    TestBed.configureTestingModule({
+      providers: [
+        MapRouteStateService,
+        {
+          provide: MapService,
+          useValue: {
+            center: signal(null),
+            zoomLevel: signal(null),
+            getMap: () => ({}),
+            centerOn,
+            getLayerService: () => layers,
+            getVectorTileLayerService: () => layers,
+          },
+        },
+        { provide: MapStateService, useValue: { addStopToSelection } },
+        { provide: MapDataLoaderService, useValue: {} },
+        { provide: MapDisplayService, useValue: {} },
+        {
+          provide: MapInteractionService,
+          useValue: { showBusTerminalDetails },
+        },
+        { provide: BikeStationsService, useValue: {} },
+        { provide: RailGraphqlService, useValue: {} },
+        { provide: FavoritesService, useValue: { favorites: signal({}) } },
+        {
+          provide: MapViewStateStorageService,
+          useValue: { defaultStateRequests: signal(0) },
+        },
+        { provide: LoggerService, useValue: { debug: jest.fn() } },
+      ],
+    });
+    const state = TestBed.inject(MapRouteStateService);
+    const params = convertToParamMap({
+      openTerminal: 'terminal-7',
+      lat: '-23.55',
+      lon: '-46.63',
+      z: '14',
+    });
+
+    state.applyRouteState(params);
+    state.applyRouteState(params);
+
+    expect(centerOn).toHaveBeenCalledWith([-46.63, -23.55], 14);
+    expect(showBusTerminalDetails).toHaveBeenCalledTimes(1);
+    expect(showBusTerminalDetails).toHaveBeenCalledWith('terminal-7');
+    expect(addStopToSelection).not.toHaveBeenCalled();
+    expect(layers.setLayerVisibility).not.toHaveBeenCalled();
+  });
 });

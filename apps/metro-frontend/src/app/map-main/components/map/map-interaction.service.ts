@@ -104,6 +104,15 @@ export class MapInteractionService {
     return this.detailsService.showRoutesForStop(stopId);
   }
 
+  showBusTerminalDetails(terminalId: string): void {
+    this.detailsService.showBusTerminalDetails(
+      terminalId,
+      undefined,
+      undefined,
+      true,
+    );
+  }
+
   activateNearbyMode(): void {
     this.nearbyService.activateNearbyMode();
   }

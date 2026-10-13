@@ -113,6 +113,16 @@ export class MapService {
         : [],
     });
 
+    const updateZoomLevel = () => {
+      const currentZoom = map.getView().getZoom() ?? null;
+      this.zoomLevel.set(currentZoom);
+      this.layerService.setZoomLevel(currentZoom);
+      this.vectorTileLayerService.setZoomLevel(currentZoom);
+    };
+
+    // Synchronize styling before attaching layers, including on map recreation.
+    updateZoomLevel();
+
     // Add managed layers from layer service
     this.layerService.addLayersToMap(map);
 
@@ -130,24 +140,14 @@ export class MapService {
       });
     }
 
-    // Initialize zoom level signal
-    this.zoomLevel.set(map.getView().getZoom() || null);
     this.center.set(
       toLonLat(map.getView().getCenter() ?? [0, 0]) as [number, number],
     );
 
-    // Listen for zoom changes and refresh layers to update labels
-    map.getView().on('change:resolution', () => {
-      const newZoom = map.getView().getZoom() || null;
-      this.zoomLevel.set(newZoom);
-
-      // Update zoom in layer service
-      this.layerService.setZoomLevel(newZoom);
-      // Update zoom in vector tile layer service
-      this.vectorTileLayerService.setZoomLevel(newZoom);
-    });
-
-    map.getView().on('change:center', () => {
+    // Keep animation frames free of layer invalidation and persistence effects.
+    // OpenLayers renders the moving view itself; publish only the settled camera.
+    map.on('moveend', () => {
+      updateZoomLevel();
       this.updateCenterSignal();
     });
 
@@ -251,6 +251,9 @@ export class MapService {
 
     // Add pointer move handler for hover feedback
     map.on('pointermove', (event) => {
+      const view = map.getView();
+      if (event.dragging || view.getAnimating() || view.getInteracting()) return;
+
       const pixel = map.getEventPixel(event.originalEvent);
       const hit = map.hasFeatureAtPixel(pixel);
 

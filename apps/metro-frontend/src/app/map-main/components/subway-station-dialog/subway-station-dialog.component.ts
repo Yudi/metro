@@ -50,7 +50,11 @@ import {
 import { DialogHeaderComponent } from '../../../shared/components/dialog-header/dialog-header.component';
 import { TrainLineDetailsComponent } from '../../../shared/components/train-line-details/train-line-details.component';
 import { NextTrainWebsocketService } from '../../../next-train/next-train-websocket.service';
-import { DatePipe, NgOptimizedImage, NgTemplateOutlet } from '@angular/common';
+import { DatePipe, NgTemplateOutlet } from '@angular/common';
+import {
+  TransitPlacePhotoComponent,
+  TransitPlacePhotoCreditComponent,
+} from '../../../shared/components/transit-place-photo/transit-place-photo.component';
 import {
   resolveStationTrainCompositionViews,
   TRAIN_PLATFORM_CONFIGS,
@@ -89,7 +93,8 @@ interface TrainLineOption {
     DialogHeaderComponent,
     TrainLineDetailsComponent,
     DatePipe,
-    NgOptimizedImage,
+    TransitPlacePhotoComponent,
+    TransitPlacePhotoCreditComponent,
     NgTemplateOutlet,
   ],
   templateUrl: './subway-station-dialog.component.html',

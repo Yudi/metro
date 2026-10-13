@@ -18,7 +18,29 @@ export class VectorTileStyleService {
   private readonly featureData = inject(VectorTileFeatureDataService);
   private readonly logger = inject(LoggerService);
 
+  // Tile features are immutable snapshots. Weak keys release styles with evicted tiles.
+  private readonly stylesWithoutLabels = new WeakMap<FeatureLike, Style | Style[]>();
+  private readonly stylesWithLabels = new WeakMap<FeatureLike, Style | Style[]>();
+  private readonly busStopStyle = this.createBusStopStyle();
+
   getStyleForLayer(
+    layerType: VectorTileLayerType,
+    feature: FeatureLike,
+    currentZoom: number | null,
+  ): Style | Style[] {
+    if (layerType === VectorTileLayerType.BUS_STOPS) return this.busStopStyle;
+    const cache = (currentZoom ?? 0) >= 14
+      ? this.stylesWithLabels
+      : this.stylesWithoutLabels;
+    const cached = cache.get(feature);
+    if (cached) return cached;
+
+    const style = this.createStyleForLayer(layerType, feature, currentZoom);
+    cache.set(feature, style);
+    return style;
+  }
+
+  private createStyleForLayer(
     layerType: VectorTileLayerType,
     feature: FeatureLike,
     currentZoom: number | null,

@@ -1,23 +1,12 @@
-.stop-description {
-  margin-bottom: 16px;
-}
-
-.stop-photo img {
+:host {
   display: block;
   width: 100%;
-  height: auto;
-  aspect-ratio: 15 / 4;
-  object-fit: cover;
+  min-width: 0;
 }
 
-.stop-photo-credit {
-  margin: 8px 0 16px;
-  color: var(--mat-sys-on-surface-variant);
-  font-size: 0.75rem;
-  overflow-wrap: anywhere;
+.stop-description { margin: 0 0 16px; }
 
-  a { color: inherit; }
-}
+.stop-photo-credit { margin: 8px 24px 16px; }
 
 :host.embedded mat-dialog-content {
   max-height: none;
@@ -26,6 +15,31 @@
 
 .arrivals-section {
   margin: 8px 0;
+  min-width: 0;
+}
+
+.stop-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 24px;
+}
+
+.stop-actions__selection {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.terminal-return {
+  height: auto;
+  min-height: 40px;
+  padding-block: 8px;
+  white-space: normal;
 }
 
 .routes-state {
@@ -44,7 +58,13 @@ mat-divider {
 
 .favorite-button:hover,
 .favorite-button.favorited {
-  color: #e91e63;
+  color: var(--mat-sys-primary);
+}
+
+@media (max-width: 600px) {
+  .stop-actions { padding-inline: 16px; }
+  .stop-photo-credit { margin-inline: 16px; }
+  .terminal-return { width: 100%; }
 }
 
 .favorite-button.favorited:hover {

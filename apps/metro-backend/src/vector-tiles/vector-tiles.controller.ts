@@ -208,12 +208,12 @@ export class VectorTilesController {
   @Get('bike-stations/:z/:x/:y.pbf')
   @Header('Content-Type', 'application/x-protobuf')
   @Header('Content-Encoding', 'identity')
-  @Header('Cache-Control', 'public, max-age=30')
+  @Header('Cache-Control', 'public, no-cache')
   @Header('Access-Control-Allow-Origin', '*')
   @ApiOperation({
     summary: 'Get bike station vector tile',
     description:
-      'Returns a Mapbox Vector Tile (MVT) containing bike stations from the current GBFS polling cache.',
+      'Returns a Mapbox Vector Tile (MVT) containing bike stations from the current polling cache. Stable URLs are revalidated with ETags so WebSocket refreshes receive current availability without retransmitting unchanged tiles.',
   })
   async getBikeStationsTile(
     @Param('z', ParseIntPipe) z: number,

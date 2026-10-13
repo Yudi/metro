@@ -1,5 +1,8 @@
 import { Service, inject } from '@angular/core';
 import { Feature } from 'ol';
+import { Point } from 'ol/geom';
+import { fromLonLat } from 'ol/proj';
+import { createBikeStationFeatureProperties } from './layers/bike-feature-properties.utils';
 import { MapService } from './map.service';
 import { LayerType } from './layers/map-layer.service';
 import { FeatureFactoryService } from './feature-factory.service';
@@ -139,22 +142,38 @@ export class MapSelectionDisplayService {
     });
 
     this.mapState.bikeStations().forEach((station) => {
-      if (selectedBikeStationIds.has(station.stationId)) {
-        const feature = this.featureFactory.createBikeStationFeature(
-          station,
-          true,
-          FeatureCreationSource.SELECTION,
+      if (!selectedBikeStationIds.has(station.stationId)) return;
+
+      const existing = currentSelectionFeatures.find(
+        (feature) => feature.get('stationId') === station.stationId,
+      );
+      if (existing) {
+        // Retain the marker and its render batch until this station changes.
+        if (existing.get('stationData') === station) return;
+        existing.setProperties(
+          createBikeStationFeatureProperties(
+            station,
+            true,
+            FeatureCreationSource.SELECTION,
+          ),
         );
-        const alreadyExists = currentSelectionFeatures.some(
-          (existing) => existing.getId() === feature.getId(),
-        );
-        if (!alreadyExists) {
-          layerService.addFeature(LayerType.SELECTION, feature);
-          this.logger.debug(
-            `Added selected bike station ${station.stationId} to SELECTION layer`,
-          );
+        const geometry = existing.getGeometry();
+        if (geometry instanceof Point) {
+          const coordinates = fromLonLat([station.longitude, station.latitude]);
+          const previous = geometry.getCoordinates();
+          if (previous[0] !== coordinates[0] || previous[1] !== coordinates[1]) {
+            geometry.setCoordinates(coordinates);
+          }
         }
+        return;
       }
+
+      const feature = this.featureFactory.createBikeStationFeature(
+        station,
+        true,
+        FeatureCreationSource.SELECTION,
+      );
+      layerService.addFeature(LayerType.SELECTION, feature);
     });
   }
 

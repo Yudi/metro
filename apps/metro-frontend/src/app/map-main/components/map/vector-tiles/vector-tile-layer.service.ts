@@ -23,6 +23,7 @@ import {
   VectorTileFeatureDataService,
 } from './vector-tile-feature-data.service';
 import { VectorTileStyleService } from './vector-tile-style.service';
+import { loadVectorTile } from './vector-tile-loader';
 
 export { VectorTileLayerType } from './vector-tile-layer.config';
 export type {
@@ -62,6 +63,7 @@ export class VectorTileLayerService {
   private readonly layers = new Map<VectorTileLayerType, VectorTileLayer>();
   private currentZoomLevel = signal<number | null>(null);
 
+  private bikeDataRevision: number | null = null;
   private busRouteIds: string[] = [];
   private busStopFilter: BusStopTileFilter = {
     routeIds: [],
@@ -135,17 +137,36 @@ export class VectorTileLayerService {
   }
 
   setBusRouteIds(routeIds: string[]): void {
-    this.busRouteIds = this.normalizeIds(routeIds);
+    const normalizedIds = this.normalizeIds(routeIds);
+    if (this.busRouteIds.join(',') === normalizedIds.join(',')) return;
+    this.busRouteIds = normalizedIds;
     this.refreshLayer(VectorTileLayerType.BUS_ROUTES);
   }
 
   setBusStopFilter(filter: BusStopTileFilter): void {
-    this.busStopFilter = {
+    const normalizedFilter: BusStopTileFilter = {
       routeIds: this.normalizeIds(filter.routeIds),
       stopIds: this.normalizeIds(filter.stopIds),
-      nearby: filter.nearby,
+      nearby: filter.nearby
+        ? {
+            lat: filter.nearby.lat,
+            lon: filter.nearby.lon,
+            radiusMeters: filter.nearby.radiusMeters,
+          }
+        : null,
     };
+    if (JSON.stringify(this.busStopFilter) === JSON.stringify(normalizedFilter)) {
+      return;
+    }
+    this.busStopFilter = normalizedFilter;
     this.refreshLayer(VectorTileLayerType.BUS_STOPS);
+  }
+
+  /** WebSockets invalidate snapshots; HTTP validators keep unchanged bodies cached. */
+  refreshBikeStations(revision: number | null): void {
+    if (revision === null || revision === this.bikeDataRevision) return;
+    this.bikeDataRevision = revision;
+    this.refreshLayer(VectorTileLayerType.BIKE_STATIONS);
   }
 
   refreshLayer(layerType: VectorTileLayerType): void {
@@ -157,11 +178,11 @@ export class VectorTileLayerService {
   }
 
   setZoomLevel(zoom: number | null): void {
-    if (this.currentZoomLevel() !== zoom) {
-      this.currentZoomLevel.set(zoom);
-      for (const layer of this.layers.values()) {
-        layer.changed();
-      }
+    const previousZoom = this.currentZoomLevel();
+    this.currentZoomLevel.set(zoom);
+    if (((previousZoom ?? 0) >= 14) !== ((zoom ?? 0) >= 14)) {
+      this.layers.get(VectorTileLayerType.RAIL_STATIONS)?.changed();
+      this.layers.get(VectorTileLayerType.BIKE_STATIONS)?.changed();
     }
   }
 
@@ -232,6 +253,7 @@ export class VectorTileLayerService {
       }),
       tileUrlFunction: (tileCoord) => this.buildTileUrl(config, tileCoord),
       tileSize: 512,
+      tileLoadFunction: loadVectorTile,
     });
 
     this.sources.set(config.id, source);
@@ -242,7 +264,8 @@ export class VectorTileLayerService {
       zIndex: config.zIndex,
       visible: config.visible,
       renderMode: 'hybrid',
-      preload: 1,
+      // Let the map queue prioritize visible tiles instead of fetching parent zooms.
+      preload: 0,
     });
 
     this.layers.set(config.id, layer);
@@ -327,6 +350,6 @@ export class VectorTileLayerService {
           .filter((id) => id.length > 0)
           .slice(0, 100),
       ),
-    );
+    ).sort();
   }
 }

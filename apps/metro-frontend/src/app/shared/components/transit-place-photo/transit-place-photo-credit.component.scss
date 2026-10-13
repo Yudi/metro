@@ -1,0 +1,14 @@
+:host { display: block; min-width: 0; }
+
+.place-photo-credit {
+  padding-top: 8px;
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+
+  a {
+    color: inherit;
+    text-underline-offset: 2px;
+  }
+}

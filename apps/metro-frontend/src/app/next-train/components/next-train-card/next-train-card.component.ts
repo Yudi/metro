@@ -25,6 +25,7 @@ import {
   NextTrainLineCode,
   DirectionHeadway,
   isApi1RailLine,
+  hasNextTrainIntegration,
   CPTM_LINE_CONFIG,
   hardNormalizeString,
 } from '@metro/shared/utils';
@@ -359,6 +360,11 @@ export class NextTrainCardComponent implements OnInit, OnDestroy {
       operationClosed: data?.operationClosed ?? false,
       outOfSchedule: data?.outOfSchedule ?? false,
       hasLiveTrains: this.trains().length > 0,
+      hasEmptyLivePredictions:
+        this.connected() &&
+        hasNextTrainIntegration(this.lineCode()) &&
+        this.canShowSchedule() &&
+        data?.hasError === false,
       showSchedule:
         this.canShowSchedule() && this.scheduledDirections().length > 0,
     };

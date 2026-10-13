@@ -32,18 +32,6 @@
   }
 }
 
-.station-heading__photo {
-  position: relative;
-  height: clamp(144px, 24vw, 260px);
-  overflow: hidden;
-}
-
-.station-heading__image {
-  object-fit: cover;
-  object-position: center 45%;
-  mask-image: linear-gradient(to bottom, #000 90%, transparent 100%);
-}
-
 .station-header-actions {
   display: flex;
   align-items: center;
@@ -54,16 +42,6 @@
 
 .station-photo-credit {
   margin: 0 24px 16px;
-  padding-top: 8px;
-  color: var(--mat-sys-on-surface-variant);
-  font-size: 0.75rem;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-
-  a {
-    color: inherit;
-    text-underline-offset: 2px;
-  }
 }
 
 .station-restrooms {

@@ -2,6 +2,7 @@ type Listener = (...args: unknown[]) => void;
 
 interface OpenLayersMockOptions {
   center?: unknown;
+  distance?: number;
   features?: Feature[];
   layers?: OpenLayersMockObject[];
   properties?: Record<string, unknown>;
@@ -11,6 +12,7 @@ interface OpenLayersMockOptions {
   visible?: boolean;
   zoom?: number;
   zIndex?: number;
+  tileUrlFunction?: (tileCoord: number[] | null) => string | undefined;
 }
 
 class OpenLayersMockObject {
@@ -22,6 +24,8 @@ class OpenLayersMockObject {
   private view: View | null = null;
   private visible = true;
   private zIndex = 0;
+  private distance = 60;
+  private readonly tileUrlFunction: OpenLayersMockOptions['tileUrlFunction'];
 
   constructor(options: OpenLayersMockOptions = {}) {
     this.source = options.source ?? null;
@@ -29,6 +33,8 @@ class OpenLayersMockObject {
     this.view = options.view ?? null;
     this.visible = options.visible ?? true;
     this.zIndex = options.zIndex ?? 0;
+    this.distance = options.distance ?? 60;
+    this.tileUrlFunction = options.tileUrlFunction;
 
     options.features?.forEach((feature) => this.addFeature(feature));
     options.layers?.forEach((layer) => this.addLayer(layer));
@@ -48,8 +54,20 @@ class OpenLayersMockObject {
     return this.properties.get(key);
   }
 
+  getProperties(): Record<string, unknown> {
+    return Object.fromEntries(this.properties);
+  }
+
+  setProperties(properties: Record<string, unknown>): void {
+    for (const [key, value] of Object.entries(properties)) this.set(key, value);
+  }
+
   set(key: string, value: unknown): void {
     this.properties.set(key, value);
+  }
+
+  getTileUrlFunction(): OpenLayersMockOptions['tileUrlFunction'] {
+    return this.tileUrlFunction;
   }
 
   getSource(): OpenLayersMockObject | null {
@@ -175,6 +193,14 @@ class OpenLayersMockObject {
     return undefined;
   }
 
+  getDistance(): number {
+    return this.distance;
+  }
+
+  setDistance(distance: number): void {
+    this.distance = distance;
+  }
+
   setStyle(style: unknown): void {
     this.properties.set('style', style);
   }
@@ -201,6 +227,14 @@ export class View extends OpenLayersMockObject {
 
   cancelAnimations(): void {
     return undefined;
+  }
+
+  getAnimating(): boolean {
+    return false;
+  }
+
+  getInteracting(): boolean {
+    return false;
   }
 
   animate(options: { center?: unknown; zoom?: number }): void {
@@ -260,6 +294,9 @@ export class Feature extends OpenLayersMockObject {
 
   constructor(properties: Record<string, unknown> = {}) {
     super({ properties });
+    this.geometry = properties['geometry'] instanceof OpenLayersMockObject
+      ? properties['geometry']
+      : null;
   }
 
   getId(): string | number | undefined {
@@ -278,18 +315,19 @@ export class Feature extends OpenLayersMockObject {
     this.geometry = geometry;
   }
 
-  getProperties(): Record<string, unknown> {
-    return {};
-  }
 }
 
 export class Point extends OpenLayersMockObject {
-  constructor(private readonly coordinates: unknown) {
+  constructor(private coordinates: unknown) {
     super();
   }
 
   getCoordinates(): unknown {
     return this.coordinates;
+  }
+
+  setCoordinates(coordinates: unknown): void {
+    this.coordinates = coordinates;
   }
 
   getType(): string {

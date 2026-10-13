@@ -16,6 +16,7 @@ import type { StopArrivalUpdate } from '../../realtime/realtime-websocket.servic
 import { StationImagesService } from '../subway-station-dialog/station-images.service';
 import { BusTerminalDialogComponent } from './bus-terminal-dialog.component';
 import type { BusTerminalDialogData } from './bus-terminal-dialog.types';
+import { FavoritesService } from '@metro/shared/api';
 
 @Component({
   selector: 'app-terminal-dark-preview',
@@ -26,7 +27,12 @@ import type { BusTerminalDialogData } from './bus-terminal-dialog.types';
 })
 class TerminalDarkPreviewComponent {}
 
-function createProviders(detail: ReturnType<BusTerminalsService['getTerminalDetail']>) {
+function createProviders(
+  detail: ReturnType<BusTerminalsService['getTerminalDetail']>,
+  options: { showMapActions?: boolean } = {},
+) {
+  const selectedRouteIds = signal(new Set<string>());
+  const favoriteIds = signal(new Set<string>());
   const data: BusTerminalDialogData = {
     terminalId: BUS_TERMINAL_SUMMARY_FIXTURE.id,
     summary: BUS_TERMINAL_SUMMARY_FIXTURE,
@@ -34,6 +40,10 @@ function createProviders(detail: ReturnType<BusTerminalsService['getTerminalDeta
     platformCode: 'all',
     scrollTop: 0,
     fitOnLoad: false,
+    showMapActions: options.showMapActions ?? true,
+    selectedRouteIds: () => selectedRouteIds(),
+    onSelectRoute: (routeId) =>
+      selectedRouteIds.update((selected) => new Set(selected).add(routeId)),
   };
   const arrivals = new Map<string, StopArrivalUpdate>();
   for (const stop of BUS_TERMINAL_DETAIL_FIXTURE.stops) {
@@ -95,6 +105,20 @@ function createProviders(detail: ReturnType<BusTerminalsService['getTerminalDeta
         load: () => undefined,
         terminalImage: () => undefined,
         markUnavailable: () => undefined,
+      },
+    },
+    {
+      provide: FavoritesService,
+      useValue: {
+        isFavorite: (stopId: string) => favoriteIds().has(stopId),
+        addFavorite: (stopId: string) =>
+          favoriteIds.update((ids) => new Set(ids).add(stopId)),
+        removeFavorite: (stopId: string) =>
+          favoriteIds.update((ids) => {
+            const next = new Set(ids);
+            next.delete(stopId);
+            return next;
+          }),
       },
     },
     {
@@ -255,7 +279,9 @@ export const BoardingAndAlightingPoints: Story = {
 export const NoTerminalImage: Story = {
   decorators: [
     applicationConfig({
-      providers: createProviders(of(BUS_TERMINAL_DETAIL_FIXTURE)),
+      providers: createProviders(of(BUS_TERMINAL_DETAIL_FIXTURE), {
+        showMapActions: false,
+      }),
     }),
   ],
   args: { embedded: true },

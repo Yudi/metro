@@ -122,6 +122,13 @@
               <mat-icon>{{ favorite.favoriteIcon() }}</mat-icon>
             </button>
           }
+          @if (terminalMapContent(); as terminal) {
+            <button mat-icon-button type="button" class="map-panel__terminal-map"
+              aria-label="Ver pontos no mapa" [disabled]="!terminal.detail()"
+              (click)="terminal.showAllStopsOnMap()">
+              <mat-icon>map</mat-icon>
+            </button>
+          }
           @if (panel.showDismiss) {
             <button
               mat-icon-button

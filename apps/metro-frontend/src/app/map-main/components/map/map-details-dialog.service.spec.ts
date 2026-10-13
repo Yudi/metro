@@ -1,3 +1,4 @@
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { LoggerService } from '@metro/shared/api';
@@ -97,6 +98,7 @@ describe('MapDetailsDialogService map-panel lifecycle', () => {
           provide: BikeStationsService,
           useValue: {
             ensureStationDetails: jest.fn(),
+            refreshTick: signal(0),
             getStation: (stationId: string) =>
               bikeStationRecords.get(stationId),
           },
@@ -106,6 +108,7 @@ describe('MapDetailsDialogService map-panel lifecycle', () => {
           provide: MapDisplayService,
           useValue: {
             updateMapDisplay: jest.fn(),
+            centerOn: jest.fn(),
             createFocusRequest: jest.fn(() => ({
               point: jest.fn(), coordinates: jest.fn(), isCurrent: () => true,
             })),
@@ -194,6 +197,17 @@ describe('MapDetailsDialogService map-panel lifecycle', () => {
     expect(
       (firstPanel?.ref.data as { routesLoading: boolean }).routesLoading,
     ).toBe(true);
+    const stopData = firstPanel?.ref.data as {
+      onSelectRoute?: (routeId: string) => void;
+      selectedRouteIds?: () => Set<string>;
+    };
+    expect(stopData.selectedRouteIds?.()).toEqual(new Set<string>());
+    stopData.onSelectRoute?.('route-100');
+    expect(selectionService.addRouteToSelection).toHaveBeenCalledWith(
+      'route-100',
+      true,
+    );
+    expect(panelService.panel()?.id).toBe(firstPanel?.id);
 
     const updatedStop = { ...stop, name: 'Praça da Sé - atualizado' };
     stopRequest.next({ stop: updatedStop, hasNext: true });
@@ -265,6 +279,44 @@ describe('MapDetailsDialogService map-panel lifecycle', () => {
     const stopPanel = panelService.panel();
     expect(stopPanel?.component).toBe(BusStopDialogComponent);
     expect((stopPanel?.ref.data as { terminalReturn?: unknown }).terminalReturn).toEqual({
+      terminalId: BUS_TERMINAL_SUMMARY_FIXTURE.id,
+      summary: BUS_TERMINAL_SUMMARY_FIXTURE,
+      viewState: { query: 'jardim', platformCode: '2', scrollTop: 180 },
+    });
+  });
+
+  it('adds a terminal route and opens a shown stop without pinning it', () => {
+    service.showBusTerminalDetails(
+      BUS_TERMINAL_SUMMARY_FIXTURE.id,
+      BUS_TERMINAL_SUMMARY_FIXTURE,
+    );
+    const terminalData = panelService.panel()?.ref.data as BusTerminalDialogData;
+    const boardingStop = BUS_TERMINAL_DETAIL_FIXTURE.stops.find(
+      (item) => item.boardingAllowed,
+    );
+    if (!boardingStop) throw new Error('Terminal fixture requires a boarding stop');
+
+    terminalData.onSelectRoute?.('477A-direction');
+    terminalData.onShowStopOnMap?.(boardingStop, {
+      query: 'jardim',
+      platformCode: '2',
+      scrollTop: 180,
+    });
+
+    expect(selectionService.addRouteToSelection).toHaveBeenCalledWith(
+      '477A-direction',
+      true,
+    );
+    expect(terminalData.selectedRouteIds?.()).toEqual(new Set<string>());
+    expect(panelService.panel()?.component).toBe(BusStopDialogComponent);
+    expect(selectionService.addStopToSelection).not.toHaveBeenCalled();
+    expect(TestBed.inject(MapDisplayService).centerOn).toHaveBeenCalledWith(
+      [boardingStop.longitude, boardingStop.latitude],
+      17,
+    );
+    expect(
+      (panelService.panel()?.ref.data as { terminalReturn?: unknown }).terminalReturn,
+    ).toEqual({
       terminalId: BUS_TERMINAL_SUMMARY_FIXTURE.id,
       summary: BUS_TERMINAL_SUMMARY_FIXTURE,
       viewState: { query: 'jardim', platformCode: '2', scrollTop: 180 },

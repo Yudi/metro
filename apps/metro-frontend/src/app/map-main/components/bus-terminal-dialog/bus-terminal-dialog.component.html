@@ -3,28 +3,9 @@
   class="terminal-content"
   [attr.aria-label]="terminalName()"
 >
-  @if (embedded() && headerImage(); as image) {
-    <div class="terminal-photo">
-      <img
-        [ngSrc]="image.src"
-        [disableOptimizedSrcset]="true"
-        width="1200"
-        height="320"
-        sizes="100vw"
-        alt=""
-        (error)="onHeaderImageError()"
-      />
-    </div>
-    <p class="terminal-photo-credit">
-      @if (image.sourceUrl) {
-        <a [href]="image.sourceUrl" target="_blank" rel="noopener noreferrer">{{ image.title }}</a>, {{ image.author }}.
-      } @else {
-        {{ image.title }}, {{ image.author }}.
-      }
-      @if (image.licenseUrl) {
-        <a [href]="image.licenseUrl" target="_blank" rel="noopener noreferrer">{{ image.license }}</a>
-      } @else { {{ image.license }} }
-    </p>
+  @if (!panelRef && headerImage(); as image) {
+    <app-transit-place-photo class="terminal-photo" [image]="image"
+      (imageError)="onHeaderImageError()" />
   }
 
   <div class="terminal-filters" aria-label="Filtros do terminal">
@@ -56,7 +37,7 @@
         }
       </mat-select>
     </mat-form-field>
-    @if (detail() && !embedded()) {
+    @if (detail() && !embedded() && !panelRef) {
       <button mat-icon-button type="button" class="terminal-map-action"
         aria-label="Ver pontos no mapa" matTooltip="Ver pontos no mapa"
         (click)="showAllStopsOnMap()">
@@ -99,7 +80,7 @@
       </div>
     }
 
-    @if (platformGroups().length > 0) {
+    @if (platformGroups().length > 0 && showPlatformAccordion()) {
       <mat-accordion
         class="platform-accordion"
         multi
@@ -115,8 +96,6 @@
                 <span class="platform-heading">
                   <mat-icon aria-hidden="true">location_on</mat-icon>
                   <span>{{ platform.label }}</span>
-                  <span class="platform-point-count">{{ platform.points.length }}
-                    {{ platform.points.length === 1 ? "ponto" : "pontos" }}</span>
                 </span>
                 <span class="platform-line-summary">
                 @if (platform.lineBadges.length > 0) {
@@ -134,70 +113,124 @@
 
             <ng-template matExpansionPanelContent>
               @if (expandedPlatforms().has(platform.key)) {
-              <div class="platform-points">
-                @for (point of platform.points; track point.key) {
-                  <section class="boarding-point">
-                    <div class="boarding-point__heading">
-                      <div class="boarding-point__identity">
-                        <app-transit-agency-logo [sourceAgency]="point.stop.sourceAgency" />
-                        <div>
-                          <strong>{{ pointIdentity(point.stop) }}</strong>
-                          <span>{{ point.stop.name }}</span>
-                        </div>
-                      </div>
-                      <div class="boarding-point__actions">
-                        <button
-                          mat-icon-button
-                          type="button"
-                          (click)="showStopOnMap(point.stop)"
-                          [attr.aria-label]="
-                            'Ver ' + point.stop.name + ' no mapa'
-                          "
-                        >
-                          <mat-icon>map</mat-icon>
-                        </button>
-                        <button
-                          mat-icon-button
-                          type="button"
-                          [attr.aria-label]="'Detalhes de ' + pointIdentity(point.stop)"
-                          matTooltip="Detalhes da parada"
-                          (click)="showStop(point.stop)"
-                        >
-                          <mat-icon>info</mat-icon>
-                        </button>
-                      </div>
-                    </div>
-
-                    @if (point.routes.length > 0) {
-                      @defer (on viewport) {
-                        <app-stop-arrivals
-                          [stop]="point.graphqlStop"
-                          [routes]="point.routes"
-                          [selectedRoutes]="selectedRouteIds()"
-                          [selectedRouteKeys]="point.routeKeys"
-                          [showMapActions]="false"
-                          [compact]="true"
-                        />
-                      } @placeholder (minimum 120ms) {
-                        <div class="arrivals-placeholder" role="status">
-                          <mat-spinner diameter="22" />
-                          <span>Carregando previsões e horários…</span>
-                        </div>
-                      }
-                    } @else {
-                      <p class="point-without-lines">
-                        Sem informações de linhas para este ponto.
-                      </p>
-                    }
-                  </section>
-                }
-              </div>
+                <ng-container
+                  [ngTemplateOutlet]="boardingPointList"
+                  [ngTemplateOutletContext]="{ $implicit: platform }"
+                />
               }
             </ng-template>
           </mat-expansion-panel>
         }
       </mat-accordion>
     }
+
+    @if (platformGroups().length > 0 && !showPlatformAccordion()) {
+      @for (platform of platformGroups(); track platform.key) {
+        <section class="platform-flat" [attr.aria-label]="platform.label">
+          <div class="platform-flat__header">
+            <span class="platform-heading">
+              <mat-icon aria-hidden="true">location_on</mat-icon>
+              <span>{{ platform.label }}</span>
+            </span>
+            <span class="platform-line-summary">
+              @if (platform.lineBadges.length > 0) {
+                @for (badge of platform.lineBadges; track badge.key) {
+                  <app-transit-route-identity
+                    [code]="badge.shortName"
+                    [sourceAgency]="badge.sourceAgency"
+                    [description]="badge.ariaLabel"
+                    [color]="badge.color"
+                    [textColor]="badge.textColor"
+                  />
+                }
+              } @else {
+                <span class="no-line-summary">Linhas não informadas</span>
+              }
+            </span>
+          </div>
+          <ng-container
+            [ngTemplateOutlet]="boardingPointList"
+            [ngTemplateOutletContext]="{ $implicit: platform }"
+          />
+        </section>
+      }
+    }
+
+    <ng-template #boardingPointList let-platform>
+      <div class="platform-points">
+        @for (point of platform.points; track point.key) {
+          <section class="boarding-point">
+            <div class="boarding-point__heading">
+              <div class="boarding-point__identity">
+                <app-transit-agency-logo [sourceAgency]="point.stop.sourceAgency" />
+                @if (pointIdentity(point.stop); as identity) {
+                  <div>
+                    <strong>{{ identity }}</strong>
+                    @if (pointDescription(point.stop); as description) {
+                      <span>{{ description }}</span>
+                    }
+                  </div>
+                }
+              </div>
+              <div class="boarding-point__actions">
+                <button
+                  mat-icon-button
+                  type="button"
+                  class="favorite-action"
+                  [attr.aria-pressed]="isFavorite(point.stop)"
+                  [attr.aria-label]="favoriteActionLabel(point.stop)"
+                  (click)="toggleFavorite(point.stop)"
+                >
+                  <mat-icon>{{ isFavorite(point.stop) ? 'favorite' : 'favorite_border' }}</mat-icon>
+                </button>
+                <button
+                  mat-icon-button
+                  type="button"
+                  (click)="showStopOnMap(point.stop)"
+                  [attr.aria-label]="
+                    'Ver ' + pointAccessibleName(point.stop) + ' no mapa'
+                  "
+                >
+                  <mat-icon>map</mat-icon>
+                </button>
+                <button
+                  mat-icon-button
+                  type="button"
+                  [attr.aria-label]="'Detalhes de ' + pointAccessibleName(point.stop)"
+                  matTooltip="Detalhes da parada"
+                  (click)="showStop(point.stop)"
+                >
+                  <mat-icon>info</mat-icon>
+                </button>
+              </div>
+            </div>
+
+            @if (point.routes.length > 0) {
+              @defer (on viewport) {
+                <app-stop-arrivals
+                  [stop]="point.graphqlStop"
+                  [routes]="point.routes"
+                  [selectedRoutes]="selectedRouteIds()"
+                  [selectedRouteKeys]="point.routeKeys"
+                  [showMapActions]="showMapActions()"
+                  [embedded]="true"
+                  (selectRoute)="selectRouteById($event)"
+                />
+              } @placeholder (minimum 120ms) {
+                <div class="arrivals-placeholder" role="status">
+                  <mat-spinner diameter="22" />
+                  <span>Carregando linhas e previsões…</span>
+                </div>
+              }
+            } @else {
+              <p class="point-without-lines">
+                Sem informações de linhas para este ponto.
+              </p>
+            }
+          </section>
+        }
+      </div>
+    </ng-template>
 
     @if (alightingOnlyStops().length > 0) {
       <section class="alighting-points" aria-labelledby="alighting-heading">
@@ -207,15 +240,29 @@
           @for (stop of alightingOnlyStops(); track stop.stopId) {
             <div class="alighting-point">
               <app-transit-agency-logo [sourceAgency]="stop.sourceAgency" />
-              <div>
-                <strong>{{ pointIdentity(stop) }}</strong>
-                <span>{{ stop.name }}</span>
-              </div>
+              @if (pointIdentity(stop); as identity) {
+                <div>
+                  <strong>{{ identity }}</strong>
+                  @if (pointDescription(stop); as description) {
+                    <span>{{ description }}</span>
+                  }
+                </div>
+              }
+              <button
+                mat-icon-button
+                type="button"
+                class="favorite-action"
+                [attr.aria-pressed]="isFavorite(stop)"
+                [attr.aria-label]="favoriteActionLabel(stop)"
+                (click)="toggleFavorite(stop)"
+              >
+                <mat-icon>{{ isFavorite(stop) ? 'favorite' : 'favorite_border' }}</mat-icon>
+              </button>
               <button
                 mat-icon-button
                 type="button"
                 (click)="showStopOnMap(stop)"
-                [attr.aria-label]="'Ver ' + stop.name + ' no mapa'"
+                [attr.aria-label]="'Ver ' + pointAccessibleName(stop) + ' no mapa'"
               >
                 <mat-icon>map</mat-icon>
               </button>
@@ -224,5 +271,8 @@
         </div>
       </section>
     }
+  }
+  @if (headerImage(); as image) {
+    <app-transit-place-photo-credit class="terminal-photo-credit" [image]="image" />
   }
 </section>

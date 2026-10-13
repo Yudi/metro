@@ -26,7 +26,7 @@
             <p>
               {{
                 compact()
-                  ? "Sem previsão para esta linha no momento"
+                  ? "Nenhuma previsão disponível para as linhas deste ponto"
                   : "Nenhuma previsão disponível no momento"
               }}
             </p>
@@ -68,7 +68,7 @@
       >
         <div class="route-rail-header">
           <div>
-            <h4>{{ embedded() ? 'Linhas selecionadas' : 'Linhas do ponto' }}</h4>
+            <h4>Linhas do ponto</h4>
             @if (arrivals(); as data) {
               <p>Previsões atualizadas às {{ data.hr }}</p>
             }
@@ -92,8 +92,8 @@
                 <mat-panel-title class="route-summary">
                   <span
                     class="route-badge"
-                    [style.background-color]="'#' + route.color"
-                    [style.color]="'#' + route.textColor"
+                    [style.background-color]="route.color"
+                    [style.color]="route.textColor"
                     >{{ route.shortName }}</span
                   >
                   <span class="route-label">
@@ -292,10 +292,11 @@
                   @if (showMapActions()) {
                     <div class="route-detail-actions">
                       <button
-                        mat-button
+                        mat-stroked-button
                         type="button"
                         (click)="showRouteOnMap($event, route)"
                         [disabled]="isRouteSelected(route)"
+                        [attr.aria-label]="(isRouteSelected(route) ? 'Linha já exibida no mapa: ' : 'Exibir linha no mapa: ') + route.shortName + ', ' + row.directionLabel"
                       >
                         <mat-icon>map</mat-icon>
                         {{

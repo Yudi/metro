@@ -1,33 +1,20 @@
-<app-dialog-header
-  icon="directions_bus"
-  [title]="stop().name"
-  [description]="
-    'ID: ' +
-    stopDisplayId +
-    (stop().platformCode ? ' (plataforma ' + stop().platformCode + ')' : '')
-  "
-/>
+@if (!panelRef) {
+  @if (headerImage(); as image) {
+    <app-transit-place-photo class="stop-photo" [image]="image"
+      (imageError)="onHeaderImageError()" />
+  }
+  <app-dialog-header
+    icon="directions_bus"
+    [title]="stop().name"
+    [description]="
+      'ID: ' +
+      stopDisplayId +
+      (stop().platformCode ? ' (plataforma ' + stop().platformCode + ')' : '')
+    "
+  />
+}
 
 <mat-dialog-content class="stop-content">
-  @if (headerImage(); as image) {
-    <div class="stop-photo">
-      <img [ngSrc]="image.src" width="1200" height="320"
-        [disableOptimizedSrcset]="true"
-        sizes="100vw" alt=""
-        (error)="onHeaderImageError()" />
-    </div>
-    <p class="stop-photo-credit">
-      @if (image.sourceUrl) {
-        <a [href]="image.sourceUrl" target="_blank" rel="noopener noreferrer">{{ image.title }}</a>
-      } @else {
-        {{ image.title }}
-      },
-      {{ image.author }}.
-      @if (image.licenseUrl) {
-        <a [href]="image.licenseUrl" target="_blank" rel="noopener noreferrer">{{ image.license }}</a>
-      } @else { {{ image.license }} }
-    </p>
-  }
   @if (stopDescription()) {
     <p class="stop-description">{{ stopDescription() }}</p>
     <mat-divider></mat-divider>
@@ -48,39 +35,50 @@
     <app-stop-arrivals
       [stop]="stop()"
       [routes]="routesSortedByFavorite()"
-      [selectedRoutes]="data.selectedRoutes"
-      [showMapActions]="showMapActions"
+      [selectedRoutes]="selectedRouteIds()"
+      [showMapActions]="showRouteMapActions"
+      [embedded]="true"
       (selectRoute)="selectRouteById($event)"
     ></app-stop-arrivals>
   </div>
 </mat-dialog-content>
 
-<mat-dialog-actions align="end">
+<mat-dialog-actions class="stop-actions">
   @if (terminalReturn()) {
-    <button mat-button type="button" (click)="returnToTerminal()">
+    <button mat-stroked-button class="terminal-return" type="button" (click)="returnToTerminal()">
       <mat-icon>arrow_back</mat-icon>
       Ver todas as linhas do terminal
     </button>
   }
-  <button
-    mat-icon-button
-    class="favorite-button"
-    [class.favorited]="isFavorite()"
-    (click)="toggleFavorite()"
-    (mouseenter)="setFavoriteHover(true)"
-    (mouseleave)="setFavoriteHover(false)"
-    [attr.aria-label]="
-      isFavorite() ? 'Remover dos favoritos' : 'Adicionar aos favoritos'
-    "
-  >
-    <mat-icon>{{ favoriteIcon() }}</mat-icon>
-  </button>
-  @if (!panelRef && !embedded()) {
-    <button mat-button (click)="close()">Fechar</button>
-  }
-  @if (showMapActions) {
-    <button mat-raised-button color="primary" (click)="addToSelection()">
-      Adicionar à seleção
-    </button>
-  }
+  <div class="stop-actions__selection">
+    @if (!panelRef) {
+      <button
+        mat-icon-button
+        type="button"
+        class="favorite-button"
+        [class.favorited]="isFavorite()"
+        (click)="toggleFavorite()"
+        (mouseenter)="setFavoriteHover(true)"
+        (mouseleave)="setFavoriteHover(false)"
+        [attr.aria-label]="
+          isFavorite() ? 'Remover dos favoritos' : 'Adicionar aos favoritos'
+        "
+      >
+        <mat-icon>{{ favoriteIcon() }}</mat-icon>
+      </button>
+    }
+    @if (!panelRef && !embedded()) {
+      <button mat-button type="button" (click)="close()">Fechar</button>
+    }
+    @if (showMapActions) {
+      <button mat-flat-button type="button" (click)="addToSelection()">
+        <mat-icon>add_location_alt</mat-icon>
+        Adicionar à seleção
+      </button>
+    }
+  </div>
 </mat-dialog-actions>
+
+@if (headerImage(); as image) {
+  <app-transit-place-photo-credit class="stop-photo-credit" [image]="image" />
+}

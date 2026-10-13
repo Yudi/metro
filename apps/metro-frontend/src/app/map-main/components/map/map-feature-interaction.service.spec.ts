@@ -7,7 +7,7 @@ import { MapStateService } from './map-state.service';
 import { MapDisplayService } from './map-display.service';
 import { MapService } from './map.service';
 import { BikeStationsService } from '../../geography/bike-stations.service';
-import { VectorTileLayerService } from './vector-tiles/vector-tile-layer.service';
+import { VectorTileLayerService, VectorTileLayerType } from './vector-tiles/vector-tile-layer.service';
 import { MapDetailsDialogService } from './map-details-dialog.service';
 import { MapSelectionService } from './map-selection.service';
 import { MapPanelService } from './map-panel/map-panel.service';
@@ -168,4 +168,46 @@ describe('MapFeatureInteractionService', () => {
       { duration: 5000 },
     );
   });
+
+  it('opens individual bike MVT details with availability and electric counts intact', () => {
+    const tiles = TestBed.inject(VectorTileLayerService);
+    const bikes = TestBed.inject(BikeStationsService);
+    const details = TestBed.inject(MapDetailsDialogService);
+    const summary = {
+      stationId: 'station-1', latitude: -23.55, longitude: -46.63,
+      capacity: 20, effectiveCapacity: 20,
+      numBikesAvailable: 7, electricBikesAvailable: 2,
+    };
+    Object.assign(tiles, {
+      isVectorTileFeature: () => true,
+      getFeatureLayerType: () => VectorTileLayerType.BIKE_STATIONS,
+      extractBikeStationClusterData: () => null,
+      extractBikeStationData: () => summary,
+    });
+    (bikes.upsertStationSummary as jest.Mock).mockReturnValue(summary);
+    service.handleFeatureSelection({
+      get: () => undefined, getProperties: () => ({}),
+    } as never);
+    expect(bikes.upsertStationSummary).toHaveBeenCalledWith(summary);
+    expect(details.showBikeStationDetails).toHaveBeenCalledWith('station-1');
+  });
+
+  it('zooms into backend bike clusters without downloading station details', () => {
+    const tiles = TestBed.inject(VectorTileLayerService);
+    const details = TestBed.inject(MapDetailsDialogService);
+    const display = TestBed.inject(MapDisplayService);
+    const centerOn = jest.fn();
+    Object.assign(display, { centerOn });
+    Object.assign(tiles, {
+      isVectorTileFeature: () => true,
+      getFeatureLayerType: () => VectorTileLayerType.BIKE_STATIONS,
+      extractBikeStationClusterData: () => ({ latitude: -23.55, longitude: -46.63 }),
+    });
+    service.handleFeatureSelection({
+      get: () => undefined, getProperties: () => ({}),
+    } as never);
+    expect(centerOn).toHaveBeenCalledWith([-46.63, -23.55], 14);
+    expect(details.showBikeStationDetails).not.toHaveBeenCalled();
+  });
+
 });

@@ -130,6 +130,12 @@ describe('OmniboxResultPageComponent', () => {
       kind: 'bus-stop',
       title: stop.name,
       data: { stop, routes: [], routesLoading: true, routesError: false },
+      mapParams: {
+        openStop: stop.stopId,
+        lat: String(stop.latitude),
+        lon: String(stop.longitude),
+        z: '16',
+      },
     });
     const dialogInjector = page.detailInjector();
     const route: BusRouteGraphQL = {
@@ -171,9 +177,10 @@ describe('OmniboxResultPageComponent', () => {
       title: BUS_TERMINAL_DETAIL_FIXTURE.name,
       terminalDetail: BUS_TERMINAL_DETAIL_FIXTURE,
       mapParams: {
-        busStops: BUS_TERMINAL_DETAIL_FIXTURE.stopIds.join(','),
+        openTerminal: BUS_TERMINAL_DETAIL_FIXTURE.id,
         lat: String(BUS_TERMINAL_DETAIL_FIXTURE.latitude),
         lon: String(BUS_TERMINAL_DETAIL_FIXTURE.longitude),
+        z: '14',
       },
     });
     expect(page.detailComponent()).toBe(BusTerminalDialogComponent);

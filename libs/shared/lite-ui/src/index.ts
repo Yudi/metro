@@ -25,3 +25,10 @@ export { LiteSpinner } from './lib/spinner/lite-spinner';
 
 // Icon Button
 export { LiteIconButton } from './lib/icon-button/lite-icon-button';
+
+// Icon
+export { LiteIcon } from './lib/icon/lite-icon';
+export type { LiteIconName } from './lib/icon/lite-icon';
+
+// Section Heading
+export { LiteSectionHeading } from './lib/section-heading/lite-section-heading';

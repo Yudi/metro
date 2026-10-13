@@ -1,13 +1,14 @@
 import { HttpClient } from '@angular/common/http';
-import { PLATFORM_ID, signal } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { PLATFORM_ID, provideAppInitializer, signal } from '@angular/core';
+import { provideRouter, withDisabledInitialNavigation } from '@angular/router';
 import {
   Meta,
   StoryObj,
   applicationConfig,
   componentWrapperDecorator,
 } from '@storybook/angular';
-import { of } from 'rxjs';
+import { NEVER, of } from 'rxjs';
+import { AuthService, authReady, firebaseUser } from '@metro/shared/firebase';
 import {
   API_BASE_URL,
   DashboardFavoriteSelections,
@@ -34,7 +35,11 @@ type DashboardScenario =
   | 'comFavoritos'
   | 'semFavoritos'
   | 'erroParcial'
-  | 'artesp';
+  | 'artesp'
+  | 'conteudoLongo'
+  | 'somenteTrilhos'
+  | 'carregando'
+  | 'erro';
 
 const favoriteList: FavoriteList = {
   ...emptyFavorites,
@@ -139,13 +144,21 @@ function resolveFavoriteRows(
   });
 }
 
+function createFavoriteList(scenario: DashboardScenario): FavoriteList {
+  switch (scenario) {
+    case 'semFavoritos':
+      return { ...emptyFavorites };
+    case 'somenteTrilhos':
+      return { ...favoriteList, busStop: [], busRoute: [] };
+    case 'artesp':
+      return artespFavoriteList;
+    default:
+      return favoriteList;
+  }
+}
+
 function createFavoritesService(scenario: DashboardScenario) {
-  const favorites =
-    scenario === 'semFavoritos'
-      ? { ...emptyFavorites }
-      : scenario === 'artesp'
-        ? artespFavoriteList
-        : favoriteList;
+  const favorites = createFavoriteList(scenario);
   const selections =
     scenario === 'artesp' ? artespDashboardSelections : dashboardSelections;
   const favoritesState = signal(favorites);
@@ -153,6 +166,12 @@ function createFavoritesService(scenario: DashboardScenario) {
   return {
     favorites: favoritesState.asReadonly(),
     dashboardSelections: signal(selections).asReadonly(),
+    migrateDashboardBusStopRoutes: async () => {
+      if (scenario === 'erro') {
+        throw new Error('Falha simulada ao carregar favoritos');
+      }
+      return false;
+    },
     migrateBusRouteFavorite: async (
       legacyCode: string,
       directionCodes: string[],
@@ -220,6 +239,9 @@ function createHttpClient(
 ): Pick<HttpClient, 'post'> {
   return {
     post: <T>(url: string, body: unknown) => {
+      if (scenario === 'carregando') {
+        return NEVER;
+      }
       const query =
         typeof body === 'object' && body && 'query' in body
           ? String((body as { query?: string }).query)
@@ -259,7 +281,14 @@ function createHttpClient(
               {
                 id: 'stop-701441',
                 stopId: '701441',
-                name: 'Parada Cardeal Arcoverde',
+                name:
+                  scenario === 'conteudoLongo'
+                    ? 'Terminal de Integração — Avenida Professor Francisco Morato / Sentido Centro'
+                    : 'Parada Cardeal Arcoverde',
+                platformCode:
+                  scenario === 'conteudoLongo'
+                    ? '12 — Embarque metropolitano'
+                    : undefined,
                 latitude: -23.5678,
                 longitude: -46.6934,
                 isSubwayStation: false,
@@ -371,7 +400,18 @@ function createHttpClient(
 
 function createDashboardProviders(scenario: DashboardScenario) {
   return [
-    provideRouter([{ path: '', component: Dashboard }]),
+    provideRouter([], withDisabledInitialNavigation()),
+    provideAppInitializer(() => {
+      authReady.set(true);
+      firebaseUser.set(null);
+    }),
+    {
+      provide: AuthService,
+      useValue: {
+        loginGoogle: async () => ({ success: false, reason: 'failed' }),
+        logout: async () => ({ success: true }),
+      },
+    },
     { provide: API_BASE_URL, useValue: '/api' },
     { provide: PLATFORM_ID, useValue: 'browser' },
     {
@@ -396,7 +436,12 @@ const meta: Meta<Dashboard> = {
   decorators: [
     componentWrapperDecorator(
       (story) =>
-        `<main style="max-width: 960px; margin: 0 auto">${story}</main>`,
+        `<main style="max-width: 1200px; margin: 0 auto">
+          <p style="margin: 0 1rem; font-size: 0.8125rem">
+            Demonstração com dados fictícios
+          </p>
+          ${story}
+        </main>`,
     ),
   ],
 };
@@ -433,5 +478,42 @@ export const ArtespScheduledOnly: Story = {
     applicationConfig({
       providers: createDashboardProviders('artesp'),
     }),
+  ],
+};
+
+export const ConteudoLongo: Story = {
+  decorators: [
+    applicationConfig({
+      providers: createDashboardProviders('conteudoLongo'),
+    }),
+  ],
+};
+
+export const SomenteTrilhos: Story = {
+  decorators: [
+    applicationConfig({
+      providers: createDashboardProviders('somenteTrilhos'),
+    }),
+  ],
+};
+
+export const Carregando: Story = {
+  decorators: [
+    applicationConfig({
+      providers: createDashboardProviders('carregando'),
+    }),
+  ],
+};
+
+export const Erro: Story = {
+  decorators: [
+    applicationConfig({ providers: createDashboardProviders('erro') }),
+  ],
+};
+
+export const ModoEscuro: Story = {
+  render: () => ({ template: '<app-dashboard style="color-scheme: dark" />' }),
+  decorators: [
+    applicationConfig({ providers: createDashboardProviders('comFavoritos') }),
   ],
 };

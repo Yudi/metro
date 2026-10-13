@@ -1,0 +1,17 @@
+// Opt-in surface tokens for Lite pages. Inherit the surrounding color scheme.
+@mixin tokens {
+  --lite-surface: light-dark(#ffffff, #181c22);
+  --lite-surface-hover: light-dark(#f3f5f8, #242a33);
+  --lite-text: light-dark(#19212e, #edf1f7);
+  --lite-text-muted: light-dark(#536174, #b4c0d0);
+  --lite-muted: var(--lite-text-muted);
+  --lite-border: light-dark(#dce2e9, #3a4452);
+  --lite-primary: light-dark(#254cc0, #b3c5ff);
+  --lite-primary-hover: light-dark(#1e3e9d, #c6d3ff);
+  --lite-on-primary: light-dark(#ffffff, #152653);
+  --lite-focus-ring: var(--lite-primary);
+  --lite-primary-subtle: light-dark(#edf2ff, #233253);
+  --lite-error-surface: light-dark(#fff1f0, #3f2326);
+  --lite-error-text: light-dark(#a12222, #ffb6b3);
+  --lite-schedule-surface: light-dark(#fffbee, #302c21);
+}

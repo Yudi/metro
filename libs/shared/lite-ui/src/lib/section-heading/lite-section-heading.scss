@@ -1,0 +1,25 @@
+:host {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--lite-border, #dce2e9);
+  color: var(--lite-text, #19212e);
+}
+
+h3 {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+small {
+  flex: 0 1 auto;
+  margin-left: auto;
+  color: var(--lite-muted, #536174);
+  text-align: end;
+}

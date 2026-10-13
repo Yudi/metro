@@ -1,0 +1,189 @@
+.route-chip, .line-chip, .line-pill, .soft-chip, .scheduled-route-code {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: start;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.line-pill {
+  min-width: 2rem;
+  min-height: 1.5rem;
+  align-self: start;
+}
+.route-chip.large { align-self: start; }
+.soft-chip, .scheduled-route-code {
+  background: var(--lite-primary-subtle);
+  color: var(--lite-text);
+}
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.status-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--lite-border);
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.status-row p + p { margin-top: 0.2rem; }
+.status-detail { color: var(--lite-text-muted); }
+
+.route-selection-list {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+}
+.dashboard-route, .route-row {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0.65rem;
+}
+
+.route-copy, .route-summary {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
+  font-size: 0.875rem;
+}
+
+.route-fare {
+  color: var(--lite-primary);
+  font-size: 0.8125rem;
+  text-align: end;
+}
+
+.route-fare.fare-missing {
+  max-width: 12ch;
+  color: var(--lite-text-muted);
+}
+
+.route-id { font-size: 0.75rem; }
+
+.train-box, .arrival-box, .scheduled-box {
+  min-width: 0;
+  padding: 0.85rem;
+  border-radius: 0.75rem;
+  background: var(--lite-surface-hover);
+  font-size: 0.875rem;
+}
+
+.train-box > strong, .arrival-box > strong {
+  display: block;
+  margin-bottom: 0.4rem;
+}
+
+.scheduled-box {
+  display: grid;
+  gap: 0.5rem;
+  background: var(--lite-schedule-surface);
+}
+
+.scheduled-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-weight: 650;
+}
+
+.scheduled-route-group { display: grid; }
+.scheduled-row {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: start;
+  padding-block: 0.65rem;
+  border-top: 1px solid var(--lite-border);
+}
+
+.scheduled-row time, .scheduled-route {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.scheduled-route-code { justify-self: start; }
+.scheduled-route span, .rail-schedule-note, .rail-schedule-location {
+  color: var(--lite-text-muted);
+  font-size: 0.75rem;
+}
+
+.scheduled-platform {
+  align-self: center;
+  text-align: end;
+  max-width: 12ch;
+}
+
+.schedule-toggle {
+  justify-self: start;
+  min-height: 44px;
+  padding: 0.25rem 0;
+  border: 0;
+  background: transparent;
+  color: var(--lite-primary);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.schedule-toggle:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.train-row, .arrival-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.4rem 0.65rem;
+  align-items: start;
+  padding-block: 0.4rem;
+}
+
+.train-row span, .arrival-row span { overflow-wrap: anywhere; }
+.train-row b, .arrival-row b {
+  color: var(--lite-primary);
+  white-space: nowrap;
+}
+
+.train-row time, .arrival-row time {
+  text-align: end;
+  color: var(--lite-text-muted);
+}
+
+time { font-variant-numeric: tabular-nums; }
+.rail-schedule-note, .rail-schedule-location { display: block; }
+.scheduled-train-row { grid-template-columns: minmax(0, 1fr) auto; }
+.scheduled-train-row > small {
+  grid-column: 2;
+  text-align: end;
+}
+
+.following-scheduled-row { border-top: 1px solid var(--lite-border); }
+
+@media (max-width: 600px) {
+  .dashboard-route, .route-row { grid-template-columns: minmax(0, auto) minmax(0, 1fr); }
+  .route-fare {
+    grid-column: 2;
+    text-align: start;
+  }
+  .route-fare.fare-missing { max-width: none; }
+  .scheduled-row { grid-template-columns: 4.5rem minmax(0, 1fr); }
+  .scheduled-platform {
+    grid-column: 2;
+    text-align: start;
+    max-width: none;
+  }
+}

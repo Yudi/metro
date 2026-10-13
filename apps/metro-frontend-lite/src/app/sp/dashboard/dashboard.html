@@ -1,82 +1,89 @@
 <section class="dashboard-page">
+  <a class="back-link" routerLink="/sp">
+    <lite-icon name="arrow-left" /> Início
+  </a>
   <header class="page-header">
-    <div>
-      <h2><a routerLink="/sp">←</a> Painel</h2>
-      <p>
-        Favoritos sincronizados da versão completa quando você entra com o
-        Google.
-      </p>
+    <div class="header-copy">
+      <h2>Painel de favoritos</h2>
+      <p>Suas linhas, pontos e estações em um só lugar.</p>
     </div>
-
-    <div class="header-actions">
-      @if (authReady()) { @if (firebaseUser(); as user) {
-      <span class="auth-status">
-        Sincronizado como {{ user.displayName || user.email || "Google" }}
-      </span>
-      <button
-        type="button"
-        class="secondary-button"
-        (click)="logout()"
-        [disabled]="authOperationPending()"
-      >
-        Sair
-      </button>
-      } @else {
-      <button
-        type="button"
-        class="secondary-button"
-        (click)="loginGoogle()"
-        [disabled]="authOperationPending()"
-      >
-        @if (authOperationPending()) { Entrando... } @else { Entrar com Google }
-      </button>
-      } } @else {
-      <span class="auth-status">Verificando login...</span>
-      }
-
-      <button
-        type="button"
-        class="refresh-button"
-        (click)="refreshDashboard()"
-        [disabled]="loading()"
-      >
-        @if (loading()) { Atualizando... } @else { Atualizar }
-      </button>
-    </div>
+    <lite-button
+      [loading]="loading()"
+      (buttonClick)="refreshDashboard()"
+    >
+      <lite-icon name="refresh" />
+      {{ loading() ? 'Atualizando...' : 'Atualizar' }}
+    </lite-button>
   </header>
 
-  @if (authError()) {
-  <div class="alert" role="alert">{{ authError() }}</div>
-  } @if (error()) {
-  <div class="alert">{{ error() }}</div>
-  } @if (lastLoadedAt()) {
-  <p class="updated">Atualizado às {{ lastLoadedAt() | date: "HH:mm" }}</p>
-  } @if (loading() && !favorites()) {
-  <div class="skeleton-list" aria-hidden="true">
-    @for (item of [1, 2, 3, 4]; track item) {
-    <div class="skeleton-card"></div>
+  <div class="account-bar">
+    <div class="account-copy">
+      @if (authReady()) {
+        @if (firebaseUser(); as user) {
+          <strong>Favoritos da sua conta</strong>
+          <span>{{ user.displayName || user.email || 'Google' }}</span>
+        } @else {
+          <strong>Leve seus favoritos com você</strong>
+          <span>Entre com o Google para sincronizar com a versão completa.</span>
+        }
+      } @else {
+        <span role="status">Verificando login...</span>
+      }
+    </div>
+    @if (authReady()) {
+      @if (firebaseUser()) {
+        <lite-button variant="outline" [disabled]="authOperationPending()" (buttonClick)="logout()">
+          {{ authOperationPending() ? 'Saindo...' : 'Sair' }}
+        </lite-button>
+      } @else {
+        <lite-button variant="outline" [disabled]="authOperationPending()" (buttonClick)="loginGoogle()">
+          {{ authOperationPending() ? 'Entrando...' : 'Entrar com Google' }}
+        </lite-button>
+      }
     }
   </div>
+
+  @if (authError(); as message) {
+    <div class="alert" role="alert">{{ message }}</div>
+  }
+  @if (error(); as message) {
+    <div class="alert" role="alert">
+      <span>{{ message }} Tente atualizar novamente.</span>
+      <lite-button variant="outline" [disabled]="loading()" (buttonClick)="refreshDashboard()">
+        Tentar novamente
+      </lite-button>
+    </div>
+  }
+  <div class="update-status" role="status" aria-live="polite">
+    @if (loading()) {
+      <span>Atualizando seu painel...</span>
+    } @else if (lastLoadedAt(); as updatedAt) {
+      <span>Última atualização às <time>{{ updatedAt | date: 'HH:mm' }}</time></span>
+    }
+  </div>
+
+  @if (!favorites() || (loading() && !lastLoadedAt())) {
+    <div class="skeleton-list" aria-hidden="true">
+      @for (item of [1, 2, 3]; track item) {
+        <div class="skeleton-row"></div>
+      }
+    </div>
   } @else if (!hasRelevantFavorites()) {
-  <article class="empty-state">
-    <span>♡</span>
-    <h3>Nenhum favorito encontrado</h3>
-    <p>
-      Use a versão completa para salvar pontos, linhas ou estações no painel.
-    </p>
-  </article>
+    <article class="empty-state">
+      <lite-icon name="heart" />
+      <h3>Seu próximo trajeto começa aqui</h3>
+      <p>Salve pontos, linhas ou estações na versão completa para acompanhar seus favoritos neste painel.</p>
+      <a class="action-link" href="https://metro.yudi.com.br/sp/menu">
+        Buscar na versão completa <lite-icon name="arrow-right" />
+      </a>
+    </article>
   } @else { @if (favoriteRailStatuses().length > 0 ||
   favoriteSpecialRailStatuses().length > 0) {
   <section class="panel">
-    <div class="panel-title">
-      <span>🚆</span>
-      <div>
-        <h3>Status das linhas</h3>
-        @if (railStatus()?.lastUpdated) {
-        <small>Dados de {{ railStatus()?.lastUpdated | date: "HH:mm" }}</small>
-        }
-      </div>
-    </div>
+    <lite-section-heading icon="train" title="Status das linhas" />
+    @if (railStatus()?.lastUpdated) {
+      <p class="section-note">Dados de {{ railStatus()?.lastUpdated | date: 'HH:mm' }}</p>
+    }
 
     <div class="status-grid">
       @for (item of favoriteRailStatuses(); track item.code) {
@@ -101,9 +108,9 @@
             statusDescription &&
             !['Operação Normal', 'Operação Encerrada'].includes(statusDescription)
           ) {
-          <p>{{ statusDescription }}</p>
+          <p class="status-detail">{{ statusDescription }}</p>
           } @if (item.status?.detail) {
-          <p>{{ item.status.detail }}</p>
+          <p class="status-detail">{{ item.status.detail }}</p>
           }
         </div>
       </article>
@@ -129,26 +136,26 @@
   </section>
   }
 
-  <div class="content-grid">
+  <div
+    class="content-grid"
+    [class.single-column]="
+      (!busStops().length && !busRoutes().length) || !railStations().length
+    "
+  >
     @if (busStops().length > 0 || busRoutes().length > 0) {
     <section class="panel">
-      <div class="panel-title">
-        <span>🚌</span>
-        <div>
-          <h3>Ônibus</h3>
-        </div>
-      </div>
+      <lite-section-heading icon="bus" title="Ônibus" />
 
       @if (busStops().length > 0) {
       <div class="section-block">
         <h4>Pontos favoritos</h4>
         <div class="item-list">
           @for (stop of busStops(); track stop.stopId) {
-          <article class="item-row">
+          <article class="item-row stop-row">
             <div class="stop-summary">
               <strong>{{ stop.name }}</strong>
               <div class="stop-identifiers">
-                <small>{{ stop.sourceId || stop.stopId }}</small>
+                <small>Ponto {{ stop.sourceId || stop.stopId }}</small>
                 @if (stop.platformCode) {
                 <small>Plataforma {{ stop.platformCode }}</small>
                 }
@@ -370,17 +377,10 @@
     </section>
     }
 
+    @if (railStations().length > 0) {
     <section class="panel">
-      <div class="panel-title">
-        <span>🚉</span>
-        <div>
-          <h3>Estações</h3>
-        </div>
-      </div>
+      <lite-section-heading icon="station" title="Estações" />
 
-      @if (railStations().length === 0) {
-      <p class="muted">Nenhuma estação salva.</p>
-      } @else {
       <div class="item-list">
         @for (station of railStations(); track station.key) {
         <article class="item-row station-row">
@@ -454,8 +454,8 @@
         </article>
         }
       </div>
-      }
     </section>
+    }
   </div>
   }
 </section>

@@ -21,6 +21,7 @@ import {
   signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { LiteButton, LiteIcon, LiteSectionHeading } from '@metro/shared/lite-ui';
 import {
   DashboardFavoriteSelections,
   FavoritesService,
@@ -77,9 +78,16 @@ type LiteRailScheduledDeparture = NonNullable<
 
 @Component({
   selector: 'app-dashboard',
-  imports: [DatePipe, NgOptimizedImage, RouterLink],
+  imports: [
+    DatePipe,
+    NgOptimizedImage,
+    RouterLink,
+    LiteButton,
+    LiteIcon,
+    LiteSectionHeading,
+  ],
   templateUrl: './dashboard.html',
-  styleUrl: './dashboard.css',
+  styleUrls: ['./dashboard.scss', './dashboard-transit.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class Dashboard {

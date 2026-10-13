@@ -43,6 +43,7 @@ describe('Bus', () => {
           useValue: {
             stations: () => [],
             refreshTick: () => 0,
+            fetchedAt: signal<number | null>(null),
             activate: () => Promise.resolve(),
             disconnect: jest.fn(),
           },
@@ -97,7 +98,7 @@ describe('Bus', () => {
             addToMap: jest.fn(),
             stopTracking: jest.fn(),
             removeFromMap: jest.fn(),
-            centerOnUser: () => Promise.resolve(),
+            isVisible: signal(false),
           },
         },
         {

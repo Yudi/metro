@@ -30,31 +30,29 @@
         />
       </div>
       <footer class="station-photo-credit">
-        Foto:
+        <span>Foto: </span>
         @if (image.sourceUrl) {
           <a
             [href]="image.sourceUrl"
             target="_blank"
             rel="noopener noreferrer"
             [attr.title]="image.title"
-            >{{ image.author }}</a
+            >{{ image.author + '.' }}</a
           >
         } @else {
-          {{ image.author }}
-        }.&#32;
-        <span>
-          Licença:&#32;
-          @if (image.licenseUrl; as licenseUrl) {
-            <a
-              [href]="licenseUrl"
-              target="_blank"
-              rel="noopener noreferrer"
-              >{{ image.license }}</a
-            >
-          } @else {
-            {{ image.license }}
-          }
-        </span>
+          <span>{{ image.author + '.' }}</span>
+        }
+        <span> Licença: </span>
+        @if (image.licenseUrl; as licenseUrl) {
+          <a
+            [href]="licenseUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            >{{ image.license }}</a
+          >
+        } @else {
+          {{ image.license }}
+        }
       </footer>
     }
     <app-dialog-header

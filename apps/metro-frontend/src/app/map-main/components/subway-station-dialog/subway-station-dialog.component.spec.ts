@@ -161,7 +161,8 @@ describe('SubwayStationDialogComponent train lines', () => {
     const credit = fixture.nativeElement.querySelector(
       '.station-photo-credit',
     ) as HTMLElement | null;
-    expect(credit?.textContent).toContain(`Foto: ${image.author}.`);
+    const creditText = credit?.textContent?.replace(/\s+/g, ' ').trim();
+    expect(creditText).toContain(`Foto: ${image.author}.`);
     expect(
       Array.from(credit?.querySelectorAll('a') ?? []).some(
         (link) => link.getAttribute('title') === image.title,

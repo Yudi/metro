@@ -15,6 +15,14 @@ import { createBikeMarkerStyles } from './bike-marker-style.utils';
 @Service()
 export class MapLayerStyleService {
   private readonly stationNameService = inject(StationNameService);
+  private readonly selectedPointStyle = createSelectedPointStyle();
+  private readonly hiddenStyle: Style[] = [];
+  private readonly selectedBikeStyles = new WeakMap<FeatureLike, {
+    bikesAvailable: number;
+    effectiveCapacity: number;
+    hasElectricBikes: boolean;
+    styles: Style[];
+  }>();
 
   private readonly addressPinIcon = new Icon({
     src: '/app/shared/icons/pin.svg',
@@ -33,6 +41,7 @@ export class MapLayerStyleService {
       anchorYUnits: 'fraction',
     }),
   });
+  private readonly addressStyle = [new Style({ image: this.addressPinIcon })];
 
   createSelectionStyle(feature: FeatureLike, zoom = 0): Style | Style[] {
     const properties = feature.getProperties();
@@ -48,21 +57,29 @@ export class MapLayerStyleService {
 
     const featureType = properties['type'];
     if (featureType === 'stop' && !properties['isSubwayStation']) {
-      return zoom >= 12 ? this.selectedBusStopStyle : [];
+      return zoom >= 12 ? this.selectedBusStopStyle : this.hiddenStyle;
     }
     if (featureType === 'bike_station') {
-      return createBikeMarkerStyles({
-        bikesAvailable: Number(properties['bikesAvailable'] ?? 0),
-        effectiveCapacity: Number(properties['effectiveCapacity'] ?? 0),
-        hasElectricBikes: Boolean(properties['hasElectricBikesAvailable']),
-        selected: true,
+      const bikesAvailable = Number(properties['bikesAvailable'] ?? 0);
+      const effectiveCapacity = Number(properties['effectiveCapacity'] ?? 0);
+      const hasElectricBikes = Boolean(properties['hasElectricBikesAvailable']);
+      const cached = this.selectedBikeStyles.get(feature);
+      if (cached && cached.bikesAvailable === bikesAvailable &&
+        cached.effectiveCapacity === effectiveCapacity &&
+        cached.hasElectricBikes === hasElectricBikes) return cached.styles;
+      const styles = createBikeMarkerStyles({
+        bikesAvailable, effectiveCapacity, hasElectricBikes, selected: true,
       });
+      this.selectedBikeStyles.set(feature, {
+        bikesAvailable, effectiveCapacity, hasElectricBikes, styles,
+      });
+      return styles;
     }
 
     if (featureType === 'address_location') {
-      return [new Style({ image: this.addressPinIcon })];
+      return this.addressStyle;
     }
-    return createSelectedPointStyle();
+    return this.selectedPointStyle;
   }
 
   createSubwayStationStyle(feature: FeatureLike, zoom = 0): Style | Style[] {

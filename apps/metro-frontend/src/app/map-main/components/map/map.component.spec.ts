@@ -4,7 +4,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MapComponent } from './map.component';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { of } from 'rxjs';
-import { LayerType } from './layers/map-layer.service';
+import { VectorTileLayerType } from './vector-tiles/vector-tile-layer.service';
 import { MapOptions, MapService } from './map.service';
 import { BikeStationsService } from '../../geography/bike-stations.service';
 import {
@@ -144,13 +144,13 @@ describe('MapComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('cancels delayed map initialization when destroyed', () => {
+  it('ignores map initialization after destruction', () => {
     jest.useFakeTimers();
     const mapService = TestBed.inject(MapService);
     const initializeMap = jest.spyOn(mapService, 'initializeMap');
 
-    (component as unknown as { initializeMap(): void }).initializeMap();
     component.ngOnDestroy();
+    (component as unknown as { initializeMap(): void }).initializeMap();
     jest.advanceTimersByTime(1_100);
 
     expect(initializeMap).not.toHaveBeenCalled();
@@ -159,9 +159,25 @@ describe('MapComponent', () => {
 
   it('applies ?bike=true to show the bike layer', () => {
     const mapService = TestBed.inject(MapService);
-    expect(mapService.getLayerService().isLayerVisible(LayerType.BIKE)).toBe(
+    expect(mapService.getVectorTileLayerService().isLayerVisible(VectorTileLayerType.BIKE_STATIONS)).toBe(
       true,
     );
+  });
+
+  it('keeps bikes toggleable and activates or disconnects their data service', () => {
+    const tiles = TestBed.inject(MapService).getVectorTileLayerService();
+    const bikes = TestBed.inject(BikeStationsService);
+    const activate = jest.spyOn(bikes, 'activate');
+    const disconnect = jest.spyOn(bikes, 'disconnect');
+    expect(tiles.layerConfigs().find((layer) => layer.id === VectorTileLayerType.BIKE_STATIONS)?.toggleable).toBe(true);
+    tiles.toggleLayer(VectorTileLayerType.BIKE_STATIONS);
+    fixture.detectChanges();
+    expect(tiles.isLayerVisible(VectorTileLayerType.BIKE_STATIONS)).toBe(false);
+    expect(disconnect).toHaveBeenCalled();
+    tiles.toggleLayer(VectorTileLayerType.BIKE_STATIONS);
+    fixture.detectChanges();
+    expect(tiles.isLayerVisible(VectorTileLayerType.BIKE_STATIONS)).toBe(true);
+    expect(activate).toHaveBeenCalled();
   });
 
   it('applies lat/lon/zoom query params to center the map', () => {

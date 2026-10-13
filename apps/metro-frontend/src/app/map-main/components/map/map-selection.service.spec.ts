@@ -58,6 +58,7 @@ describe('MapSelectionService', () => {
     removeStopDisplayData: jest.Mock;
     cancelStopDataLoad: jest.Mock;
     cancelStopDataLoads: jest.Mock;
+    cancelPendingLoads: jest.Mock;
   };
   let logger: {
     debug: jest.Mock;
@@ -98,6 +99,7 @@ describe('MapSelectionService', () => {
       removeStopDisplayData: jest.fn(),
       cancelStopDataLoad: jest.fn(),
       cancelStopDataLoads: jest.fn(),
+      cancelPendingLoads: jest.fn(),
     };
     logger = {
       debug: jest.fn(),
@@ -155,7 +157,7 @@ describe('MapSelectionService', () => {
     mapState = TestBed.inject(MapStateService);
   });
 
-  it('frames complete route geometry when the user adds a route', async () => {
+  it('uses server bounds even when cached route geometry is available', async () => {
     const route = {
       ...createBusDirection('gtfs:100', 0, 'Terminal B'),
       geometry: { type: 'LineString', coordinates: [[-46.6, -23.5], [-46.7, -23.6]] },
@@ -164,8 +166,8 @@ describe('MapSelectionService', () => {
 
     await service.addRouteToSelection(route.routeId, true);
 
-    expect(focus.coordinates).toHaveBeenCalledWith(route.geometry.coordinates);
-    expect(geography.getRouteFocusCoordinates).not.toHaveBeenCalled();
+    expect(focus.coordinates).toHaveBeenCalledWith([]);
+    expect(geography.getRouteFocusCoordinates).toHaveBeenCalledWith('gtfs:100');
   });
 
   it('focuses a rail link using all line stations without resetting the city view', () => {
@@ -274,7 +276,6 @@ describe('MapSelectionService', () => {
     expect(mapState.selectedStops().size).toBe(1);
     expect(acceptedFocus).toHaveBeenCalledTimes(1);
     expect(acceptedFocus).toHaveBeenCalledWith([-46.6, -23.5]);
-    expect(dataLoader.syncVectorTileFilters).toHaveBeenCalledTimes(1);
   });
 
   it('cancels queued stop focus when its canonical selection is removed', async () => {
@@ -427,7 +428,7 @@ describe('MapSelectionService', () => {
     );
   });
 
-  it('publishes a route tile filter before starting its full-data request', async () => {
+  it('adds the route selection before starting its full-data request', async () => {
     cache.getRoute.mockReturnValue(
       of({
         routeId: 'route-1',
@@ -440,11 +441,7 @@ describe('MapSelectionService', () => {
 
     await service.addRouteToSelection('route-1', false);
 
-    expect(dataLoader.syncVectorTileFilters).toHaveBeenCalledTimes(1);
     expect(dataLoader.loadRouteData).toHaveBeenCalledWith('route-1', false);
-    expect(
-      dataLoader.syncVectorTileFilters.mock.invocationCallOrder[0],
-    ).toBeLessThan(dataLoader.loadRouteData.mock.invocationCallOrder[0]);
     expect(mapState.selectedRoutes().has('route-1')).toBe(true);
     expect(snackBar.open).not.toHaveBeenCalled();
   });
@@ -811,7 +808,7 @@ describe('MapSelectionService', () => {
     expect(snackBar.open).not.toHaveBeenCalled();
   });
 
-  it('uses the full-data response to populate the selection before updating filters', async () => {
+  it('uses the full-data response to populate the selection', async () => {
     const stop = {
       stopId: 'stop-1',
       name: 'Stop 1',
@@ -829,10 +826,6 @@ describe('MapSelectionService', () => {
       undefined,
       expect.any(Function),
     );
-    expect(dataLoader.syncVectorTileFilters).toHaveBeenCalledTimes(1);
-    expect(
-      dataLoader.syncVectorTileFilters.mock.invocationCallOrder[0],
-    ).toBeGreaterThan(dataLoader.loadStopData.mock.invocationCallOrder[0]);
     expect(mapState.selectedStops().has(stop.stopId)).toBe(true);
     expect(snackBar.open).not.toHaveBeenCalled();
   });
@@ -857,7 +850,7 @@ describe('MapSelectionService', () => {
     await pendingSelection;
 
     expect(mapState.selectedStops().has(stop.stopId)).toBe(false);
-    expect(dataLoader.cancelStopDataLoads).toHaveBeenCalledTimes(1);
+    expect(dataLoader.cancelPendingLoads).toHaveBeenCalledTimes(1);
   });
 
   it('cancels an alias request when its canonical stop is removed', async () => {

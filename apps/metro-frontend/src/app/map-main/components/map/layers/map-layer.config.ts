@@ -9,19 +9,5 @@ export function createMapLayerConfigs(): LayerConfig[] {
       toggleable: false,
       zIndex: 25,
     },
-    {
-      id: LayerType.BUS_ROUTES,
-      name: 'Rotas de ônibus',
-      visible: true,
-      toggleable: false,
-      zIndex: 20,
-    },
-    {
-      id: LayerType.BIKE,
-      name: 'Estações de bicicleta',
-      visible: false,
-      toggleable: true,
-      zIndex: 30,
-    },
   ];
 }

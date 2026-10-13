@@ -136,28 +136,20 @@ export class GeographyGraphQLService {
     }).pipe(map((data) => data.busStop));
   }
 
-  /** Fetch complete geometry for camera framing, independent of visible tiles. */
+  /** Only two server-calculated corners are needed to frame the complete route. */
   getRouteFocusCoordinates(routeId: string): Observable<[number, number][]> {
-    if (isBusDirectionFavorite(routeId) || isBusLineFavorite(routeId)) {
-      return this.getBusRoute(routeId).pipe(map((route) =>
-        (route?.geometry?.coordinates ?? []).map(([longitude, latitude]) =>
-          [longitude, latitude] as [number, number],
-        ),
-      ));
-    }
-    return this.executeGraphQL<{ routeFullData: RouteFullDataGraphQL | null }>(`
-      query RouteFocusCoordinates($routeId: String!) {
-        routeFullData(routeId: $routeId) {
-          route { geometry { type coordinates } }
-          shapes { geometry { type coordinates } }
+    return this.executeGraphQL<{ routeBounds: BoundingBox | null }>(`
+      query RouteFocusBounds($routeId: String!) {
+        routeBounds(routeId: $routeId) {
+          minLng minLat maxLng maxLat
         }
       }
     `, { routeId }).pipe(map((data) => {
-      const route = data.routeFullData;
-      return [
-        ...(route?.route.geometry?.coordinates ?? []),
-        ...(route?.shapes ?? []).flatMap((shape) => shape.geometry.coordinates),
-      ].map(([longitude, latitude]) => [longitude, latitude] as [number, number]);
+      const bounds = data.routeBounds;
+      return bounds ? [
+        [bounds.minLng, bounds.minLat] as [number, number],
+        [bounds.maxLng, bounds.maxLat] as [number, number],
+      ] : [];
     }));
   }
 
@@ -220,7 +212,7 @@ export class GeographyGraphQLService {
   getFavoriteBusDirections(codes: string[]): Observable<BusRouteGraphQL[]> {
     return this.executeGraphQL<{ favoriteBusDirections: BusRouteGraphQL[] }>(`
       query FavoriteBusDirections($codes: [String!]!) {
-        favoriteBusDirections(codes: $codes) { ${ROUTE_FIELDS} geometry { type coordinates } }
+        favoriteBusDirections(codes: $codes) { ${ROUTE_FIELDS} }
       }
     `, { codes }).pipe(map((data) => data.favoriteBusDirections));
   }

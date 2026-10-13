@@ -6,6 +6,7 @@ import {
   getRailLineByCode,
   type BusFare,
 } from '@metro/shared/utils';
+import { Subscription } from 'rxjs';
 import { Feature } from 'ol';
 import { FeatureLike } from 'ol/Feature';
 import { BikeStationsService } from '../../geography/bike-stations.service';
@@ -41,7 +42,17 @@ export class MapFeatureInteractionService {
     optional: true,
   });
 
+  private routeDetailsRequest = 0;
+  private routeDetailsSubscription: Subscription | null = null;
+
+  cancelPendingFeatureDetails(): void {
+    this.routeDetailsRequest++;
+    this.routeDetailsSubscription?.unsubscribe();
+    this.routeDetailsSubscription = null;
+  }
+
   handleFeatureSelection(feature: Feature | FeatureLike): void {
+    this.cancelPendingFeatureDetails();
     const clusterMembers = this.getClusterMembers(feature as Feature);
 
     if (clusterMembers && clusterMembers.length > 1) {
@@ -218,8 +229,10 @@ export class MapFeatureInteractionService {
       return;
     }
 
-    this.geographyService.getBusRoute(routeId).subscribe({
+    const request = this.routeDetailsRequest;
+    this.routeDetailsSubscription = this.geographyService.getBusRoute(routeId).subscribe({
       next: (route) => {
+        if (request !== this.routeDetailsRequest) return;
         this.showRouteDetails(route?.favoriteCode ?? routeId, {
           ...properties,
           sourceAgency: route?.sourceAgency,
@@ -230,7 +243,9 @@ export class MapFeatureInteractionService {
           favoriteCode: route?.favoriteCode ?? routeData.favoriteCode,
         });
       },
-      error: () => this.showRouteDetails(routeId, properties),
+      error: () => {
+        if (request === this.routeDetailsRequest) this.showRouteDetails(routeId, properties);
+      },
     });
   }
 

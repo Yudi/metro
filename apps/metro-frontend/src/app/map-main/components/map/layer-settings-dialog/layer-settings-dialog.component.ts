@@ -12,9 +12,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatDividerModule } from '@angular/material/divider';
 import { MapService } from '.././map.service';
-import { LayerType } from '../layers/map-layer.service';
 import { VectorTileLayerType } from '../vector-tiles/vector-tile-layer.service';
-import { LoggerService } from '@metro/shared/api';
 import { MAP_PANEL_REF } from '../map-panel/map-panel-ref';
 
 /**
@@ -25,7 +23,6 @@ interface LayerToggleConfig {
   name: string;
   visible: boolean;
   toggleable: boolean;
-  isVectorTile: boolean;
 }
 
 @Component({
@@ -47,89 +44,14 @@ export class LayerSettingsDialogComponent {
   protected readonly panelRef = inject(MAP_PANEL_REF, { optional: true });
   private readonly dialogRef =
     this.panelRef ?? inject(MatDialogRef<LayerSettingsDialogComponent>);
-  private logger = inject(LoggerService);
-  private layerService = this.mapService.getLayerService();
   private vectorTileLayerService = this.mapService.getVectorTileLayerService();
 
-  /**
-   * Unified list of toggleable layers from both services
-   * Subway layers come from VectorTileLayerService (MVT)
-   * Other layers come from MapLayerService (GeoJSON)
-   */
-  readonly toggleableLayers = computed<LayerToggleConfig[]>(() => {
-    const vtLayers = this.vectorTileLayerService
-      .layerConfigs()
-      .filter((c) => c.toggleable)
-      .map((c) => ({
-        id: c.id,
-        name: c.name,
-        visible: c.visible,
-        toggleable: c.toggleable,
-        isVectorTile: true,
-      }));
+  readonly toggleableLayers = computed<LayerToggleConfig[]>(() =>
+    this.vectorTileLayerService.layerConfigs().filter((layer) => layer.toggleable),
+  );
 
-    const regularLayers = this.layerService
-      .toggleableLayers()
-      // Exclude rail layers since they're now handled by vector tiles
-      .filter(
-        (c) =>
-          c.id !== LayerType.RAIL_STATIONS && c.id !== LayerType.RAIL_ROUTES,
-      )
-      .map((c) => ({
-        id: c.id,
-        name: c.name,
-        visible: c.visible,
-        toggleable: c.toggleable,
-        isVectorTile: false,
-      }));
-
-    return [...vtLayers, ...regularLayers];
-  });
-
-  /**
-   * Toggle layer visibility and load data if needed
-   */
-  onLayerToggle(layerId: string, isVectorTile: boolean): void {
-    const wasVisible = this.isLayerVisible(layerId, isVectorTile);
-
-    this.logger.debug(`Toggling ${layerId}`, {
-      wasVisible,
-      isVectorTile,
-    });
-
-    // Toggle the appropriate layer type
-    if (isVectorTile) {
-      this.vectorTileLayerService.toggleLayer(layerId as VectorTileLayerType);
-    } else {
-      this.layerService.toggleLayer(layerId as LayerType);
-    }
-
-    const isNowVisible = this.isLayerVisible(layerId, isVectorTile);
-
-    this.logger.debug(`After toggle ${layerId}`, {
-      isNowVisible,
-    });
-    // Bike layer activation/deactivation is handled by MapComponent's effect
-    // which watches the layer visibility signal
-  }
-
-  /**
-   * Check if layer is visible
-   */
-  isLayerVisible(layerId: string, isVectorTile?: boolean): boolean {
-    // Determine if it's a vector tile layer
-    const isVT =
-      isVectorTile ??
-      (layerId === VectorTileLayerType.RAIL_STATIONS ||
-        layerId === VectorTileLayerType.RAIL_ROUTES ||
-        layerId === VectorTileLayerType.BUS_STOPS);
-
-    if (isVT) {
-      return this.vectorTileLayerService.isLayerVisible(
-        layerId as VectorTileLayerType,
-      );
-    }
-    return this.layerService.isLayerVisible(layerId as LayerType);
+  onLayerToggle(layerId: string): void {
+    this.vectorTileLayerService.toggleLayer(layerId as VectorTileLayerType);
   }
 
   /**
@@ -138,19 +60,15 @@ export class LayerSettingsDialogComponent {
   getLayerIcon(layerId: string): string {
     switch (layerId) {
       case VectorTileLayerType.RAIL_STATIONS:
-      case LayerType.RAIL_STATIONS:
         return 'subway';
       case VectorTileLayerType.RAIL_ROUTES:
-      case LayerType.RAIL_ROUTES:
         return 'route';
-      case LayerType.BUS_ROUTES:
+      case VectorTileLayerType.BUS_ROUTES:
         return 'directions_bus';
       case VectorTileLayerType.BUS_STOPS:
         return 'directions_bus';
-      case LayerType.BIKE:
+      case VectorTileLayerType.BIKE_STATIONS:
         return 'pedal_bike';
-      case LayerType.SELECTION:
-        return 'check_circle';
       default:
         return 'layers';
     }

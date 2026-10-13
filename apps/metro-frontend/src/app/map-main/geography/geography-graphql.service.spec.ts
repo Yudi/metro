@@ -62,17 +62,31 @@ describe('GeographyGraphQLService camera geometry', () => {
     expect(coordinates).toEqual([[[-46.6, -23.5], [-46.7, -23.6]]]);
   });
 
-  it('collects complete route shapes rather than clipping to visible tiles', () => {
+  it.each(['gtfs:100', 'bus:v1:saved-direction'])('requests only server bounds for %s', (routeId) => {
     const coordinates: [number, number][][] = [];
-    service.getRouteFocusCoordinates('gtfs:100').subscribe((value) => coordinates.push(value));
+    service.getRouteFocusCoordinates(routeId).subscribe((value) => coordinates.push(value));
     const request = http.expectOne('/api/graphql');
-    expect(request.request.body.variables).toEqual({ routeId: 'gtfs:100' });
-    expect(request.request.body.query).toContain('shapes { geometry { type coordinates } }');
-    request.flush({ data: { routeFullData: {
-      route: { geometry: null },
-      shapes: [{ geometry: { coordinates: [[-46.6, -23.5], [-46.7, -23.6]] } }],
+    expect(request.request.body.variables).toEqual({ routeId });
+    expect(request.request.body.query).toContain('routeBounds(routeId: $routeId)');
+    expect(request.request.body.query).not.toContain('geometry');
+    request.flush({ data: { routeBounds: {
+      minLng: -46.7, minLat: -23.6, maxLng: -46.6, maxLat: -23.5,
     } } });
-    expect(coordinates).toEqual([[[-46.6, -23.5], [-46.7, -23.6]]]);
+    expect(coordinates).toEqual([[[-46.7, -23.6], [-46.6, -23.5]]]);
+  });
+
+  it('leaves the camera alone when the route has no bounds', () => {
+    const coordinates: [number, number][][] = [];
+    service.getRouteFocusCoordinates('missing').subscribe((value) => coordinates.push(value));
+    http.expectOne('/api/graphql').flush({ data: { routeBounds: null } });
+    expect(coordinates).toEqual([[]]);
+  });
+
+  it('loads saved direction metadata without downloading its geometry', () => {
+    service.getFavoriteBusDirections(['saved']).subscribe();
+    const request = http.expectOne('/api/graphql');
+    expect(request.request.body.query).not.toContain('geometry');
+    request.flush({ data: { favoriteBusDirections: [] } });
   });
 
   it('does not request bounds for an unknown rail line', () => {

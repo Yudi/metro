@@ -63,6 +63,46 @@ describe('map destinations from the omnibox', () => {
     expect(setLayerVisibility).toHaveBeenCalledWith('rail-routes', true);
   });
 
+  it('applies each URL selection once across mixed parameters and lifecycle replay', () => {
+    const addRouteToSelection = jest.fn();
+    const addStopToSelection = jest.fn();
+    const centerOn = jest.fn();
+    const layers = { setLayerVisibility: jest.fn() };
+    TestBed.configureTestingModule({ providers: [
+      MapRouteStateService,
+      { provide: MapService, useValue: {
+        center: signal(null), zoomLevel: signal(null), centerOn,
+        getVectorTileLayerService: () => layers,
+      } },
+      { provide: MapStateService, useValue: {} },
+      { provide: MapDisplayService, useValue: {} },
+      { provide: MapInteractionService, useValue: { addRouteToSelection, addStopToSelection } },
+      { provide: BikeStationsService, useValue: {} },
+      { provide: RailGraphqlService, useValue: {} },
+      { provide: FavoritesService, useValue: { favorites: signal({}) } },
+      { provide: MapViewStateStorageService, useValue: { defaultStateRequests: signal(0) } },
+      { provide: LoggerService, useValue: { debug: jest.fn() } },
+    ] });
+    const state = TestBed.inject(MapRouteStateService);
+    const params = convertToParamMap({
+      busRoutes: 'route-1,route-1', busStops: 'stop-1', railStations: 'station-1,stop-1',
+      bike: '1', lat: '-23.55', lon: '-46.63', z: '16',
+    });
+    state.beginSession();
+    state.applyRouteState(params);
+    state.applyRouteState(params);
+    expect(addRouteToSelection).toHaveBeenCalledTimes(1);
+    expect(addStopToSelection.mock.calls).toEqual([['stop-1', false], ['station-1', false]]);
+    expect(centerOn).toHaveBeenCalledTimes(1);
+    expect(layers.setLayerVisibility).toHaveBeenCalledTimes(1);
+    expect(layers.setLayerVisibility).toHaveBeenCalledWith('bike-stations', true);
+    state.endSession();
+    state.beginSession();
+    state.applyRouteState(params);
+    expect(addRouteToSelection).toHaveBeenCalledTimes(2);
+    expect(centerOn).toHaveBeenCalledTimes(2);
+  });
+
   it('selects linked stations and centers on their coordinates', () => {
     const setLayerVisibility = jest.fn();
     const centerOn = jest.fn();

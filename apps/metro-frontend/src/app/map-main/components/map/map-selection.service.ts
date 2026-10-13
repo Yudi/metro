@@ -193,7 +193,6 @@ export class MapSelectionService {
       selectedRoutes: Array.from(this.mapState.selectedRoutes().keys()),
     });
 
-    this.dataLoader.syncVectorTileFilters();
     void this.dataLoader.loadRouteData(routeId, shouldDisplaySnackbar);
     this.subscribeToRouteRealtime(route);
     this.focusRoute(routeId, route, focus);
@@ -442,7 +441,6 @@ export class MapSelectionService {
       };
       this.mapState.addStopToSelection(selectedStop);
       focus?.point([stop.longitude, stop.latitude]);
-      this.dataLoader.syncVectorTileFilters();
 
       if (shouldDisplaySnackbar) {
         this.snackBar.open(`Parada adicionada`, 'Fechar', { duration: 2000 });
@@ -507,7 +505,6 @@ export class MapSelectionService {
       latitude: station.latitude,
       longitude: station.longitude,
     });
-    this.displayService.updateMapDisplay();
     if (shouldDisplaySnackbar) {
       this.createSelectionFocus('bike', stationId).point([
         station.longitude, station.latitude,
@@ -519,27 +516,29 @@ export class MapSelectionService {
   removeBikeStationFromSelection(stationId: string): void {
     this.cancelSelectionFocus('bike', stationId);
     this.mapState.removeBikeStationFromSelection(stationId);
-    this.displayService.updateMapDisplay();
     this.snackBar.open('Estação removida', 'Fechar', { duration: 2000 });
   }
 
   clearAllSelections(shouldDisplaySnackbar = true): void {
     this.selectionFocus = null;
-    this.pendingRouteSelections.clear();
-    this.pendingOppositeDirectionSelections.clear();
+    this.cancelPendingSelections();
     for (const route of this.mapState.selectedRoutes().values()) {
       this.unsubscribeFromRouteRealtime(route);
     }
 
-    this.cancelPendingStopSelections();
     this.mapState.clearAllSelections();
-    this.dataLoader.syncVectorTileFilters();
     this.displayService.clearSelection();
-    this.displayService.updateMapDisplay();
 
     if (shouldDisplaySnackbar) {
       this.snackBar.open(`Seleções limpas`, 'Fechar', { duration: 2000 });
     }
+  }
+
+  cancelPendingSelections(): void {
+    this.pendingRouteSelections.clear();
+    this.pendingOppositeDirectionSelections.clear();
+    this.pendingStopSelections.clear();
+    this.dataLoader.cancelPendingLoads();
   }
 
   cancelPendingStopSelections(): void {
@@ -567,12 +566,7 @@ export class MapSelectionService {
     selectionId = getBusRouteIdentity(route),
   ): void {
     if (!focus?.isCurrent()) return;
-    const coordinates = route.geometry?.coordinates;
-    if (coordinates?.length) {
-      focus.coordinates(coordinates.map(([longitude, latitude]) => [longitude, latitude]));
-      return;
-    }
-    this.geography.getRouteFocusCoordinates(routeId).subscribe({
+    this.geography.getRouteFocusCoordinates(route.favoriteCode ?? routeId).subscribe({
       next: (coordinates) => {
         if (this.mapState.selectedRoutes().has(selectionId)) {
           focus.coordinates(coordinates);

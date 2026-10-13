@@ -1,15 +1,14 @@
-import { Service, inject } from '@angular/core';
+import { Service, computed, inject } from '@angular/core';
 import { Feature } from 'ol';
 import { Point } from 'ol/geom';
 import { fromLonLat } from 'ol/proj';
+import type { BusStopGraphQL } from '../../geography/geography-graphql.service';
 import { createBikeStationFeatureProperties } from './layers/bike-feature-properties.utils';
 import { MapService } from './map.service';
 import { LayerType } from './layers/map-layer.service';
 import { FeatureFactoryService } from './feature-factory.service';
-import { LoggerService } from '@metro/shared/api';
-import { FeatureCreationSource } from './map.types';
+import { FeatureCreationSource, SelectedStop } from './map.types';
 import { MapStateService } from './map-state.service';
-import { getBusRouteIdentity } from '@metro/shared/utils';
 
 /** Keeps selected map features in their dedicated layer. */
 @Service()
@@ -17,145 +16,75 @@ export class MapSelectionDisplayService {
   private readonly mapService = inject(MapService);
   private readonly mapState = inject(MapStateService);
   private readonly featureFactory = inject(FeatureFactoryService);
-  private readonly logger = inject(LoggerService);
+  private readonly stopsById = computed(() => new Map(
+    this.mapState.displayedStops().map((stop) => [stop.stopId, stop]),
+  ));
+  private readonly bikesById = computed(() => new Map(
+    this.mapState.bikeStations().map((station) => [station.stationId, station]),
+  ));
+  private readonly stopSnapshots = new WeakMap<Feature, BusStopGraphQL | SelectedStop>();
 
   updateSelectedFeatures(): void {
     const layerService = this.mapService.getLayerService();
-    const selectedRouteIds = new Set(this.mapState.selectedRoutes().keys());
-    const selectedStopIds = new Set(this.mapState.selectedStops().keys());
-    const selectedBikeStationIds = new Set(
-      this.mapState.selectedBikeStations().keys(),
-    );
-    const currentSelectionFeatures = layerService.getFeaturesFromLayer(
-      LayerType.SELECTION,
-    );
-    const targetSelectionIds = new Set([
-      ...selectedRouteIds,
-      ...selectedStopIds,
-      ...selectedBikeStationIds,
-      ...this.mapState
-        .displayedShapes()
-        .filter(
-          (shape) =>
-            shape.routeInfo &&
-            selectedRouteIds.has(getBusRouteIdentity(shape.routeInfo)),
-        )
-        .map((shape) => shape.id),
-    ]);
+    const selectedStops = this.mapState.selectedStops();
+    const selectedBikes = this.mapState.selectedBikeStations();
+    const stopFeatures = new Map<string, Feature>();
+    const bikeFeatures = new Map<string, Feature>();
 
-    const featuresToRemove = currentSelectionFeatures.filter((feature) => {
-      const featureId = feature.getId()?.toString();
-      const routeId = feature.getProperties()['routeId'] as string | undefined;
-      const stopId = feature.getProperties()['stopId'] as string | undefined;
-      const stationId = feature.getProperties()['stationId'] as
-        | string
-        | undefined;
-      const creationSource = feature.getProperties()['creationSource'] as
-        | FeatureCreationSource
-        | undefined;
-
-      if (creationSource === FeatureCreationSource.ADDRESS_SEARCH) return false;
-      if (featureId && targetSelectionIds.has(featureId)) return false;
-      if (routeId && selectedRouteIds.has(routeId)) return false;
-      if (stopId && selectedStopIds.has(stopId)) return false;
-      if (stationId && selectedBikeStationIds.has(stationId)) return false;
-      return true;
-    });
-
-    featuresToRemove.forEach((feature) => {
-      layerService.removeFeature(LayerType.SELECTION, feature);
-      this.logger.debug('Removed deselected feature from SELECTION layer', {
-        featureId: feature.getId(),
-      });
-    });
-
-    if (
-      selectedRouteIds.size === 0 &&
-      selectedStopIds.size === 0 &&
-      selectedBikeStationIds.size === 0
-    ) {
-      this.logger.debug('No selections remaining');
-      return;
+    for (const feature of layerService.getFeaturesFromLayer(LayerType.SELECTION)) {
+      if (feature.get('creationSource') === FeatureCreationSource.ADDRESS_SEARCH) continue;
+      const stopId = feature.get('stopId') as string | undefined;
+      const stationId = feature.get('stationId') as string | undefined;
+      if (stopId && selectedStops.has(stopId)) {
+        stopFeatures.set(stopId, feature);
+      } else if (stationId && selectedBikes.has(stationId)) {
+        bikeFeatures.set(stationId, feature);
+      } else {
+        layerService.removeFeature(LayerType.SELECTION, feature);
+      }
     }
 
-    this.logger.debug('Updating selection layer');
-
-    this.mapState.displayedShapes().forEach((shape) => {
-      if (
-        shape.routeInfo &&
-        selectedRouteIds.has(getBusRouteIdentity(shape.routeInfo))
-      ) {
-        const feature = this.featureFactory.createShapeFeature(
-          shape,
-          FeatureCreationSource.SELECTION,
-        );
-        const alreadyExists = currentSelectionFeatures.some(
-          (existing) =>
-            existing.getId() === feature.getId() ||
-            this.featuresAreEqual(existing, feature),
-        );
-        if (!alreadyExists) {
+    if (selectedStops.size) {
+      const stops = this.stopsById();
+      for (const [id, selection] of selectedStops) {
+        const snapshot = stops.get(id) ?? selection;
+        const existing = stopFeatures.get(id);
+        if (existing && this.stopSnapshots.get(existing) === snapshot) continue;
+        const stop: BusStopGraphQL = stops.get(id) ?? {
+          ...selection, stopId: id, isSubwayStation: selection.isSubwayStation ?? false,
+        };
+        if (existing) {
+          this.featureFactory.updateStopFeature(existing, stop);
+          this.stopSnapshots.set(existing, snapshot);
+        } else {
+          const feature = this.featureFactory.createStopFeature(stop, FeatureCreationSource.SELECTION);
+          this.stopSnapshots.set(feature, snapshot);
           layerService.addFeature(LayerType.SELECTION, feature);
-          this.logger.debug(
-            `Added selected shape ${shape.id} to SELECTION layer`,
-          );
         }
       }
-    });
+    }
 
-    this.mapState.displayedStops().forEach((stop) => {
-      if (selectedStopIds.has(stop.stopId)) {
-        const feature = this.featureFactory.createStopFeature(
-          stop,
-          FeatureCreationSource.SELECTION,
-        );
-        const alreadyExists = currentSelectionFeatures.some(
-          (existing) =>
-            existing.getId() === feature.getId() ||
-            this.featuresAreEqual(existing, feature),
-        );
-        if (!alreadyExists) {
-          layerService.addFeature(LayerType.SELECTION, feature);
-          this.logger.debug(
-            `Added selected stop ${stop.stopId} to SELECTION layer`,
-          );
+    if (selectedBikes.size) {
+      const bikes = this.bikesById();
+      for (const id of selectedBikes.keys()) {
+        const station = bikes.get(id);
+        if (!station) continue;
+        const existing = bikeFeatures.get(id);
+        if (!existing) {
+          layerService.addFeature(LayerType.SELECTION, this.featureFactory.createBikeStationFeature(
+            station, true, FeatureCreationSource.SELECTION,
+          ));
+          continue;
         }
-      }
-    });
-
-    // URL selections can have coordinates before their detail data arrives.
-    const displayedStopIds = new Set(
-      this.mapState.displayedStops().map((stop) => stop.stopId),
-    );
-    this.mapState.selectedStops().forEach((stop) => {
-      if (displayedStopIds.has(stop.id)) return;
-      const alreadyExists = currentSelectionFeatures.some(
-        (feature) => feature.getId() === stop.id,
-      );
-      if (alreadyExists) return;
-      const feature = this.featureFactory.createStopFeature(
-        { ...stop, stopId: stop.id, isSubwayStation: stop.isSubwayStation ?? false },
-        FeatureCreationSource.SELECTION,
-      );
-      layerService.addFeature(LayerType.SELECTION, feature);
-    });
-
-    this.mapState.bikeStations().forEach((station) => {
-      if (!selectedBikeStationIds.has(station.stationId)) return;
-
-      const existing = currentSelectionFeatures.find(
-        (feature) => feature.get('stationId') === station.stationId,
-      );
-      if (existing) {
-        // Retain the marker and its render batch until this station changes.
-        if (existing.get('stationData') === station) return;
-        existing.setProperties(
-          createBikeStationFeatureProperties(
-            station,
-            true,
-            FeatureCreationSource.SELECTION,
-          ),
-        );
+        if (existing.get('stationData') === station) continue;
+        const styleChanged = existing.get('bikesAvailable') !== station.numBikesAvailable ||
+          existing.get('effectiveCapacity') !== station.effectiveCapacity ||
+          existing.get('hasElectricBikesAvailable') !== station.hasElectricBikesAvailable;
+        // Detail timestamps and availability metadata do not invalidate the render batch.
+        existing.setProperties(createBikeStationFeatureProperties(
+          station, true, FeatureCreationSource.SELECTION,
+        ), true);
+        if (styleChanged) existing.changed();
         const geometry = existing.getGeometry();
         if (geometry instanceof Point) {
           const coordinates = fromLonLat([station.longitude, station.latitude]);
@@ -164,69 +93,7 @@ export class MapSelectionDisplayService {
             geometry.setCoordinates(coordinates);
           }
         }
-        return;
       }
-
-      const feature = this.featureFactory.createBikeStationFeature(
-        station,
-        true,
-        FeatureCreationSource.SELECTION,
-      );
-      layerService.addFeature(LayerType.SELECTION, feature);
-    });
-  }
-
-  addToSelectionLayer(feature: Feature): void {
-    const layerService = this.mapService.getLayerService();
-    feature.setProperties({
-      ...feature.getProperties(),
-      creationSource: FeatureCreationSource.SELECTION,
-    });
-
-    const subwayRouteFeatures = layerService.getFeaturesFromLayer(
-      LayerType.RAIL_ROUTES,
-    );
-    const matchingFeature = subwayRouteFeatures.find(
-      (existing) =>
-        existing.getId() === feature.getId() ||
-        this.featuresAreEqual(existing, feature),
-    );
-
-    if (matchingFeature) {
-      matchingFeature.setProperties({
-        ...matchingFeature.getProperties(),
-        creationSource: FeatureCreationSource.SELECTION,
-      });
-      layerService.moveFeature(
-        matchingFeature,
-        LayerType.RAIL_ROUTES,
-        LayerType.SELECTION,
-      );
-    } else {
-      layerService.addFeature(LayerType.SELECTION, feature);
     }
-  }
-
-  removeFromSelectionLayer(feature: Feature): void {
-    const layerService = this.mapService.getLayerService();
-    if (feature.getProperties()['isSubwayRoute']) {
-      layerService.moveFeature(
-        feature,
-        LayerType.SELECTION,
-        LayerType.RAIL_ROUTES,
-      );
-    } else {
-      layerService.removeFeature(LayerType.SELECTION, feature);
-    }
-  }
-
-  clearSelectionLayer(): void {
-    this.mapService.getLayerService().clearLayer(LayerType.SELECTION);
-  }
-
-  private featuresAreEqual(first: Feature, second: Feature): boolean {
-    const firstId = first.getProperties()['id'];
-    const secondId = second.getProperties()['id'];
-    return firstId && secondId && firstId === secondId;
   }
 }

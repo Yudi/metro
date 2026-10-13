@@ -90,6 +90,24 @@ describe('MapDataLoaderService', () => {
     expect(mapState.displayedRoutes()).toEqual([]);
   });
 
+  it('cancels all route loads, releases their subscriptions, and ignores late responses', async () => {
+    const updates = new Subject<RouteFullDataGraphQL>();
+    const teardown = jest.fn();
+    geographyService.getRouteFullData.mockReturnValue(new Observable<RouteFullDataGraphQL>((subscriber) => {
+      const subscription = updates.subscribe(subscriber);
+      return () => { teardown(); subscription.unsubscribe(); };
+    }));
+    const pending = service.loadRouteData('route-1');
+    service.cancelPendingLoads();
+    updates.next({ route: route('route-1') });
+    await pending;
+    expect(teardown).toHaveBeenCalledTimes(1);
+    expect(mapState.displayedRoutes()).toEqual([]);
+    expect(mapState.isLoading()).toBe(false);
+    expect(snackBar.open).not.toHaveBeenCalled();
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
   it('reports a failed route-data request in Brazilian Portuguese', async () => {
     await service.loadRouteData('route-1');
 
@@ -120,8 +138,6 @@ describe('MapDataLoaderService', () => {
   it('adds a deferred route batch once and clears loading on completion', async () => {
     const updates = new Subject<StopFullDataSnapshot>();
     geographyService.watchStopFullData.mockReturnValue(updates.asObservable());
-    const displayUpdates = jest.fn();
-    mapState.setUpdateDisplayCallback(displayUpdates);
 
     const resultPromise = service.loadStopData(stop.stopId, false);
     updates.next({ stop, hasNext: true });
@@ -140,8 +156,6 @@ describe('MapDataLoaderService', () => {
     expect(mapState.routesDerivedFromStops()).toEqual(
       new Set(['100', '101', '102']),
     );
-    expect(displayUpdates).toHaveBeenCalledTimes(2);
-    expect(vectorTileLayer.setBusRouteIds).toHaveBeenCalledTimes(1);
     expect(mapState.isLoading()).toBe(true);
 
     updates.next({ stop, routes: routeData, hasNext: false });
@@ -149,8 +163,6 @@ describe('MapDataLoaderService', () => {
     expect(mapState.displayedRoutes()).toEqual(
       routeData.map(({ route }) => route),
     );
-    expect(displayUpdates).toHaveBeenCalledTimes(2);
-    expect(vectorTileLayer.setBusRouteIds).toHaveBeenCalledTimes(1);
     expect(mapState.isLoading()).toBe(false);
     expect(snackBar.open).not.toHaveBeenCalled();
   });

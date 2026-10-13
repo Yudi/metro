@@ -170,8 +170,6 @@ export class MapDetailsDialogService {
 
       if (result?.action === 'select' && result.stationId) {
         this.selectionService.addBikeStationToSelection(result.stationId);
-      } else if (panelRef.closeReason === 'dismissed') {
-        this.displayService.updateMapDisplay();
       }
     });
   }
@@ -184,7 +182,7 @@ export class MapDetailsDialogService {
     this.logger.debug('Showing routes for stop', { stopId });
     const knownStop =
       initialStop ??
-      this.mapState.allDisplayedStops().find((stop) => stop.stopId === stopId);
+      this.mapState.displayedStops().find((stop) => stop.stopId === stopId);
     if (knownStop?.isSubwayStation) {
       this.openSubwayStationPanel({ stop: knownStop });
       return Promise.resolve();
@@ -274,8 +272,6 @@ export class MapDetailsDialogService {
               result.terminalReturn.viewState,
               false,
             );
-          } else if (openedPanel.closeReason === 'dismissed') {
-            this.displayService.updateMapDisplay();
           }
           finish();
         });
@@ -483,11 +479,6 @@ export class MapDetailsDialogService {
     panelRef.setDataUpdater<BusTerminalDialogComponent>((component, nextData) =>
       component.updateTerminal(nextData),
     );
-    panelRef.afterClosed().subscribe(() => {
-      if (panelRef.closeReason === 'dismissed') {
-        this.displayService.updateMapDisplay();
-      }
-    });
   }
 
   private toBusStopGraphQL(stop: BusTerminalStop): BusStopGraphQL {
@@ -515,7 +506,7 @@ export class MapDetailsDialogService {
       : lines.length
         ? `Linhas ${lines.join(', ')}`
         : '';
-    const panelRef = this.panelService.openComponent<
+    this.panelService.openComponent<
       SubwayStationDialogData,
       void
     >({
@@ -527,10 +518,5 @@ export class MapDetailsDialogService {
       icon: 'train',
     });
 
-    panelRef.afterClosed().subscribe(() => {
-      if (panelRef.closeReason === 'dismissed') {
-        this.displayService.updateMapDisplay();
-      }
-    });
   }
 }

@@ -1,7 +1,3 @@
-import {
-  BusRouteGraphQL,
-  BusShapeGraphQL,
-} from '../../geography/geography-graphql.service';
 import type {
   LiveTrainTrackingApiId,
   SpecialRailService,
@@ -14,10 +10,6 @@ import type { BusFare } from '@metro/shared/utils';
 import type { BusTerminalSummary } from '@metro/shared/bus-terminal-contracts';
 
 export type { BikePricingPlan, BikeVehicleAvailability };
-
-export interface BusShapeWithRoute extends BusShapeGraphQL {
-  routeInfo?: BusRouteGraphQL;
-}
 
 // Selection item types for centralized state management
 export interface SelectedRoute {

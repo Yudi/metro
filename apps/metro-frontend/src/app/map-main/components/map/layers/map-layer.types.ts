@@ -8,8 +8,4 @@ export interface LayerConfig {
 
 export enum LayerType {
   SELECTION = 'selection',
-  RAIL_STATIONS = 'rail-stations',
-  RAIL_ROUTES = 'rail-routes',
-  BUS_ROUTES = 'bus-routes',
-  BIKE = 'bike',
 }

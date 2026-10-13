@@ -1,8 +1,7 @@
 import { CityContextService } from '../../../cities/city-context.service';
 import { isPlatformBrowser } from '@angular/common';
 import { Service, PLATFORM_ID, inject, signal } from '@angular/core';
-import Dexie, { Table } from 'dexie';
-import { LayerType } from './layers/map-layer.service';
+import { MapViewStateDatabase } from './map-view-state.database';
 import { VectorTileLayerType } from './vector-tiles/vector-tile-layer.service';
 
 export const MAP_VIEW_STATE_RESTORE_PARAM = 'restoreMapState';
@@ -10,29 +9,12 @@ export const MAP_VIEW_STATE_RESTORE_PARAM = 'restoreMapState';
 export interface SavedMapViewState {
   center: [number, number];
   zoom: number;
-  layers: Partial<Record<LayerType, boolean>>;
   vectorLayers: Partial<Record<VectorTileLayerType, boolean>>;
   selections: {
     routeIds: string[];
     stopIds: string[];
     bikeStationIds: string[];
   };
-}
-
-interface MapViewStateRecord extends SavedMapViewState {
-  key: string;
-  updatedAt: number;
-}
-
-class MapViewStateDatabase extends Dexie {
-  mapViewStates!: Table<MapViewStateRecord, string>;
-
-  constructor() {
-    super('metro-map-view-state');
-    this.version(1).stores({
-      mapViewStates: '&key, updatedAt',
-    });
-  }
 }
 
 @Service()
@@ -92,7 +74,6 @@ export class MapViewStateStorageService {
     return {
       center: record.center,
       zoom: record.zoom,
-      layers: record.layers,
       vectorLayers: record.vectorLayers,
       selections: record.selections,
     };

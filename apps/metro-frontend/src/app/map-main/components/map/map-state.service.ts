@@ -4,7 +4,6 @@ import {
   BusStopGraphQL,
 } from '../../geography/geography-graphql.service';
 import {
-  BusShapeWithRoute,
   MapSelectionCounts,
   BikeStation,
   SelectedRoute,
@@ -15,19 +14,6 @@ import { getBusRouteIdentity } from '@metro/shared/utils';
 
 @Service()
 export class MapStateService {
-  // Callback to update display - will be set by the component
-  private updateDisplayCallback?: () => void;
-
-  setUpdateDisplayCallback(callback: () => void): void {
-    this.updateDisplayCallback = callback;
-  }
-
-  private triggerDisplayUpdate(): void {
-    if (this.updateDisplayCallback) {
-      this.updateDisplayCallback();
-    }
-  }
-
   readonly isLoading = signal(false);
 
   // Selection signals - cumulative user selections with metadata
@@ -47,14 +33,11 @@ export class MapStateService {
    * that are no longer needed by any active selection.
    */
   private displayedStopSources = new Map<string, Set<string>>(); // stopId -> Set of sourceSelectionIds
-  private displayedShapeSources = new Map<string, Set<string>>(); // shapeId -> Set of sourceSelectionIds
   private displayedRouteSources = new Map<string, Set<string>>(); // route identity -> Set of source selection IDs
 
   // Display data - what's currently shown on map
   readonly displayedRoutes = signal<BusRouteGraphQL[]>([]);
   readonly displayedStops = signal<BusStopGraphQL[]>([]);
-  readonly displayedShapes = signal<BusShapeWithRoute[]>([]);
-  readonly subwayStations = signal<BusStopGraphQL[]>([]); // Permanently displayed subway stations
   readonly bikeStations = signal<BikeStation[]>([]);
 
   // Computed properties
@@ -76,17 +59,12 @@ export class MapStateService {
     () => new Set(this.selectedBikeStations().keys()),
   );
 
-  // Combined stops for display (subway stations + regular stops)
-  readonly allDisplayedStops = computed(() => [
-    ...this.subwayStations(),
-    ...this.displayedStops(),
-  ]);
   readonly hasDisplayedData = computed(
     () =>
-      this.displayedRoutes().length > 0 || this.allDisplayedStops().length > 0,
+      this.displayedRoutes().length > 0 || this.displayedStops().length > 0,
   );
   readonly totalDisplayedStops = computed(
-    () => this.allDisplayedStops().length,
+    () => this.displayedStops().length,
   );
   readonly totalDisplayedRoutes = computed(() => this.displayedRoutes().length);
 
@@ -101,14 +79,12 @@ export class MapStateService {
     const newStops = new Map(this.selectedStops());
     newStops.set(stop.id, stop);
     this.selectedStops.set(newStops);
-    this.triggerDisplayUpdate();
   }
 
   addBikeStationToSelection(station: SelectedBikeStation): void {
     const newStations = new Map(this.selectedBikeStations());
     newStations.set(station.id, station);
     this.selectedBikeStations.set(newStations);
-    this.triggerDisplayUpdate();
   }
 
   removeRouteFromSelection(routeId: string): void {
@@ -121,14 +97,12 @@ export class MapStateService {
     const newStops = new Map(this.selectedStops());
     newStops.delete(stopId);
     this.selectedStops.set(newStops);
-    this.triggerDisplayUpdate();
   }
 
   removeBikeStationFromSelection(stationId: string): void {
     const newStations = new Map(this.selectedBikeStations());
     newStations.delete(stationId);
     this.selectedBikeStations.set(newStations);
-    this.triggerDisplayUpdate();
   }
 
   clearAllSelections(): void {
@@ -138,10 +112,8 @@ export class MapStateService {
     this.routesDerivedFromStops.set(new Set());
     this.displayedRoutes.set([]);
     this.displayedStops.set([]);
-    this.displayedShapes.set([]);
     // Clear source tracking
     this.displayedStopSources.clear();
-    this.displayedShapeSources.clear();
     this.displayedRouteSources.clear();
   }
 
@@ -160,7 +132,7 @@ export class MapStateService {
     this.addRoutesToDisplay([route], sourceSelectionId, derivedFromStop);
   }
 
-  /** Add a related route batch with a single map display refresh. */
+  /** Publish related routes as one state update. */
   addRoutesToDisplay(
     routes: readonly BusRouteGraphQL[],
     sourceSelectionId?: string,
@@ -207,7 +179,6 @@ export class MapStateService {
 
     if (displayChanged) {
       this.displayedRoutes.set(nextRoutes);
-      this.triggerDisplayUpdate();
     }
   }
 
@@ -221,7 +192,6 @@ export class MapStateService {
     const exists = currentStops.find((s) => s.id === stop.id);
     if (!exists) {
       this.displayedStops.set([...currentStops, stop]);
-      this.triggerDisplayUpdate();
     }
 
     // Track source if provided
@@ -232,54 +202,8 @@ export class MapStateService {
     }
   }
 
-  addSubwayStation(station: BusStopGraphQL): void {
-    const currentStations = this.subwayStations();
-    const exists = currentStations.find((s) => s.id === station.id);
-    if (!exists) {
-      this.subwayStations.set([...currentStations, station]);
-      this.triggerDisplayUpdate();
-    }
-  }
-
-  /**
-   * Add a shape to display, tracking which selection caused it.
-   * @param shape The shape to display
-   * @param sourceSelectionId The ID of the selection that caused this (routeId or stopId)
-   */
-  addShapeToDisplay(
-    shape: BusShapeWithRoute,
-    sourceSelectionId?: string,
-  ): void {
-    const currentShapes = this.displayedShapes();
-    const exists = currentShapes.find((s) => s.id === shape.id);
-    if (!exists) {
-      this.displayedShapes.set([...currentShapes, shape]);
-      this.triggerDisplayUpdate();
-    }
-
-    // Track source if provided
-    if (sourceSelectionId) {
-      const sources =
-        this.displayedShapeSources.get(shape.shapeId) || new Set();
-      sources.add(sourceSelectionId);
-      this.displayedShapeSources.set(shape.shapeId, sources);
-    }
-  }
-
   setBikeStations(stations: BikeStation[]): void {
     this.bikeStations.set(stations);
-    this.triggerDisplayUpdate();
-  }
-
-  resetDisplayedData(): void {
-    this.displayedRoutes.set([]);
-    this.displayedStops.set([]);
-    this.displayedShapes.set([]);
-    this.routesDerivedFromStops.set(new Set());
-    // Clear source tracking
-    this.displayedStopSources.clear();
-    this.displayedShapeSources.clear();
-    this.displayedRouteSources.clear();
   }
 
   /**
@@ -290,7 +214,6 @@ export class MapStateService {
   removeDisplayDataBySource(sourceSelectionId: string): void {
     // Remove this source from all tracked items and collect items to remove
     const stopsToRemove: string[] = [];
-    const shapesToRemove: string[] = [];
     const routesToRemove: string[] = [];
 
     // Check stops
@@ -299,15 +222,6 @@ export class MapStateService {
       if (sources.size === 0) {
         stopsToRemove.push(stopId);
         this.displayedStopSources.delete(stopId);
-      }
-    });
-
-    // Check shapes
-    this.displayedShapeSources.forEach((sources, shapeId) => {
-      sources.delete(sourceSelectionId);
-      if (sources.size === 0) {
-        shapesToRemove.push(shapeId);
-        this.displayedShapeSources.delete(shapeId);
       }
     });
 
@@ -329,14 +243,6 @@ export class MapStateService {
       );
     }
 
-    if (shapesToRemove.length > 0) {
-      const shapeIdsToRemove = new Set(shapesToRemove);
-      const currentShapes = this.displayedShapes();
-      this.displayedShapes.set(
-        currentShapes.filter((s) => !shapeIdsToRemove.has(s.shapeId)),
-      );
-    }
-
     if (routesToRemove.length > 0) {
       const routeIdsToRemove = new Set(routesToRemove);
       const currentRoutes = this.displayedRoutes();
@@ -354,7 +260,6 @@ export class MapStateService {
       this.routesDerivedFromStops.set(derived);
     }
 
-    this.triggerDisplayUpdate();
   }
 
   /**
@@ -379,7 +284,7 @@ export class MapStateService {
       routes: this.selectedRoutes().size,
       stops: this.selectedStops().size,
       displayed:
-        this.displayedRoutes().length + this.allDisplayedStops().length,
+        this.displayedRoutes().length + this.displayedStops().length,
     };
   }
 }

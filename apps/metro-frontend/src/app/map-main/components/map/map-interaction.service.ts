@@ -83,7 +83,17 @@ export class MapInteractionService {
   }
 
   clearAllSelections(shouldDisplaySnackbar = true): void {
+    this.featureService.cancelPendingFeatureDetails();
     this.selectionService.clearAllSelections(shouldDisplaySnackbar);
+  }
+
+  cancelPendingFeatureDetails(): void {
+    this.featureService.cancelPendingFeatureDetails();
+  }
+
+  cancelPendingWork(): void {
+    this.selectionService.cancelPendingSelections();
+    this.featureService.cancelPendingFeatureDetails();
   }
 
   cancelPendingStopSelections(): void {

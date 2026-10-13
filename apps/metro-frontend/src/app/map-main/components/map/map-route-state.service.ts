@@ -18,11 +18,9 @@ import {
 } from '@metro/shared/utils';
 import { MapService } from './map.service';
 import { MapStateService } from './map-state.service';
-import { MapDataLoaderService } from './map-data-loader.service';
 import { MapDisplayService } from './map-display.service';
 import { MapInteractionService } from './map-interaction.service';
 import { BikeStationsService } from '../../geography/bike-stations.service';
-import { LayerType } from './layers/map-layer.service';
 import { VectorTileLayerType } from './vector-tiles/vector-tile-layer.service';
 import {
   MAP_VIEW_STATE_RESTORE_PARAM,
@@ -36,7 +34,6 @@ export class MapRouteStateService {
   readonly cityContext = inject(CityContextService);
   private readonly mapService = inject(MapService);
   private readonly mapState = inject(MapStateService);
-  private readonly dataLoader = inject(MapDataLoaderService);
   private readonly displayService = inject(MapDisplayService);
   private readonly interactionService = inject(MapInteractionService);
   private readonly bikeStationsService = inject(BikeStationsService);
@@ -48,7 +45,10 @@ export class MapRouteStateService {
   private readonly persistenceReady = signal(false);
   private readonly appliedFavoriteSelections = new Set<string>();
   private lastDetailHandoff: string | null = null;
-  private isApplyingSavedState = false;
+  private readonly isApplyingSavedState = signal(false);
+  private session = 0;
+  private lastCameraParams: string | null = null;
+  private readonly appliedLayerParams = new Map<string, boolean>();
   private appliedSavedStateForNavigation = false;
   private lastDefaultStateRequest =
     this.mapViewStateStorage.defaultStateRequests();
@@ -56,6 +56,23 @@ export class MapRouteStateService {
   constructor() {
     this.setupDefaultStateRequestHandler();
     this.setupMapStatePersistence();
+  }
+
+  beginSession(): void {
+    this.session++;
+    this.persistenceReady.set(false);
+    this.isApplyingSavedState.set(false);
+    this.lastCameraParams = null;
+    this.appliedLayerParams.clear();
+    this.appliedFavoriteSelections.clear();
+    this.appliedSavedStateForNavigation = false;
+    this.lastDetailHandoff = null;
+  }
+
+  endSession(): void {
+    this.session++;
+    this.persistenceReady.set(false);
+    this.isApplyingSavedState.set(false);
   }
 
   markPersistenceReady(): void {
@@ -83,7 +100,7 @@ export class MapRouteStateService {
   private setupMapStatePersistence(): void {
     effect((onCleanup) => {
       const state = this.captureMapViewState();
-      if (!this.persistenceReady() || this.isApplyingSavedState || !state) {
+      if (!this.persistenceReady() || this.isApplyingSavedState() || !state) {
         return;
       }
 
@@ -97,17 +114,14 @@ export class MapRouteStateService {
   private captureMapViewState(): SavedMapViewState | null {
     const center = this.mapService.center();
     const zoom = this.mapService.zoomLevel();
-    const layerService = this.mapService.getLayerService();
     const vectorTileService = this.mapService.getVectorTileLayerService();
     if (!center || zoom === null) return null;
 
     return {
       center,
       zoom,
-      layers: {
-        [LayerType.BIKE]: layerService.isLayerVisible(LayerType.BIKE),
-      },
       vectorLayers: {
+        [VectorTileLayerType.BIKE_STATIONS]: vectorTileService.isLayerVisible(VectorTileLayerType.BIKE_STATIONS),
         [VectorTileLayerType.BUS_STOPS]: vectorTileService.isLayerVisible(
           VectorTileLayerType.BUS_STOPS,
         ),
@@ -139,60 +153,58 @@ export class MapRouteStateService {
     }
 
     this.appliedSavedStateForNavigation = true;
-    const savedState = await this.mapViewStateStorage.readLastState();
-    if (!savedState) {
-      this.applyDefaultMapState();
-      return;
+    const session = this.session;
+    this.isApplyingSavedState.set(true);
+    try {
+      const savedState = await this.mapViewStateStorage.readLastState();
+      if (session !== this.session) return;
+      if (!savedState) {
+        this.applyDefaultMapState();
+        return;
+      }
+      await this.applySavedMapState(savedState, session);
+    } catch (error) {
+      if (session === this.session) this.logger.error('Failed to restore saved map state', error);
+    } finally {
+      if (session === this.session) this.isApplyingSavedState.set(false);
     }
-    await this.applySavedMapState(savedState);
   }
 
-  private async applySavedMapState(state: SavedMapViewState): Promise<void> {
-    this.isApplyingSavedState = true;
-    try {
-      this.interactionService.clearAllSelections(false);
-      const layerService = this.mapService.getLayerService();
-      const vectorTileService = this.mapService.getVectorTileLayerService();
-      layerService.setLayerVisibility(
-        LayerType.BIKE,
-        state.layers[LayerType.BIKE] ?? false,
-      );
-      vectorTileService.setLayerVisibility(
-        VectorTileLayerType.RAIL_STATIONS,
-        state.vectorLayers[VectorTileLayerType.RAIL_STATIONS] ?? true,
-      );
-      vectorTileService.setLayerVisibility(
-        VectorTileLayerType.RAIL_ROUTES,
-        state.vectorLayers[VectorTileLayerType.RAIL_ROUTES] ?? false,
-      );
-
-      vectorTileService.setLayerVisibility(
-        VectorTileLayerType.BUS_STOPS,
-        state.vectorLayers[VectorTileLayerType.BUS_STOPS] ?? true,
-      );
-
-      if (state.layers[LayerType.BIKE]) {
-        await this.bikeStationsService.activate();
-        this.mapState.setBikeStations(this.bikeStationsService.stations());
-      }
-      for (const routeId of state.selections.routeIds) {
-        await this.restoreRouteSelection(routeId);
-      }
-      for (const stopId of state.selections.stopIds) {
-        await this.interactionService.addStopToSelection(stopId, false);
-      }
-      for (const stationId of state.selections.bikeStationIds) {
-        this.interactionService.addBikeStationToSelection(stationId, false);
-      }
-
-      this.dataLoader.syncVectorTileFilters();
-      this.mapService.centerOn(state.center, state.zoom);
-      this.displayService.updateMapDisplay();
-    } catch (error) {
-      this.logger.error('Failed to restore saved map state', error);
-    } finally {
-      this.isApplyingSavedState = false;
+  private async applySavedMapState(state: SavedMapViewState, session: number): Promise<void> {
+    this.interactionService.clearAllSelections(false);
+    const vectorTileService = this.mapService.getVectorTileLayerService();
+    const bikeVisible = state.vectorLayers[VectorTileLayerType.BIKE_STATIONS] ?? false;
+    vectorTileService.setLayerVisibility(VectorTileLayerType.BIKE_STATIONS, bikeVisible);
+    vectorTileService.setLayerVisibility(
+      VectorTileLayerType.RAIL_STATIONS,
+      state.vectorLayers[VectorTileLayerType.RAIL_STATIONS] ?? true,
+    );
+    vectorTileService.setLayerVisibility(
+      VectorTileLayerType.RAIL_ROUTES,
+      state.vectorLayers[VectorTileLayerType.RAIL_ROUTES] ?? false,
+    );
+    vectorTileService.setLayerVisibility(
+      VectorTileLayerType.BUS_STOPS,
+      state.vectorLayers[VectorTileLayerType.BUS_STOPS] ?? true,
+    );
+    if (bikeVisible) {
+      await this.bikeStationsService.activate();
+      if (session !== this.session) return;
+      this.mapState.setBikeStations(this.bikeStationsService.stations());
     }
+    for (const routeId of state.selections.routeIds) {
+      if (session !== this.session) return;
+      await this.restoreRouteSelection(routeId);
+    }
+    for (const stopId of state.selections.stopIds) {
+      if (session !== this.session) return;
+      await this.interactionService.addStopToSelection(stopId, false);
+    }
+    if (session !== this.session) return;
+    for (const stationId of state.selections.bikeStationIds) {
+      this.interactionService.addBikeStationToSelection(stationId, false);
+    }
+    this.mapService.centerOn(state.center, state.zoom);
   }
 
   private async restoreRouteSelection(routeId: string): Promise<void> {
@@ -214,13 +226,13 @@ export class MapRouteStateService {
   }
 
   private applyDefaultMapState(): void {
-    this.isApplyingSavedState = true;
+    this.isApplyingSavedState.set(true);
     try {
       this.interactionService.clearAllSelections(false);
       this.displayService.clearAddressLocation();
       this.mapService
-        .getLayerService()
-        .setLayerVisibility(LayerType.BIKE, false);
+        .getVectorTileLayerService()
+        .setLayerVisibility(VectorTileLayerType.BIKE_STATIONS, false);
       this.mapService
         .getVectorTileLayerService()
         .setLayerVisibility(VectorTileLayerType.RAIL_STATIONS, true);
@@ -234,10 +246,10 @@ export class MapRouteStateService {
         this.cityContext.center(),
         this.cityContext.city().map.zoom,
       );
-      this.dataLoader.syncVectorTileFilters();
-      this.displayService.updateMapDisplay();
+
+
     } finally {
-      this.isApplyingSavedState = false;
+      this.isApplyingSavedState.set(false);
     }
 
     const state = this.captureMapViewState();
@@ -287,8 +299,8 @@ export class MapRouteStateService {
     for (const stationId of favorites.bikeStation) {
       this.applyFavoriteSelection(`bikeStation:${stationId}`, () => {
         this.mapService
-          .getLayerService()
-          .setLayerVisibility(LayerType.BIKE, true);
+          .getVectorTileLayerService()
+          .setLayerVisibility(VectorTileLayerType.BIKE_STATIONS, true);
         this.interactionService.addBikeStationToSelection(stationId, false);
       });
     }
@@ -358,7 +370,6 @@ export class MapRouteStateService {
       );
     };
 
-    const layerService = this.mapService.getLayerService();
     const vectorTileService = this.mapService.getVectorTileLayerService();
     const specialLineCode = paramGet('railLine');
     if (specialLineCode) {
@@ -383,67 +394,34 @@ export class MapRouteStateService {
       });
     }
 
-    const mappings: Array<{
-      param: string;
-      kind: 'layer' | 'vector' | 'feature';
-      id?: string;
-    }> = [
-      { param: 'bike', kind: 'layer', id: LayerType.BIKE },
-      {
-        param: 'subwayStations',
-        kind: 'vector',
-        id: VectorTileLayerType.RAIL_STATIONS,
-      },
-      {
-        param: 'subwayRoutes',
-        kind: 'vector',
-        id: VectorTileLayerType.RAIL_ROUTES,
-      },
-      { param: 'busStopsLayer', kind: 'vector', id: VectorTileLayerType.BUS_STOPS },
-      { param: 'busStops', kind: 'feature' },
-      { param: 'busRoutes', kind: 'feature' },
-      { param: 'railStations', kind: 'feature' },
+    const layerParams: ReadonlyArray<readonly [string, VectorTileLayerType]> = [
+      ['bike', VectorTileLayerType.BIKE_STATIONS],
+      ['subwayStations', VectorTileLayerType.RAIL_STATIONS],
+      ['subwayRoutes', VectorTileLayerType.RAIL_ROUTES],
+      ['busStopsLayer', VectorTileLayerType.BUS_STOPS],
     ];
-
-    for (const mapping of mappings) {
-      if (!paramHas(mapping.param)) continue;
-      const enabled = parseBoolean(paramGet(mapping.param));
-      if (enabled === null && mapping.kind !== 'feature') continue;
-
-      if (mapping.kind === 'feature') {
-        const parseIds = (key: string) =>
-          (paramGet(key) ?? '')
-            .split(',')
-            .map((value) => value.trim())
-            .filter(Boolean);
-        parseIds('busRoutes').forEach((routeId) =>
-          this.interactionService.addRouteToSelection(routeId, false),
-        );
-        parseIds('busStops').forEach((stopId) =>
-          this.interactionService.addStopToSelection(stopId, false),
-        );
-        parseIds('railStations').forEach((stationId) =>
-          this.interactionService.addStopToSelection(stationId, false),
-        );
-      } else if (mapping.kind === 'vector') {
-        vectorTileService.setLayerVisibility(
-          mapping.id as VectorTileLayerType,
-          enabled as boolean,
-        );
-        this.logger.debug('Applied query param layer (vector)', {
-          param: mapping.param,
-          enabled,
-        });
-      } else {
-        layerService.setLayerVisibility(
-          mapping.id as LayerType,
-          enabled as boolean,
-        );
-        this.logger.debug('Applied query param layer', {
-          param: mapping.param,
-          enabled,
-        });
+    for (const [param, layer] of layerParams) {
+      const enabled = parseBoolean(paramGet(param));
+      if (enabled === null) {
+        this.appliedLayerParams.delete(param);
+      } else if (this.appliedLayerParams.get(param) !== enabled) {
+        this.appliedLayerParams.set(param, enabled);
+        vectorTileService.setLayerVisibility(layer, enabled);
       }
+    }
+
+    const parseIds = (param: string) => Array.from(new Set(
+      (paramGet(param) ?? '').split(',').map((value) => value.trim()).filter(Boolean),
+    ));
+    for (const routeId of parseIds('busRoutes')) {
+      this.applyFavoriteSelection(`queryBusRoute:${routeId}`, () => {
+        void this.interactionService.addRouteToSelection(routeId, false);
+      });
+    }
+    for (const stopId of new Set([...parseIds('busStops'), ...parseIds('railStations')])) {
+      this.applyFavoriteSelection(`queryStop:${stopId}`, () => {
+        void this.interactionService.addStopToSelection(stopId, false);
+      });
     }
 
     const getNum = (keys: string[]) => {
@@ -486,8 +464,6 @@ export class MapRouteStateService {
           longitude: lon as number,
           isSubwayStation: true,
         });
-        this.dataLoader.syncVectorTileFilters();
-        this.displayService.updateMapDisplay();
       });
     }
 
@@ -512,7 +488,9 @@ export class MapRouteStateService {
       });
     }
 
-    if (!isRepeatedDetailHandoff) {
+    const cameraParams = JSON.stringify([lat, lon, zoom]);
+    if (!isRepeatedDetailHandoff && cameraParams !== this.lastCameraParams) {
+      this.lastCameraParams = cameraParams;
       if (isValidLat(lat) && isValidLon(lon)) {
         const useZoom = isValidZoom(zoom) ? (zoom as number) : undefined;
         try {

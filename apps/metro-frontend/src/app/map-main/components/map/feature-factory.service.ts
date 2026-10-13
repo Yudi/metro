@@ -1,16 +1,13 @@
 import { Service } from '@angular/core';
 import { Feature } from 'ol';
-import { Point, LineString } from 'ol/geom';
+import { Point } from 'ol/geom';
 import { fromLonLat } from 'ol/proj';
 import { BusStopGraphQL } from '../../geography/geography-graphql.service';
 import {
-  BusShapeWithRoute,
   FeatureCreationSource,
   BikeStation,
 } from './map.types';
-import { isSubwayRoute } from '../../geography/transit-utils';
 import { createBikeStationFeatureProperties } from './layers/bike-feature-properties.utils';
-import { getBusRouteIdentity } from '@metro/shared/utils';
 
 /**
  * Factory service for creating OpenLayers features from GraphQL data
@@ -28,7 +25,36 @@ export class FeatureFactoryService {
     const geometry = new Point(fromLonLat([stop.longitude, stop.latitude]));
     const feature = new Feature({ geometry });
 
-    feature.setProperties({
+    feature.setProperties(this.stopProperties(stop, creationSource));
+    feature.setId(stop.id);
+    return feature;
+  }
+
+  /** Retain the feature and render batch when a detail snapshot changes. */
+  updateStopFeature(feature: Feature, stop: BusStopGraphQL): void {
+    const properties = this.stopProperties(stop, FeatureCreationSource.SELECTION);
+    const changed = Object.fromEntries(Object.entries(properties).filter(([key, value]) => {
+      const previous: unknown = feature.get(key);
+      return Array.isArray(value) && Array.isArray(previous)
+        ? value.length !== previous.length || value.some((item, index) => item !== previous[index])
+        : previous !== value;
+    }));
+    if (Object.keys(changed).length) feature.setProperties(changed);
+    const geometry = feature.getGeometry();
+    if (geometry instanceof Point) {
+      const coordinates = fromLonLat([stop.longitude, stop.latitude]);
+      const previous = geometry.getCoordinates();
+      if (previous[0] !== coordinates[0] || previous[1] !== coordinates[1]) {
+        geometry.setCoordinates(coordinates);
+      }
+    }
+  }
+
+  private stopProperties(
+    stop: BusStopGraphQL,
+    creationSource: FeatureCreationSource,
+  ): Record<string, unknown> {
+    return {
       id: stop.id,
       stopId: stop.stopId,
       name: stop.name,
@@ -40,75 +66,7 @@ export class FeatureFactoryService {
       mergedStopIds: stop.mergedStopIds,
       type: 'stop',
       creationSource,
-    });
-
-    feature.setId(stop.id);
-    return feature;
-  }
-
-  /**
-   * Create OpenLayers Feature from a route shape
-   */
-  createShapeFeature(
-    shape: BusShapeWithRoute,
-    creationSource: FeatureCreationSource = FeatureCreationSource.ROUTE_DISPLAY,
-  ): Feature {
-    const coordinates = shape.geometry.coordinates.map((coord: number[]) =>
-      fromLonLat([coord[0], coord[1]]),
-    );
-    const geometry = new LineString(coordinates);
-    const feature = new Feature({ geometry });
-
-    const properties: Record<string, unknown> = {
-      id: shape.id,
-      shapeId: shape.shapeId,
-      type: 'shape',
-      creationSource,
     };
-
-    if (shape.routeInfo) {
-      properties['color'] = shape.routeInfo.color;
-      properties['textColor'] = shape.routeInfo.textColor;
-      properties['routeId'] = getBusRouteIdentity(shape.routeInfo);
-      properties['gtfsRouteId'] = shape.routeInfo.routeId;
-      properties['favoriteCode'] = shape.routeInfo.favoriteCode;
-      properties['destination'] = shape.routeInfo.destination;
-      properties['isCircular'] = shape.routeInfo.isCircular;
-      properties['directionId'] = shape.routeInfo.directionId;
-      properties['shortName'] = shape.routeInfo.shortName;
-      properties['longName'] = shape.routeInfo.longName;
-      properties['sourceAgency'] = shape.routeInfo.sourceAgency;
-      properties['sourceId'] = shape.routeInfo.sourceId;
-      properties['supportsRealtime'] = shape.routeInfo.supportsRealtime;
-      properties['fares'] = shape.routeInfo.fares;
-      properties['isSubwayRoute'] = isSubwayRoute(shape.routeInfo);
-    }
-
-    feature.setProperties(properties);
-    feature.setId(shape.id);
-    return feature;
-  }
-
-  /**
-   * Batch create stop features
-   */
-  createStopFeatures(
-    stops: BusStopGraphQL[],
-    creationSource: FeatureCreationSource = FeatureCreationSource.ROUTE_DISPLAY,
-  ): Feature[] {
-    return stops.map((stop) => this.createStopFeature(stop, creationSource));
-  }
-
-  /**
-   * Batch create shape features
-   */
-  createShapeFeatures(
-    shapes: BusShapeWithRoute[],
-    creationSource: FeatureCreationSource = FeatureCreationSource.ROUTE_DISPLAY,
-  ): Feature[] {
-    return shapes.map((shape) =>
-      this.createShapeFeature(shape, creationSource),
-    );
   }
 
   createBikeStationFeature(

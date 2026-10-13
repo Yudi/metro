@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
+import { GeographyGraphQLService, BusRouteGraphQL } from '../../geography/geography-graphql.service';
 import { LoggerService } from '@metro/shared/api';
 import { MapFeatureInteractionService } from './map-feature-interaction.service';
 import { MapStateService } from './map-state.service';
@@ -66,6 +67,46 @@ describe('MapFeatureInteractionService', () => {
     });
     service = TestBed.inject(MapFeatureInteractionService);
     panels = TestBed.inject(MapPanelService);
+  });
+
+  it('shows only the latest route click and cancels detail work when leaving the map', () => {
+    const older = new Subject<BusRouteGraphQL>();
+    const newer = new Subject<BusRouteGraphQL>();
+    const afterLeaving = new Subject<BusRouteGraphQL>();
+    const getBusRoute = jest.fn().mockReturnValueOnce(older)
+      .mockReturnValueOnce(newer).mockReturnValueOnce(afterLeaving);
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      MapFeatureInteractionService,
+      { provide: MatSnackBar, useValue: snackBar },
+      { provide: MapStateService, useValue: {} },
+      { provide: MapDisplayService, useValue: {} },
+      { provide: MapService, useValue: { focusFeature: jest.fn() } },
+      { provide: MapDetailsDialogService, useValue: {} },
+      { provide: MapSelectionService, useValue: {} },
+      { provide: BikeStationsService, useValue: {} },
+      { provide: LoggerService, useValue: { debug: jest.fn() } },
+      { provide: GeographyGraphQLService, useValue: { getBusRoute } },
+      { provide: VectorTileLayerService, useValue: {
+        isVectorTileFeature: () => true,
+        getFeatureLayerType: () => VectorTileLayerType.BUS_ROUTES,
+        extractBusRouteData: (feature: { getId(): string }) => ({ routeId: feature.getId() }),
+      } },
+    ] });
+    service = TestBed.inject(MapFeatureInteractionService);
+    snackBar.open.mockReturnValue({ onAction: () => of() });
+    const feature = (id: string) => ({ getId: () => id, get: () => undefined, getProperties: () => ({}) });
+    const route = (id: string): BusRouteGraphQL => ({ id, routeId: id, shortName: id, longName: id, color: '112233', textColor: 'FFFFFF' });
+    service.handleFeatureSelection(feature('A') as never);
+    service.handleFeatureSelection(feature('B') as never);
+    newer.next(route('B'));
+    older.next(route('A'));
+    expect(snackBar.open).toHaveBeenCalledTimes(1);
+    expect(snackBar.open).toHaveBeenCalledWith('Rota: B', 'Adicionar', { duration: 5000 });
+    service.handleFeatureSelection(feature('C') as never);
+    service.cancelPendingFeatureDetails();
+    afterLeaving.next(route('C'));
+    expect(snackBar.open).toHaveBeenCalledTimes(1);
   });
 
   it('explains an estimated train location without exposing source details', () => {

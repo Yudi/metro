@@ -1,6 +1,5 @@
 import { getContrastColor } from '@metro/shared/utils';
 import type { BusRouteGraphQL, BusStopGraphQL } from './geography-graphql.service';
-import type { BusShapeWithRoute } from '../components/map/map.types';
 
 /**
  * Centralized utility functions for transit data operations
@@ -12,13 +11,6 @@ import type { BusShapeWithRoute } from '../components/map/map.types';
  */
 export function isSubwayRoute(route: BusRouteGraphQL): boolean {
   return route.routeId.startsWith('METRÔ') || route.routeId.startsWith('CPTM');
-}
-
-/**
- * Check if a shape represents a subway route
- */
-export function isSubwayShape(shape: BusShapeWithRoute): boolean {
-  return shape.routeInfo ? isSubwayRoute(shape.routeInfo) : false;
 }
 
 /**

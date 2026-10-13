@@ -1,6 +1,6 @@
 import { Service, inject } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { Observable, Subscription } from 'rxjs';
+import { firstValueFrom, Observable, Subject, Subscription, takeUntil } from 'rxjs';
 import { GeographyGraphQLService } from '../../geography/geography-graphql.service';
 import type {
   BusStopGraphQL,
@@ -8,7 +8,6 @@ import type {
 } from '../../geography/geography-graphql.service';
 import { MapStateService } from './map-state.service';
 import { LoggerService } from '@metro/shared/api';
-import { isSubwayRoute } from '../../geography/transit-utils';
 import { VectorTileLayerService } from './vector-tiles/vector-tile-layer.service';
 import { getBusRouteIdentity } from '@metro/shared/utils';
 
@@ -36,35 +35,22 @@ export class MapDataLoaderService {
     ActiveStopDataRequest
   >();
   private activeLoadCount = 0;
-  private readonly activeRouteRequests = new Map<string, object>();
-
-  // Callback to update display - will be set by the component
-  private updateDisplayCallback?: () => void;
-
-  setUpdateDisplayCallback(callback: () => void): void {
-    this.updateDisplayCallback = callback;
-  }
-
-  private triggerDisplayUpdate(): void {
-    if (this.updateDisplayCallback) {
-      this.updateDisplayCallback();
-    }
-  }
+  private readonly activeRouteRequests = new Map<string, Subject<void>>();
 
   async loadRouteData(
     routeId: string,
     shouldDisplaySnackbar = true,
   ): Promise<void> {
     const finishLoading = this.beginLoading();
-    const request = {};
+    this.cancelRouteDataLoad(routeId);
+    const request = new Subject<void>();
     this.activeRouteRequests.set(routeId, request);
     this.logger.debug('loadRouteData called', { routeId });
 
     try {
-      // Use combined query to get route, trips, shapes, and stops in a single request
-      const routeFullData = await this.geographyService
-        .getRouteFullData(routeId)
-        .toPromise();
+      const routeFullData = await firstValueFrom(
+        this.geographyService.getRouteFullData(routeId).pipe(takeUntil(request)),
+      );
 
       if (this.activeRouteRequests.get(routeId) !== request) return;
       if (!routeFullData) {
@@ -81,9 +67,8 @@ export class MapDataLoaderService {
 
       // Add route to display, tracking that this routeId is the source
       this.mapState.addRouteToDisplay(route, routeId, false);
-      this.syncVectorTileFilters();
-      this.triggerDisplayUpdate();
     } catch (error) {
+      if (this.activeRouteRequests.get(routeId) !== request) return;
       this.logger.error('Error loading route data', error);
       if (shouldDisplaySnackbar) {
         this.snackBar.open(
@@ -226,20 +211,6 @@ export class MapDataLoaderService {
               true,
             );
 
-            for (const route of newRoutes) {
-              if (isSubwayRoute(route)) {
-                this.logger.debug(
-                  'Skipping stop loading for subway route derived from stop',
-                  { routeId: route.routeId, shortName: route.shortName },
-                );
-              } else {
-                this.logger.debug('Registered route derived from stop', {
-                  routeId: route.routeId,
-                });
-              }
-            }
-
-            this.syncVectorTileFilters();
           }
 
           this.logger.debug('Stop routes loaded', {
@@ -277,37 +248,14 @@ export class MapDataLoaderService {
     request.subscription.add(subscription);
     return initialResult;
   }
-  refreshDisplayedData(): void {
-    this.activeRouteRequests.clear();
-    // Rebuild displayed data based on current selections
-    this.mapState.resetDisplayedData();
-
-    // Trigger immediate display update to clear old features from map
-    this.triggerDisplayUpdate();
-
-    // Note: Subway stations are now rendered via Vector Tiles (MVT)
-    // No need to load them via GraphQL
-
-    // Reload data for all selected items (use keys to get IDs from the Maps)
-    this.mapState
-      .selectedRoutes()
-      .forEach((_, routeId) => this.loadRouteData(routeId));
-    this.mapState
-      .selectedStops()
-      .forEach((_, stopId) => this.loadStopData(stopId));
-    this.syncVectorTileFilters();
-  }
-
   /**
    * Remove display data for a specific route without refetching other data.
    * Uses source tracking to only remove items that are no longer needed by any selection.
    */
   removeRouteDisplayData(routeId: string): void {
-    this.activeRouteRequests.delete(routeId);
+    this.cancelRouteDataLoad(routeId);
     this.logger.debug('Removing display data sourced from route', { routeId });
     this.mapState.removeRouteDisplayData(routeId);
-    this.syncVectorTileFilters();
-    this.triggerDisplayUpdate();
   }
 
   /**
@@ -319,8 +267,21 @@ export class MapDataLoaderService {
     this.cancelStopDataLoad(stopId);
     this.logger.debug('Removing display data sourced from stop', { stopId });
     this.mapState.removeStopDisplayData(stopId);
-    this.syncVectorTileFilters();
-    this.triggerDisplayUpdate();
+  }
+
+  cancelPendingLoads(): void {
+    for (const routeId of [...this.activeRouteRequests.keys()]) {
+      this.cancelRouteDataLoad(routeId);
+    }
+    this.cancelStopDataLoads();
+  }
+
+  private cancelRouteDataLoad(routeId: string): void {
+    const request = this.activeRouteRequests.get(routeId);
+    if (!request) return;
+    this.activeRouteRequests.delete(routeId);
+    request.next();
+    request.complete();
   }
 
   cancelStopDataLoads(): void {

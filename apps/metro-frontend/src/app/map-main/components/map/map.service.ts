@@ -4,7 +4,6 @@ import { fromLonLat, toLonLat } from 'ol/proj';
 import { createEmpty, extend, isEmpty } from 'ol/extent';
 import { Feature } from 'ol';
 import { FeatureLike } from 'ol/Feature';
-import Overlay from 'ol/Overlay';
 import { defaults as defaultControls } from 'ol/control/defaults';
 import { defaults as defaultInteractions } from 'ol/interaction/defaults';
 import { MapLayerService, LayerType } from './layers/map-layer.service';
@@ -33,10 +32,8 @@ export class MapService {
   private readonly camera = inject(MapCameraService);
 
   private map = signal<Map | null>(null);
+  private selectionTimer: ReturnType<typeof setTimeout> | null = null;
 
-  // Observable signals for component state (kept for future use)"
-  readonly isDrawing = signal<boolean>(false);
-  readonly isModifying = signal<boolean>(false);
   readonly selectedFeature = signal<FeatureLike | null>(null);
   readonly features = signal<Feature[]>([]);
   readonly zoomLevel = signal<number | null>(null);
@@ -156,76 +153,18 @@ export class MapService {
         // First feature can be Feature or RenderFeature (from vector tiles)
         const feature = features[0] as FeatureLike;
 
-        // Debug: log feature info
-        this.logger.debug('Feature clicked', {
-          id: feature.getId?.() ?? 'no-id',
-          properties: feature.getProperties(),
-          geometryType: feature.getGeometry()?.getType(),
-          isVectorTile:
-            this.vectorTileLayerService.isVectorTileFeature(feature),
-        });
-
-        // Print layer visibility status
-        this.logger.debug('Layer visibility', {
-          selection: this.layerService.isLayerVisible(LayerType.SELECTION),
-          railStations: this.layerService.isLayerVisible(
-            LayerType.RAIL_STATIONS,
-          ),
-          railRoutes: this.layerService.isLayerVisible(LayerType.RAIL_ROUTES),
-          busRoutes: this.layerService.isLayerVisible(LayerType.BUS_ROUTES),
-          bike: this.layerService.isLayerVisible(LayerType.BIKE),
-        });
-
-        // Debug: Print ALL layers on the map (including unmanaged ones)
-        const map = this.map();
-        if (map) {
-          const allLayers = map.getLayers().getArray();
-          this.logger.debug(
-            'All layers on map',
-            allLayers.map((layer, index) => ({
-              index,
-              type: layer.constructor.name,
-              visible: layer.getVisible(),
-              zIndex: layer.getZIndex(),
-              source: layer.get('source')?.constructor?.name,
-              featureCount:
-                layer.get('source')?.getFeatures?.()?.length || 'N/A',
-            })),
-          );
-
-          // Check which layer contains the clicked feature
-          const clickedFeatureId = feature.getId();
-          allLayers.forEach((layer, index) => {
-            const source = layer.get('source');
-            if (source && source.getFeatures) {
-              const layerFeatures = source.getFeatures();
-              const foundInThisLayer = layerFeatures.find(
-                (f: Feature) => f.getId() === clickedFeatureId || f === feature,
-              );
-              if (foundInThisLayer) {
-                this.logger.debug('Feature found in layer', {
-                  layerIndex: index,
-                  layerType: layer.constructor.name,
-                  visible: layer.getVisible(),
-                  zIndex: layer.getZIndex(),
-                  sourceType: source.constructor.name,
-                });
-              }
-            }
-          });
-        }
-
-        // Print all layer contents for debugging
-        this.layerService.debugPrintLayerContents();
-
         // Always trigger selection, even if it's the same feature
         // First clear the selection, then set it again to ensure the effect runs
         this.selectedFeature.set(null);
         // Use setTimeout to ensure the signal change is processed
-        setTimeout(() => {
-          this.selectedFeature.set(feature);
+        if (this.selectionTimer) clearTimeout(this.selectionTimer);
+        this.selectionTimer = setTimeout(() => {
+          this.selectionTimer = null;
+          if (this.map() === map) this.selectedFeature.set(feature);
         }, 0);
       } else {
+        if (this.selectionTimer) clearTimeout(this.selectionTimer);
+        this.selectionTimer = null;
         this.logger.debug('No features found at click, clearing selection');
         this.selectedFeature.set(null);
       }
@@ -359,23 +298,6 @@ export class MapService {
   }
 
   /**
-   * Create popup overlay
-   */
-  createPopup(element: HTMLElement, coordinates: [number, number]): Overlay {
-    const overlay = new Overlay({
-      element,
-      positioning: 'bottom-center',
-      stopEvent: false,
-      offset: [0, -10],
-    });
-
-    overlay.setPosition(fromLonLat(coordinates));
-    this.map()?.addOverlay(overlay);
-
-    return overlay;
-  }
-
-  /**
    * Get current map instance
    */
   getMap(): Map | null {
@@ -400,6 +322,8 @@ export class MapService {
    * Clear feature selection (clears the selection layer)
    */
   clearSelection(): void {
+    if (this.selectionTimer) clearTimeout(this.selectionTimer);
+    this.selectionTimer = null;
     this.logger.debug('Clearing selection layer');
     this.layerService.clearLayer(LayerType.SELECTION);
     this.selectedFeature.set(null);
@@ -409,6 +333,8 @@ export class MapService {
    * Destroy the map and clean up resources
    */
   destroy(): void {
+    if (this.selectionTimer) clearTimeout(this.selectionTimer);
+    this.selectionTimer = null;
     const map = this.map();
     this.camera.detach();
     if (map) {
@@ -424,7 +350,5 @@ export class MapService {
     });
     this.features.set([]);
     this.selectedFeature.set(null);
-    this.isDrawing.set(false);
-    this.isModifying.set(false);
   }
 }

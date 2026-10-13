@@ -22,21 +22,15 @@ export class MapLayerService {
   private readonly styleService = inject(MapLayerStyleService);
 
   // Layer visibility state
-  // Note: SUBWAY_STATIONS and SUBWAY_ROUTES are now managed by VectorTileLayerService
   private layerVisibility = signal<Map<LayerType, boolean>>(
     new Map<LayerType, boolean>([
       [LayerType.SELECTION, true], // Always visible, not toggleable
-      [LayerType.BUS_ROUTES, true], // Visible by default
-      [LayerType.BIKE, false], // Hidden by default
     ]),
   );
 
   // Vector sources for each layer (data is preserved here)
-  // Note: SUBWAY_STATIONS and SUBWAY_ROUTES are now managed by VectorTileLayerService
   private sources = new Map<LayerType, VectorSource>([
     [LayerType.SELECTION, new VectorSource()],
-    [LayerType.BUS_ROUTES, new VectorSource()],
-    [LayerType.BIKE, new VectorSource()],
   ]);
 
   // Vector layers
@@ -58,7 +52,6 @@ export class MapLayerService {
 
   /**
    * Initialize all vector layers with their styles
-   * Note: SUBWAY_STATIONS and SUBWAY_ROUTES are now managed by VectorTileLayerService
    */
   private initializeLayers(): void {
     // Selection layer - highlighted/selected features (below stops so stops are visible)
@@ -71,26 +64,6 @@ export class MapLayerService {
       }),
     );
 
-    // Bus routes layer (bus route shapes only - no stops)
-    this.layers.set(
-      LayerType.BUS_ROUTES,
-      new VectorLayer({
-        source: this.sources.get(LayerType.BUS_ROUTES),
-        style: (feature) => this.styleService.createBusRouteStyle(feature),
-        zIndex: 20, // Low - route shapes only
-      }),
-    );
-
-    // This empty layer owns the existing bike toggle. Station data and clusters
-    // are rendered by VectorTileLayerService; selected markers use SELECTION.
-    this.layers.set(
-      LayerType.BIKE,
-      new VectorLayer({
-        source: this.sources.get(LayerType.BIKE),
-        zIndex: 30,
-        visible: false,
-      }),
-    );
   }
 
   /**
@@ -128,15 +101,6 @@ export class MapLayerService {
     if (!config || !config.toggleable) return;
 
     const newVisibility = !layer.getVisible();
-
-    // Handle layer dependencies
-    if (layerType === LayerType.RAIL_ROUTES && newVisibility) {
-      // When enabling rail routes, also enable rail stations
-      this.setLayerVisibility(LayerType.RAIL_STATIONS, true);
-    } else if (layerType === LayerType.RAIL_STATIONS && !newVisibility) {
-      // When disabling rail stations, also disable rail routes
-      this.setLayerVisibility(LayerType.RAIL_ROUTES, false);
-    }
 
     // Set the toggled layer visibility
     layer.setVisible(newVisibility);
@@ -378,10 +342,6 @@ export class MapLayerService {
     this.currentZoomLevel.set(zoom);
     if (((previousZoom ?? 0) >= 12) !== ((zoom ?? 0) >= 12)) {
       this.layers.get(LayerType.SELECTION)?.changed();
-    }
-    // Station labels depend on zoom.
-    if (((previousZoom ?? 0) >= 14) !== ((zoom ?? 0) >= 14)) {
-      this.layers.get(LayerType.RAIL_STATIONS)?.changed();
     }
   }
 

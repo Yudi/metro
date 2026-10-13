@@ -1,3 +1,5 @@
+import { DestroyRef, signal } from '@angular/core';
+import { MapDataLoaderService } from './map-data-loader.service';
 import { TestBed } from '@angular/core/testing';
 import { LoggerService } from '@metro/shared/api';
 import { BIKE_STATION_FULL } from '@metro/shared/storybook-mocks';
@@ -12,6 +14,51 @@ import { MapService } from './map.service';
 import { MapStateService } from './map-state.service';
 
 describe('MapDisplayService bike tile ownership', () => {
+  it('batches overlay mutations, updates route filters independently, and stops on teardown', () => {
+    const map = signal<object | null>(null);
+    const syncVectorTileFilters = jest.fn();
+    const updateSelectedFeatures = jest.fn();
+    let disconnect: () => void = () => undefined;
+    TestBed.configureTestingModule({ providers: [
+      MapDisplayService, MapStateService,
+      { provide: CityContextService, useValue: {} },
+      { provide: MapCameraService, useValue: {} },
+      { provide: FeatureFactoryService, useValue: {} },
+      { provide: MapService, useValue: { getMap: map } },
+      { provide: MapDataLoaderService, useValue: { syncVectorTileFilters } },
+      { provide: MapSelectionDisplayService, useValue: { updateSelectedFeatures } },
+    ] });
+    const state = TestBed.inject(MapStateService);
+    const display = TestBed.inject(MapDisplayService);
+    TestBed.runInInjectionContext(() => display.connect({
+      destroyed: false,
+      onDestroy: (callback: () => void) => { disconnect = callback; return () => undefined; },
+    } as DestroyRef));
+    TestBed.tick();
+    expect(updateSelectedFeatures).not.toHaveBeenCalled();
+    map.set({});
+    TestBed.tick();
+    expect(updateSelectedFeatures).toHaveBeenCalledTimes(1);
+    expect(syncVectorTileFilters).toHaveBeenCalledTimes(1);
+
+    state.addRouteToSelection({ id: 'route-1', shortName: '100', longName: 'Centro' });
+    TestBed.tick();
+    expect(syncVectorTileFilters).toHaveBeenCalledTimes(2);
+    expect(updateSelectedFeatures).toHaveBeenCalledTimes(1);
+
+    state.addStopToSelection({ id: 'stop-1', name: 'Sé', latitude: -23.55, longitude: -46.63 });
+    state.setBikeStations([]);
+    state.addBikeStationToSelection({ id: 'bike-1', name: 'Estação', latitude: -23.55, longitude: -46.63 });
+    TestBed.tick();
+    expect(updateSelectedFeatures).toHaveBeenCalledTimes(2);
+    expect(syncVectorTileFilters).toHaveBeenCalledTimes(3);
+    disconnect();
+    state.clearAllSelections();
+    TestBed.tick();
+    expect(updateSelectedFeatures).toHaveBeenCalledTimes(2);
+    expect(syncVectorTileFilters).toHaveBeenCalledTimes(3);
+  });
+
   it('renders only selected bike overlays regardless of the detail cache size', () => {
     TestBed.configureTestingModule({
       providers: [
@@ -39,7 +86,7 @@ describe('MapDisplayService bike tile ownership', () => {
     state.setBikeStations(stations);
     display.updateMapDisplay();
     expect(createBike).not.toHaveBeenCalled();
-    expect(layers.getFeaturesFromLayer(LayerType.BIKE)).toHaveLength(0);
+    expect(layers.getAllLayers()).toHaveLength(1);
 
     const station = stations[0];
     state.selectedBikeStations.set(new Map([[station.stationId, {
@@ -50,7 +97,7 @@ describe('MapDisplayService bike tile ownership', () => {
     const marker = layers.getFeaturesFromLayer(LayerType.SELECTION)[0];
     expect(marker.get('stationData')).toBe(station);
     expect(createBike).toHaveBeenCalledTimes(1);
-    expect(layers.getFeaturesFromLayer(LayerType.BIKE)).toHaveLength(0);
+    expect(layers.getAllLayers()).toHaveLength(1);
 
     const setProperties = jest.spyOn(marker, 'setProperties');
     display.updateMapDisplay();
@@ -65,7 +112,6 @@ describe('MapDisplayService bike tile ownership', () => {
     expect(marker.get('electricBikesAvailable')).toBe(3);
 
     // The selection stays interactive even when the general bike layer is hidden.
-    layers.setLayerVisibility(LayerType.BIKE, false);
     expect(layers.getLayer(LayerType.SELECTION)?.getVisible()).toBe(true);
     state.selectedBikeStations.set(new Map());
     display.updateMapDisplay();

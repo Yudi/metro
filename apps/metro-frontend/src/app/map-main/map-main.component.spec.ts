@@ -44,6 +44,7 @@ describe('Bus', () => {
             stations: () => [],
             refreshTick: () => 0,
             fetchedAt: signal<number | null>(null),
+            mapRevision: signal<string | number | null>(null),
             activate: () => Promise.resolve(),
             disconnect: jest.fn(),
           },

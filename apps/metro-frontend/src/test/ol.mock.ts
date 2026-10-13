@@ -350,6 +350,19 @@ export class Point extends OpenLayersMockObject {
     super();
   }
 
+  getExtent(): [number, number, number, number] {
+    if (!Array.isArray(this.coordinates)) {
+      return [Number.NaN, Number.NaN, Number.NaN, Number.NaN];
+    }
+
+    const [x, y] = this.coordinates as [unknown, unknown];
+    if (typeof x !== 'number' || typeof y !== 'number') {
+      return [Number.NaN, Number.NaN, Number.NaN, Number.NaN];
+    }
+
+    return [x, y, x, y];
+  }
+
   getCoordinates(): unknown {
     return this.coordinates;
   }

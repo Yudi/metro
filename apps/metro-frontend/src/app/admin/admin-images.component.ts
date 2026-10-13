@@ -383,7 +383,7 @@ export class AdminImagesComponent {
       );
       const summary = lineLabels.join(', ');
       if (entry.service === 'train') {
-        return summary ? `${summary} · Imagem de trens` : 'Imagem de trens';
+        return summary ? `${summary} (imagem de trens)` : 'Imagem de trens';
       }
       return summary;
     }

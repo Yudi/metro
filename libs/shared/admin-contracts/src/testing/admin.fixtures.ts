@@ -35,8 +35,8 @@ export const MEDIA_STATION_FIXTURE: MediaResource = {
   identity: 'luz',
   name: 'Luz',
   scopes: [
-    { id: '1', label: 'Linha 1 · Azul' },
-    { id: '4', label: 'Linha 4 · Amarela' },
+    { id: '1', label: 'Linha 1 - Azul' },
+    { id: '4', label: 'Linha 4 - Amarela' },
   ],
 };
 

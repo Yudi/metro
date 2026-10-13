@@ -9,6 +9,7 @@ function createSidePlatforms(
   return L6_DESTINATION_CODES.map((destinationCode) => ({
     id: `l6-${stationCode.toLowerCase()}-towards-${destinationCode.toLowerCase()}`,
     direction: { destinationCodes: [destinationCode] },
+    disembarkingSide: 'right',
     platformType: 'side',
     features: [],
   }));

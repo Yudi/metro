@@ -59,10 +59,8 @@
                 <header class="favorite-header">
                   <h3>{{ stop.name }}</h3>
                   <p class="muted">
-                    Ponto {{ stopDisplayId(stop) }}
-                    @if (stop.platformCode) {
-                      · Plataforma {{ stop.platformCode }}
-                    }
+                    Ponto {{ stopDisplayId(stop)
+                    }}{{ stop.platformCode ? ', plataforma ' + stop.platformCode : '' }}
                   </p>
                 </header>
                 @let routes = getRoutesForStop(stop.stopId);

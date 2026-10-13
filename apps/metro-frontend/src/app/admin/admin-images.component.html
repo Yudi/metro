@@ -75,7 +75,7 @@
                         >{{ resourceKindLabel(resource)
                         }}{{
                           resourceScopeSummary(resource)
-                            ? " · " + resourceScopeSummary(resource)
+                            ? ", " + resourceScopeSummary(resource)
                             : ""
                         }}</span
                       >
@@ -190,18 +190,12 @@
                     }
                     <div class="entry-details">
                       <strong>{{ entry.title }}</strong>
-                      <span
-                        >{{ entry.label || "Sem rótulo" }} ·
-                        {{ entry.author }}</span
-                      >
-                      <span
-                        >{{ entry.license
-                        }}{{
-                          entryScopeSummary(entry)
-                            ? " · " + entryScopeSummary(entry)
-                            : ""
-                        }}</span
-                      >
+                      <span>{{ entry.label || "Sem rótulo" }}</span>
+                      <span>Autor: {{ entry.author }}</span>
+                      <span>{{ entry.license }}</span>
+                      @if (entryScopeSummary(entry); as scopeSummary) {
+                        <span>{{ scopeSummary }}</span>
+                      }
                       @if (entry.isDefault) {
                         <span class="default-badge">Padrão</span>
                       }
@@ -315,8 +309,8 @@
                       }
                     }
                     <span
-                      >{{ file.name }} ·
-                      {{ (file.size / 1024 / 1024).toFixed(1) }} MiB</span
+                      >{{ file.name }}
+                      ({{ (file.size / 1024 / 1024).toFixed(1) }} MiB)</span
                     >
                   </div>
                 }

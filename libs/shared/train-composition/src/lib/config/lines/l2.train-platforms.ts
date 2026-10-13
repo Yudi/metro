@@ -187,18 +187,8 @@ export const L2_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
           },
           {
             id: 'l2-pso-vmd-escalator-up-door-5',
-            type: 'escalator-up',
-            label: 'Escada rolante subindo na porta 5',
-            anchor: {
-              type: 'door',
-              carPosition: 2,
-              doorPosition: 1,
-            },
-          },
-          {
-            id: 'l2-pso-vmd-escalator-down-door-5',
-            type: 'escalator-down',
-            label: 'Escada rolante descendo na porta 5',
+            type: 'escalator-both',
+            label: 'Escada rolante em ambos os sentidos na 5ª porta',
             anchor: {
               type: 'door',
               carPosition: 2,
@@ -296,8 +286,8 @@ export const L2_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
           {
             id: 'l2-aip-vmd-stairs-rear-door-6',
             type: 'stairs',
-            label: 'Escada na 6ª porta, contando de trás para frente',
-            anchor: { type: 'door', carPosition: 5, doorPosition: 3 },
+            label: 'Escada na 6ª porta',
+            anchor: { type: 'door', carPosition: 2, doorPosition: 2 },
           },
         ],
       },

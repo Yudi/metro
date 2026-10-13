@@ -274,7 +274,7 @@ export const L1_TRAIN_PLATFORM_CONFIG = defineTrainLinePlatformConfig({
             id: 'l1-pso-jab-escalator-both-rear-door-5',
             type: 'escalator-both',
             label:
-              'Escada rolante de subida e descida na 5ª porta, contando de trás para frente',
+              'Escada rolante em ambos os sentidos na 5ª porta, contando de trás para frente',
             anchor: { type: 'door', carPosition: 5, doorPosition: 4 },
           },
           {

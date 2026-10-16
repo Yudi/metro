@@ -20,7 +20,6 @@
     @if (headerImage(); as image) {
       <app-transit-place-photo [image]="image" [priority]="true"
         (imageError)="onHeaderImageError()" />
-      <app-transit-place-photo-credit class="station-photo-credit" [image]="image" />
     }
     <app-dialog-header
       icon="train"
@@ -288,6 +287,9 @@
               </div>
             }
 
+            @if (headerImage(); as image) {
+              <app-transit-place-photo-credit class="station-photo-credit" [image]="image" />
+            }
           </div>
         </ng-template>
       </mat-tab>

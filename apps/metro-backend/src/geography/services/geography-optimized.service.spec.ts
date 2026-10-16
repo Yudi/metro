@@ -146,6 +146,24 @@ describe('GeographyServiceOptimized route full data', () => {
 });
 
 describe('GeographyServiceOptimized precomputed rail connections', () => {
+  it('omits precomputed counts for badge metadata and caches the two projections separately', async () => {
+    const prisma = { $queryRaw: jest.fn().mockResolvedValue([]) };
+    const service = new GeographyServiceOptimized(
+      prisma as never, {} as never, {} as never, {} as never, {} as never, {} as never,
+    );
+
+    await Promise.all([
+      service.getRouteRailConnectionsForStop('stop-1', ['route-1'], false),
+      service.getRouteRailConnectionsForStop('stop-1', ['route-1'], false),
+    ]);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(prisma.$queryRaw.mock.calls[0].slice(1)).toContain(false);
+
+    await service.getRouteRailConnectionsForStop('stop-1', ['route-1']);
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+    expect(prisma.$queryRaw.mock.calls[1].slice(1)).toContain(true);
+  });
+
   it('hydrates indexed GeoSampa station hits with one database query', async () => {
     const prisma = {
       $queryRaw: jest.fn().mockResolvedValue([
@@ -211,19 +229,9 @@ describe('GeographyServiceOptimized precomputed rail connections', () => {
     const query = (prisma.$queryRaw.mock.calls[0][0] as TemplateStringsArray)
       .join(' ')
       .replace(/\s+/g, ' ');
-    expect(query).toContain('COUNT(*)::INTEGER');
-    expect(query).toContain('COUNT(DISTINCT stops_until) = 1');
-    expect(query).toContain('origin.stop_id = hit.from_stop_id');
-    expect(query).toContain('near_stop.stop_sequence = hit.near_stop_sequence');
-    expect(query).toContain(
-      'between_stop.stop_sequence > origin.stop_sequence',
-    );
-    expect(query).toContain(
-      'between_stop.stop_sequence <= near_stop.stop_sequence',
-    );
-    expect(query).not.toContain(
-      'near_stop.stop_sequence - origin.stop_sequence',
-    );
+    expect(query).toContain('THEN hit.stops_until ELSE NULL END AS stops_until');
+    expect(query).not.toContain('Gtfs_StopTime');
+    expect(query).not.toContain('Gtfs_Trip');
   });
 
   it('deduplicates sibling-stop station hits when their stop counts agree', async () => {

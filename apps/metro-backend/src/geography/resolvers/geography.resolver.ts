@@ -9,8 +9,8 @@ import {
   ResolveField,
 } from '@nestjs/graphql';
 import { GraphQLResolveInfo } from 'graphql';
-import { UseGuards, ValidationPipe } from '@nestjs/common';
-import { GeographyServiceOptimized } from '../services/geography-optimized.service';
+import { PayloadTooLargeException, UseGuards, ValidationPipe } from '@nestjs/common';
+import { GeographyServiceOptimized, MAX_STOP_FULL_DATA_ROUTES } from '../services/geography-optimized.service';
 import { BusDirectionService } from '../services/bus-direction.service';
 import {
   BusStop,
@@ -414,20 +414,60 @@ export class GeographyResolver {
 
 @Resolver(() => StopFullData)
 export class StopFullDataResolver {
+  private readonly metadataLoads = new WeakMap<StopFullDataParent, Promise<BusRoute[]>>();
+
   constructor(
     private readonly geographyService: GeographyServiceOptimized,
     private readonly directions: BusDirectionService,
   ) {}
+
+  @ResolveField(() => [BusRoute])
+  routeMetadata(@Parent() parent: StopFullDataParent): Promise<BusRoute[]> {
+    let pending = this.metadataLoads.get(parent);
+    if (!pending) {
+      pending = this.geographyService.getRoutesForMultipleStops([parent.stop.stopId])
+        .then((routes) => {
+          const metadata = routes.get(parent.stop.stopId) ?? [];
+          if (metadata.length > MAX_STOP_FULL_DATA_ROUTES) {
+            throw new PayloadTooLargeException(
+              `Stop route details exceed the maximum of ${MAX_STOP_FULL_DATA_ROUTES}`,
+            );
+          }
+          return metadata;
+        });
+      this.metadataLoads.set(parent, pending);
+    }
+    return pending;
+  }
+
+  @ResolveField(() => [RouteRailConnection], { nullable: true })
+  async railConnections(
+    @Parent() parent: StopFullDataParent,
+    @Args('includeStopCounts', { type: () => Boolean, defaultValue: true })
+    includeStopCounts = true,
+  ): Promise<RouteRailConnection[]> {
+    const routes = await this.routeMetadata(parent);
+    return this.geographyService.getRouteRailConnectionsForStop(
+      parent.stop.stopId,
+      routes.map((route) => route.routeId),
+      includeStopCounts,
+    );
+  }
 
   @ResolveField(() => [RouteFullData])
   async routes(
     @Parent() parent: StopFullDataParent,
     @Info() info: GraphQLResolveInfo,
   ): Promise<RouteFullData[]> {
-    const routes = await this.geographyService.getStopRoutesFullData(
-      parent.stop.stopId,
-      requestedRouteFullDataOptions(info),
-    );
+    const options = requestedRouteFullDataOptions(info);
+    const routes: RouteFullData[] = options.includeTrips || options.includeShapes || options.includeStops
+      ? await this.geographyService.getStopRoutesFullData(parent.stop.stopId, options)
+      : (await this.routeMetadata(parent)).map((route) => ({
+          route,
+          trips: [],
+          shapes: [],
+          stops: [],
+        }));
     const directions = await this.directions.forRoutes(
       routes.map(({ route }) => route.routeId),
       parent.stop.stopId,

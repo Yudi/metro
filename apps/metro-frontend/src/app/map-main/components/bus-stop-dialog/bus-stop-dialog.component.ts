@@ -19,6 +19,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import {
   BusStopGraphQL,
   BusRouteGraphQL,
+  RouteRailConnectionGraphQL,
 } from '../../geography/geography-graphql.service';
 import { FavoritesService, LoggerService } from '@metro/shared/api';
 import { StopArrivalsComponent } from '../stop-arrivals/stop-arrivals.component';
@@ -55,6 +56,9 @@ export interface BusStopDialogData {
   onSelectRoute?: (routeId: string) => void;
   routesLoading?: boolean;
   routesError?: boolean;
+  railConnections?: RouteRailConnectionGraphQL[] | null;
+  railConnectionsLoading?: boolean;
+  railConnectionsError?: boolean;
   terminalReturn?: BusTerminalReturnData;
   terminalViewState?: BusTerminalViewState;
   onOpenTerminal?: (terminal: BusTerminalReturnData) => void;
@@ -101,6 +105,9 @@ export class BusStopDialogComponent {
   readonly routes = signal(this.data.routes);
   readonly routesLoading = signal(this.data.routesLoading ?? false);
   readonly routesError = signal(this.data.routesError ?? false);
+  readonly railConnections = signal(this.data.railConnections ?? null);
+  readonly railConnectionsLoading = signal(this.data.railConnectionsLoading ?? false);
+  readonly railConnectionsError = signal(this.data.railConnectionsError ?? false);
   private readonly terminals = inject(BusTerminalsService);
   private readonly images = inject(StationImagesService);
   private readonly explicitTerminalReturn = signal(this.data.terminalReturn);
@@ -247,6 +254,9 @@ export class BusStopDialogComponent {
     this.routes.set(data.routes);
     this.routesLoading.set(data.routesLoading ?? false);
     this.routesError.set(data.routesError ?? false);
+    this.railConnections.set(data.railConnections ?? null);
+    this.railConnectionsLoading.set(data.railConnectionsLoading ?? false);
+    this.railConnectionsError.set(data.railConnectionsError ?? false);
   }
 
   onHeaderImageError(): void {

@@ -127,6 +127,36 @@ describe('StopArrivalsComponent', () => {
     expect(fixture.componentInstance.getLineRouteTextColor(line)).toBe('#ffffff');
   });
 
+  it('uses streamed rail metadata without making another browser request', () => {
+    const geography = TestBed.inject(GeographyGraphQLService);
+    const lookup = jest.mocked(geography.getRouteRailConnectionsForStop);
+    lookup.mockClear();
+    fixture.componentRef.setInput('railConnectionsPending', true);
+    fixture.componentRef.setInput('routes', [{ ...route }]);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.railConnectionsLoading()).toBe(true);
+    expect(lookup).not.toHaveBeenCalled();
+
+    fixture.componentRef.setInput('railConnectionsOverride', [connection]);
+    fixture.componentRef.setInput('railConnectionsPending', false);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.railConnections().get(route.routeId)).toEqual(connection);
+    expect(fixture.componentInstance.routeServesRail(route)).toBe(true);
+    expect(fixture.componentInstance.railConnectionsLoading()).toBe(false);
+    expect(lookup).not.toHaveBeenCalled();
+  });
+
+  it('keeps its realtime subscription and predictions when stop metadata refreshes', () => {
+    const realtime = TestBed.inject(RealtimeWebsocketService);
+    const subscribe = jest.mocked(realtime.subscribeToStop);
+    const predictions = fixture.componentInstance.arrivals();
+    subscribe.mockClear();
+    fixture.componentRef.setInput('stop', { ...stop, name: 'Updated stop name' });
+    fixture.detectChanges();
+    expect(subscribe).not.toHaveBeenCalled();
+    expect(fixture.componentInstance.arrivals()).toBe(predictions);
+  });
+
   it('uses readable fallback colors for blank feed colors and unmatched arrival lines', () => {
     fixture.componentRef.setInput('routes', [{ ...route, color: '', textColor: '' }]);
     fixture.detectChanges();

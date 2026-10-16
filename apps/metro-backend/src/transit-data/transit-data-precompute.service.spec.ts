@@ -86,7 +86,7 @@ describe('TransitDataPrecomputeService', () => {
       .mockResolvedValueOnce([{ source_signature: 'rail-hash' }])
       .mockResolvedValueOnce([
         {
-          source_signature: 'v2:radius=200:gtfs=gtfs-hash:rail=rail-hash',
+          source_signature: 'v3:radius=200:gtfs=gtfs-hash:rail=rail-hash',
         },
       ]);
 
@@ -106,7 +106,7 @@ describe('TransitDataPrecomputeService', () => {
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([{ source_signature: 'rail-hash' }])
       .mockResolvedValueOnce([
-        { source_signature: 'v2:radius=200:gtfs=gtfs-hash:rail=rail-hash' },
+        { source_signature: 'v3:radius=200:gtfs=gtfs-hash:rail=rail-hash' },
       ]);
 
     await service.refreshAfterGtfsImport();
@@ -197,6 +197,24 @@ describe('TransitDataPrecomputeService', () => {
     expect(query).toContain('file."recordCount" > 0');
     expect(query).toContain('HAVING COUNT(DISTINCT file."fileName")');
     expect(query).not.toContain('COALESCE(file."recordCount", 0) <= 0');
+  });
+
+  it('refreshes rail stop counts when upgrading an unchanged feed from v2', async () => {
+    prisma.$queryRaw
+      .mockResolvedValueOnce([{ source_signature: 'rail-hash' }])
+      .mockResolvedValueOnce([{
+        source_signature: 'v2:radius=200:gtfs=gtfs-hash:rail=rail-hash',
+      }]);
+
+    await service.refreshRouteRailConnections('gtfs-hash');
+
+    expect(prisma.$executeRawUnsafe).toHaveBeenCalledWith(
+      'REFRESH MATERIALIZED VIEW CONCURRENTLY "public"."route_rail_connection_hits"',
+    );
+    expect(prisma.$executeRaw.mock.calls[0].slice(1)).toEqual([
+      'route-rail-connections',
+      'v3:radius=200:gtfs=gtfs-hash:rail=rail-hash',
+    ]);
   });
 
   it('does not mark a failed materialized-view refresh as current', async () => {

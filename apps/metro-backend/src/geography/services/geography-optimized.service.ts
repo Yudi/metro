@@ -17,13 +17,14 @@ import {
 } from '../entities/geography.entity';
 import { BoundingBoxInput, StopSearchInput } from '../dto/geography.input';
 import { mapBusRoute } from './bus-catalog.utils';
+import { AsyncTtlCache } from '../../common/cache/async-ttl-cache';
 
 const MAX_BUS_STOP_LIMIT = 100_000;
 const MAX_BUS_ROUTE_LIMIT = 10_000;
 const MAX_BUS_SHAPE_LIMIT = 500;
 const MAX_BATCH_IDS = 500;
 const MAX_ROUTE_RAIL_CONNECTION_ROUTES = 100;
-const MAX_STOP_FULL_DATA_ROUTES = 100;
+export const MAX_STOP_FULL_DATA_ROUTES = 100;
 // Limit nested route expansions to avoid exhausting the database pool.
 const STOP_FULL_DATA_CONCURRENCY = 2;
 
@@ -40,6 +41,7 @@ export interface RouteFullDataOptions {
 @Injectable()
 export class GeographyServiceOptimized {
   private readonly logger = new Logger(GeographyServiceOptimized.name);
+  private readonly railConnectionsCache = new AsyncTtlCache<RouteRailConnection[]>(60_000, 256);
 
   constructor(
     private prisma: PrismaService,
@@ -246,6 +248,7 @@ export class GeographyServiceOptimized {
   async getRouteRailConnectionsForStop(
     stopId: string,
     routeIds: string[],
+    includeStopCounts = true,
   ): Promise<RouteRailConnection[]> {
     const uniqueRouteIds = Array.from(
       new Set(routeIds.map((routeId) => routeId.trim()).filter(Boolean)),
@@ -260,6 +263,18 @@ export class GeographyServiceOptimized {
         `Route rail connections support at most ${MAX_ROUTE_RAIL_CONNECTION_ROUTES} routes`,
       );
     }
+
+    return this.railConnectionsCache.getOrLoad(
+      JSON.stringify([normalizedStopId, uniqueRouteIds, includeStopCounts]),
+      () => this.loadRouteRailConnectionsForStop(normalizedStopId, uniqueRouteIds, includeStopCounts),
+    );
+  }
+
+  private async loadRouteRailConnectionsForStop(
+    normalizedStopId: string,
+    uniqueRouteIds: string[],
+    includeStopCounts: boolean,
+  ): Promise<RouteRailConnection[]> {
 
     const rows = await this.prisma.$queryRaw<
       Array<{
@@ -303,59 +318,6 @@ export class GeographyServiceOptimized {
         INNER JOIN expanded_stops expanded
           ON expanded.source_stop_id = hit.from_stop_id
         WHERE hit.route_id = ANY(${uniqueRouteIds}::TEXT[])
-      ),
-      candidate_stop_counts AS (
-        SELECT DISTINCT
-          hit.from_stop_id,
-          hit.route_id,
-          hit.direction_id,
-          hit.trip_headsign,
-          hit.station_id,
-          hit.near_stop_id,
-          hit.near_stop_sequence,
-          (
-            SELECT COUNT(*)::INTEGER
-            FROM "public"."Gtfs_StopTime" between_stop
-            WHERE between_stop.trip_id = trip.trip_id
-              AND between_stop.stop_sequence > origin.stop_sequence
-              AND between_stop.stop_sequence <= near_stop.stop_sequence
-          ) AS stops_until
-        FROM matched_hits hit
-        INNER JOIN "public"."Gtfs_Trip" trip
-          ON trip.route_id = hit.route_id
-          AND trip.direction_id = hit.direction_id
-          AND trip.trip_headsign = hit.trip_headsign
-        INNER JOIN "public"."Gtfs_StopTime" origin
-          ON origin.trip_id = trip.trip_id
-          AND origin.stop_id = hit.from_stop_id
-        INNER JOIN "public"."Gtfs_StopTime" near_stop
-          ON near_stop.trip_id = trip.trip_id
-          AND near_stop.stop_id = hit.near_stop_id
-          AND near_stop.stop_sequence = hit.near_stop_sequence
-        WHERE near_stop.stop_sequence > origin.stop_sequence
-      ),
-      matched_stop_counts AS (
-        SELECT
-          from_stop_id,
-          route_id,
-          direction_id,
-          trip_headsign,
-          station_id,
-          near_stop_id,
-          near_stop_sequence,
-          CASE
-            WHEN COUNT(DISTINCT stops_until) = 1 THEN MIN(stops_until)
-            ELSE NULL
-          END AS stops_until
-        FROM candidate_stop_counts
-        GROUP BY
-          from_stop_id,
-          route_id,
-          direction_id,
-          trip_headsign,
-          station_id,
-          near_stop_id,
-          near_stop_sequence
       )
       SELECT
         hit.route_id,
@@ -371,16 +333,8 @@ export class GeographyServiceOptimized {
         hit.agencies,
         hit.lines,
         hit.distance_meters,
-        matched_count.stops_until
+        CASE WHEN ${includeStopCounts} THEN hit.stops_until ELSE NULL END AS stops_until
       FROM matched_hits hit
-      LEFT JOIN matched_stop_counts matched_count
-        ON matched_count.from_stop_id = hit.from_stop_id
-        AND matched_count.route_id = hit.route_id
-        AND matched_count.direction_id = hit.direction_id
-        AND matched_count.trip_headsign = hit.trip_headsign
-        AND matched_count.station_id = hit.station_id
-        AND matched_count.near_stop_id = hit.near_stop_id
-        AND matched_count.near_stop_sequence = hit.near_stop_sequence
       ORDER BY
         hit.route_short_name,
         CASE WHEN hit.route_id LIKE 'artesp:%' THEN 1 ELSE 0 END,

@@ -55,7 +55,7 @@ import type {
   BusStopGraphQL,
   StopFullDataSnapshot,
 } from '../map-main/geography/geography-graphql.service';
-import { GeographyGraphQLService } from '../map-main/geography/geography-graphql.service';
+import { GeographyGraphQLService, hasStopRouteErrors } from '../map-main/geography/geography-graphql.service';
 import { TypesenseSearchService } from '../search/typesense-search.service';
 import { TransitSearchFieldComponent } from '../shared/components/transit-search-field/transit-search-field.component';
 
@@ -238,6 +238,8 @@ export class OmniboxResultPageComponent {
                 ...current.data,
                 routesLoading: false,
                 routesError: true,
+                railConnectionsLoading: false,
+                railConnectionsError: true,
               },
             },
           };
@@ -265,7 +267,7 @@ export class OmniboxResultPageComponent {
         : (snapshot.routes ?? []).map(({ route }) => route);
     const routesError =
       previousDetail?.data.routesError === true ||
-      (snapshot.errors?.length ?? 0) > 0 ||
+      hasStopRouteErrors(snapshot) ||
       (!snapshot.hasNext && snapshot.routes === undefined);
     const detail: Detail = {
       kind: 'bus-stop',
@@ -293,8 +295,12 @@ export class OmniboxResultPageComponent {
             } },
           );
         },
-        routesLoading: snapshot.hasNext && !routesError,
+        routesLoading: snapshot.routes === undefined && snapshot.hasNext && !routesError,
         routesError,
+        railConnections: snapshot.railConnections ?? previousDetail?.data.railConnections,
+        railConnectionsLoading: snapshot.railConnections === undefined && snapshot.hasNext,
+        railConnectionsError: snapshot.railConnections === null ||
+          (!snapshot.hasNext && snapshot.railConnections === undefined),
       },
       mapParams: {
         openStop: stop.stopId || requestedStopId,

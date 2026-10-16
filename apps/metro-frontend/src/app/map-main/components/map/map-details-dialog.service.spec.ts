@@ -222,8 +222,11 @@ describe('MapDetailsDialogService map-panel lifecycle', () => {
     stopRequest.next({
       stop: updatedStop,
       routes: [{ route }],
-      hasNext: false,
+      hasNext: true,
     });
+    expect((firstPanel?.ref.data as { routesLoading: boolean }).routesLoading).toBe(false);
+    expect((firstPanel?.ref.data as { routes: BusRouteGraphQL[] }).routes).toEqual([route]);
+    stopRequest.next({ stop: updatedStop, routes: [{ route }], railConnections: [], hasNext: false });
     stopRequest.complete();
     await pendingDetails;
 
@@ -382,6 +385,24 @@ describe('MapDetailsDialogService map-panel lifecycle', () => {
       }
     },
   );
+
+  it('keeps route metadata usable when a rail lookup fails', async () => {
+    const stopRequest = new Subject<StopFullDataSnapshot>();
+    geographyService.watchStopFullData.mockReturnValue(stopRequest.asObservable());
+    const pendingDetails = service.showRoutesForStop(stop.stopId, stop);
+    stopRequest.next({
+      stop, routes: [], railConnections: null, hasNext: false,
+      errors: [{ message: 'Rail lookup failed', path: ['stopFullData', 'railConnections'] }],
+    });
+    stopRequest.complete();
+    await pendingDetails;
+    const data = panelService.panel()?.ref.data as {
+      routesLoading: boolean; routesError: boolean; railConnectionsError: boolean;
+    };
+    expect(data.routesLoading).toBe(false);
+    expect(data.routesError).toBe(false);
+    expect(data.railConnectionsError).toBe(true);
+  });
 
   it.each([
     { name: 'while routes are pending', completeBeforeAdd: false },

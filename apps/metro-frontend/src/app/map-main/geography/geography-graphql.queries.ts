@@ -1,3 +1,23 @@
+export const RAIL_CONNECTION_METADATA_FIELDS = `
+    routeId
+    routeShortName
+    directions {
+      directionId
+      headsign
+      stations {
+        id
+        name
+        lines
+        distanceMeters
+      }
+    }
+  `;
+
+export const RAIL_CONNECTION_FIELDS = `
+    ${RAIL_CONNECTION_METADATA_FIELDS}
+    directions { stations { stopsUntil } }
+  `;
+
 export const STOP_FIELDS = `
     id
     stopId
@@ -14,12 +34,7 @@ export const STOP_FIELDS = `
     mergedStopIds
   `;
 
-export const ROUTE_FIELDS = `
-    favoriteCode
-    requestedCode
-    destination
-    isCircular
-    directionId
+export const ROUTE_METADATA_FIELDS = `
     id
     routeId
     shortName
@@ -33,4 +48,13 @@ export const ROUTE_FIELDS = `
       price
       currency
     }
+  `;
+
+export const ROUTE_FIELDS = `
+    favoriteCode
+    requestedCode
+    destination
+    isCircular
+    directionId
+    ${ROUTE_METADATA_FIELDS}
   `;

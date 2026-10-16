@@ -6,6 +6,7 @@ import { Observable, Subject } from 'rxjs';
 import type {
   BusStopGraphQL,
   RouteFullDataGraphQL,
+  RouteRailConnectionGraphQL,
 } from './geography-graphql.service';
 import { GeographyGraphQLService } from './geography-graphql.service';
 
@@ -14,6 +15,9 @@ interface RawStopFullDataResult {
     stopFullData?: {
       stop?: BusStopGraphQL | null;
       routes?: RouteFullDataGraphQL[] | null;
+      routeMetadata?: RouteFullDataGraphQL['route'][] | null;
+      railConnections?: RouteRailConnectionGraphQL[] | null;
+      railConnectionsWithStopCounts?: RouteRailConnectionGraphQL[] | null;
     } | null;
   };
   errors?: readonly { message: string; path?: readonly (string | number)[] }[];
@@ -113,6 +117,8 @@ describe('GeographyGraphQLService incremental stop query', () => {
     service = TestBed.inject(GeographyGraphQLService);
   });
 
+  afterEach(() => jest.restoreAllMocks());
+
   it('shares active consumers, delivers stop before routes, then allows a fresh query', () => {
     const updates = new Subject<RawStopFullDataResult>();
     query.mockReturnValue(updates.asObservable());
@@ -181,5 +187,67 @@ describe('GeographyGraphQLService incremental stop query', () => {
 
     expect(query).toHaveBeenCalledTimes(2);
     retrySubscription.unsubscribe();
+  });
+
+  it('delivers colors before deferred directions and caches only complete metadata for one minute', () => {
+    const now = jest.spyOn(Date, 'now').mockReturnValue(1000);
+    const updates = new Subject<RawStopFullDataResult>();
+    query.mockReturnValue(updates.asObservable());
+    const values: unknown[] = [];
+    const route = {
+      id: 'route-1', routeId: 'route-1', shortName: '100',
+      longName: 'Centro', color: '006341', textColor: 'ffffff',
+    };
+    const subscription = service.watchStopFullData(stop.stopId)
+      .subscribe((value) => values.push(value));
+
+    expect(query.mock.calls[0][0]).toContain('routeMetadata');
+    const metadataFields = query.mock.calls[0][0].split('routeMetadata {')[1].split('... @defer')[0];
+    expect(metadataFields).not.toContain('directionId');
+    expect(query.mock.calls[0][0]).toContain('railConnections(includeStopCounts: false)');
+    expect(query.mock.calls[0][0]).toContain('@defer(label: "stopRailConnectionCounts")');
+    updates.next({ data: { stopFullData: { stop, routeMetadata: [route] } }, hasNext: true });
+    expect(values).toEqual([{ stop, routes: [{ route }], hasNext: true }]);
+
+    updates.next({ data: { stopFullData: {
+      stop, routeMetadata: [route], routes: [{ route }],
+      railConnections: [], railConnectionsWithStopCounts: [],
+    } }, hasNext: false });
+    updates.complete();
+    subscription.unsubscribe();
+
+    const cached: unknown[] = [];
+    service.watchStopFullData(stop.stopId).subscribe((value) => cached.push(value));
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(cached).toEqual([values[1]]);
+
+    now.mockReturnValue(61_001);
+    const retry = service.watchStopFullData(stop.stopId).subscribe();
+    expect(query).toHaveBeenCalledTimes(2);
+    retry.unsubscribe();
+    now.mockRestore();
+  });
+
+  it('keeps exact stop counts when the lightweight rail patch arrives later', () => {
+    const updates = new Subject<RawStopFullDataResult>();
+    query.mockReturnValue(updates.asObservable());
+    const values: unknown[] = [];
+    service.watchStopFullData(stop.stopId).subscribe((value) => values.push(value));
+    const detailed: RouteRailConnectionGraphQL[] = [{
+      routeId: 'route-1', routeShortName: '100', directions: [{
+        directionId: 0, headsign: 'Centro', stations: [{
+          id: 'station-1', name: 'Sé', lines: ['Azul'], distanceMeters: 50, stopsUntil: 3,
+        }],
+      }],
+    }];
+    updates.next({ data: { stopFullData: { stop, railConnectionsWithStopCounts: detailed } }, hasNext: true });
+    updates.next({ data: { stopFullData: {
+      stop, railConnections: [], railConnectionsWithStopCounts: detailed,
+    } }, hasNext: false });
+    updates.complete();
+    expect(values).toEqual([
+      { stop, railConnections: detailed, hasNext: true },
+      { stop, railConnections: detailed, hasNext: false },
+    ]);
   });
 });

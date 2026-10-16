@@ -285,10 +285,21 @@ export class StopFullData {
   @Field(() => BusStop, { description: 'The stop information' })
   stop!: BusStop;
 
+  @Field(() => [BusRoute], {
+    description: 'Lightweight route metadata without direction or geometry expansion',
+  })
+  routeMetadata!: BusRoute[];
+
   @Field(() => [RouteFullData], {
     description: 'Full data for all routes passing through this stop',
   })
   routes!: RouteFullData[];
+
+  @Field(() => [RouteRailConnection], {
+    nullable: true,
+    description: 'Downstream rail connections for routes serving this stop',
+  })
+  railConnections?: RouteRailConnection[] | null;
 }
 
 @ObjectType()

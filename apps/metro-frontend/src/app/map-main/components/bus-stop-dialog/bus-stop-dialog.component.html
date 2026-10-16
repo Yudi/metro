@@ -35,6 +35,9 @@
     <app-stop-arrivals
       [stop]="stop()"
       [routes]="routesSortedByFavorite()"
+      [railConnectionsOverride]="railConnections()"
+      [railConnectionsPending]="railConnectionsLoading()"
+      [railConnectionsFailed]="railConnectionsError()"
       [selectedRoutes]="selectedRouteIds()"
       [showMapActions]="showRouteMapActions"
       [embedded]="true"

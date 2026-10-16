@@ -107,6 +107,9 @@ export class StopArrivalsComponent {
       Omit<BusStopGraphQL, 'id' | 'latitude' | 'longitude' | 'isSubwayStation'>
     >();
   routes = input<BusRouteGraphQL[]>([]);
+  readonly railConnectionsOverride = input<RouteRailConnectionGraphQL[] | null>(null);
+  readonly railConnectionsPending = input(false);
+  readonly railConnectionsFailed = input(false);
   selectedRoutes = input<Set<string>>(new Set());
   showMapActions = input(false);
   compact = input(false);
@@ -201,6 +204,7 @@ export class StopArrivalsComponent {
   readonly hasRealtimeSupport = computed(
     () => getSptransStopCode(this.stop()) !== null,
   );
+  private readonly realtimeStopCode = computed(() => getSptransStopCode(this.stop()));
   readonly hasArtespSchedules = computed(() => hasArtespStopData(this.stop()));
 
   readonly stationLineBadges = computed(() => {
@@ -330,8 +334,7 @@ export class StopArrivalsComponent {
 
     // Watch for stop changes and subscribe
     effect((onCleanup) => {
-      const stop = this.stop();
-      const realtimeStopCode = getSptransStopCode(stop);
+      const realtimeStopCode = this.realtimeStopCode();
       let loadingTimeout: ReturnType<typeof setTimeout> | undefined;
       let releaseStopSubscription: (() => void) | undefined;
 
@@ -366,8 +369,7 @@ export class StopArrivalsComponent {
 
     // Separate effect to watch for arrival updates
     effect(() => {
-      const stop = this.stop();
-      const realtimeStopCode = getSptransStopCode(stop);
+      const realtimeStopCode = this.realtimeStopCode();
       if (realtimeStopCode) {
         const allArrivals = this.realtimeService.stopArrivals();
         const stopArrivals = allArrivals.get(realtimeStopCode);
@@ -411,6 +413,16 @@ export class StopArrivalsComponent {
     });
 
     effect((onCleanup) => {
+      const connections = this.railConnectionsOverride();
+      const pending = this.railConnectionsPending();
+      const failed = this.railConnectionsFailed();
+      if (connections !== null || pending || failed) {
+        this.setRailConnections(connections ?? []);
+        this.railConnectionsLoading.set(pending);
+        this.railConnectionsError.set(failed);
+        return;
+      }
+
       const stop = this.stop();
       const routeIds = getUniqueRouteIds(this.routes());
 
@@ -428,16 +440,7 @@ export class StopArrivalsComponent {
         .getRouteRailConnectionsForStop(stop.stopId, routeIds)
         .subscribe({
           next: (connections) => {
-            const connectionMap = new Map<string, RouteRailConnectionGraphQL>();
-
-            for (const connection of connections) {
-              connectionMap.set(connection.routeId, connection);
-              if (!/^artesp[:/]/i.test(connection.routeId)) {
-                connectionMap.set(connection.routeShortName, connection);
-              }
-            }
-
-            this.railConnections.set(connectionMap);
+            this.setRailConnections(connections);
             this.railConnectionsLoading.set(false);
           },
           error: () => {
@@ -449,6 +452,17 @@ export class StopArrivalsComponent {
 
       onCleanup(() => subscription.unsubscribe());
     });
+  }
+
+  private setRailConnections(connections: RouteRailConnectionGraphQL[]): void {
+    const connectionMap = new Map<string, RouteRailConnectionGraphQL>();
+    for (const connection of connections) {
+      connectionMap.set(connection.routeId, connection);
+      if (!/^artesp[:/]/i.test(connection.routeId)) {
+        connectionMap.set(connection.routeShortName, connection);
+      }
+    }
+    this.railConnections.set(connectionMap);
   }
 
   /**

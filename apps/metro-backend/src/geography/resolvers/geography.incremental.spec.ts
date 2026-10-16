@@ -13,6 +13,83 @@ import {
 } from './geography.resolver';
 
 describe('geography incremental GraphQL delivery', () => {
+  it('delivers colors and precomputed rail badges while directions and exact stop counts are pending', async () => {
+    const module = await Test.createTestingModule({
+      imports: [GraphQLSchemaBuilderModule],
+    }).compile();
+    const directions = deferred<unknown[]>();
+    const rail = deferred<unknown[]>();
+    const counts = deferred<unknown[]>();
+    const route = { routeId: 'route-1', shortName: '100', color: '006341' };
+    const geographyService = {
+      getBusStop: jest.fn().mockResolvedValue({ stopId: 'stop-1' }),
+      getRoutesForMultipleStops: jest.fn().mockResolvedValue(new Map([['stop-1', [route]]])),
+      getStopRoutesFullData: jest.fn(() => directions.promise),
+      getRouteRailConnectionsForStop: jest.fn((_stopId, _routes, includeStopCounts) =>
+        includeStopCounts ? counts.promise : rail.promise),
+    };
+    const geographyResolver = new GeographyResolver(
+      geographyService as never, {} as never, {} as never, {} as never,
+    );
+    const stopResolver = new StopFullDataResolver(
+      geographyService as never, { forRoutes: jest.fn(() => directions.promise) } as never,
+    );
+    try {
+      const schema = await module.get(GraphQLSchemaFactory).create([
+        GeographyResolver, StopFullDataResolver, RouteFullDataResolver,
+      ]);
+      attachGeographyResolvers(schema, geographyResolver, stopResolver,
+        new RouteFullDataResolver(geographyService as never));
+      const yoga = createYoga({ schema, plugins: [useDeferStream()], logging: false });
+      const response = await yoga.fetch('http://localhost/graphql', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'multipart/mixed; deferSpec=20220824' },
+        body: JSON.stringify({ query: `{
+          stopFullData(stopId: "stop-1") {
+            stop { stopId }
+            routeMetadata { shortName color }
+            ... @defer(label: "directions") { routes { route { shortName } } }
+            ... @defer(label: "rail") {
+              railConnections(includeStopCounts: false) { routeId directions { stations { name } } }
+            }
+            ... @defer(label: "counts") {
+              railConnectionsWithStopCounts: railConnections {
+                routeId directions { stations { name stopsUntil } }
+              }
+            }
+          }
+        }` }),
+      });
+      expect(response.status).toBe(200);
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('Expected an incremental response stream');
+      const initial = await readUntil(reader, '"color":"006341"');
+      expect(initial).toContain('"routeMetadata"');
+      expect(initial).not.toContain('"routes":');
+      expect(initial).not.toContain('"railConnections":');
+
+      rail.resolve([{ routeId: 'route-1', directions: [{ stations: [{ name: 'Sé' }] }] }]);
+      const badges = await readUntil(reader, '"name":"Sé"');
+      expect(badges).not.toContain('"stopsUntil"');
+      expect(badges).not.toContain('"routes":');
+      expect(geographyService.getRouteRailConnectionsForStop).toHaveBeenCalledWith('stop-1', ['route-1'], false);
+      expect(geographyService.getRoutesForMultipleStops).toHaveBeenCalledTimes(1);
+
+      expect(geographyService.getStopRoutesFullData).not.toHaveBeenCalled();
+      directions.resolve([route]);
+      await readUntil(reader, '"routes":');
+      counts.resolve([{ routeId: 'route-1', directions: [{ stations: [{ name: 'Sé', stopsUntil: 3 }] }] }]);
+      const details = await readUntil(reader, '"stopsUntil":3');
+      expect(details).toContain('"railConnectionsWithStopCounts"');
+      await reader.cancel();
+    } finally {
+      directions.resolve([]);
+      rail.resolve([]);
+      counts.resolve([]);
+      await module.close();
+    }
+  });
+
   it.each([true, false, undefined])('delivers stop fields before deferred routes with isCircular=%s', async (isCircular) => {
     const module = await Test.createTestingModule({
       imports: [GraphQLSchemaBuilderModule],
@@ -255,6 +332,10 @@ function attachGeographyResolvers(
     _context,
     info,
   ) => stopFullDataResolver.routes(parent as never, info);
+  const stopFields = objectType(schema, 'StopFullData').getFields();
+  stopFields.routeMetadata.resolve = (parent) => stopFullDataResolver.routeMetadata(parent as never);
+  stopFields.railConnections.resolve = (parent, args) =>
+    stopFullDataResolver.railConnections(parent as never, args.includeStopCounts);
   const routeFields = objectType(schema, 'RouteFullData').getFields();
   routeFields.trips.resolve = (parent) =>
     routeFullDataResolver.trips(parent as never);
@@ -262,6 +343,12 @@ function attachGeographyResolvers(
     routeFullDataResolver.shapes(parent as never);
   routeFields.stops.resolve = (parent) =>
     routeFullDataResolver.stops(parent as never);
+}
+
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((release) => { resolve = release; });
+  return { promise, resolve };
 }
 
 function objectType(

@@ -1,7 +1,9 @@
 import { StationImagesService } from './station-images.service';
-import { signal } from '@angular/core';
+import { ANIMATION_MODULE_TYPE, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { MatTabGroupHarness } from '@angular/material/tabs/testing';
 import { of } from 'rxjs';
 import {
   FavoritesService,
@@ -16,6 +18,7 @@ import { BreathingAnimationService } from '../../../shared/services/breathing-an
 import { IMAGE_ENTRY_FIXTURE } from '@metro/shared/admin-contracts';
 import type { StationHeaderImage } from './station-images';
 import { SubwayStationDialogComponent } from './subway-station-dialog.component';
+import { MAP_PANEL_REF } from '../map/map-panel/map-panel-ref';
 
 const stationImages = {
   load: jest.fn(),
@@ -60,6 +63,7 @@ describe('SubwayStationDialogComponent train lines', () => {
     TestBed.configureTestingModule({
       imports: [SubwayStationDialogComponent],
       providers: [
+        { provide: ANIMATION_MODULE_TYPE, useValue: 'NoopAnimations' },
         {
           provide: StationImagesService,
           useValue: stationImages,
@@ -147,10 +151,26 @@ describe('SubwayStationDialogComponent train lines', () => {
     );
   });
 
-  it('shows station photo attribution without a source link when no URL is supplied', () => {
+  it.each([
+    {
+      context: 'dialog',
+      inMapPanel: false,
+      sourceUrl: IMAGE_ENTRY_FIXTURE.sourceUrl,
+    },
+    { context: 'dialog without a source URL', inMapPanel: false, sourceUrl: null },
+    {
+      context: 'map panel',
+      inMapPanel: true,
+      sourceUrl: IMAGE_ENTRY_FIXTURE.sourceUrl,
+    },
+    { context: 'map panel without a source URL', inMapPanel: true, sourceUrl: null },
+  ])('shows photo credits in the information tab of the $context', async ({ inMapPanel, sourceUrl }) => {
+    if (inMapPanel) {
+      TestBed.overrideProvider(MAP_PANEL_REF, { useValue: { close: jest.fn() } });
+    }
     const image: StationHeaderImage = {
       ...IMAGE_ENTRY_FIXTURE,
-      sourceUrl: null,
+      sourceUrl,
       src: '/api/media/station-images/files/metro/example.avif',
     };
     stationImages.image.mockReturnValue(image);
@@ -158,16 +178,33 @@ describe('SubwayStationDialogComponent train lines', () => {
     const fixture = TestBed.createComponent(SubwayStationDialogComponent);
     fixture.detectChanges();
 
+    expect(Boolean(fixture.nativeElement.querySelector('.station-heading'))).toBe(!inMapPanel);
+    const tabs = await TestbedHarnessEnvironment.loader(fixture).getHarness(
+      MatTabGroupHarness,
+    );
+    await tabs.selectTab({ label: /Informações/ });
+
     const credit = fixture.nativeElement.querySelector(
-      '.station-photo-credit',
+      '.station-information .station-photo-credit',
     ) as HTMLElement | null;
     const creditText = credit?.textContent?.replace(/\s+/g, ' ').trim();
     expect(creditText).toContain(`Foto: ${image.author}.`);
+    expect(creditText).toContain(`Licença: ${image.license}`);
+    const authorLink = credit?.querySelector<HTMLAnchorElement>('a[title]');
+    if (sourceUrl) {
+      expect(authorLink?.textContent).toBe(`${image.author}.`);
+      expect(authorLink?.getAttribute('href')).toBe(sourceUrl);
+      expect(authorLink?.getAttribute('target')).toBe('_blank');
+      expect(authorLink?.getAttribute('rel')).toBe('noopener noreferrer');
+    } else {
+      expect(authorLink).toBeNull();
+    }
     expect(
-      Array.from(credit?.querySelectorAll('a') ?? []).some(
-        (link) => link.getAttribute('title') === image.title,
-      ),
-    ).toBe(false);
+      credit?.querySelector<HTMLAnchorElement>('a:not([title])')?.getAttribute('href'),
+    ).toBe(image.licenseUrl);
+    expect(
+      fixture.nativeElement.querySelector('.station-heading .station-photo-credit'),
+    ).toBeNull();
 
     fixture.destroy();
   });

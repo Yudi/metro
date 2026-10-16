@@ -1,7 +1,7 @@
 import { Service, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, BehaviorSubject, defer, of } from 'rxjs';
-import { finalize, map, shareReplay } from 'rxjs/operators';
+import { finalize, map, shareReplay, tap } from 'rxjs/operators';
 import { IncrementalGraphqlClient } from '@metro/shared/api';
 import type { GraphqlResponseError } from '@metro/shared/api';
 import type { MapFeature } from '../components/map/map-service.types';
@@ -22,7 +22,13 @@ import {
   convertToBusStop,
 } from './geography-graphql.mapper';
 import { isBusDirectionFavorite, isBusLineFavorite, parseRailLineCode } from '@metro/shared/utils';
-import { ROUTE_FIELDS, STOP_FIELDS } from './geography-graphql.queries';
+import {
+  RAIL_CONNECTION_FIELDS,
+  RAIL_CONNECTION_METADATA_FIELDS,
+  ROUTE_FIELDS,
+  ROUTE_METADATA_FIELDS,
+  STOP_FIELDS,
+} from './geography-graphql.queries';
 
 export type {
   BoundingBox,
@@ -41,8 +47,15 @@ export type {
 export interface StopFullDataSnapshot {
   stop: BusStopGraphQL | null;
   routes?: readonly RouteFullDataGraphQL[] | null;
+  railConnections?: RouteRailConnectionGraphQL[] | null;
   hasNext: boolean;
   errors?: readonly GraphqlResponseError[];
+}
+
+export function hasStopRouteErrors(snapshot: StopFullDataSnapshot): boolean {
+  return snapshot.errors?.some(({ path }) =>
+    path?.[1] !== 'railConnections' && path?.[1] !== 'railConnectionsWithStopCounts',
+  ) ?? false;
 }
 
 @Service()
@@ -53,6 +66,10 @@ export class GeographyGraphQLService {
   private readonly stopFullDataRequests = new Map<
     string,
     Observable<StopFullDataSnapshot>
+  >();
+  private readonly stopFullDataCache = new Map<
+    string,
+    { snapshot: StopFullDataSnapshot; expiresAt: number }
   >();
 
   // State management
@@ -412,9 +429,14 @@ export class GeographyGraphQLService {
     ).pipe(map((data) => data?.routeFullData || null));
   }
 
-  /** Emits the stop first, then its related routes from the same query. */
+  /** Delivers lightweight metadata first, then independent direction and rail patches. */
   watchStopFullData(stopId: string): Observable<StopFullDataSnapshot> {
     return defer(() => {
+      const cached = this.stopFullDataCache.get(stopId);
+      if (cached && cached.expiresAt > Date.now()) {
+        return of(cached.snapshot);
+      }
+      this.stopFullDataCache.delete(stopId);
       const activeRequest = this.stopFullDataRequests.get(stopId);
       if (activeRequest) {
         return activeRequest;
@@ -426,11 +448,20 @@ export class GeographyGraphQLService {
             stop {
               ${STOP_FIELDS}
             }
+            routeMetadata { ${ROUTE_METADATA_FIELDS} }
             ... @defer(label: "stopRoutes") {
               routes {
                 route {
                   ${ROUTE_FIELDS}
                 }
+              }
+            }
+            ... @defer(label: "stopRailConnections") {
+              railConnections(includeStopCounts: false) { ${RAIL_CONNECTION_METADATA_FIELDS} }
+            }
+            ... @defer(label: "stopRailConnectionCounts") {
+              railConnectionsWithStopCounts: railConnections {
+                ${RAIL_CONNECTION_FIELDS}
               }
             }
           }
@@ -442,19 +473,46 @@ export class GeographyGraphQLService {
           stopFullData?: {
             stop?: BusStopGraphQL | null;
             routes?: RouteFullDataGraphQL[] | null;
+            routeMetadata?: BusRouteGraphQL[] | null;
+            railConnections?: RouteRailConnectionGraphQL[] | null;
+            railConnectionsWithStopCounts?: RouteRailConnectionGraphQL[] | null;
           } | null;
         }>(query, { stopId })
         .pipe(
           map((result) => {
             const stopFullData = result.data?.stopFullData;
+            const routes = stopFullData?.routes ??
+              stopFullData?.routeMetadata?.map((route) => ({ route }));
+            const railConnections = stopFullData?.railConnectionsWithStopCounts ??
+              stopFullData?.railConnections;
             return {
               stop: stopFullData?.stop ?? null,
-              ...(stopFullData && 'routes' in stopFullData
-                ? { routes: stopFullData.routes ?? [] }
+              ...(stopFullData && ('routes' in stopFullData || 'routeMetadata' in stopFullData)
+                ? { routes: routes ?? [] }
+                : {}),
+              ...(stopFullData && ('railConnections' in stopFullData || 'railConnectionsWithStopCounts' in stopFullData)
+                ? { railConnections }
                 : {}),
               hasNext: result.hasNext,
               ...(result.errors ? { errors: result.errors } : {}),
             };
+          }),
+          tap((snapshot) => {
+            if (
+              snapshot.hasNext || !snapshot.stop || !snapshot.routes ||
+              !snapshot.railConnections || snapshot.errors?.length
+            ) {
+              return;
+            }
+            this.stopFullDataCache.delete(stopId);
+            this.stopFullDataCache.set(stopId, {
+              snapshot,
+              expiresAt: Date.now() + 60_000,
+            });
+            if (this.stopFullDataCache.size > 100) {
+              const oldestKey = this.stopFullDataCache.keys().next().value;
+              if (oldestKey !== undefined) this.stopFullDataCache.delete(oldestKey);
+            }
           }),
           finalize(() => {
             if (this.stopFullDataRequests.get(stopId) === sharedRequest) {
@@ -485,19 +543,7 @@ export class GeographyGraphQLService {
           stopId: $stopId
           routeIds: $routeIds
         ) {
-          routeId
-          routeShortName
-          directions {
-            directionId
-            headsign
-            stations {
-              id
-              name
-              lines
-              distanceMeters
-              stopsUntil
-            }
-          }
+          ${RAIL_CONNECTION_FIELDS}
         }
       }
     `;

@@ -5,7 +5,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { LoggerService } from '@metro/shared/api';
 import { BikeStationsService } from '../../geography/bike-stations.service';
 import type { BusTerminalSummary, BusTerminalStop } from '@metro/shared/bus-terminal-contracts';
-import { GeographyGraphQLService } from '../../geography/geography-graphql.service';
+import { GeographyGraphQLService, hasStopRouteErrors } from '../../geography/geography-graphql.service';
 import type {
   BusRouteGraphQL,
   BusStopGraphQL,
@@ -231,6 +231,7 @@ export class MapDetailsDialogService {
           routes,
           routesLoading,
           routesError,
+          railConnectionsLoading: true,
           selectedRoutes: this.mapState.selectedRouteIds(),
           selectedRouteIds: () => this.mapState.selectedRouteIds(),
           onSelectRoute: (routeId) => {
@@ -291,7 +292,7 @@ export class MapDetailsDialogService {
             : (snapshot.routes ?? []).map(({ route }) => route);
         const routesError =
           currentData.routesError === true ||
-          (snapshot.errors?.length ?? 0) > 0 ||
+          hasStopRouteErrors(snapshot) ||
           (!snapshot.hasNext && snapshot.routes === undefined);
         routeSummary.set(
           nextRoutes.length
@@ -303,8 +304,12 @@ export class MapDetailsDialogService {
           ...currentData,
           stop: nextStop,
           routes: nextRoutes,
-          routesLoading: snapshot.hasNext,
+          routesLoading: snapshot.routes === undefined && snapshot.hasNext,
           routesError,
+          railConnections: snapshot.railConnections ?? currentData.railConnections,
+          railConnectionsLoading: snapshot.railConnections === undefined && snapshot.hasNext,
+          railConnectionsError: snapshot.railConnections === null ||
+            (!snapshot.hasNext && snapshot.railConnections === undefined),
         });
       };
 
@@ -352,10 +357,11 @@ export class MapDetailsDialogService {
               openBusPanel(
                 snapshot.stop,
                 routes,
-                snapshot.hasNext,
-                (snapshot.errors?.length ?? 0) > 0 ||
+                snapshot.routes === undefined && snapshot.hasNext,
+                hasStopRouteErrors(snapshot) ||
                   (!snapshot.hasNext && snapshot.routes === undefined),
               );
+              updateBusPanel(snapshot);
             } else {
               updateBusPanel(snapshot);
             }
@@ -385,6 +391,8 @@ export class MapDetailsDialogService {
                 ...panelRef.data,
                 routesLoading: false,
                 routesError: true,
+                railConnectionsLoading: false,
+                railConnectionsError: true,
               });
             } else {
               loadingRef?.close();

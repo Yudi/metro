@@ -444,7 +444,7 @@ export class StopFullDataResolver {
   async railConnections(
     @Parent() parent: StopFullDataParent,
     @Args('includeStopCounts', { type: () => Boolean, defaultValue: true })
-    includeStopCounts = true,
+    includeStopCounts: boolean,
   ): Promise<RouteRailConnection[]> {
     const routes = await this.routeMetadata(parent);
     return this.geographyService.getRouteRailConnectionsForStop(
